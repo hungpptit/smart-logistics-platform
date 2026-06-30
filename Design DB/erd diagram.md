@@ -1,0 +1,525 @@
+# 📊 SƠ ĐỒ LƯỢC ĐỒ CƠ SỞ DỮ LIỆU TỔNG THỂ (MERMAID ERD)
+
+Tài liệu này cung cấp lược đồ cơ sở dữ liệu chi tiết (Entity-Relationship Diagram - ERD) thể hiện đầy đủ cấu trúc của **38 bảng** thuộc **9 module** của Phase 1. 
+
+Bạn có thể copy mã nguồn Mermaid bên dưới để nhúng trực tiếp vào các công cụ vẽ sơ đồ (như Draw.io, GitHub, Notion, hoặc Mermaid Live Editor).
+
+---
+
+## 🗺️ Mermaid ERD Code
+
+```mermaid
+erDiagram
+    %% ==========================================
+    %% MODULE 1: AUTHENTICATION & AUTHORIZATION
+    %% ==========================================
+    Users {
+        uuid id PK
+        varchar username UK
+        varchar email UK
+        text password_hash
+        varchar phone
+        text avatar_url
+        user_status_enum status
+        timestamptz last_login_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    Roles {
+        uuid id PK
+        varchar role_code UK
+        varchar role_name
+        text description
+        timestamptz created_at
+    }
+    Permissions {
+        uuid id PK
+        varchar permission_code UK
+        varchar permission_name
+        varchar module
+        text description
+        timestamptz created_at
+    }
+    UserRoles {
+        uuid user_id PK, FK
+        uuid role_id PK, FK
+        timestamptz assigned_at
+        uuid assigned_by FK
+    }
+    RolePermissions {
+        uuid role_id PK, FK
+        uuid permission_id PK, FK
+    }
+
+    Users ||--o{ UserRoles : "has"
+    Roles ||--o{ UserRoles : "linked"
+    Roles ||--o{ RolePermissions : "contains"
+    Permissions ||--o{ RolePermissions : "linked"
+    Users ||--o{ UserRoles : "assigned_by"
+
+    %% ==========================================
+    %% MODULE 2: CUSTOMERS & ADDRESSES
+    %% ==========================================
+    Customers {
+        uuid id PK
+        uuid user_id FK, UK
+        varchar customer_code UK
+        customer_type_enum customer_type
+        varchar company_name
+        varchar tax_code
+        customer_status_enum status
+        text note
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    Addresses {
+        uuid id PK
+        varchar address_line_1
+        varchar address_line_2
+        varchar ward
+        varchar district
+        varchar province
+        varchar country
+        varchar postal_code
+        double_precision latitude
+        double_precision longitude
+        text formatted_address
+        varchar place_id
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    CustomerAddresses {
+        uuid id PK
+        uuid customer_id FK
+        uuid address_id FK
+        customer_address_type_enum address_type
+        boolean is_default
+        timestamptz created_at
+    }
+    CustomerContacts {
+        uuid id PK
+        uuid customer_id FK
+        varchar full_name
+        varchar phone
+        varchar email
+        varchar position
+        boolean is_primary
+        text note
+        timestamptz created_at
+    }
+
+    Users ||--o| Customers : "linked_to_account"
+    Customers ||--o{ CustomerAddresses : "manages"
+    Addresses ||--o{ CustomerAddresses : "referenced_by"
+    Customers ||--o{ CustomerContacts : "has_contact_people"
+
+    %% ==========================================
+    %% MODULE 3: FACILITY NETWORK
+    %% ==========================================
+    Facilities {
+        uuid id PK
+        varchar facility_code UK
+        varchar facility_name
+        uuid facility_type_id FK
+        uuid parent_facility_id FK
+        uuid manager_user_id FK
+        facility_status_enum operating_status
+        date opened_at
+        date closed_at
+        text note
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    FacilityTypes {
+        uuid id PK
+        varchar type_code UK
+        varchar type_name
+        text description
+        timestamptz created_at
+    }
+    FacilityAddresses {
+        uuid id PK
+        uuid facility_id FK
+        uuid address_id FK
+        facility_address_type_enum address_type
+        boolean is_primary
+        timestamptz created_at
+    }
+    FacilityZones {
+        uuid id PK
+        uuid facility_id FK
+        varchar zone_code
+        varchar zone_name
+        facility_zone_type_enum zone_type
+        integer capacity
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    FacilityTypes ||--o{ Facilities : "categorizes"
+    Facilities ||--o{ Facilities : "parent_warehouse_recursive"
+    Users ||--o| Facilities : "manages_warehouse"
+    Facilities ||--o{ FacilityAddresses : "located_at"
+    Addresses ||--o{ FacilityAddresses : "referenced_by"
+    Facilities ||--o{ FacilityZones : "divided_into"
+
+    %% ==========================================
+    %% MODULE 4: ORDERS & SERVICES
+    %% ==========================================
+    Services {
+        uuid id PK
+        varchar service_code UK
+        varchar service_name
+        numeric base_price
+        text description
+        boolean is_active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    Orders {
+        uuid id PK
+        uuid customer_id FK
+        varchar order_code UK
+        order_status_enum status
+        uuid service_id FK
+        uuid pickup_address_id FK
+        uuid sender_contact_id FK
+        uuid delivery_address_id FK
+        uuid receiver_contact_id FK
+        uuid created_by FK
+        uuid updated_by FK
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    Packages {
+        uuid id PK
+        uuid order_id FK
+        varchar package_code UK
+        numeric weight
+        numeric length
+        numeric width
+        numeric height
+        varchar description
+        uuid required_vehicle_type_id FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    OrderPayments {
+        uuid id PK
+        uuid order_id FK, UK
+        numeric shipping_fee
+        numeric insurance_fee
+        numeric cod_amount
+        fee_payer_enum fee_payer
+        payment_method_enum payment_method
+        payment_status_enum payment_status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    OrderStatusHistory {
+        uuid id PK
+        uuid order_id FK
+        order_status_enum status
+        uuid changed_by_user_id FK
+        order_change_source_enum change_source
+        text reason
+        timestamptz created_at
+    }
+
+    Customers ||--o{ Orders : "places"
+    Services ||--o{ Orders : "applies_to"
+    Addresses ||--o{ Orders : "pickup_location"
+    Addresses ||--o{ Orders : "delivery_location"
+    CustomerContacts ||--o{ Orders : "sender_contact"
+    CustomerContacts ||--o{ Orders : "receiver_contact"
+    Users ||--o{ Orders : "created_by"
+    Users ||--o{ Orders : "updated_by"
+    
+    Orders ||--|| OrderPayments : "payment_details"
+    Orders ||--o{ Packages : "contains"
+    Orders ||--o{ OrderStatusHistory : "logs_status"
+    Users ||--o{ OrderStatusHistory : "changed_by"
+
+    %% ==========================================
+    %% MODULE 5: SHIPMENT MANAGEMENT
+    %% ==========================================
+    Shipments {
+        uuid id PK
+        varchar shipment_code UK
+        shipment_status_enum status
+        uuid route_id FK
+        uuid created_by FK
+        uuid updated_by FK
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    ShipmentPackages {
+        uuid id PK
+        uuid shipment_id FK
+        uuid package_id FK
+        shipment_package_status_enum status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    ShipmentEvents {
+        uuid id PK
+        uuid shipment_id FK
+        shipment_event_type_enum event_type
+        text description
+        timestamptz event_time
+    }
+    ShipmentTransfers {
+        uuid id PK
+        uuid shipment_id FK
+        uuid origin_facility_id FK
+        uuid destination_facility_id FK
+        transfer_status_enum status
+        timestamptz transferred_at
+        timestamptz received_at
+    }
+
+    Shipments ||--o{ ShipmentPackages : "contains"
+    Packages ||--o{ ShipmentPackages : "shipped_via"
+    Shipments ||--o{ ShipmentEvents : "logs_events"
+    Shipments ||--o{ ShipmentTransfers : "routed_between_depots"
+    Facilities ||--o{ ShipmentTransfers : "origin_warehouse"
+    Facilities ||--o{ ShipmentTransfers : "destination_warehouse"
+    Users ||--o{ Shipments : "created_by"
+    Users ||--o{ Shipments : "updated_by"
+
+    %% ==========================================
+    %% MODULE 6: FLEET & DRIVER MANAGEMENT
+    %% ==========================================
+    Drivers {
+        uuid id PK
+        uuid user_id FK, UK
+        varchar employee_code UK
+        varchar full_name
+        varchar phone UK
+        varchar driver_license_number
+        varchar driver_license_class
+        date hire_date
+        driver_employment_status_enum employment_status
+        uuid home_facility_id FK
+        text note
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    Vehicles {
+        uuid id PK
+        varchar vehicle_code UK
+        varchar license_plate UK
+        uuid vehicle_type_id FK
+        uuid home_facility_id FK
+        numeric max_weight
+        numeric max_volume
+        numeric max_length
+        boolean refrigeration_supported
+        varchar gps_device_id
+        vehicle_operating_status_enum operating_status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    VehicleTypes {
+        uuid id PK
+        varchar type_code UK
+        varchar type_name
+        numeric max_default_weight
+        text description
+        timestamptz created_at
+    }
+    DriverVehicleAssignments {
+        uuid id PK
+        uuid driver_id FK
+        uuid vehicle_id FK
+        timestamptz assigned_from
+        timestamptz assigned_to
+        boolean is_active
+    }
+    DriverLocations {
+        uuid driver_id PK, FK
+        double_precision latitude
+        double_precision longitude
+        real heading
+        real speed
+        real accuracy
+        timestamptz recorded_at
+    }
+
+    Users ||--o| Drivers : "linked_to_account"
+    Facilities ||--o{ Drivers : "home_depot"
+    VehicleTypes ||--o{ Vehicles : "defines"
+    Facilities ||--o{ Vehicles : "home_garage"
+    Drivers ||--o{ DriverVehicleAssignments : "assigned_to"
+    Vehicles ||--o{ DriverVehicleAssignments : "used_by"
+    Drivers ||--|| DriverLocations : "realtime_location"
+    VehicleTypes ||--o{ Packages : "required_capacity"
+
+    %% ==========================================
+    %% MODULE 7: ROUTING & DISPATCH ENGINE
+    %% ==========================================
+    Routes {
+        uuid id PK
+        varchar route_code UK
+        route_status_enum status
+        uuid driver_vehicle_assignment_id FK
+        numeric total_distance_meters
+        integer total_estimated_duration_seconds
+        double_precision start_latitude
+        double_precision start_longitude
+        timestamptz planned_start_at
+        timestamptz planned_end_at
+        timestamptz actual_start_at
+        timestamptz actual_end_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    RouteStops {
+        uuid id PK
+        uuid route_id FK
+        uuid shipment_id FK
+        uuid facility_id FK
+        integer sequence_number
+        route_stop_type_enum stop_type
+        route_stop_status_enum status
+        timestamptz eta
+        timestamptz actual_arrival_at
+        timestamptz actual_departure_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    DispatchTasks {
+        uuid id PK
+        uuid route_id FK
+        uuid assigned_to FK
+        dispatch_task_status_enum status
+        text notes
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    RouteLocationLogs {
+        uuid id PK
+        uuid route_id FK
+        double_precision latitude
+        double_precision longitude
+        real speed
+        real heading
+        real accuracy
+        timestamptz recorded_at
+    }
+    RouteOptimizations {
+        uuid id PK
+        uuid route_id FK
+        varchar algorithm_name
+        numeric cost_metric
+        numeric optimization_duration_ms
+        jsonb input_parameters
+        timestamptz created_at
+    }
+
+    DriverVehicleAssignments ||--o{ Routes : "drives"
+    Routes ||--o{ RouteStops : "comprises"
+    Shipments ||--o{ RouteStops : "dropped_or_picked_at"
+    Facilities ||--o{ RouteStops : "located_at_stop"
+    Routes ||--o{ DispatchTasks : "dispatched_via"
+    Drivers ||--o{ DispatchTasks : "assigned_to_driver"
+    Routes ||--o{ RouteLocationLogs : "records_gps"
+    Routes ||--o{ RouteOptimizations : "optimized_by"
+    Routes ||--o| Shipments : "shipment_route"
+
+    %% ==========================================
+    %% MODULE 8: TRACKING, SCAN & POD
+    %% ==========================================
+    TrackingEvents {
+        uuid id PK
+        uuid shipment_id FK
+        uuid route_stop_id FK
+        tracking_event_type_enum event_type
+        varchar location_name
+        double_precision latitude
+        double_precision longitude
+        text description
+        uuid created_by FK
+        timestamptz created_at
+    }
+    BarcodeScans {
+        uuid id PK
+        uuid shipment_id FK
+        uuid package_id FK
+        uuid route_stop_id FK
+        uuid facility_id FK
+        varchar scanned_barcode
+        barcode_scan_type_enum scan_type
+        double_precision latitude
+        double_precision longitude
+        uuid scanned_by FK
+        timestamptz scanned_at
+    }
+    DeliveryProofs {
+        uuid id PK
+        uuid shipment_id FK
+        uuid route_stop_id FK
+        delivery_result_enum delivery_result
+        varchar receiver_name
+        delivery_failure_reason_enum failure_reason
+        text failure_note
+        timestamptz created_at
+    }
+    DriverCheckIns {
+        uuid id PK
+        uuid route_stop_id FK
+        uuid driver_id FK
+        double_precision check_in_latitude
+        double_precision check_in_longitude
+        double_precision check_out_latitude
+        double_precision check_out_longitude
+        timestamptz check_in_at
+        timestamptz check_out_at
+    }
+    TrackingAttachments {
+        uuid id PK
+        uuid delivery_proof_id FK
+        varchar file_name
+        varchar file_type
+        text file_url
+        timestamptz created_at
+    }
+
+    Shipments ||--o{ TrackingEvents : "logs_timeline"
+    RouteStops ||--o{ TrackingEvents : "happened_at"
+    Users ||--o{ TrackingEvents : "logged_by"
+    
+    Shipments ||--o{ BarcodeScans : "scans_barcode"
+    Packages ||--o{ BarcodeScans : "identifies_package"
+    RouteStops ||--o{ BarcodeScans : "scanned_at_stop"
+    Facilities ||--o{ BarcodeScans : "scanned_at_hub"
+    Users ||--o{ BarcodeScans : "scanned_by_user"
+
+    Shipments ||--o| DeliveryProofs : "receipt"
+    RouteStops ||--o| DeliveryProofs : "proof_location"
+    DeliveryProofs ||--o{ TrackingAttachments : "files"
+    
+    RouteStops ||--o| DriverCheckIns : "arrival_audit"
+    Drivers ||--o{ DriverCheckIns : "completed_by"
+
+    %% ==========================================
+    %% MODULE 9: SYSTEM CONFIGURATION
+    %% ==========================================
+    SystemSettings {
+        varchar setting_key PK
+        text setting_value
+        setting_value_type_enum value_type
+        text description
+        uuid updated_by FK
+        timestamptz updated_at
+    }
+    
+    Users ||--o{ SystemSettings : "configured_by"
+
+```
