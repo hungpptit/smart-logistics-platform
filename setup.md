@@ -97,13 +97,13 @@ smart-logistics-platform/
 
 | Thành phần | Công nghệ / Thư viện | Ngôn ngữ | Lý do lựa chọn |
 | :--- | :--- | :--- | :--- |
-| **Backend API** | Node.js, Express.js | TypeScript | Đảm bảo tính mở rộng cao, type-safety, xử lý bất đồng bộ tốt cho I/O nặng. |
+| **Backend API** | Node.js, Express.js | TypeScript | Đảm bảo tính mở rộng cao, viết nhanh, gọn nhẹ, xử lý I/O tốt. |
 | **Real-time Engine** | Socket.io | JavaScript/TS | Tạo kết nối song công liên tục giữa Shipper di động và Web Admin giám sát. |
-| **Database chính** | PostgreSQL 15 | SQL | Cơ sở dữ liệu quan hệ mạnh mẽ, hỗ trợ PostGIS tối ưu tọa độ địa lý. |
-| **Real-time Cache** | Redis 7 | NoSQL (Key-Value) | Lưu trữ đệm GPS tọa độ sống của tài xế với độ trễ cực thấp (micro-giây). |
+| **ORM & Migration** | **Prisma ORM** | TypeScript | Quản lý DB bằng Schema-Driven, tự động sinh Migration và Type-safety cực mạnh. |
+| **Database chính** | **PostgreSQL 15 + PostGIS** | SQL / Spatial | Cơ sở dữ liệu quan hệ mạnh mẽ, tích hợp PostGIS để lõi AI tính khoảng cách bản đồ số siêu tốc. |
+| **Real-time Cache** | Redis 7 | NoSQL | Lưu trữ đệm GPS tọa độ sống của tài xế với độ trễ micro-giây. |
 | **Frontend Web** | React (Vite) | TypeScript | Xây dựng Single Page Application mượt mà, hỗ trợ component hiển thị bản đồ. |
 | **Mobile App** | Flutter | Dart | Viết một lần chạy cả iOS và Android, hiệu năng cao, hỗ trợ chạy GPS ngầm. |
-| **ORM** | Prisma ORM | TypeScript | Viết câu lệnh truy vấn dễ dàng, auto-generate types từ schema PostgreSQL. |
 | **AI Algorithms** | Custom GA & Clustering | JS/TS hoặc Python | Tích hợp thuật toán gom cụm (K-Means/DBSCAN) và VRP (Genetic Algorithm). |
 
 ---
@@ -118,9 +118,9 @@ Hệ thống sử dụng Docker để cô lập môi trường của PostgreSQL 
 version: '3.8'
 
 services:
-  # Database PostgreSQL
+  # Database PostgreSQL với tính năng Bản đồ số PostGIS
   postgres:
-    image: postgres:15-alpine
+    image: postgis/postgis:15-3.4-alpine # Nâng cấp lên PostGIS chuyên dụng cho Logistics
     container_name: slp-postgres
     restart: always
     environment:
@@ -185,28 +185,26 @@ networks:
 
 ### 5.1. Thiết lập Backend (Node.js & Express)
 
-1. Di chuyển vào thư mục backend:
-   ```bash
-   cd backend
-   ```
-2. Tạo file cấu hình môi trường `.env` từ file mẫu:
-   ```bash
-   copy .env.example .env
-   ```
-3. Cài đặt các thư viện cần thiết:
-   ```bash
-   npm install
-   ```
-4. Khởi tạo Prisma và đồng bộ schema vào PostgreSQL:
-   ```bash
-   npx prisma db push
-   # Hoặc nếu chạy migration chính thức:
-   # npx prisma migrate dev --name init
-   ```
-5. Chạy dự án ở chế độ phát triển (Development):
-   ```bash
-   npm run dev
-   ```
+Khi Kiều và Quý kéo code về, luồng chạy lệnh để khởi tạo và đồng bộ database qua Prisma cực kỳ đơn giản:
+
+```bash
+# 1. Di chuyển vào thư mục backend
+cd backend
+
+# 2. Cài đặt các thư viện
+npm install
+
+# 3. Tạo file .env và điền DATABASE_URL (chuỗi kết nối đến Docker Postgres)
+
+# 4. Đồng bộ Schema và tự động tạo các bảng vào Postgres
+npx prisma db push # Hoặc: npx prisma migrate dev
+
+# 5. Chạy seed script để nạp dữ liệu Master/Lookup (Roles, Permissions, Services, Settings...)
+npx prisma db seed
+
+# 6. Khởi chạy server ở chế độ phát triển
+npm run dev
+```
 
 ---
 

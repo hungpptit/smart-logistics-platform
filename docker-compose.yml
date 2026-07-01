@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Database PostgreSQL với tính năng Bản đồ số PostGIS
+  postgres:
+    image: postgis/postgis:15-3.4-alpine # Nâng cấp lên PostGIS chuyên dụng cho Logistics
+    container_name: slp-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin_password
+      POSTGRES_DB: smart_logistics_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - slp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d smart_logistics_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Real-time Stream
+  redis:
+    image: redis:7-alpine
+    container_name: slp-redis
+    restart: always
+    command: redis-server --requirepass redis_password --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - slp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  slp-network:
+    driver: bridge
