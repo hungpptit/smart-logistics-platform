@@ -43,6 +43,13 @@ Tất cả API trả về cấu trúc đồng nhất để Frontend dễ dàng x
 }
 ```
 
+> [!NOTE]
+> **Xử lý Validation Input**: Trong mã nguồn Node.js/TypeScript, toàn bộ việc validate dữ liệu đầu vào (mã 400 Bad Request) bắt buộc sử dụng cặp bài trùng **`class-validator`** và **`class-transformer`**.
+> * Định nghĩa các Data Transfer Object (DTO) dạng Class.
+> * Sử dụng các decorator như `@IsString()`, `@IsDecimal()`, `@IsNotEmpty()`, `@IsEmail()`, `@IsUUID()` để ràng buộc thuộc tính.
+> * Hệ thống sẽ tự động bắt lỗi và map danh sách vi phạm vào mảng `errors` trả về Client để đảm bảo code ngắn gọn và nhất quán.
+
+
 ---
 
 ## 2. 🔐 Tiêu Chuẩn Bảo Mật (Security & Protection Standards)
@@ -87,6 +94,12 @@ Hệ thống logistics phụ thuộc lớn vào bản đồ và định vị, c�
   }
   ```
 
+> [!WARNING]
+> **CẢNH BÁO MẤT AN TOÀN TỌA ĐỘ**: Quy chuẩn GeoJSON bắt buộc định dạng tọa độ là **`[Longitude, Latitude]` (Kinh độ trước, Vĩ độ sau)**.
+> * Điều này ngược với hầu hết các thư viện bản đồ như Google Maps API, Leaflet hay các truy vấn hàm SQL thuần trong PostgreSQL thường yêu cầu `(Latitude, Longitude)`.
+> * Lập trình viên khi xuất bản dữ liệu dạng GeoJSON cho Client (Mobile Flutter/Web React) cần lưu ý đúng thứ tự **`[Kinh độ (106.x), Vĩ độ (10.x)]`** để tránh lỗi vẽ bản đồ bị lệch vị trí địa lý.
+
+
 ---
 
 ## 4. 📦 Tiêu Chuẩn Chuỗi Cung Ứng (Supply Chain Standards)
@@ -110,6 +123,11 @@ Hệ thống logistics phụ thuộc lớn vào bản đồ và định vị, c�
 
 * **Type Safety**: Bật cấu hình `strict: true` trong `tsconfig.json`. Không sử dụng kiểu dữ liệu `any`, bắt buộc định nghĩa rõ ràng Type/Interface cho Request Body, Response và DTOs.
 * **Environment Configuration**: Không lưu bất cứ mã khóa bảo mật hay URL kết nối nào trong code. Tất cả phải được nạp thông qua biến môi trường `.env` (`process.env.VARIABLE_NAME`).
+* **Múi giờ hệ thống (Timezone Standard)**: 
+  * Toàn hệ thống (Database PostgreSQL, Redis, Backend và Client) thống nhất sử dụng chuẩn định dạng thời gian **ISO 8601** và lưu trữ dưới múi giờ **UTC-0** (Ví dụ: `2026-07-01T06:45:54Z`).
+  * Tuyệt đối không lưu thời gian theo múi giờ địa phương (ICT/UTC+7) vào Database để tránh xung đột múi giờ giữa các máy chủ và thiết bị di động.
+  * Việc chuyển đổi sang múi giờ hiển thị cục bộ (Local Timezone) sẽ do Client (Web/Mobile App) đảm nhiệm khi hiển thị lên màn hình cho người dùng.
 * **Xử lý lỗi tập trung (Centralized Error Handling)**: 
   * Viết một Middleware xử lý lỗi toàn cục trong Express.
   * Không dùng `try-catch` tràn lan để trả response lỗi ở khắp các file. Hãy throw các Custom Error class (ví dụ `NotFoundError`, `UnauthorizedError`) và để Error Middleware tự động bắt và format response trả về cho Client.
+

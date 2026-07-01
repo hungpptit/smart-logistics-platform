@@ -16,11 +16,14 @@
   "dependencies": {
     "@prisma/client": "^5.12.1",
     "bcryptjs": "^2.4.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "redis": "^4.6.13",
+    "reflect-metadata": "^0.2.2",
     "socket.io": "^4.7.5"
   },
   "devDependencies": {
