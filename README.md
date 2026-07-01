@@ -137,6 +137,27 @@ npm run dev
 
 ---
 
+### 🔄 Hướng dẫn vận hành hàng ngày (Daily Run Guide)
+
+Từ những lần chạy sau, bạn không cần cấu hình lại từ đầu mà chỉ cần bật/tắt nhanh bằng các lệnh sau:
+
+1. **Khởi động nhanh Database & Redis (Docker)**:
+   ```bash
+   docker compose start
+   ```
+   *(Cuối ngày khi nghỉ làm việc, tắt các container bằng lệnh `docker compose stop` để giải phóng RAM mà vẫn giữ nguyên dữ liệu).*
+
+2. **Khởi động Backend**:
+   ```bash
+   cd backend
+   npm run dev
+   ```
+
+> [!NOTE]
+> Bạn chỉ cần chạy lại `npm install` hoặc `npx prisma db push` khi kéo code mới từ Git về (git pull) có cập nhật thư viện mới hoặc sửa đổi cấu trúc bảng.
+
+---
+
 ## 🗄️ Danh sách 9 Module Database đã cấu hình
 
 Hệ thống đã được thiết kế hoàn tất với cấu trúc 38 bảng liên kết chặt chẽ:
