@@ -4,21 +4,21 @@ import { PlaneTakeoff, Warehouse, Snowflake } from 'lucide-react';
 export const ServicesGrid: React.FC = () => {
   const services = [
     {
-      title: 'Express Delivery',
-      desc: 'Next-day flight transit for time-critical documents, packages, and premium electronics.',
-      cost: 'From $12.50',
+      title: 'Giao hàng Hỏa tốc',
+      desc: 'Vận chuyển nhanh chóng cho tài liệu quan trọng, bưu phẩm gấp và linh kiện điện tử cao cấp.',
+      cost: 'Từ 35.000 đ',
       icon: <PlaneTakeoff size={32} />,
     },
     {
-      title: 'Standard Logistics',
-      desc: 'Cost-efficient overland transport with high-density distribution and scanning confirmation.',
-      cost: 'From $4.20',
+      title: 'Giao hàng Tiêu chuẩn',
+      desc: 'Vận chuyển đường bộ tối ưu chi phí, mạng lưới phân phối rộng khắp kèm xác nhận quét mã vạch.',
+      cost: 'Từ 20.000 đ',
       icon: <Warehouse size={32} />,
     },
     {
-      title: 'Cold Chain Logistics',
-      desc: 'Climate-controlled transport with continuous GPS temperature logging for pharmaceutical/fresh goods.',
-      cost: 'From $22.00',
+      title: 'Vận chuyển Đông lạnh',
+      desc: 'Vận chuyển kiểm soát nhiệt độ nghiêm ngặt với cảm biến đo nhiệt độ liên tục qua GPS cho thực phẩm, dược phẩm.',
+      cost: 'Từ 60.000 đ',
       icon: <Snowflake size={32} />,
     },
   ];
@@ -27,8 +27,8 @@ export const ServicesGrid: React.FC = () => {
     <section className="services-section" id="services">
       <div className="container">
         <div className="section-header">
-          <h2 className="section-title">Our Service Offerings</h2>
-          <p className="section-subtitle">Velocity Logistics offers tailored solutions to optimize cost and time schedules.</p>
+          <h2 className="section-title">Các Dịch Vụ Vận Chuyển</h2>
+          <p className="section-subtitle">Smart Logistics Platform cung cấp các giải pháp tối ưu hóa chi phí và thời gian giao nhận hàng.</p>
         </div>
         
         <div className="services-grid">

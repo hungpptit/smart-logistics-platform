@@ -10,7 +10,7 @@ export class AuthController {
       const result = await this.authService.register(req.body);
       res.status(201).json({
         success: true,
-        message: 'User registered successfully',
+        message: 'Đăng ký tài khoản thành công',
         data: result,
       });
     } catch (error) {
@@ -23,7 +23,7 @@ export class AuthController {
       const result = await this.authService.login(req.body);
       res.status(200).json({
         success: true,
-        message: 'Logged in successfully',
+        message: 'Đăng nhập thành công',
         data: result,
       });
     } catch (error) {
@@ -37,7 +37,7 @@ export class AuthController {
       const result = await this.authService.getProfile(userId);
       res.status(200).json({
         success: true,
-        message: 'Profile retrieved successfully',
+        message: 'Lấy thông tin tài khoản thành công',
         data: result,
       });
     } catch (error) {

@@ -22,9 +22,9 @@ export class AuthService {
 
     if (existingUser) {
       if (existingUser.username === dto.username) {
-        throw new BadRequestException('Username is already taken');
+        throw new BadRequestException('Tên tài khoản đã tồn tại trên hệ thống');
       }
-      throw new BadRequestException('Email is already registered');
+      throw new BadRequestException('Địa chỉ email đã được đăng ký tài khoản');
     }
 
     // 2. Validate role
@@ -34,7 +34,7 @@ export class AuthService {
     });
 
     if (!role) {
-      throw new BadRequestException(`Role with code '${roleCode}' does not exist`);
+      throw new BadRequestException(`Vai trò với mã '${roleCode}' không tồn tại`);
     }
 
     // 3. Hash password
@@ -76,13 +76,10 @@ export class AuthService {
    * Login user and issue JWT
    */
   public async login(dto: LoginDto) {
-    // 1. Find user by username or email
+    // 1. Find user by email
     const user = await prisma.user.findFirst({
       where: {
-        OR: [
-          { username: dto.usernameOrEmail },
-          { email: dto.usernameOrEmail },
-        ],
+        email: dto.email,
         deletedAt: null,
       },
       include: {
@@ -95,18 +92,18 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid username/email or password');
+      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
     // 2. Validate status
     if (user.status !== 'ACTIVE') {
-      throw new UnauthorizedException(`Account status is ${user.status.toLowerCase()}`);
+      throw new UnauthorizedException(`Trạng thái tài khoản đang là ${user.status.toLowerCase()}`);
     }
 
     // 3. Compare password
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid username/email or password');
+      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
     // 4. Update last login time
@@ -166,7 +163,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('User profile not found');
+      throw new NotFoundException('Không tìm thấy thông tin tài khoản người dùng');
     }
 
     const { passwordHash: _, ...userWithoutPassword } = user;

@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (usernameOrEmail: string, password: string) => Promise<{ success: boolean; message: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
   register: (data: {
     username: string;
     email: string;
@@ -57,14 +57,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, [token]);
 
-  const handleLogin = async (usernameOrEmail: string, password: string) => {
+  const handleLogin = async (email: string, password: string) => {
     try {
       const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ usernameOrEmail, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       const resData = await response.json();
@@ -74,13 +74,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('token', newToken);
         setToken(newToken);
         setUser(resData.data.user);
-        return { success: true, message: 'Logged in successfully!' };
+        return { success: true, message: 'Đăng nhập thành công!' };
       } else {
-        return { success: false, message: resData.message || 'Login failed.' };
+        return { success: false, message: resData.message || 'Đăng nhập thất bại.' };
       }
     } catch (error) {
       console.error('Login request error:', error);
-      return { success: false, message: 'Cannot connect to backend server.' };
+      return { success: false, message: 'Không thể kết nối đến máy chủ backend.' };
     }
   };
 
@@ -103,17 +103,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const resData = await response.json();
 
       if (response.ok && resData.success) {
-        return { success: true, message: 'Registration successful!' };
+        return { success: true, message: 'Đăng ký tài khoản thành công!' };
       } else {
         return { 
           success: false, 
-          message: resData.message || 'Registration failed.',
+          message: resData.message || 'Đăng ký tài khoản thất bại.',
           errors: resData.errors 
         };
       }
     } catch (error) {
       console.error('Registration request error:', error);
-      return { success: false, message: 'Cannot connect to backend server.' };
+      return { success: false, message: 'Không thể kết nối đến máy chủ backend.' };
     }
   };
 

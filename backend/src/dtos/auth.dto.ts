@@ -1,35 +1,35 @@
 import { IsString, IsEmail, IsOptional, MinLength, MaxLength } from 'class-validator';
 
 export class RegisterDto {
-  @IsString({ message: 'Username must be a string' })
-  @MinLength(3, { message: 'Username must be at least 3 characters long' })
-  @MaxLength(50, { message: 'Username must not exceed 50 characters' })
+  @IsString({ message: 'Tên tài khoản phải là một chuỗi ký tự' })
+  @MinLength(3, { message: 'Tên tài khoản phải có ít nhất 3 ký tự' })
+  @MaxLength(50, { message: 'Tên tài khoản không được vượt quá 50 ký tự' })
   username!: string;
 
-  @IsEmail({}, { message: 'Invalid email address' })
+  @IsEmail({}, { message: 'Địa chỉ email không hợp lệ' })
   email!: string;
 
-  @IsString({ message: 'Password must be a string' })
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
+  @IsString({ message: 'Mật khẩu phải là một chuỗi ký tự' })
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
   password!: string;
 
-  @IsString({ message: 'Phone must be a string' })
+  @IsString({ message: 'Số điện thoại phải là một chuỗi ký tự' })
   @IsOptional()
   phone?: string;
 
-  @IsString({ message: 'Avatar URL must be a string' })
+  @IsString({ message: 'Đường dẫn ảnh đại diện phải là một chuỗi ký tự' })
   @IsOptional()
   avatarUrl?: string;
 
-  @IsString({ message: 'Role code must be a string' })
+  @IsString({ message: 'Mã vai trò phải là một chuỗi ký tự' })
   @IsOptional()
   roleCode?: string;
 }
 
 export class LoginDto {
-  @IsString({ message: 'Username or Email must be a string' })
-  usernameOrEmail!: string;
+  @IsEmail({}, { message: 'Email không đúng định dạng' })
+  email!: string;
 
-  @IsString({ message: 'Password must be a string' })
+  @IsString({ message: 'Mật khẩu phải là một chuỗi ký tự' })
   password!: string;
 }

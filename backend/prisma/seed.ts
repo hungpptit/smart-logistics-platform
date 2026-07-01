@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 
+declare const process: any;
+
 const prisma = new PrismaClient();
 
 async function main() {
@@ -103,16 +105,75 @@ async function main() {
   // 5. Seed Services
   console.log('💼 Seeding Services...');
   const services = [
-    { serviceCode: 'EXPRESS', serviceName: 'Giao hàng Hỏa tốc 2h', basePrice: 35000.00, description: 'Cam kết giao trong vòng 2 giờ kể từ khi lấy hàng thành công', isActive: true },
-    { serviceCode: 'STANDARD', serviceName: 'Giao hàng Tiêu chuẩn', basePrice: 22000.00, description: 'Thời gian giao hàng từ 1-3 ngày, phù hợp hàng thường', isActive: true },
-    { serviceCode: 'SAVING', serviceName: 'Giao hàng Tiết kiệm', basePrice: 15000.00, description: 'Cước phí tối ưu, giao từ 3-5 ngày', isActive: true },
-    { serviceCode: 'COLD_CHAIN', serviceName: 'Vận chuyển Đông lạnh', basePrice: 60000.00, description: 'Đảm bảo dải nhiệt độ tiêu chuẩn cho hàng đông lạnh y tế', isActive: true },
+    {
+      serviceCode: 'EXPRESS',
+      serviceName: 'Giao hàng Hỏa tốc 2h',
+      basePrice: 35000.00,
+      freeDistanceKm: 2.0,
+      pricePerKm: 8000.00,
+      freeWeightKg: 1.0,
+      pricePerKg: 5000.00,
+      estimatedDeliveryHours: 6,
+      pricingVersion: 1,
+      description: 'Cam kết giao trong vòng 2 giờ kể từ khi lấy hàng thành công',
+      isActive: true
+    },
+    {
+      serviceCode: 'STANDARD',
+      serviceName: 'Giao hàng Tiêu chuẩn',
+      basePrice: 20000.00,
+      freeDistanceKm: 2.0,
+      pricePerKm: 5000.00,
+      freeWeightKg: 1.0,
+      pricePerKg: 3000.00,
+      estimatedDeliveryHours: 24,
+      pricingVersion: 1,
+      description: 'Thời gian giao hàng từ 1-3 ngày, phù hợp hàng thường',
+      isActive: true
+    },
+    {
+      serviceCode: 'SAVING',
+      serviceName: 'Giao hàng Tiết kiệm',
+      basePrice: 15000.00,
+      freeDistanceKm: 2.0,
+      pricePerKm: 3000.00,
+      freeWeightKg: 1.0,
+      pricePerKg: 2000.00,
+      estimatedDeliveryHours: 72,
+      pricingVersion: 1,
+      description: 'Cước phí tối ưu, giao từ 3-5 ngày',
+      isActive: true
+    },
+    {
+      serviceCode: 'COLD_CHAIN',
+      serviceName: 'Vận chuyển Đông lạnh',
+      basePrice: 60000.00,
+      freeDistanceKm: 2.0,
+      pricePerKm: 12000.00,
+      freeWeightKg: 1.0,
+      pricePerKg: 8000.00,
+      estimatedDeliveryHours: 12,
+      pricingVersion: 1,
+      description: 'Đảm bảo dải nhiệt độ tiêu chuẩn cho hàng đông lạnh y tế',
+      isActive: true
+    },
   ];
 
   for (const s of services) {
     await prisma.service.upsert({
       where: { serviceCode: s.serviceCode },
-      update: { serviceName: s.serviceName, basePrice: s.basePrice, description: s.description, isActive: s.isActive },
+      update: {
+        serviceName: s.serviceName,
+        basePrice: s.basePrice,
+        freeDistanceKm: s.freeDistanceKm,
+        pricePerKm: s.pricePerKm,
+        freeWeightKg: s.freeWeightKg,
+        pricePerKg: s.pricePerKg,
+        estimatedDeliveryHours: s.estimatedDeliveryHours,
+        pricingVersion: s.pricingVersion,
+        description: s.description,
+        isActive: s.isActive
+      },
       create: s,
     });
   }

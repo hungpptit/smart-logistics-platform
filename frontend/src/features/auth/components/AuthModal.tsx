@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { Modal } from '../../../components/Modal';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -40,8 +41,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [regUsername, setRegUsername] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regRole, setRegRole] = useState('CUSTOMER');
+
+  // Password Visibility States
+  const [showLoginPass, setShowLoginPass] = useState(false);
+  const [showRegPass, setShowRegPass] = useState(false);
+  const [showRegConfirmPass, setShowRegConfirmPass] = useState(false);
+
+  // Loading State
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Validation Errors
+  const [errors, setErrors] = useState<{
+    username?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    phone?: string;
+  }>({});
+
+  const [loginErrors, setLoginErrors] = useState<{
+    username?: string;
+    password?: string;
+  }>({});
 
   // Status message
   const [alert, setAlert] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -52,8 +76,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     setRegUsername('');
     setRegEmail('');
     setRegPassword('');
+    setRegConfirmPassword('');
     setRegPhone('');
     setRegRole('CUSTOMER');
+    setErrors({});
+    setLoginErrors({});
+    setShowLoginPass(false);
+    setShowRegPass(false);
+    setShowRegConfirmPass(false);
+    setIsLoading(false);
     setAlert(null);
   };
 
@@ -62,16 +93,90 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     onClose();
   };
 
+  const validateLoginForm = (): boolean => {
+    const newErrors: typeof loginErrors = {};
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!loginUser.trim()) {
+      newErrors.username = 'Email đăng nhập không được để trống';
+    } else if (!emailRegex.test(loginUser.trim())) {
+      newErrors.username = 'Email đăng nhập không đúng định dạng (VD: name@domain.com)';
+    }
+
+    if (!loginPass) {
+      newErrors.password = 'Mật khẩu không được để trống';
+    } else if (loginPass.length < 6) {
+      newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+    }
+
+    setLoginErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: typeof errors = {};
+
+    // Username check
+    if (!regUsername.trim()) {
+      newErrors.username = 'Tên tài khoản không được để trống';
+    } else if (regUsername.trim().length < 3) {
+      newErrors.username = 'Tên tài khoản phải có ít nhất 3 ký tự';
+    }
+
+    // Email check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!regEmail.trim()) {
+      newErrors.email = 'Email không được để trống';
+    } else if (!emailRegex.test(regEmail.trim())) {
+      newErrors.email = 'Email không đúng định dạng (VD: name@domain.com)';
+    }
+
+    // Password check
+    if (!regPassword) {
+      newErrors.password = 'Mật khẩu không được để trống';
+    } else if (regPassword.length < 6) {
+      newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+    }
+
+    // Confirm Password check
+    if (regPassword !== regConfirmPassword) {
+      newErrors.confirmPassword = 'Mật khẩu xác nhận không trùng khớp';
+    }
+
+    // Phone check (optional)
+    if (regPhone.trim()) {
+      const phoneRegex = /^[0-9]{10,11}$/;
+      if (!phoneRegex.test(regPhone.trim())) {
+        newErrors.phone = 'Số điện thoại phải từ 10 đến 11 số';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAlert(null);
+    setLoginErrors({});
 
-    const result = await login(loginUser, loginPass);
-    if (result.success) {
-      onSuccess(result.message);
-      handleClose();
-    } else {
-      setAlert({ message: result.message, type: 'error' });
+    if (!validateLoginForm()) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await login(loginUser, loginPass);
+      if (result.success) {
+        onSuccess(result.message);
+        handleClose();
+      } else {
+        setAlert({ message: result.message, type: 'error' });
+      }
+    } catch (err) {
+      setAlert({ message: 'Có lỗi kết nối xảy ra. Vui lòng thử lại.', type: 'error' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -79,34 +184,47 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     e.preventDefault();
     setAlert(null);
 
-    const result = await register({
-      username: regUsername,
-      email: regEmail,
-      password: regPassword,
-      phone: regPhone || undefined,
-      roleCode: regRole,
-    });
+    if (!validateForm()) {
+      return;
+    }
 
-    if (result.success) {
-      setAlert({ message: 'Registration successful! You can now sign in.', type: 'success' });
-      setTimeout(() => {
-        setActiveTab('login');
-        setLoginUser(regUsername);
-        setAlert(null);
-      }, 1500);
-      
-      // Clear register form
-      setRegUsername('');
-      setRegEmail('');
-      setRegPassword('');
-      setRegPhone('');
-      setRegRole('CUSTOMER');
-    } else {
-      let errorMsg = result.message;
-      if (result.errors && result.errors.length > 0) {
-        errorMsg += ': ' + result.errors.map((err: any) => `${err.field} (${err.constraints.join(', ')})`).join('; ');
+    setIsLoading(true);
+    try {
+      const result = await register({
+        username: regUsername,
+        email: regEmail,
+        password: regPassword,
+        phone: regPhone || undefined,
+        roleCode: regRole,
+      });
+
+      if (result.success) {
+        setAlert({ message: 'Đăng ký tài khoản thành công! Đang chuyển hướng đăng nhập...', type: 'success' });
+        setTimeout(() => {
+          setActiveTab('login');
+          setLoginUser(regUsername);
+          setAlert(null);
+        }, 1500);
+        
+        // Clear register form
+        setRegUsername('');
+        setRegEmail('');
+        setRegPassword('');
+        setRegConfirmPassword('');
+        setRegPhone('');
+        setRegRole('CUSTOMER');
+        setErrors({});
+      } else {
+        let errorMsg = result.message;
+        if (result.errors && result.errors.length > 0) {
+          errorMsg += ': ' + result.errors.map((err: any) => `${err.field} (${err.constraints.join(', ')})`).join('; ');
+        }
+        setAlert({ message: errorMsg, type: 'error' });
       }
-      setAlert({ message: errorMsg, type: 'error' });
+    } catch (err) {
+      setAlert({ message: 'Có lỗi kết nối xảy ra. Vui lòng thử lại.', type: 'error' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -119,14 +237,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           className={`auth-tab ${activeTab === 'login' ? 'active' : ''}`}
           onClick={() => { setActiveTab('login'); setAlert(null); }}
         >
-          SIGN IN
+          ĐĂNG NHẬP
         </button>
         <button 
           type="button"
           className={`auth-tab ${activeTab === 'register' ? 'active' : ''}`}
           onClick={() => { setActiveTab('register'); setAlert(null); }}
         >
-          REGISTER
+          ĐĂNG KÝ
         </button>
       </div>
 
@@ -142,34 +260,66 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           {activeTab === 'login' && (
             <form onSubmit={handleLoginSubmit} className="auth-form-wrapper">
               <div className="form-group">
-                <label htmlFor="login-username">Username or Email</label>
+                <label htmlFor="login-username">Email đăng nhập</label>
                 <input 
-                  type="text" 
+                  type="email" 
                   id="login-username" 
                   className="form-input"
                   required 
-                  placeholder="Enter username or email..."
+                  placeholder="Nhập địa chỉ email đăng nhập..."
                   value={loginUser}
                   onChange={(e) => setLoginUser(e.target.value)}
+                  disabled={isLoading}
                 />
+                {loginErrors.username && <div className="form-error">{loginErrors.username}</div>}
               </div>
               <div className="form-group">
-                <label htmlFor="login-password">Password</label>
-                <input 
-                  type="password" 
-                  id="login-password" 
-                  className="form-input"
-                  required 
-                  placeholder="Enter password..."
-                  value={loginPass}
-                  onChange={(e) => setLoginPass(e.target.value)}
-                />
+                <label htmlFor="login-password">Mật khẩu</label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showLoginPass ? 'text' : 'password'} 
+                    id="login-password" 
+                    className="form-input"
+                    required 
+                    placeholder="Nhập mật khẩu..."
+                    value={loginPass}
+                    onChange={(e) => setLoginPass(e.target.value)}
+                    disabled={isLoading}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPass(!showLoginPass)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--color-secondary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 0,
+                    }}
+                  >
+                    {showLoginPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {loginErrors.password && <div className="form-error">{loginErrors.password}</div>}
               </div>
-              <button type="submit" className="btn btn-primary auth-submit-btn">SIGN IN TO ACCOUNT</button>
+              <button 
+                type="submit" 
+                className="btn btn-primary auth-submit-btn" 
+                disabled={isLoading}
+              >
+                {isLoading ? 'ĐANG XỬ LÝ...' : 'ĐĂNG NHẬP HỆ THỐNG'}
+              </button>
               <p className="auth-footer-text">
-                Don't have an account?{' '}
+                Chưa có tài khoản?{' '}
                 <span onClick={() => { setActiveTab('register'); setAlert(null); }}>
-                  Register here
+                  Đăng ký tại đây
                 </span>
               </p>
             </form>
@@ -179,16 +329,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           {activeTab === 'register' && (
             <form onSubmit={handleRegisterSubmit} className="auth-form-wrapper">
               <div className="form-group">
-                <label htmlFor="reg-username">Username</label>
+                <label htmlFor="reg-username">Tên tài khoản</label>
                 <input 
                   type="text" 
                   id="reg-username" 
                   className="form-input"
                   required 
-                  placeholder="e.g. hungpp"
+                  placeholder="Ví dụ: hungpp"
                   value={regUsername}
                   onChange={(e) => setRegUsername(e.target.value)}
+                  disabled={isLoading}
                 />
+                {errors.username && <div className="form-error">{errors.username}</div>}
               </div>
               <div className="form-group">
                 <label htmlFor="reg-email">Email</label>
@@ -197,39 +349,109 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                   id="reg-email" 
                   className="form-input"
                   required 
-                  placeholder="e.g. hung@example.com"
+                  placeholder="Ví dụ: hung@example.com"
                   value={regEmail}
                   onChange={(e) => setRegEmail(e.target.value)}
+                  disabled={isLoading}
                 />
+                {errors.email && <div className="form-error">{errors.email}</div>}
               </div>
               <div className="form-group">
-                <label htmlFor="reg-password">Password</label>
-                <input 
-                  type="password" 
-                  id="reg-password" 
-                  className="form-input"
-                  required 
-                  placeholder="Minimum 6 characters..."
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                />
+                <label htmlFor="reg-password">Mật khẩu</label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showRegPass ? 'text' : 'password'} 
+                    id="reg-password" 
+                    className="form-input"
+                    required 
+                    placeholder="Tối thiểu 6 ký tự..."
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    disabled={isLoading}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegPass(!showRegPass)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--color-secondary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 0,
+                    }}
+                  >
+                    {showRegPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {errors.password && <div className="form-error">{errors.password}</div>}
               </div>
               <div className="form-group">
-                <label htmlFor="reg-phone">Phone Number (Optional)</label>
+                <label htmlFor="reg-confirm-password">Xác nhận mật khẩu</label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showRegConfirmPass ? 'text' : 'password'} 
+                    id="reg-confirm-password" 
+                    className="form-input"
+                    required 
+                    placeholder="Nhập lại mật khẩu..."
+                    value={regConfirmPassword}
+                    onChange={(e) => setRegConfirmPassword(e.target.value)}
+                    disabled={isLoading}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegConfirmPass(!showRegConfirmPass)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--color-secondary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 0,
+                    }}
+                  >
+                    {showRegConfirmPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {errors.confirmPassword && <div className="form-error">{errors.confirmPassword}</div>}
+              </div>
+              <div className="form-group">
+                <label htmlFor="reg-phone">Số điện thoại (Không bắt buộc)</label>
                 <input 
                   type="text" 
                   id="reg-phone" 
                   className="form-input"
-                  placeholder="e.g. 0912345678"
+                  placeholder="Ví dụ: 0912345678"
                   value={regPhone}
                   onChange={(e) => setRegPhone(e.target.value)}
+                  disabled={isLoading}
                 />
+                {errors.phone && <div className="form-error">{errors.phone}</div>}
               </div>
-              <button type="submit" className="btn btn-primary auth-submit-btn">CREATE ACCOUNT</button>
+              <button 
+                type="submit" 
+                className="btn btn-primary auth-submit-btn" 
+                disabled={isLoading}
+              >
+                {isLoading ? 'ĐANG XỬ LÝ...' : 'ĐĂNG KÝ TÀI KHOẢN'}
+              </button>
               <p className="auth-footer-text">
-                Already have an account?{' '}
+                Đã có tài khoản?{' '}
                 <span onClick={() => { setActiveTab('login'); setAlert(null); }}>
-                  Sign in here
+                  Đăng nhập tại đây
                 </span>
               </p>
             </form>

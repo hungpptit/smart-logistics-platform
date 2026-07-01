@@ -528,14 +528,20 @@ model FacilityZone {
 // ==========================================
 
 model Service {
-  id          String   @id @default(uuid()) @db.Uuid
-  serviceCode String   @unique @map("service_code") @db.VarChar(30)
-  serviceName String   @map("service_name") @db.VarChar(100)
-  basePrice   Decimal  @default(0.00) @map("base_price") @db.Decimal(12, 2)
-  description String?  @db.Text
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id                     String   @id @default(uuid()) @db.Uuid
+  serviceCode            String   @unique @map("service_code") @db.VarChar(30)
+  serviceName            String   @map("service_name") @db.VarChar(100)
+  basePrice              Decimal  @default(0.00) @map("base_price") @db.Decimal(12, 2)
+  freeDistanceKm         Float    @default(2.0) @map("free_distance_km")
+  pricePerKm             Decimal  @default(0.00) @map("price_per_km") @db.Decimal(12, 2)
+  freeWeightKg           Float    @default(1.0) @map("free_weight_kg")
+  pricePerKg             Decimal  @default(0.00) @map("price_per_kg") @db.Decimal(12, 2)
+  estimatedDeliveryHours Int      @default(24) @map("estimated_delivery_hours")
+  pricingVersion         Int      @default(1) @map("pricing_version")
+  description            String?  @db.Text
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   orders      Order[]
@@ -572,6 +578,10 @@ model Order {
   shippingFee           Decimal       @default(0.00) @map("shipping_fee") @db.Decimal(12, 2)
   insuranceFee          Decimal       @default(0.00) @map("insurance_fee") @db.Decimal(12, 2)
   codAmount             Decimal       @default(0.00) @map("cod_amount") @db.Decimal(12, 2)
+  totalAmount           Decimal       @default(0.00) @map("total_amount") @db.Decimal(12, 2)
+  estimatedDistance     Decimal?      @map("estimated_distance") @db.Decimal(10, 2)
+  estimatedDuration     Int?          @map("estimated_duration")
+  pricingVersion        Int           @default(1) @map("pricing_version")
   estimatedDeliveryDate DateTime?     @map("estimated_delivery_date") @db.Timestamptz
 
   // Audit Fields
