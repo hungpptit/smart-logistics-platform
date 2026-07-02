@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthModal } from './features/auth/components/AuthModal';
 import { TimelineStepper } from './features/tracking/components/TimelineStepper';
-import { LeafletMap } from './features/tracking/components/LeafletMap';
+import { MapcnMap } from './features/tracking/components/MapcnMap';
 import { ServicesGrid } from './components/ServicesGrid';
 import { Toast } from './components/Toast';
 import { TRACKING_DATABASE } from './features/tracking/services/mockDb';
@@ -159,7 +159,7 @@ const AppContent: React.FC = () => {
                   </span>
                 </div>
                 <div className="card-body map-body">
-                  <LeafletMap 
+                  <MapcnMap 
                     route={currentTracking.route} 
                     currentPos={currentTracking.currentPos} 
                     destination={currentTracking.destination} 
