@@ -337,23 +337,26 @@ class _TrackingTabState extends State<TrackingTab> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'ĐƠN HÀNG ĐANG HOẠT ĐỘNG',
-                          style: AppTypography.labelMd.copyWith(color: AppColors.secondary, letterSpacing: 1.0),
-                        ),
-                        const SizedBox(height: 4.0),
-                        Text(
-                          _selectedCode,
-                          style: AppTypography.headlineMd.copyWith(
-                            color: AppColors.deepOnyx,
-                            fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ĐƠN HÀNG ĐANG HOẠT ĐỘNG',
+                            style: AppTypography.labelMd.copyWith(color: AppColors.secondary, letterSpacing: 1.0),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4.0),
+                          Text(
+                            _selectedCode,
+                            style: AppTypography.headlineMd.copyWith(
+                              color: AppColors.deepOnyx,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8.0),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
                       decoration: BoxDecoration(
