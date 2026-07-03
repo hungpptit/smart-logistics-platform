@@ -53,24 +53,19 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       appBar: AppBar(
         backgroundColor: AppColors.pureWhite,
         elevation: 0.5,
-        automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.menu, color: AppColors.logisticsRed),
-              onPressed: () {
-                // Drawer action simulated
-              },
-            ),
-            const SizedBox(width: 4.0),
-            Text(
-              'Velocity Logistics',
-              style: AppTypography.headlineMd.copyWith(
-                color: AppColors.logisticsRed,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+        leading: IconButton(
+          icon: const Icon(Icons.menu, color: AppColors.logisticsRed),
+          onPressed: () {
+            // Drawer action simulated
+          },
+        ),
+        titleSpacing: 0.0,
+        title: Text(
+          'Velocity Logistics',
+          style: AppTypography.headlineMd.copyWith(
+            color: AppColors.logisticsRed,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: [
           IconButton(
