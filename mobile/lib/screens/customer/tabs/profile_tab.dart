@@ -257,7 +257,10 @@ class ProfileTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8.0,
+                  runSpacing: 4.0,
                   children: [
                     Text(
                       label,
@@ -267,7 +270,6 @@ class ProfileTab extends StatelessWidget {
                       ),
                     ),
                     if (isDefault) ...[
-                      const SizedBox(width: 8.0),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
                         decoration: BoxDecoration(
