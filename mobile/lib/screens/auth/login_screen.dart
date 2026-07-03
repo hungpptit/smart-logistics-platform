@@ -16,7 +16,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   
-  String _currentRole = 'customer'; // 'customer' or 'driver'
   bool _isObscured = true;
   bool _isLoading = false;
 
@@ -30,12 +29,6 @@ class _LoginScreenState extends State<LoginScreen> {
   void _togglePasswordVisibility() {
     setState(() {
       _isObscured = !_isObscured;
-    });
-  }
-
-  void _setRole(String role) {
-    setState(() {
-      _currentRole = role;
     });
   }
 
@@ -196,95 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Role Switch Tab (Segmented Control style)
-                            Container(
-                              padding: const EdgeInsets.all(4.0),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceContainer,
-                                borderRadius: AppStyles.roundedLg,
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () => _setRole('customer'),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 10.0),
-                                        decoration: BoxDecoration(
-                                          color: _currentRole == 'customer'
-                                              ? AppColors.pureWhite
-                                              : Colors.transparent,
-                                          borderRadius: AppStyles.roundedDefault,
-                                          boxShadow: _currentRole == 'customer'
-                                              ? AppStyles.ambientShadow
-                                              : null,
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.person,
-                                              size: 18.0,
-                                              color: _currentRole == 'customer'
-                                                  ? AppColors.logisticsRed
-                                                  : AppColors.secondary,
-                                            ),
-                                            const SizedBox(width: 6.0),
-                                            Text(
-                                              'Khách hàng',
-                                              style: AppTypography.labelLg.copyWith(
-                                                color: _currentRole == 'customer'
-                                                    ? AppColors.logisticsRed
-                                                    : AppColors.secondary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () => _setRole('driver'),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 10.0),
-                                        decoration: BoxDecoration(
-                                          color: _currentRole == 'driver'
-                                              ? AppColors.pureWhite
-                                              : Colors.transparent,
-                                          borderRadius: AppStyles.roundedDefault,
-                                          boxShadow: _currentRole == 'driver'
-                                              ? AppStyles.ambientShadow
-                                              : null,
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.local_shipping,
-                                              size: 18.0,
-                                              color: _currentRole == 'driver'
-                                                  ? AppColors.logisticsRed
-                                                  : AppColors.secondary,
-                                            ),
-                                            const SizedBox(width: 6.0),
-                                            Text(
-                                              'Tài xế',
-                                              style: AppTypography.labelLg.copyWith(
-                                                color: _currentRole == 'driver'
-                                                    ? AppColors.logisticsRed
-                                                    : AppColors.secondary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 24.0),
+
 
                             // Email / Username Input
                             Text(
