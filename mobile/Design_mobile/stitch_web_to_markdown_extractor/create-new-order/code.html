@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Velocity Logistics - Đơn hàng mới</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#f9f9f9",
+                    "surface-tint": "#c00100",
+                    "surface-container-low": "#f3f3f3",
+                    "pure-white": "#FFFFFF",
+                    "cloud-gray": "#F4F4F4",
+                    "on-surface-variant": "#603e39",
+                    "tertiary": "#0059ba",
+                    "on-secondary": "#ffffff",
+                    "on-secondary-fixed-variant": "#404750",
+                    "surface-container": "#eeeeee",
+                    "logistics-red": "#FF0000",
+                    "background": "#f9f9f9",
+                    "secondary-fixed-dim": "#c0c7d2",
+                    "primary-fixed-dim": "#ffb4a8",
+                    "on-tertiary-fixed-variant": "#004491",
+                    "on-secondary-fixed": "#151c24",
+                    "primary-fixed": "#ffdad4",
+                    "outline": "#956d67",
+                    "surface-container-highest": "#e2e2e2",
+                    "secondary-fixed": "#dce3ee",
+                    "on-primary-fixed": "#410000",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-container": "#fffbff",
+                    "deep-onyx": "#161D25",
+                    "tertiary-fixed-dim": "#acc7ff",
+                    "on-primary-fixed-variant": "#930100",
+                    "surface-dim": "#dadada",
+                    "error": "#ba1a1a",
+                    "inverse-on-surface": "#f1f1f1",
+                    "surface-container-high": "#e8e8e8",
+                    "secondary": "#585f68",
+                    "on-error-container": "#93000a",
+                    "tertiary-container": "#0071e8",
+                    "surface-variant": "#e2e2e2",
+                    "on-tertiary-fixed": "#001a40",
+                    "error-container": "#ffdad6",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#1a1c1c",
+                    "inverse-primary": "#ffb4a8",
+                    "outline-variant": "#ebbbb4",
+                    "on-background": "#1a1c1c",
+                    "on-primary": "#ffffff",
+                    "inverse-surface": "#2f3131",
+                    "on-tertiary-container": "#fefcff",
+                    "secondary-container": "#d9e0eb",
+                    "primary-container": "#eb0000",
+                    "on-error": "#ffffff",
+                    "surface": "#f9f9f9",
+                    "on-secondary-container": "#5c636d",
+                    "tertiary-fixed": "#d7e2ff",
+                    "primary": "#bc0100"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter-desktop": "24px",
+                    "margin-desktop": "40px",
+                    "container-max": "1280px",
+                    "base": "8px",
+                    "gutter-mobile": "16px",
+                    "margin-mobile": "20px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Montserrat"],
+                    "body-md": ["Montserrat"],
+                    "button": ["Montserrat"],
+                    "label-md": ["Montserrat"],
+                    "headline-lg": ["Montserrat"],
+                    "display-lg": ["Montserrat"],
+                    "label-lg": ["Montserrat"],
+                    "headline-md": ["Montserrat"],
+                    "headline-lg-mobile": ["Montserrat"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "button": ["14px", {"lineHeight": "20px", "fontWeight": "700"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Montserrat', sans-serif; background-color: #f9f9f9; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e2e2; border-radius: 10px; }
+        .step-active { color: #FF0000; font-weight: 700; }
+        .form-card { background: #FFFFFF; border: 1px solid #e2e2e2; transition: all 0.3s ease; }
+        .form-card:focus-within { border-color: #FF0000; box-shadow: 0 4px 12px rgba(255, 0, 0, 0.05); }
+        input:focus { outline: none !important; border-color: #FF0000 !important; ring: 0 !important; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- TopAppBar (From Shared Components) -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter-mobile h-16 bg-surface shadow-sm">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary hover:bg-surface-container transition-colors p-2 rounded-full active:scale-95">menu</button>
+<h1 class="font-headline-md text-headline-md-mobile font-bold text-logistics-red">Velocity Logistics</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a logistics manager in a high-tech corporate office environment. The person is wearing a sleek, modern professional outfit. The background shows blurred digital tracking screens with red and white accents, maintaining the corporate identity of Velocity Logistics. High-key lighting ensures a clean and efficient professional mood." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1Jq3OGFDLWtenlFzq5jSNfzw-BUe3XVCE0_-w1Vq2tYtRIVpjJ1EurWdl39uZrWR0ogOuxvBp0TWnc2E0L-NGmxYEE3-FTgnng72zNksNCVxZ1y7ab5Zv9suo3xt_xMmKFtxLK2Jr1xLLUzujrUemQ17By7zqiVzVlvR5OEUC3TcqNpNplMloFJ3TEIC6A9YP__TDufTuRAI9frfwyhDBOYh5b3ukZUcGZZTadu9hVgbqAH2NSuOQWg"/>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-gutter-mobile md:px-margin-desktop max-w-container-max mx-auto">
+<!-- Header Section -->
+<div class="mb-10">
+<h2 class="font-display-lg text-display-lg text-deep-onyx mb-2">Đơn hàng mới</h2>
+<p class="font-body-md text-on-surface-variant">Hoàn thành các chi tiết bên dưới để lên lịch giao hàng qua mạng lưới toàn cầu của chúng tôi.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Main Form Column -->
+<form class="lg:col-span-8 space-y-8" id="orderForm">
+<!-- Section 1: Pickup Info -->
+<div class="space-y-4">
+<div class="flex items-center gap-2 mb-4">
+<span class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">1</span>
+<h3 class="font-headline-md text-deep-onyx">Thông tin lấy hàng</h3>
+</div>
+<div class="form-card rounded-xl p-6 grid grid-cols-1 gap-4">
+<div class="col-span-2">
+<label class="block font-label-md text-on-surface-variant mb-1">Họ tên người gửi</label>
+<input class="w-full p-3 rounded-lg border border-surface-variant font-body-md" placeholder="Tên đầy đủ hoặc Tên công ty" type="text"/>
+</div>
+<div class="col-span-2">
+<label class="block font-label-md text-on-surface-variant mb-1">Số điện thoại</label>
+<input class="w-full p-3 rounded-lg border border-surface-variant font-body-md" placeholder="+84 000 000 000" type="tel"/>
+</div>
+<div class="col-span-2">
+<label class="block font-label-md text-on-surface-variant mb-1">Địa chỉ lấy hàng</label>
+<div class="relative">
+<input class="w-full p-3 pr-12 rounded-lg border border-surface-variant font-body-md" placeholder="Đường, Phường/Xã, Quận/Huyện, Tỉnh/TP" type="text"/>
+<span class="material-symbols-outlined absolute right-3 top-3 text-on-surface-variant">location_on</span>
+</div>
+</div>
+<div class="col-span-2 mt-2">
+<div class="w-full h-48 rounded-xl overflow-hidden relative border border-surface-variant">
+<div class="absolute inset-0 bg-surface-container animate-pulse"></div>
+<img class="w-full h-full object-cover relative z-10" data-alt="A detailed, modern digital map interface showing a pickup location pin in a bustling metropolitan area. The map uses a clean, light-mode palette with subtle gray roads and white buildings. A prominent red location pin marks the exact spot, consistent with Velocity Logistics branding. Professional and high-precision cartography style." data-location="New York City" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBA7wuMKQ3bCtusx6h3TmG_5ih690vvBkWgg-mG0tjfNyojNU_soIGDpiljg04QCs3ZniyIFoo7V6ZOgN263TQXnOAZsd_GrjpuOaBu0wW_GlIiGOOrV3ykYuCeeSr7zesmAAaon6DdBcGqgL1fLnAgX4f5VPYzGqfV2H-fjZubgwL710fFJzz9wdD_9e2xDdC6k9CXkq528MAj5v_mE3qDaxujj6xWPUcNfuVfaZLjr4em-MldY1Ho-g"/>
+<div class="absolute bottom-3 right-3 z-20">
+<button class="bg-pure-white shadow-sm px-4 py-2 rounded-full flex items-center gap-2 font-button text-deep-onyx hover:bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-sm">near_me</span> Ghim bản đồ
+                                    </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Section 2: Delivery Info -->
+<div class="space-y-4">
+<div class="flex items-center gap-2 mb-4">
+<span class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">2</span>
+<h3 class="font-headline-md text-deep-onyx">Thông tin giao hàng</h3>
+</div>
+<div class="form-card rounded-xl p-6 grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-2">
+<label class="block font-label-md text-on-surface-variant mb-1">Họ tên người nhận</label>
+<input class="w-full p-3 rounded-lg border border-surface-variant font-body-md" placeholder="Tên đầy đủ hoặc Tên công ty" type="text"/>
+</div>
+<div class="col-span-2">
+<label class="block font-label-md text-on-surface-variant mb-1">Số điện thoại</label>
+<input class="w-full p-3 rounded-lg border border-surface-variant font-body-md" placeholder="+84 000 000 000" type="tel"/>
+</div>
+<div class="col-span-2">
+<label class="block font-label-md text-on-surface-variant mb-1">Địa chỉ giao hàng</label>
+<div class="relative">
+<input class="w-full p-3 pr-12 rounded-lg border border-surface-variant font-body-md" placeholder="Đường, Phường/Xã, Quận/Huyện, Tỉnh/TP" type="text"/>
+<span class="material-symbols-outlined absolute right-3 top-3 text-on-surface-variant">location_on</span>
+</div>
+</div></div>
+</div>
+<!-- Section 3: Package Details -->
+<div class="space-y-4">
+<div class="flex items-center gap-2 mb-4">
+<span class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">3</span>
+<h3 class="font-headline-md text-deep-onyx">Chi tiết kiện hàng</h3>
+</div>
+<div class="form-card rounded-xl p-6">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+<div>
+<label class="block font-label-md text-on-surface-variant mb-1">Khối lượng (kg)</label>
+<input class="w-full p-3 rounded-lg border border-surface-variant font-body-md" placeholder="0.0" type="number"/>
+</div>
+<div>
+<label class="block font-label-md text-on-surface-variant mb-1">Dài (cm)</label>
+<input class="w-full p-3 rounded-lg border border-surface-variant font-body-md" placeholder="0" type="number"/>
+</div>
+<div>
+<label class="block font-label-md text-on-surface-variant mb-1">Rộng (cm)</label>
+<input class="w-full p-3 rounded-lg border border-surface-variant font-body-md" placeholder="0" type="number"/>
+</div>
+<div>
+<label class="block font-label-md text-on-surface-variant mb-1">Cao (cm)</label>
+<input class="w-full p-3 rounded-lg border border-surface-variant font-body-md" placeholder="0" type="number"/>
+</div>
+</div>
+<label class="block font-label-md text-on-surface-variant mb-3">Loại kiện hàng</label>
+<div class="grid grid-cols-3 gap-3">
+<label class="relative cursor-pointer group">
+<input checked="" class="peer sr-only" name="pkg_type" type="radio" value="box"/>
+<div class="p-4 rounded-xl border border-surface-variant flex flex-col items-center gap-2 transition-all peer-checked:border-logistics-red peer-checked:bg-primary-container/10 group-hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-on-surface-variant group-peer-checked:text-logistics-red">package_2</span>
+<span class="font-label-md">Thùng / Kiện</span>
+</div>
+</label>
+<label class="relative cursor-pointer group">
+<input class="peer sr-only" name="pkg_type" type="radio" value="document"/>
+<div class="p-4 rounded-xl border border-surface-variant flex flex-col items-center gap-2 transition-all peer-checked:border-logistics-red peer-checked:bg-primary-container/10 group-hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-on-surface-variant group-peer-checked:text-logistics-red">description</span>
+<span class="font-label-md">Tài liệu</span>
+</div>
+</label>
+<label class="relative cursor-pointer group">
+<input class="peer sr-only" name="pkg_type" type="radio" value="pallet"/>
+<div class="p-4 rounded-xl border border-surface-variant flex flex-col items-center gap-2 transition-all peer-checked:border-logistics-red peer-checked:bg-primary-container/10 group-hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-on-surface-variant group-peer-checked:text-logistics-red">inventory</span>
+<span class="font-label-md">Pallet</span>
+</div>
+</label>
+</div>
+</div>
+</div>
+<!-- Section 4: Service & Payment -->
+<div class="space-y-4">
+<div class="flex items-center gap-2 mb-4">
+<span class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">4</span>
+<h3 class="font-headline-md text-deep-onyx">Gói dịch vụ</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<label class="relative cursor-pointer block">
+<input checked="" class="peer sr-only" name="service" type="radio" value="express"/>
+<div class="p-5 h-full rounded-xl border border-surface-variant peer-checked:border-logistics-red peer-checked:bg-primary-container/5 hover:border-logistics-red/50 transition-all">
+<div class="flex justify-between items-start mb-3">
+<div class="bg-logistics-red text-pure-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Nhanh nhất</div>
+<span class="font-headline-md text-deep-onyx">$24.99</span>
+</div>
+<h4 class="font-label-lg text-deep-onyx">Velocity Express</h4>
+<p class="font-label-md text-on-surface-variant mt-1">Giao hàng trong 24-48 giờ kèm theo định vị GPS thời gian thực.</p>
+</div>
+</label>
+<label class="relative cursor-pointer block">
+<input class="peer sr-only" name="service" type="radio" value="standard"/>
+<div class="p-5 h-full rounded-xl border border-surface-variant peer-checked:border-logistics-red peer-checked:bg-primary-container/5 hover:border-logistics-red/50 transition-all">
+<div class="flex justify-between items-start mb-3">
+<div class="bg-surface-container text-on-surface-variant text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Tiết kiệm</div>
+<span class="font-headline-md text-deep-onyx">$12.50</span>
+</div>
+<h4 class="font-label-lg text-deep-onyx">Velocity Standard</h4>
+<p class="font-label-md text-on-surface-variant mt-1">Giao hàng trong 3-5 ngày làm việc. Đáng tin cậy và giá cả phải chăng.</p>
+</div>
+</label>
+</div>
+<div class="form-card rounded-xl p-6 mt-4">
+<h4 class="font-label-lg text-deep-onyx mb-4">Phương thức thanh toán</h4>
+<div class="flex flex-wrap gap-4">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="w-4 h-4 text-logistics-red" name="payment" type="radio" value="prepaid"/>
+<span class="font-body-md">Thanh toán ngay (Kỹ thuật số)</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input class="w-4 h-4 text-logistics-red" name="payment" type="radio" value="cod"/>
+<span class="font-body-md">Thanh toán khi nhận hàng (COD)</span>
+</label>
+</div>
+</div>
+</div>
+<!-- Footer Action -->
+<div class="pt-8 pb-12">
+<button class="w-full md:w-auto bg-logistics-red text-pure-white font-button py-4 px-12 rounded-lg shadow-lg hover:bg-primary active:scale-95 transition-all flex items-center justify-center gap-3" type="submit">
+                        Xác nhận tạo đơn <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</form>
+<!-- Sidebar Info/Summary -->
+<aside class="lg:col-span-4 space-y-6">
+<div class="sticky top-24">
+<!-- Summary Card -->
+<div class="bg-deep-onyx text-pure-white rounded-xl p-6 shadow-xl mb-6">
+<h3 class="font-headline-md mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-logistics-red">receipt_long</span>
+                            Tóm tắt đơn hàng
+                        </h3>
+<div class="space-y-3 border-t border-white/10 pt-4">
+<div class="flex justify-between font-label-md text-white/70">
+<span class="">Giá cước cơ bản</span>
+<span class="">$18.00</span>
+</div>
+<div class="flex justify-between font-label-md text-white/70">
+<span class="">Phụ phí hỏa tốc</span>
+<span class="">$5.50</span>
+</div>
+<div class="flex justify-between font-label-md text-white/70">
+<span class="">Thuế nhiên liệu (6%)</span>
+<span class="">$1.49</span>
+</div>
+<div class="flex justify-between font-headline-md border-t border-white/10 pt-4 mt-2">
+<span class="">Tổng cộng</span>
+<span class="text-logistics-red">$24.99</span>
+</div>
+</div>
+</div>
+<!-- Guidance Card -->
+<div class="bg-surface-container rounded-xl p-6 border border-surface-variant">
+<h4 class="font-label-lg text-deep-onyx mb-3">Hướng dẫn gửi hàng</h4>
+<ul class="space-y-3">
+<li class="flex gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm mt-1">verified</span>
+<p class="text-label-md">Đảm bảo tất cả các mặt hàng được đóng gói an toàn với đệm lót phù hợp.</p>
+</li>
+<li class="flex gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm mt-1">block</span>
+<p class="text-label-md">Cấm: Chất lỏng dễ cháy, pin lithium (không nhãn mác) và hàng dễ hỏng.</p>
+</li>
+<li class="flex gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm mt-1">schedule</span>
+<p class="text-label-md">Việc lấy hàng thường diễn ra trong vòng 3 giờ đối với các đơn Express đặt trước 14:00.</p>
+</li>
+</ul>
+</div>
+<!-- Dynamic Illustration -->
+<div class="mt-8 rounded-xl overflow-hidden h-40 relative group">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" data-alt="A high-quality 3D render of a Velocity Logistics delivery drone flying over a modern city grid at sunset. The lighting is warm and cinematic, emphasizing speed and technological precision. The drone carries a small package with the Velocity logo in red. Professional marketing aesthetic with deep shadows and vibrant light trails." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAhq7lJpVV7kPGopEC6CBO64IgyhhTGLLwhGNlip_D2c6IYo75fPPVyDWN873Qntu3Jwp6lrD-Gp1fS-gwGccRXyjR0bj8E3VyF7UD9jPoaojtvAJwvEre0xscGhJUkYwROSKGhvQzWTg1EH86KTUGFvJxOM6tWH0pzMpklS-0b52e9-lvJhrHRWUqAwBscvMSCng46nQuTID8OFkYFMRlT1I6FaW5M5S-2wHRdaJL1QPVq9h3vShzaVA"/>
+<div class="absolute inset-0 bg-gradient-to-t from-deep-onyx/80 to-transparent flex items-end p-4">
+<p class="text-pure-white font-label-md">Đã bật Theo dõi Thông minh</p>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- BottomNavBar (From Shared Components) - Active on 'New Order' -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-3 bg-pure-white shadow-[0_-4px_6px_-1px_rgba(22,29,37,0.05)] border-t border-surface-container-highest">
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:bg-surface-container-low transition-all" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Tổng quan</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:bg-surface-container-low transition-all" href="#">
+<span class="material-symbols-outlined">local_shipping</span>
+<span class="font-label-md text-label-md">Theo dõi</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 transition-all active:scale-90" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+<span class="font-label-md text-label-md">Đơn hàng mới</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:bg-surface-container-low transition-all" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-md text-label-md">Cá nhân</span>
+</a>
+</nav>
+<!-- Floating Action Feedback (JS Simulation) -->
+<div class="fixed bottom-24 right-4 translate-y-20 opacity-0 bg-deep-onyx text-pure-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-3 transition-all duration-500 z-[70]" id="toast">
+<span class="material-symbols-outlined text-green-500">check_circle</span>
+<span class="font-label-lg">Chi tiết đơn hàng đã được lưu.</span>
+</div>
+<script>
+        // Simple micro-interaction for form inputs
+        const inputs = document.querySelectorAll('input');
+        const toast = document.getElementById('toast');
+
+        inputs.forEach(input => {
+            input.addEventListener('blur', () => {
+                if (input.value.length > 2) {
+                    showToast(`Đã lưu ${input.placeholder || 'thông tin'}`);
+                }
+            });
+        });
+
+        function showToast(message) {
+            toast.querySelector('span:last-child').textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2500);
+        }
+
+        // Form submission prevention
+        document.getElementById('orderForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Đang xử lý...';
+            btn.disabled = true;
+            
+            setTimeout(() => {
+                btn.innerHTML = '<span class="material-symbols-outlined">done_all</span> Đã xác nhận!';
+                btn.classList.replace('bg-logistics-red', 'bg-green-600');
+                showToast("Đơn hàng đã được gửi thành công!");
+            }, 1500);
+        });
+
+        // Toggle map interaction effect
+        const mapBtn = document.querySelector('[data-location]');
+        if(mapBtn) {
+            mapBtn.parentElement.addEventListener('click', () => {
+                showToast("Vị trí đã được ghim chính xác.");
+            });
+        }
+    </script>
+</body></html>

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Velocity Logistics | Tốc độ &amp; Tin cậy</title>
+<!-- Google Fonts: Montserrat for Brand Integrity -->
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols for Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#f9f9f9",
+                    "surface-tint": "#c00100",
+                    "surface-container-low": "#f3f3f3",
+                    "pure-white": "#FFFFFF",
+                    "cloud-gray": "#F4F4F4",
+                    "on-surface-variant": "#603e39",
+                    "tertiary": "#0059ba",
+                    "on-secondary": "#ffffff",
+                    "on-secondary-fixed-variant": "#404750",
+                    "surface-container": "#eeeeee",
+                    "logistics-red": "#FF0000",
+                    "background": "#f9f9f9",
+                    "secondary-fixed-dim": "#c0c7d2",
+                    "primary-fixed-dim": "#ffb4a8",
+                    "on-tertiary-fixed-variant": "#004491",
+                    "on-secondary-fixed": "#151c24",
+                    "primary-fixed": "#ffdad4",
+                    "outline": "#956d67",
+                    "surface-container-highest": "#e2e2e2",
+                    "secondary-fixed": "#dce3ee",
+                    "on-primary-fixed": "#410000",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-container": "#fffbff",
+                    "deep-onyx": "#161D25",
+                    "tertiary-fixed-dim": "#acc7ff",
+                    "on-primary-fixed-variant": "#930100",
+                    "surface-dim": "#dadada",
+                    "error": "#ba1a1a",
+                    "inverse-on-surface": "#f1f1f1",
+                    "surface-container-high": "#e8e8e8",
+                    "secondary": "#585f68",
+                    "on-error-container": "#93000a",
+                    "tertiary-container": "#0071e8",
+                    "surface-variant": "#e2e2e2",
+                    "on-tertiary-fixed": "#001a40",
+                    "error-container": "#ffdad6",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#1a1c1c",
+                    "inverse-primary": "#ffb4a8",
+                    "outline-variant": "#ebbbb4",
+                    "on-background": "#1a1c1c",
+                    "on-primary": "#ffffff",
+                    "inverse-surface": "#2f3131",
+                    "on-tertiary-container": "#fefcff",
+                    "secondary-container": "#d9e0eb",
+                    "primary-container": "#eb0000",
+                    "on-error": "#ffffff",
+                    "surface": "#f9f9f9",
+                    "on-secondary-container": "#5c636d",
+                    "tertiary-fixed": "#d7e2ff",
+                    "primary": "#bc0100"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter-desktop": "24px",
+                    "margin-desktop": "40px",
+                    "container-max": "1280px",
+                    "base": "8px",
+                    "gutter-mobile": "16px",
+                    "margin-mobile": "20px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Montserrat"],
+                    "body-md": ["Montserrat"],
+                    "button": ["Montserrat"],
+                    "label-md": ["Montserrat"],
+                    "headline-lg": ["Montserrat"],
+                    "display-lg": ["Montserrat"],
+                    "label-lg": ["Montserrat"],
+                    "headline-md": ["Montserrat"],
+                    "headline-lg-mobile": ["Montserrat"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "button": ["14px", {"lineHeight": "20px", "fontWeight": "700"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #f9f9f9;
+            color: #1a1c1c;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Animations */
+        @keyframes drift {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
+        .animate-drift {
+            animation: drift 60s linear infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-float {
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .reveal-item {
+            opacity: 0;
+            animation: fadeInUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        /* Prevent potential overflow issues */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .animate-drift, .animate-float, .reveal-item {
+                animation: none !important;
+                opacity: 1 !important;
+                transform: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md selection:bg-logistics-red selection:text-white">
+<!-- Hero Section / Splash Layout -->
+<main class="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-surface-bright pb-12">
+<!-- Background Atmospheric Element: Dynamic Texture -->
+<div class="absolute inset-0 z-0 pointer-events-none opacity-40">
+<div class="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_20%_30%,#FF000005_0%,transparent_50%)]"></div>
+<div class="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_80%_70%,#161D2505_0%,transparent_50%)]"></div>
+<!-- Moving Logistics Pattern -->
+<div class="absolute top-1/2 left-0 w-[200%] h-32 border-y border-surface-container-highest flex items-center overflow-hidden -rotate-6 opacity-20">
+<div class="flex gap-12 whitespace-nowrap animate-drift">
+<span class="text-display-lg font-bold text-surface-container-highest tracking-tighter">VELOCITY LOGISTICS • TỐC ĐỘ • TIN CẬY • CHÍNH XÁC • HIỆU QUẢ • TOÀN CẦU •</span>
+<span class="text-display-lg font-bold text-surface-container-highest tracking-tighter">VELOCITY LOGISTICS • TỐC ĐỘ • TIN CẬY • CHÍNH XÁC • HIỆU QUẢ • TOÀN CẦU •</span>
+</div>
+</div>
+</div>
+<!-- Main Content Canvas -->
+<div class="relative z-10 w-full max-w-container-max px-margin-mobile md:px-margin-desktop flex flex-col items-center">
+<!-- Brand Anchor -->
+<div class="mb-10 text-center flex flex-col items-center gap-6 pt-8">
+<!-- Branding Container -->
+<div class="flex items-center justify-center p-4 bg-pure-white shadow-xl rounded-xl border border-surface-container animate-float">
+<span class="material-symbols-outlined text-[64px] text-logistics-red" style="font-variation-settings: 'FILL' 1;">
+                        local_shipping
+                    </span>
+</div>
+<div class="space-y-2 reveal-item" style="animation-delay: 0.1s;">
+<h1 class="font-display-lg text-display-lg text-deep-onyx tracking-tight">
+                        Velocity <span class="text-logistics-red">Logistics</span>
+</h1>
+<p class="font-headline-md text-headline-md text-secondary tracking-wide flex items-center justify-center gap-3">
+<span class="h-[2px] w-8 bg-logistics-red opacity-50"></span>
+                        Tốc độ &amp; Tin cậy
+                        <span class="h-[2px] w-8 bg-logistics-red opacity-50"></span>
+</p>
+</div>
+</div>
+<!-- Impact Imagery / Bento-style Highlight -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6 w-full max-w-4xl mb-12">
+<!-- Main Feature Card -->
+<div class="md:col-span-8 relative h-64 md:h-80 rounded-xl overflow-hidden shadow-lg border border-surface-container-highest group reveal-item" style="animation-delay: 0.3s;">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC4dG09Nir02J1MxBW6Cjxv_XPJU_ihnZtsMMdrrGMbasDEyt7VKaaOCl4Faa07IgZkuulnJek9L4aoI9lPLg9tGFSQpk32lkgThQaxEbWETjf8ae9k1fRbqk06Y7mUKtl69QPjcab1vPZ91agzbpszRd4PjW1uIA1WPx7fLCo63OlDtuamcPQPEwhNTlX78DJhQgBKq2kVF9RIPUhXQKmLGdaWxNmymUtIb2zdO-_-NRp6p8OB--QpUw')">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-deep-onyx/90 via-deep-onyx/30 to-transparent"></div>
+<div class="absolute bottom-6 left-6 text-pure-white">
+<h3 class="font-headline-md text-headline-md mb-1">Chuyển phát toàn cầu</h3>
+<p class="font-body-md text-body-md opacity-90">Vận chuyển liền mạch tới hơn 200 quốc gia.</p>
+</div>
+</div>
+<!-- Secondary Metric Cards -->
+<div class="md:col-span-4 flex flex-col gap-6">
+<div class="flex-1 bg-pure-white p-6 rounded-xl shadow-sm border-l-4 border-logistics-red flex flex-col justify-center reveal-item" style="animation-delay: 0.4s;">
+<span class="text-logistics-red font-display-lg text-headline-lg leading-none">99.9%</span>
+<p class="text-secondary font-label-lg uppercase tracking-wider mt-2">Đúng giờ tuyệt đối</p>
+</div>
+<div class="flex-1 bg-deep-onyx p-6 rounded-xl shadow-sm flex flex-col justify-center text-pure-white reveal-item" style="animation-delay: 0.5s;">
+<span class="material-symbols-outlined text-logistics-red text-4xl mb-2">bolt</span>
+<p class="font-body-md">Cập nhật hành trình tức thời cho mọi đơn hàng.</p>
+</div>
+</div>
+</div>
+<!-- Call to Action Cluster -->
+<div class="flex flex-col sm:flex-row gap-6 w-full max-w-md reveal-item" style="animation-delay: 0.6s;">
+<button class="flex-1 group relative px-8 py-4 bg-logistics-red text-pure-white font-button text-button rounded-lg shadow-lg hover:shadow-xl hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 overflow-hidden" onclick="handleNavigation('login')">
+<span class="relative flex items-center justify-center gap-2">
+                        Đăng nhập
+                        <span class="material-symbols-outlined text-[18px]">login</span>
+</span>
+</button>
+<button class="flex-1 group px-8 py-4 bg-transparent border-2 border-deep-onyx text-deep-onyx font-button text-button rounded-lg hover:bg-deep-onyx hover:text-pure-white hover:scale-[1.03] active:scale-[0.97] transition-all duration-200" onclick="handleNavigation('register')">
+<span class="flex items-center justify-center gap-2">
+                        Đăng ký
+                        <span class="material-symbols-outlined text-[18px]">person_add</span>
+</span>
+</button>
+</div>
+<!-- Trust Badges -->
+<div class="mt-16 pt-8 border-t border-surface-container-highest w-full max-w-2xl flex flex-wrap justify-center items-center gap-x-12 gap-y-6 opacity-60 reveal-item" style="animation-delay: 0.7s;">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined">verified_user</span>
+<span class="font-label-md">Chứng nhận ISO 9001</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined">public</span>
+<span class="font-label-md">Giao hàng trung hòa Carbon</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined">support_agent</span>
+<span class="font-label-md">Hỗ trợ 24/7</span>
+</div>
+</div>
+</div>
+<!-- Footer Note -->
+<footer class="mt-12 text-center w-full px-margin-mobile reveal-item" style="animation-delay: 0.8s;">
+<p class="font-label-md text-secondary">
+                © 2024 Velocity Logistics Inc. | <a class="hover:text-logistics-red underline decoration-dotted transition-colors" href="#">Chính sách bảo mật</a>
+</p>
+</footer>
+</main>
+<script>
+        function handleNavigation(type) {
+            console.log("Navigating to: " + type);
+            // In a real app, this would route to /login or /register
+        }
+
+        // Initialize animations on load
+        window.addEventListener('DOMContentLoaded', () => {
+            const items = document.querySelectorAll('.reveal-item');
+            items.forEach((item, index) => {
+                item.style.animationDelay = `${0.1 * (index + 1)}s`;
+            });
+        });
+    </script>
+</body></html>

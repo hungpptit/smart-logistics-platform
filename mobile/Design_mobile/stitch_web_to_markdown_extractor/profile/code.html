@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Velocity Logistics - Hồ sơ cá nhân</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary": "#585f68",
+                    "outline-variant": "#ebbbb4",
+                    "pure-white": "#FFFFFF",
+                    "on-secondary-fixed": "#151c24",
+                    "tertiary-fixed": "#d7e2ff",
+                    "on-secondary-fixed-variant": "#404750",
+                    "on-error": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "logistics-red": "#FF0000",
+                    "tertiary-fixed-dim": "#acc7ff",
+                    "primary-container": "#eb0000",
+                    "on-primary-fixed-variant": "#930100",
+                    "error-container": "#ffdad6",
+                    "on-surface-variant": "#603e39",
+                    "primary": "#bc0100",
+                    "on-tertiary-fixed-variant": "#004491",
+                    "surface-container-low": "#f3f3f3",
+                    "inverse-on-surface": "#f1f1f1",
+                    "surface-container-highest": "#e2e2e2",
+                    "primary-fixed-dim": "#ffb4a8",
+                    "surface-dim": "#dadada",
+                    "surface-container-high": "#e8e8e8",
+                    "background": "#f9f9f9",
+                    "on-background": "#1a1c1c",
+                    "tertiary-container": "#0071e8",
+                    "on-tertiary-fixed": "#001a40",
+                    "cloud-gray": "#F4F4F4",
+                    "tertiary": "#0059ba",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-container": "#fffbff",
+                    "secondary-container": "#d9e0eb",
+                    "deep-onyx": "#161D25",
+                    "surface-bright": "#f9f9f9",
+                    "on-secondary-container": "#5c636d",
+                    "secondary-fixed": "#dce3ee",
+                    "surface-tint": "#c00100",
+                    "inverse-primary": "#ffb4a8",
+                    "on-surface": "#1a1c1c",
+                    "on-secondary": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "surface-variant": "#e2e2e2",
+                    "error": "#ba1a1a",
+                    "secondary-fixed-dim": "#c0c7d2",
+                    "primary-fixed": "#ffdad4",
+                    "surface-container": "#eeeeee",
+                    "inverse-surface": "#2f3131",
+                    "surface": "#f9f9f9",
+                    "on-tertiary-container": "#fefcff",
+                    "on-primary-fixed": "#410000",
+                    "outline": "#956d67",
+                    "on-primary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "base": "8px",
+                    "gutter-mobile": "16px",
+                    "container-max": "1280px",
+                    "gutter-desktop": "24px",
+                    "margin-mobile": "20px",
+                    "margin-desktop": "40px"
+            },
+            "fontFamily": {
+                    "headline-lg-mobile": ["Montserrat"],
+                    "display-lg": ["Montserrat"],
+                    "headline-md": ["Montserrat"],
+                    "label-md": ["Montserrat"],
+                    "label-lg": ["Montserrat"],
+                    "body-lg": ["Montserrat"],
+                    "headline-lg": ["Montserrat"],
+                    "button": ["Montserrat"],
+                    "body-md": ["Montserrat"]
+            },
+            "fontSize": {
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "700"}],
+                    "button": ["14px", {"lineHeight": "20px", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Montserrat', sans-serif; background-color: #f9f9f9; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .profile-card-shadow {
+            box-shadow: 0 4px 20px -2px rgba(22, 29, 37, 0.08);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased pb-24">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter-mobile h-16 bg-surface shadow-sm">
+<div class="flex items-center gap-4">
+<button class="p-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-primary" data-icon="menu">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile text-primary font-bold">Hồ sơ cá nhân</h1>
+</div>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-fixed">
+<img class="w-full h-full object-cover" data-alt="A professional close-up portrait of a logistics manager in a bright, modern office setting. The lighting is clean and high-key, emphasizing a light-mode aesthetic. The subject is wearing a professional polo shirt with a subtle red logo. The background is softly blurred, showing a hints of a clean, organized logistics hub. The color palette is dominated by pure white and soft grays with vibrant red accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBk0-kSt-b2VQ4G3qzIIVCKg-2vNwk3bXmnGH41mkUV5-T2_Y2eih-SViyBepVIf_6L6Ze2MR7XE46rKfBVKaoRnfLuw-YXbq-4zJ1p53kYoXfLTvoXJmU98SI00e5o0oXK5qTDPZhZNLV183v0G1ajrzAeW7skUddW6s-dkYObbTWQGi0lGC_urLZH3KTCHRKJU0YJcVlrzjQlYG42E6i6xLlQsYQ2TscjrRLH4iWFUoB6ErQLm6hM8Q"/>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="pt-20 px-gutter-mobile max-w-md mx-auto">
+<!-- Profile Header -->
+<section class="flex flex-col items-center py-6">
+<div class="relative mb-4 group">
+<div class="w-28 h-28 rounded-full overflow-hidden border-4 border-pure-white shadow-lg">
+<img class="w-full h-full object-cover" data-alt="A high-quality avatar image of a smiling professional in a modern logistics environment. The image is bright and sharp, reflecting a corporate modern aesthetic. The lighting is natural and clear. The background features clean architectural lines of a shipping warehouse with a focus on efficiency and reliability. The overall mood is professional and friendly, aligned with the Velocity Logistics brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMVneF7Mp_WYnKxaqBM7A0LzI3B4l1jOX2gVlfAtTxApIyuAyQ2OHLEJRk4t807hb11XbZ3b4cey-A8rPySQyhi2216ZoxpGnEgVVIW1M04xkDTf9dGYwZb5DHU0QblWk_I0Cd0o2o2hzfypfFE4tM8Q_pwekHkh4gr-hsleBCO1JPkB6r8xWPDkDP2THhpbxinZH_KZlPxTcKINiYKHgQLHDx97XpmYVqlsK_9d3UveEaIzQo6sfj6w"/>
+</div>
+<button class="absolute bottom-1 right-1 bg-logistics-red text-white p-1.5 rounded-full shadow-md active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-sm" data-icon="edit">edit</span>
+</button>
+</div>
+<div class="text-center">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Nguyễn Văn An</h2>
+<div class="mt-1 inline-flex items-center px-3 py-1 rounded-full bg-primary-container text-on-primary-container">
+<span class="material-symbols-outlined text-[14px] mr-1" data-icon="local_shipping">local_shipping</span>
+<span class="font-label-lg text-label-lg">Tài xế chuyên nghiệp</span>
+</div>
+</div>
+</section>
+<!-- User Details Section -->
+<section class="mt-4 space-y-4">
+<div class="bg-pure-white rounded-xl p-4 profile-card-shadow flex items-center gap-4">
+<div class="w-12 h-12 flex items-center justify-center bg-surface-container rounded-full">
+<span class="material-symbols-outlined text-primary" data-icon="call">call</span>
+</div>
+<div>
+<p class="text-secondary font-label-md text-label-md">Số điện thoại</p>
+<p class="font-body-md text-body-md font-semibold text-on-surface">+84 901 234 567</p>
+</div>
+</div>
+<div class="bg-pure-white rounded-xl p-4 profile-card-shadow flex items-center gap-4">
+<div class="w-12 h-12 flex items-center justify-center bg-surface-container rounded-full">
+<span class="material-symbols-outlined text-primary" data-icon="mail">mail</span>
+</div>
+<div>
+<p class="text-secondary font-label-md text-label-md">Email</p>
+<p class="font-body-md text-body-md font-semibold text-on-surface">an.nguyen@velocity.vn</p>
+</div>
+</div>
+</section>
+<!-- Managed Branches (Conditional for Driver) -->
+<section class="mt-8">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-headline-md text-headline-md-mobile text-on-surface">Thông tin bưu cục</h3>
+<span class="font-label-md text-label-md text-primary">Quản lý</span>
+</div>
+<div class="bg-pure-white rounded-xl overflow-hidden profile-card-shadow">
+<div class="p-4 border-b border-surface-container flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="location_on">location_on</span>
+<div>
+<p class="font-label-lg text-label-lg text-on-surface">Bưu cục Quận 1 - Hồ Chí Minh</p>
+<p class="text-secondary text-label-md font-label-md">Trạm trung chuyển chính</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="p-4 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="location_on">location_on</span>
+<div>
+<p class="font-label-lg text-label-lg text-on-surface">Kho hàng Tân Sơn Nhất</p>
+<p class="text-secondary text-label-md font-label-md">Điểm tập kết hàng bay</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</section>
+<!-- Actions -->
+<section class="mt-8 space-y-3">
+<button class="w-full h-12 flex items-center justify-center border-2 border-deep-onyx rounded-xl text-deep-onyx font-button text-button hover:bg-surface-container-low transition-colors active:scale-95">
+<span class="material-symbols-outlined mr-2" data-icon="lock_reset">lock_reset</span>
+                Đổi mật khẩu
+            </button>
+<button class="w-full h-12 flex items-center justify-center bg-transparent border-2 border-primary rounded-xl text-primary font-button text-button hover:bg-error-container transition-colors active:scale-95">
+<span class="material-symbols-outlined mr-2" data-icon="logout">logout</span>
+                Đăng xuất
+            </button>
+</section>
+<!-- Footer / Meta -->
+<footer class="mt-12 text-center pb-8">
+<p class="text-secondary font-label-md text-label-md">Phiên bản 4.2.0 (Build 99283)</p>
+<p class="text-secondary font-label-md text-label-md mt-1">© 2024 Velocity Logistics. Bảo lưu mọi quyền.</p>
+</footer>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-3 bg-pure-white shadow-[0_-4px_6px_-1px_rgba(22,29,37,0.05)] rounded-t-xl border-t border-surface-container-highest">
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:bg-surface-container-low transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Tổng quan</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:bg-surface-container-low transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="local_shipping">local_shipping</span>
+<span class="font-label-md text-label-md">Vận chuyển</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:bg-surface-container-low transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+<span class="font-label-md text-label-md">Đơn mới</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="person" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-label-md text-label-md">Cá nhân</span>
+</a>
+</nav>
+<script>
+        // Micro-interaction for buttons
+        document.querySelectorAll('button, a').forEach(el => {
+            el.addEventListener('click', function(e) {
+                // Potential logic for routing or animation feedback
+            });
+        });
+
+        // Simple visibility effect for cards
+        const cards = document.querySelectorAll('.profile-card-shadow');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                    entry.target.classList.remove('opacity-0', 'translate-y-4');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        cards.forEach(card => {
+            card.classList.add('transition-all', 'duration-500', 'opacity-0', 'translate-y-4');
+            observer.observe(card);
+        });
+    </script>
+</body></html>

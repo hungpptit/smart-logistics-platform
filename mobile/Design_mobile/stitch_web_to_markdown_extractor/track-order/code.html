@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Velocity Logistics | Theo dõi đơn hàng</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Config Verbatim -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#f9f9f9",
+                    "surface-tint": "#c00100",
+                    "surface-container-low": "#f3f3f3",
+                    "pure-white": "#FFFFFF",
+                    "cloud-gray": "#F4F4F4",
+                    "on-surface-variant": "#603e39",
+                    "tertiary": "#0059ba",
+                    "on-secondary": "#ffffff",
+                    "on-secondary-fixed-variant": "#404750",
+                    "surface-container": "#eeeeee",
+                    "logistics-red": "#FF0000",
+                    "background": "#f9f9f9",
+                    "secondary-fixed-dim": "#c0c7d2",
+                    "primary-fixed-dim": "#ffb4a8",
+                    "on-tertiary-fixed-variant": "#004491",
+                    "on-secondary-fixed": "#151c24",
+                    "primary-fixed": "#ffdad4",
+                    "outline": "#956d67",
+                    "surface-container-highest": "#e2e2e2",
+                    "secondary-fixed": "#dce3ee",
+                    "on-primary-fixed": "#410000",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-container": "#fffbff",
+                    "deep-onyx": "#161D25",
+                    "tertiary-fixed-dim": "#acc7ff",
+                    "on-primary-fixed-variant": "#930100",
+                    "surface-dim": "#dadada",
+                    "error": "#ba1a1a",
+                    "inverse-on-surface": "#f1f1f1",
+                    "surface-container-high": "#e8e8e8",
+                    "secondary": "#585f68",
+                    "on-error-container": "#93000a",
+                    "tertiary-container": "#0071e8",
+                    "surface-variant": "#e2e2e2",
+                    "on-tertiary-fixed": "#001a40",
+                    "error-container": "#ffdad6",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#1a1c1c",
+                    "inverse-primary": "#ffb4a8",
+                    "outline-variant": "#ebbbb4",
+                    "on-background": "#1a1c1c",
+                    "on-primary": "#ffffff",
+                    "inverse-surface": "#2f3131",
+                    "on-tertiary-container": "#fefcff",
+                    "secondary-container": "#d9e0eb",
+                    "primary-container": "#eb0000",
+                    "on-error": "#ffffff",
+                    "surface": "#f9f9f9",
+                    "on-secondary-container": "#5c636d",
+                    "tertiary-fixed": "#d7e2ff",
+                    "primary": "#bc0100"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter-desktop": "24px",
+                    "margin-desktop": "40px",
+                    "container-max": "1280px",
+                    "base": "8px",
+                    "gutter-mobile": "16px",
+                    "margin-mobile": "20px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Montserrat"],
+                    "body-md": ["Montserrat"],
+                    "button": ["Montserrat"],
+                    "label-md": ["Montserrat"],
+                    "headline-lg": ["Montserrat"],
+                    "display-lg": ["Montserrat"],
+                    "label-lg": ["Montserrat"],
+                    "headline-md": ["Montserrat"],
+                    "headline-lg-mobile": ["Montserrat"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "button": ["14px", {"lineHeight": "20px", "fontWeight": "700"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #f9f9f9;
+            font-family: 'Montserrat', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .timeline-line {
+            width: 2px;
+            background: #161D25;
+            position: absolute;
+            left: 11px;
+            top: 24px;
+            bottom: 0;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(22, 29, 37, 0.05);
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter-mobile md:px-margin-desktop h-16 bg-surface shadow-sm">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary active:scale-95 transition-transform">menu</button>
+<h1 class="font-headline-md text-headline-md-mobile font-bold text-logistics-red">Velocity Logistics</h1>
+</div>
+<div class="flex items-center gap-4">
+<span class="hidden md:block font-label-lg text-label-lg text-on-surface-variant">VEL-99283</span>
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="Close-up professional portrait of a modern logistics manager in a high-tech warehouse office." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAkBXkUgeD3R0X5LmgRZPPgscy2-uQLPG_gTXqwqi5D06poeIfHvbE91zFAu2huJ_WDWROKIsLEThlOaXd3oAd7LdozXtSfAH4xBP8b2IFzskV5CFwQUYfuBuqI-ExZ_ZJ0HxQRnYMZ_KdYVAGm9OcdJo7V5rMeg_vPDyJjwOE3CtwcsWEdevMvriKMYJ5VX4CeI9HoEV3nj_WZDNycaJdYWWDYYjFcXss4QNwhx__PHxaZSZ-SRJBwLg"/>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-gutter-mobile md:px-margin-desktop max-w-container-max mx-auto">
+<!-- Search Section -->
+<section class="mb-12">
+<div class="max-w-3xl mx-auto text-center space-y-6">
+<h2 class="font-headline-lg text-headline-lg-mobile text-deep-onyx">Theo dõi đơn hàng</h2>
+<div class="relative group">
+<input class="w-full h-16 px-6 pr-32 rounded-xl bg-pure-white border-2 border-surface-container-highest focus:border-logistics-red focus:ring-0 transition-all font-body-lg text-body-lg text-deep-onyx placeholder:text-secondary-fixed-dim shadow-sm" placeholder="Nhập mã vận đơn (VD: VEL-482-991)" type="text"/>
+<button class="absolute right-2 top-2 bottom-2 px-6 bg-logistics-red text-pure-white font-button text-button rounded-lg hover:brightness-110 active:scale-95 transition-all">
+                        TRA CỨU
+                    </button>
+</div>
+<div class="flex flex-wrap justify-center gap-3">
+<span class="text-label-md font-label-md text-on-secondary-container">Gần đây:</span>
+<button class="px-3 py-1 bg-surface-container-low rounded-full text-label-md font-label-md hover:bg-surface-container transition-colors">VEL-112-901</button>
+<button class="px-3 py-1 bg-surface-container-low rounded-full text-label-md font-label-md hover:bg-surface-container transition-colors">VEL-992-004</button>
+</div>
+</div>
+</section>
+<!-- Quick Select Section -->
+<section class="mb-12">
+<div class="max-w-3xl mx-auto">
+<div class="flex items-center justify-between mb-4 px-2">
+<h3 class="font-label-lg text-label-lg text-deep-onyx uppercase tracking-widest">Chọn nhanh</h3>
+<button class="text-label-md font-label-md text-logistics-red hover:underline">Xem tất cả</button>
+</div>
+<div class="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+<div class="flex-none w-64 p-4 bg-pure-white rounded-xl border-2 border-logistics-red shadow-sm cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-lg text-label-lg text-deep-onyx">VEL-482-991</span>
+<span class="w-2 h-2 bg-green-600 rounded-full"></span>
+</div>
+<p class="text-label-md font-label-md text-secondary">Đang vận chuyển</p>
+<p class="text-label-md font-label-md text-on-surface-variant mt-1">Đến: Chicago, IL</p>
+</div>
+<div class="flex-none w-64 p-4 bg-pure-white rounded-xl border border-surface-container-highest shadow-sm hover:bg-surface-bright transition-colors cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-lg text-label-lg text-deep-onyx">VEL-112-901</span>
+<span class="w-2 h-2 bg-secondary-fixed-dim rounded-full"></span>
+</div>
+<p class="text-label-md font-label-md text-secondary">Đang xử lý</p>
+<p class="text-label-md font-label-md text-on-surface-variant mt-1">Đến: Austin, TX</p>
+</div>
+<div class="flex-none w-64 p-4 bg-pure-white rounded-xl border border-surface-container-highest shadow-sm hover:bg-surface-bright transition-colors cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-lg text-label-lg text-deep-onyx">VEL-992-004</span>
+<span class="w-2 h-2 bg-green-600 rounded-full"></span>
+</div>
+<p class="text-label-md font-label-md text-secondary">Đang vận chuyển</p>
+<p class="text-label-md font-label-md text-on-surface-variant mt-1">Đến: Seattle, WA</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Tracking Content (Bento Style) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Tracking Details & Timeline -->
+<div class="lg:col-span-7 space-y-6">
+<div class="bg-pure-white p-8 rounded-xl shadow-sm border border-surface-container-highest">
+<div class="flex justify-between items-start mb-8">
+<div>
+<span class="text-label-md font-label-md text-secondary uppercase tracking-widest">Đơn hàng đang hoạt động</span>
+<h3 class="font-headline-md text-headline-md text-deep-onyx mt-1">VEL-482-991</h3>
+</div>
+<div class="px-4 py-1 bg-green-100 text-green-800 rounded-full text-label-md font-label-md flex items-center gap-2">
+<span class="w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
+                            Đang vận chuyển
+                        </div>
+</div>
+<!-- Vertical Timeline -->
+<div class="space-y-10 relative">
+<!-- Step 4: In Transit -->
+<div class="relative flex gap-6">
+<div class="timeline-line bg-secondary-fixed-dim"></div>
+<div class="z-10 w-6 h-6 rounded-full bg-logistics-red flex items-center justify-center ring-4 ring-red-50">
+<span class="material-symbols-outlined text-[14px] text-pure-white" style="font-variation-settings: 'FILL' 1;">local_shipping</span>
+</div>
+<div class="flex-1 -mt-1">
+<div class="flex justify-between items-start">
+<h4 class="font-label-lg text-label-lg text-deep-onyx">Đang vận chuyển</h4>
+<span class="font-label-md text-label-md text-secondary">Hôm nay, 09:42 SA</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Đã rời Trung tâm Phân phối Khu vực (RDC), Chicago Hub.</p>
+</div>
+</div>
+<!-- Step 3: Received -->
+<div class="relative flex gap-6">
+<div class="timeline-line"></div>
+<div class="z-10 w-6 h-6 rounded-full bg-deep-onyx flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px] text-pure-white" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="flex-1 -mt-1">
+<div class="flex justify-between items-start">
+<h4 class="font-label-lg text-label-lg text-deep-onyx">Đã nhập kho</h4>
+<span class="font-label-md text-label-md text-secondary">24 Th10, 02:15 CH</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Lô hàng đã được xử lý qua Cơ sở Phân loại và sẵn sàng để điều phối.</p>
+</div>
+</div>
+<!-- Step 2: Collected -->
+<div class="relative flex gap-6">
+<div class="timeline-line"></div>
+<div class="z-10 w-6 h-6 rounded-full bg-deep-onyx flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px] text-pure-white" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="flex-1 -mt-1">
+<div class="flex justify-between items-start">
+<h4 class="font-label-lg text-label-lg text-deep-onyx">Đã lấy hàng</h4>
+<span class="font-label-md text-label-md text-secondary">24 Th10, 09:00 SA</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Kiện hàng đã được lấy từ địa chỉ Người gửi: Khu công nghiệp A, Detroit.</p>
+</div>
+</div>
+<!-- Step 1: Created -->
+<div class="relative flex gap-6">
+<div class="z-10 w-6 h-6 rounded-full bg-deep-onyx flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px] text-pure-white" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="flex-1 -mt-1">
+<div class="flex justify-between items-start">
+<h4 class="font-label-lg text-label-lg text-deep-onyx">Đã tạo vận đơn</h4>
+<span class="font-label-md text-label-md text-secondary">23 Th10, 11:30 CH</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Đơn hàng đã được xử lý và nhãn vận chuyển đã được tạo. Sẵn sàng để thu gom.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Side Info & Live Map Trigger -->
+<div class="lg:col-span-5 space-y-6">
+<!-- Live Map Card -->
+<div class="relative h-64 rounded-xl overflow-hidden shadow-sm group">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="A high-contrast stylized digital map focused on the Midwestern United States." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA4gM76B7HMMkMvR7ODppo1ySv8CPB3mGBBdI3CZgK1n0yG7gmzhC4UMsoPDDNE41UHuHFY5BhSEOf2vvGr4zyzpZzFB7H1W_a4FHsnVqFXXe6D9KTpH8Y-167O5xyKpRKpDrxCSOSTuJyLR1lN0-AoKP19qgp9RCl1UsLklnx8bqRVodyyPmpA-gf_5asGSd08C4uWZbCXmF6fO2jW7oZpuUUU5SetD0hOMGOjJQ036bKBs94J4O6bFQ')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+<div class="absolute bottom-6 left-6 right-6">
+<button class="w-full py-4 bg-pure-white text-deep-onyx font-button text-button rounded-lg shadow-xl hover:bg-surface-bright transition-all flex items-center justify-center gap-3 active:scale-95">
+<span class="material-symbols-outlined">map</span>
+                            Xem bản đồ trực tuyến
+                        </button>
+</div>
+</div>
+<!-- Shipment Details Card -->
+<div class="bg-pure-white p-6 rounded-xl border border-surface-container-highest space-y-6">
+<h4 class="font-label-lg text-label-lg text-deep-onyx border-b border-surface-container-highest pb-3">Chi tiết lô hàng</h4>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<p class="text-label-md font-label-md text-secondary">Dự kiến đến</p>
+<p class="font-body-md text-body-md font-bold text-deep-onyx">26 Th10, Cuối ngày</p>
+</div>
+<div>
+<p class="text-label-md font-label-md text-secondary">Trọng lượng</p>
+<p class="font-body-md text-body-md font-bold text-deep-onyx">12.5 kg</p>
+</div>
+<div>
+<p class="text-label-md font-label-md text-secondary">Loại dịch vụ</p>
+<p class="font-body-md text-body-md font-bold text-logistics-red">Chuyển phát nhanh</p>
+</div>
+<div>
+<p class="text-label-md font-label-md text-secondary">Nhà vận chuyển</p>
+<p class="font-body-md text-body-md font-bold text-deep-onyx">VEL Prime</p>
+</div>
+</div>
+<div class="pt-4 border-t border-surface-container-highest">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container-low rounded-lg flex items-center justify-center text-logistics-red">
+<span class="material-symbols-outlined text-3xl">inventory_2</span>
+</div>
+<div>
+<p class="text-label-md font-label-md text-secondary">Hàng ký gửi</p>
+<p class="font-body-md text-body-md text-deep-onyx">2x Linh kiện Công nghệ cao</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Card -->
+<div class="bg-deep-onyx text-pure-white p-6 rounded-xl">
+<p class="font-label-lg text-label-lg mb-4">Cần hỗ trợ về lô hàng này?</p>
+<div class="flex gap-4">
+<button class="flex-1 py-2 bg-logistics-red rounded-lg font-button text-button hover:brightness-110 transition-all">Hỗ trợ</button>
+<button class="flex-1 py-2 bg-transparent border border-pure-white/20 rounded-lg font-button text-button hover:bg-pure-white/10 transition-all">Hẹn lại lịch</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-3 bg-pure-white border-t border-surface-container-highest shadow-[0_-4px_6px_-1px_rgba(22,29,37,0.05)] rounded-t-xl">
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Tổng quan</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1">
+<span class="material-symbols-outlined" data-icon="local_shipping" style="font-variation-settings: 'FILL' 1;">local_shipping</span>
+<span class="font-label-md text-label-md">Theo dõi</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+<span class="font-label-md text-label-md">Đơn mới</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-md text-label-md">Cá nhân</span>
+</button>
+</nav>
+<script>
+        // Micro-interaction for input focus
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('scale-[1.01]');
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.remove('scale-[1.01]');
+        });
+    </script>
+</body></html>

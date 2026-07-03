@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Velocity Logistics - Đăng nhập bảo mật</title>
+<!-- Montserrat Font -->
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#f9f9f9",
+                    "surface-tint": "#c00100",
+                    "surface-container-low": "#f3f3f3",
+                    "pure-white": "#FFFFFF",
+                    "cloud-gray": "#F4F4F4",
+                    "on-surface-variant": "#603e39",
+                    "tertiary": "#0059ba",
+                    "on-secondary": "#ffffff",
+                    "on-secondary-fixed-variant": "#404750",
+                    "surface-container": "#eeeeee",
+                    "logistics-red": "#FF0000",
+                    "background": "#f9f9f9",
+                    "secondary-fixed-dim": "#c0c7d2",
+                    "primary-fixed-dim": "#ffb4a8",
+                    "on-tertiary-fixed-variant": "#004491",
+                    "on-secondary-fixed": "#151c24",
+                    "primary-fixed": "#ffdad4",
+                    "outline": "#956d67",
+                    "surface-container-highest": "#e2e2e2",
+                    "secondary-fixed": "#dce3ee",
+                    "on-primary-fixed": "#410000",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-container": "#fffbff",
+                    "deep-onyx": "#161D25",
+                    "tertiary-fixed-dim": "#acc7ff",
+                    "on-primary-fixed-variant": "#930100",
+                    "surface-dim": "#dadada",
+                    "error": "#ba1a1a",
+                    "inverse-on-surface": "#f1f1f1",
+                    "surface-container-high": "#e8e8e8",
+                    "secondary": "#585f68",
+                    "on-error-container": "#93000a",
+                    "tertiary-container": "#0071e8",
+                    "surface-variant": "#e2e2e2",
+                    "on-tertiary-fixed": "#001a40",
+                    "error-container": "#ffdad6",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#1a1c1c",
+                    "inverse-primary": "#ffb4a8",
+                    "outline-variant": "#ebbbb4",
+                    "on-background": "#1a1c1c",
+                    "on-primary": "#ffffff",
+                    "inverse-surface": "#2f3131",
+                    "on-tertiary-container": "#fefcff",
+                    "secondary-container": "#d9e0eb",
+                    "primary-container": "#eb0000",
+                    "on-error": "#ffffff",
+                    "surface": "#f9f9f9",
+                    "on-secondary-container": "#5c636d",
+                    "tertiary-fixed": "#d7e2ff",
+                    "primary": "#bc0100"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter-desktop": "24px",
+                    "margin-desktop": "40px",
+                    "container-max": "1280px",
+                    "base": "8px",
+                    "gutter-mobile": "16px",
+                    "margin-mobile": "20px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Montserrat"],
+                    "body-md": ["Montserrat"],
+                    "button": ["Montserrat"],
+                    "label-md": ["Montserrat"],
+                    "headline-lg": ["Montserrat"],
+                    "display-lg": ["Montserrat"],
+                    "label-lg": ["Montserrat"],
+                    "headline-md": ["Montserrat"],
+                    "headline-lg-mobile": ["Montserrat"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "button": ["14px", {"lineHeight": "20px", "fontWeight": "700"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        /* Precision grid background */
+        .bg-grid-subtle {
+            background-size: 40px 40px;
+            background-image: linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+        }
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="bg-cloud-gray font-body-md text-on-background min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter-mobile md:px-margin-desktop h-16 bg-surface shadow-sm">
+<div class="flex items-center gap-4">
+<button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-container transition-colors active:scale-95 duration-150" onclick="history.back()">
+<span class="material-symbols-outlined text-on-surface-variant">arrow_back</span>
+</button>
+<span class="font-headline-md text-headline-md-mobile md:text-headline-md font-bold text-logistics-red">Velocity Logistics</span>
+</div>
+<div class="hidden md:flex items-center gap-6">
+<span class="text-on-surface-variant font-label-lg">Cổng bảo mật v2.4</span>
+</div>
+</header>
+<main class="flex-grow flex items-center justify-center px-gutter-mobile pt-20 pb-12 bg-grid-subtle relative overflow-hidden">
+<!-- Background decorative elements -->
+<div class="absolute -right-24 -bottom-24 w-96 h-96 bg-primary opacity-5 rounded-full blur-3xl"></div>
+<div class="absolute -left-24 -top-24 w-96 h-96 bg-tertiary-container opacity-5 rounded-full blur-3xl"></div>
+<div class="w-full max-w-[480px] bg-pure-white rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-surface-container-highest overflow-hidden z-10">
+<!-- Header Section -->
+<div class="p-8 pb-4 text-center">
+<div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-container/10 mb-6">
+<span class="material-symbols-outlined text-logistics-red text-[40px]">lock_person</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-deep-onyx mb-2">Chào mừng trở lại</h1>
+<p class="text-on-surface-variant font-body-md">Đăng nhập để quản lý vận đơn và hiệu suất đội xe của bạn.</p>
+</div>
+<!-- Login Form -->
+<form class="p-8 pt-4 space-y-6" id="loginForm">
+<!-- Role Selection -->
+<div class="grid grid-cols-2 gap-4 p-1 bg-surface-container rounded-lg">
+<button class="flex items-center justify-center gap-2 py-2 rounded font-label-lg transition-all duration-200 bg-pure-white text-logistics-red shadow-sm" id="roleCustomer" onclick="setRole('customer')" type="button">
+<span class="material-symbols-outlined text-[18px]">person</span>
+                        Khách hàng
+                    </button>
+<button class="flex items-center justify-center gap-2 py-2 rounded font-label-lg transition-all duration-200 text-on-secondary-fixed-variant hover:bg-pure-white/50" id="roleDriver" onclick="setRole('driver')" type="button">
+<span class="material-symbols-outlined text-[18px]">local_shipping</span>
+                        Tài xế
+                    </button>
+</div>
+<!-- Input Fields -->
+<div class="space-y-4">
+<div class="space-y-2">
+<label class="font-label-lg text-deep-onyx ml-1" for="identifier">Email hoặc Tên đăng nhập</label>
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-secondary-fixed-variant group-focus-within:text-logistics-red transition-colors">mail</span>
+<input class="w-full pl-12 pr-4 py-3 bg-surface-bright border border-surface-container-highest rounded-lg focus:ring-0 focus:border-logistics-red transition-all outline-none text-body-md" id="identifier" placeholder="ten@congty.com" required="" type="text"/>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between items-center px-1">
+<label class="font-label-lg text-deep-onyx" for="password">Mật khẩu</label>
+<a class="text-tertiary hover:underline font-label-md" href="#">Quên mật khẩu?</a>
+</div>
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-secondary-fixed-variant group-focus-within:text-logistics-red transition-colors">lock</span>
+<input class="w-full pl-12 pr-12 py-3 bg-surface-bright border border-surface-container-highest rounded-lg focus:ring-0 focus:border-logistics-red transition-all outline-none text-body-md" id="password" placeholder="••••••••" required="" type="password"/>
+<button class="absolute right-4 top-1/2 -translate-y-1/2 text-on-secondary-fixed-variant hover:text-deep-onyx transition-colors" onclick="togglePassword()" type="button">
+<span class="material-symbols-outlined" id="passwordIcon">visibility</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="pt-2">
+<button class="w-full py-4 bg-logistics-red text-pure-white rounded-lg font-button text-lg hover:brightness-90 active:scale-[0.98] transition-all shadow-md flex items-center justify-center gap-2" type="submit">
+                        Đăng nhập
+                        <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</form>
+<!-- Bottom footer -->
+<div class="p-8 pt-0 text-center">
+<div class="flex items-center gap-4 mb-6">
+<div class="h-[1px] flex-grow bg-surface-container-highest"></div>
+<span class="text-label-md text-on-secondary-fixed-variant uppercase tracking-widest">hoặc</span>
+<div class="h-[1px] flex-grow bg-surface-container-highest"></div>
+</div>
+<p class="text-body-md text-on-surface-variant">
+                    Mới sử dụng Velocity? 
+                    <a class="text-logistics-red font-bold hover:underline" href="#">Đăng ký ngay</a>
+</p>
+</div>
+</div>
+</main>
+<!-- Simple Feedback Toast -->
+<div class="fixed bottom-margin-mobile left-1/2 -translate-x-1/2 translate-y-20 opacity-0 bg-deep-onyx text-pure-white px-6 py-3 rounded-full shadow-xl transition-all duration-300 flex items-center gap-3 z-[100]" id="toast">
+<span class="material-symbols-outlined text-logistics-red">verified_user</span>
+<span class="font-label-lg" id="toastMsg">Đang chuyển hướng đến Bảng điều khiển...</span>
+</div>
+<!-- Scripts -->
+<script>
+        let currentRole = 'customer';
+
+        function setRole(role) {
+            currentRole = role;
+            const customerBtn = document.getElementById('roleCustomer');
+            const driverBtn = document.getElementById('roleDriver');
+
+            if (role === 'customer') {
+                customerBtn.className = "flex items-center justify-center gap-2 py-2 rounded font-label-lg transition-all duration-200 bg-pure-white text-logistics-red shadow-sm";
+                driverBtn.className = "flex items-center justify-center gap-2 py-2 rounded font-label-lg transition-all duration-200 text-on-secondary-fixed-variant hover:bg-pure-white/50";
+            } else {
+                driverBtn.className = "flex items-center justify-center gap-2 py-2 rounded font-label-lg transition-all duration-200 bg-pure-white text-logistics-red shadow-sm";
+                customerBtn.className = "flex items-center justify-center gap-2 py-2 rounded font-label-lg transition-all duration-200 text-on-secondary-fixed-variant hover:bg-pure-white/50";
+            }
+        }
+
+        function togglePassword() {
+            const pwdInput = document.getElementById('password');
+            const pwdIcon = document.getElementById('passwordIcon');
+            if (pwdInput.type === 'password') {
+                pwdInput.type = 'text';
+                pwdIcon.innerText = 'visibility_off';
+            } else {
+                pwdInput.type = 'password';
+                pwdIcon.innerText = 'visibility';
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            
+            toastMsg.innerText = currentRole === 'customer' 
+                ? "Đang truy cập Cổng khách hàng..." 
+                : "Đang khởi tạo Công cụ định tuyến Tài xế...";
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                console.log(`Redirecting user to ${currentRole} dashboard`);
+                alert(`THÀNH CÔNG: Đang chuyển hướng đến môi trường ${currentRole.toUpperCase()}.`);
+                toast.classList.add('translate-y-20', 'opacity-0');
+                toast.classList.remove('translate-y-0', 'opacity-100');
+            }, 1500);
+        });
+    </script>
+</body></html>
