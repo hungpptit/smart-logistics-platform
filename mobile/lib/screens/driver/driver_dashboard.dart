@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_styles.dart';
@@ -531,64 +533,93 @@ class _DriverDashboardState extends State<DriverDashboard> {
             Container(
               height: 220.0,
               width: double.infinity,
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 borderRadius: AppStyles.roundedXl,
                 border: Border.all(color: AppColors.surfaceContainer),
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://lh3.googleusercontent.com/aida-public/AB6AXuDzQB6RDtlgqjcCGlIAOOsifvWn2qtgcDJCOLHUUP_mzYCFfbIlsF08vXVsPUr86ATHFNdsrNSmNudKBReySkEx26iHpd3tL46w9d-MAImLyXYJNrI8A3xIVCMA_Ibk3dxYxT4XwthKu0ccrEReST02y2VQheenWKH3gvGOy8Dj1B1Ptr969lqx7Dcn6V2lqnY1Ia0srTYBqsw083DuVycfZSGLGdmPFCzjzIchA7-PAF8Kh058CogzgQ',
-                  ),
-                  fit: BoxFit.cover,
-                ),
               ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: AppStyles.roundedXl,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      AppColors.deepOnyx.withValues(alpha: 0.6),
-                    ],
-                  ),
-                ),
-                padding: const EdgeInsets.all(16.0),
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  padding: const EdgeInsets.all(12.0),
-                  decoration: BoxDecoration(
-                    color: AppColors.pureWhite.withValues(alpha: 0.9),
-                    borderRadius: AppStyles.roundedLg,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36.0,
-                        height: 36.0,
-                        decoration: const BoxDecoration(
-                          color: AppColors.logisticsRed,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.navigation, color: AppColors.pureWhite, size: 18.0),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: FlutterMap(
+                      options: MapOptions(
+                        initialCenter: const LatLng(30.2672, -97.7431),
+                        initialZoom: 13.0,
                       ),
-                      const SizedBox(width: 12.0),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Dự kiến điểm dừng tiếp',
-                              style: AppTypography.labelMd.copyWith(color: AppColors.logisticsRed, fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              '14 Phút',
-                              style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.deepOnyx),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.velocity.mobile',
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: const LatLng(30.2672, -97.7431),
+                              width: 30.0,
+                              height: 30.0,
+                              child: const Icon(
+                                Icons.my_location,
+                                color: AppColors.logisticsRed,
+                                size: 24.0,
+                              ),
                             ),
                           ],
                         ),
+                      ],
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            AppColors.deepOnyx.withValues(alpha: 0.5),
+                          ],
+                        ),
                       ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 16.0,
+                    right: 16.0,
+                    bottom: 16.0,
+                    child: Container(
+                      padding: const EdgeInsets.all(12.0),
+                      decoration: BoxDecoration(
+                        color: AppColors.pureWhite.withValues(alpha: 0.9),
+                        borderRadius: AppStyles.roundedLg,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36.0,
+                            height: 36.0,
+                            decoration: const BoxDecoration(
+                              color: AppColors.logisticsRed,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.navigation, color: AppColors.pureWhite, size: 18.0),
+                          ),
+                          const SizedBox(width: 12.0),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Dự kiến điểm dừng tiếp',
+                                  style: AppTypography.labelMd.copyWith(color: AppColors.logisticsRed, fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  '14 Phút',
+                                  style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.deepOnyx),
+                                ),
+                              ],
+                            ),
+                          ),
                       ElevatedButton(
                         onPressed: _startNavigation,
                         style: ElevatedButton.styleFrom(
@@ -603,8 +634,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24.0),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24.0),
 
             // Route List
             Text(
@@ -808,66 +841,79 @@ class _DriverDashboardState extends State<DriverDashboard> {
     return Scaffold(
       body: Stack(
         children: [
-          // 1. Full Screen Map
+          // 1. Full Screen Interactive Map with Markers
           Positioned.fill(
-            child: Image.network(
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuD3-VB_5qkstxR_ResRVgBqslLZk09wNt7uwI5PyFcSwDgSsmDJT2eam9EIO3qagLAiM7YIqU6r8x_w1u1bOusGtta4S8t-0Z-s7holsubQ46WucFOEEn8YDni0_cVRx1cdd0hn2gGGMcn9KB5Y9XAc82_BU31_StSUUlyuFyRGg71hn4UYa5WP6YOfCc9lXQ6ToJGOIQJS8-VG-8RjyYY83jIN5PV0snwrXdAIWzbcjXAEOVS37auxFA',
-              fit: BoxFit.cover,
-            ),
-          ),
-
-          // 2. Animated Pulse Location Arrow overlay
-          Center(
-            child: Stack(
-              alignment: Alignment.center,
+            child: FlutterMap(
+              options: MapOptions(
+                initialCenter: const LatLng(30.2672, -97.7431),
+                initialZoom: 14.5,
+              ),
               children: [
-                // Pulsing outer ring
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 1.0, end: 2.0),
-                  duration: const Duration(seconds: 2),
-                  builder: (context, value, child) {
-                    return Container(
-                      width: 50.0 * value,
-                      height: 50.0 * value,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.logisticsRed.withValues(alpha: 0.3 * (2.0 - value)),
-                      ),
-                    );
-                  },
-                  onEnd: () {},
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.velocity.mobile',
                 ),
-                // Driver Arrow
-                Transform.rotate(
-                  angle: 0.44, // tilted ~25 degrees
-                  child: Container(
-                    width: 44.0,
-                    height: 44.0,
-                    decoration: BoxDecoration(
-                      color: AppColors.logisticsRed,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.pureWhite, width: 2.0),
-                      boxShadow: AppStyles.softShadow,
+                MarkerLayer(
+                  markers: [
+                    // Stop 1
+                    Marker(
+                      point: const LatLng(30.2750, -97.7500),
+                      width: 40.0,
+                      height: 50.0,
+                      child: _buildMapStopPin('1'),
                     ),
-                    child: const Icon(Icons.navigation, color: AppColors.pureWhite, size: 24.0),
-                  ),
+                    // Stop 2
+                    Marker(
+                      point: const LatLng(30.2600, -97.7350),
+                      width: 40.0,
+                      height: 50.0,
+                      child: _buildMapStopPin('2'),
+                    ),
+                    // Driver Location
+                    Marker(
+                      point: const LatLng(30.2672, -97.7431),
+                      width: 80.0,
+                      height: 80.0,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Pulsing outer ring
+                          TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 1.0, end: 2.0),
+                            duration: const Duration(seconds: 2),
+                            builder: (context, value, child) {
+                              return Container(
+                                width: 40.0 * value,
+                                height: 40.0 * value,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.logisticsRed.withValues(alpha: 0.3 * (2.0 - value)),
+                                ),
+                              );
+                            },
+                          ),
+                          // Driver Arrow
+                          Transform.rotate(
+                            angle: 0.44, // tilted ~25 degrees
+                            child: Container(
+                              width: 36.0,
+                              height: 36.0,
+                              decoration: BoxDecoration(
+                                color: AppColors.logisticsRed,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.pureWhite, width: 2.0),
+                                boxShadow: AppStyles.softShadow,
+                              ),
+                              child: const Icon(Icons.navigation, color: AppColors.pureWhite, size: 20.0),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ),
-
-          // 3. Delivery stops overlays on map
-          // Stop 1
-          Positioned(
-            top: 150.0,
-            left: 80.0,
-            child: _buildMapStopPin('1'),
-          ),
-          // Stop 2
-          Positioned(
-            top: 280.0,
-            right: 120.0,
-            child: _buildMapStopPin('2'),
           ),
 
           // 4. Top Navigation Direction Banner
