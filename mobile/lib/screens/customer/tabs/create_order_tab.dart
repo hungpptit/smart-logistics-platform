@@ -296,7 +296,9 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
                         });
                       },
                     ),
-                    Text('Thanh toán ngay (Thẻ/Ví)', style: AppTypography.bodyMd),
+                    Expanded(
+                      child: Text('Thanh toán ngay (Thẻ/Ví)', style: AppTypography.bodyMd),
+                    ),
                   ],
                 ),
                 Row(
@@ -311,7 +313,9 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
                         });
                       },
                     ),
-                    Text('Thanh toán khi nhận hàng (COD)', style: AppTypography.bodyMd),
+                    Expanded(
+                      child: Text('Thanh toán khi nhận hàng (COD)', style: AppTypography.bodyMd),
+                    ),
                   ],
                 ),
               ],
