@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_styles.dart';
@@ -13,6 +15,13 @@ class TrackingTab extends StatefulWidget {
 class _TrackingTabState extends State<TrackingTab> {
   final _searchController = TextEditingController();
   String _selectedCode = 'VEL-482-991';
+  final MapController _mapController = MapController();
+
+  final Map<String, LatLng> _coordinates = {
+    'VEL-482-991': const LatLng(41.8781, -87.6298), // Chicago
+    'VEL-112-901': const LatLng(30.2672, -97.7431), // Austin
+    'VEL-992-004': const LatLng(47.6062, -122.3321), // Seattle
+  };
 
   final Map<String, Map<String, dynamic>> _shipmentsData = {
     'VEL-482-991': {
@@ -143,6 +152,10 @@ class _TrackingTabState extends State<TrackingTab> {
         setState(() {
           _selectedCode = query;
         });
+        final coords = _coordinates[query];
+        if (coords != null) {
+          _mapController.move(coords, 12.0);
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -265,6 +278,10 @@ class _TrackingTabState extends State<TrackingTab> {
                     setState(() {
                       _selectedCode = code;
                     });
+                    final coords = _coordinates[code];
+                    if (coords != null) {
+                      _mapController.move(coords, 12.0);
+                    }
                   },
                   child: Container(
                     width: 200.0,
@@ -470,43 +487,83 @@ class _TrackingTabState extends State<TrackingTab> {
           Container(
             height: 240.0,
             width: double.infinity,
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               borderRadius: AppStyles.roundedXl,
               border: Border.all(color: AppColors.surfaceContainerHighest),
-              image: const DecorationImage(
-                image: NetworkImage(
-                  'https://lh3.googleusercontent.com/aida-public/AB6AXuA4gM76B7HMMkMvR7ODppo1ySv8CPB3mGBBdI3CZgK1n0yG7gmzhC4UMsoPDDNE41UHuHFY5BhSEOf2vvGr4zyzpZzFB7H1W_a4FHsnVqFXXe6D9KTpH8Y-167O5xyKpRKpDrxCSOSTuJyLR1lN0-AoKP19qgp9RCl1UsLklnx8bqRVodyyPmpA-gf_5asGSd08C4uWZbCXmF6fO2jW7oZpuUUU5SetD0hOMGOjJQ036bKBs94J4O6bFQ',
-                ),
-                fit: BoxFit.cover,
-              ),
             ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: AppStyles.roundedXl,
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black.withValues(alpha: 0.6)],
-                ),
-              ),
-              padding: const EdgeInsets.all(16.0),
-              alignment: Alignment.bottomCenter,
-              child: SizedBox(
-                width: double.infinity,
-                height: 48.0,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Open full map modal/route
-                  },
-                  icon: const Icon(Icons.map, size: 18.0),
-                  label: const Text('Xem bản đồ trực tuyến'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.pureWhite,
-                    foregroundColor: AppColors.deepOnyx,
-                    shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: _coordinates[_selectedCode] ?? const LatLng(41.8781, -87.6298),
+                      initialZoom: 12.0,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.velocity.mobile',
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: _coordinates[_selectedCode] ?? const LatLng(41.8781, -87.6298),
+                            width: 45.0,
+                            height: 45.0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.logisticsRed,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.pureWhite, width: 2.0),
+                                boxShadow: AppStyles.softShadow,
+                              ),
+                              child: const Icon(
+                                Icons.local_shipping,
+                                color: AppColors.pureWhite,
+                                size: 22.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              ),
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.6)],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 16.0,
+                  right: 16.0,
+                  bottom: 16.0,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48.0,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // Open full map modal/route
+                      },
+                      icon: const Icon(Icons.map, size: 18.0),
+                      label: const Text('Xem bản đồ trực tuyến'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.pureWhite,
+                        foregroundColor: AppColors.deepOnyx,
+                        shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24.0),
@@ -635,6 +692,10 @@ class _TrackingTabState extends State<TrackingTab> {
           _selectedCode = code;
           _searchController.text = code;
         });
+        final coords = _coordinates[code];
+        if (coords != null) {
+          _mapController.move(coords, 12.0);
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),

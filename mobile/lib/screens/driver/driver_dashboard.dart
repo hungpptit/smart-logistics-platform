@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -23,10 +24,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
   String _driverName = 'Tài xế';
   String _driverEmail = 'driver@velocity.vn';
 
+  // Real-time GPS location fields
+  StreamSubscription<Position>? _positionSubscription;
+  LatLng _currentLocation = const LatLng(10.8231, 106.6297); // default to HCMC center
+  final MapController _mapController = MapController();
+  final MapController _navMapController = MapController();
+
   @override
   void initState() {
     super.initState();
     _loadDriverProfile();
+    _initLocationService();
   }
 
   Future<void> _loadDriverProfile() async {
@@ -40,9 +48,164 @@ class _DriverDashboardState extends State<DriverDashboard> {
     }
   }
 
+  Future<void> _initLocationService() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        _showLocationServiceDialog();
+      }
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (mounted) {
+          _showPermissionDeniedDialog(false);
+        }
+        return;
+      }
+    }
+    
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        _showPermissionDeniedDialog(true);
+      }
+      return;
+    } 
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      if (mounted) {
+        setState(() {
+          _currentLocation = LatLng(position.latitude, position.longitude);
+        });
+        _mapController.move(_currentLocation, 13.0);
+        _navMapController.move(_currentLocation, 14.5);
+      }
+    } catch (e) {
+      debugPrint("Lỗi lấy vị trí ban đầu: $e");
+    }
+
+    await _positionSubscription?.cancel();
+
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      ),
+    ).listen((Position position) {
+      if (mounted) {
+        setState(() {
+          _currentLocation = LatLng(position.latitude, position.longitude);
+        });
+        if (_isNavigating) {
+          _navMapController.move(_currentLocation, 14.5);
+        } else {
+          _mapController.move(_currentLocation, 13.0);
+        }
+      }
+    });
+  }
+
+  void _showLocationServiceDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.location_off, color: AppColors.logisticsRed),
+              SizedBox(width: 8),
+              Text('Chưa bật định vị'),
+            ],
+          ),
+          content: const Text(
+            'Dịch vụ định vị GPS trên thiết bị của bạn đang tắt. '
+            'Vui lòng bật định vị để ứng dụng có thể hiển thị bản đồ và dẫn đường chính xác.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Hủy', style: TextStyle(color: AppColors.secondary)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await Geolocator.openLocationSettings();
+                Future.delayed(const Duration(seconds: 2), () {
+                  _initLocationService();
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.deepOnyx,
+                foregroundColor: AppColors.pureWhite,
+              ),
+              child: const Text('Mở Cài đặt'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPermissionDeniedDialog(bool permanent) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.security, color: permanent ? AppColors.logisticsRed : AppColors.secondary),
+              const SizedBox(width: 8),
+              const Text('Quyền định vị'),
+            ],
+          ),
+          content: Text(
+            permanent
+                ? 'Bạn đã từ chối vĩnh viễn quyền định vị. Vui lòng mở Cài đặt ứng dụng để cấp quyền thủ công.'
+                : 'Ứng dụng cần quyền định vị để hiển thị vị trí của bạn trên bản đồ.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Hủy', style: TextStyle(color: AppColors.secondary)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                if (permanent) {
+                  await Geolocator.openAppSettings();
+                } else {
+                  _initLocationService();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.deepOnyx,
+                foregroundColor: AppColors.pureWhite,
+              ),
+              child: Text(permanent ? 'Mở Cài đặt' : 'Cấp quyền'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _alertTimer?.cancel();
+    _positionSubscription?.cancel();
     super.dispose();
   }
 
@@ -542,19 +705,20 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 children: [
                   Positioned.fill(
                     child: FlutterMap(
+                      mapController: _mapController,
                       options: MapOptions(
-                        initialCenter: const LatLng(30.2672, -97.7431),
+                        initialCenter: _currentLocation,
                         initialZoom: 13.0,
                       ),
                       children: [
                         TileLayer(
-                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          urlTemplate: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
                           userAgentPackageName: 'com.velocity.mobile',
                         ),
                         MarkerLayer(
                           markers: [
                             Marker(
-                              point: const LatLng(30.2672, -97.7431),
+                              point: _currentLocation,
                               width: 30.0,
                               height: 30.0,
                               child: const Icon(
@@ -844,34 +1008,35 @@ class _DriverDashboardState extends State<DriverDashboard> {
           // 1. Full Screen Interactive Map with Markers
           Positioned.fill(
             child: FlutterMap(
+              mapController: _navMapController,
               options: MapOptions(
-                initialCenter: const LatLng(30.2672, -97.7431),
+                initialCenter: _currentLocation,
                 initialZoom: 14.5,
               ),
               children: [
                 TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  urlTemplate: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.velocity.mobile',
                 ),
                 MarkerLayer(
                   markers: [
                     // Stop 1
                     Marker(
-                      point: const LatLng(30.2750, -97.7500),
+                      point: LatLng(_currentLocation.latitude + 0.006, _currentLocation.longitude - 0.004),
                       width: 40.0,
                       height: 50.0,
                       child: _buildMapStopPin('1'),
                     ),
                     // Stop 2
                     Marker(
-                      point: const LatLng(30.2600, -97.7350),
+                      point: LatLng(_currentLocation.latitude - 0.004, _currentLocation.longitude + 0.006),
                       width: 40.0,
                       height: 50.0,
                       child: _buildMapStopPin('2'),
                     ),
                     // Driver Location
                     Marker(
-                      point: const LatLng(30.2672, -97.7431),
+                      point: _currentLocation,
                       width: 80.0,
                       height: 80.0,
                       child: Stack(
