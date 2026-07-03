@@ -38,6 +38,16 @@ class AuthService {
     return await _storage.read(key: 'token');
   }
 
+  // Get stored email
+  static Future<String?> getStoredEmail() async {
+    return await _storage.read(key: 'email');
+  }
+
+  // Get stored username
+  static Future<String?> getStoredUsername() async {
+    return await _storage.read(key: 'username');
+  }
+
   // Login API Call
   static Future<Map<String, dynamic>> login(String email, String password) async {
     try {

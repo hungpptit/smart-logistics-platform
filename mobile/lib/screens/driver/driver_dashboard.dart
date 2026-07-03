@@ -18,6 +18,26 @@ class _DriverDashboardState extends State<DriverDashboard> {
   bool _showTrafficAlert = false;
   Timer? _alertTimer;
 
+  String _driverName = 'Tài xế';
+  String _driverEmail = 'driver@velocity.vn';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDriverProfile();
+  }
+
+  Future<void> _loadDriverProfile() async {
+    final name = await AuthService.getStoredUsername();
+    final email = await AuthService.getStoredEmail();
+    if (mounted && (name != null || email != null)) {
+      setState(() {
+        if (name != null) _driverName = name;
+        if (email != null) _driverEmail = email;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _alertTimer?.cancel();
@@ -284,11 +304,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 ),
               ),
               accountName: Text(
-                'Logistics Pro',
+                _driverName,
                 style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite, fontWeight: FontWeight.bold),
               ),
               accountEmail: Text(
-                'ID: VEL-99283',
+                _driverEmail,
                 style: AppTypography.labelMd.copyWith(color: Colors.white70),
               ),
             ),
@@ -341,7 +361,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
           children: [
             // Header Intro
             Text(
-              'Chào buổi sáng, Tài xế 99283',
+              'Chào buổi sáng, $_driverName',
               style: AppTypography.headlineLgMobile.copyWith(
                 fontWeight: FontWeight.bold,
                 color: AppColors.deepOnyx,
