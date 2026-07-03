@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 declare const process: any;
 
@@ -10,10 +11,10 @@ async function main() {
   // 1. Seed Roles
   console.log('🔑 Seeding Roles...');
   const roles = [
-    { roleCode: 'ADMIN', roleName: 'Quản trị viên', description: 'Toàn quyền quản trị hệ thống' },
-    { roleCode: 'STAFF', roleName: 'Nhân viên điều phối', description: 'Tạo đơn hàng, phân phối và quản lý kho bãi' },
-    { roleCode: 'SHIPPER', roleName: 'Tài xế / Shipper', description: 'Nhận tuyến đường, check-in điểm đỗ, cập nhật POD' },
-    { roleCode: 'CUSTOMER', roleName: 'Khách hàng', description: 'Khách hàng cá nhân hoặc doanh nghiệp gửi hàng' },
+    { roleCode: 'ADMIN', roleName: 'Quản trị hệ thống', description: 'Quản trị nhân sự và phân quyền, quản lý khách hàng, cấu hình tham số thuật toán AI, cấu hình hạ tầng kỹ thuật (chu kỳ GPS, API Keys bản đồ), báo cáo thống kê doanh thu và hiệu suất' },
+    { roleCode: 'STAFF', roleName: 'Nhân viên', description: 'Tiếp nhận và phân loại đơn hàng, cập nhật nhập/xuất kho, kích hoạt định tuyến tự động bằng AI, giám sát vị trí shipper realtime, điều phối và xử lý sự cố lộ trình' },
+    { roleCode: 'SHIPPER', roleName: 'Tài xế giao hàng', description: 'Tiếp nhận ca làm việc và lộ trình tối ưu, sử dụng bản đồ điều hướng, quét QR code cập nhật trạng thái đơn hàng (kèm ảnh và tọa độ), đồng bộ tọa độ GPS chạy ngầm' },
+    { roleCode: 'CUSTOMER', roleName: 'Khách hàng', description: 'Tạo đơn hàng lẻ/hàng loạt, in mã vận đơn QR, đặt lịch hẹn lấy hàng, tra cứu hành trình đơn hàng realtime, theo dõi vị trí shipper trên bản đồ' },
   ];
 
   for (const r of roles) {
@@ -218,6 +219,79 @@ async function main() {
         isActive: ss.isActive,
       },
     });
+  }
+
+  // 7. Seed Test Users
+  console.log('👤 Seeding Test Users...');
+  const testUsers = [
+    {
+      username: 'admin',
+      email: 'admin@velocity.vn',
+      password: 'AdminPassword123',
+      phone: '0900000001',
+      roleCode: 'ADMIN',
+    },
+    {
+      username: 'dispatcher',
+      email: 'staff@velocity.vn',
+      password: 'StaffPassword123',
+      phone: '0900000002',
+      roleCode: 'STAFF',
+    },
+    {
+      username: 'shipper',
+      email: 'driver@velocity.vn',
+      password: 'DriverPassword123',
+      phone: '0900000003',
+      roleCode: 'SHIPPER',
+    },
+    {
+      username: 'customer',
+      email: 'customer@velocity.vn',
+      password: 'CustomerPassword123',
+      phone: '0900000004',
+      roleCode: 'CUSTOMER',
+    },
+  ];
+
+  for (const tu of testUsers) {
+    const existing = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: tu.username },
+          { email: tu.email }
+        ]
+      }
+    });
+
+    if (!existing) {
+      const passwordHash = await bcrypt.hash(tu.password, 10);
+      const user = await prisma.user.create({
+        data: {
+          username: tu.username,
+          email: tu.email,
+          passwordHash: passwordHash,
+          phone: tu.phone,
+          status: 'ACTIVE',
+        }
+      });
+
+      const role = await prisma.role.findUnique({
+        where: { roleCode: tu.roleCode }
+      });
+
+      if (role) {
+        await prisma.userRole.create({
+          data: {
+            userId: user.id,
+            roleId: role.id,
+          }
+        });
+      }
+      console.log(`✅ Created test user: ${tu.username} (${tu.roleCode})`);
+    } else {
+      console.log(`ℹ️ Test user already exists: ${tu.username}`);
+    }
   }
 
   console.log('✨ Seeding master lookup tables completed successfully!');
