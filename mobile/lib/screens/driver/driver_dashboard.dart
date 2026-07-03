@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_styles.dart';
+import '../../services/auth_service.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -321,8 +322,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
             ListTile(
               leading: const Icon(Icons.logout, color: AppColors.error),
               title: const Text('Đăng xuất'),
-              onTap: () {
-                Navigator.pushReplacementNamed(context, '/');
+              onTap: () async {
+                await AuthService.clearAuthData();
+                if (context.mounted) {
+                  Navigator.pushReplacementNamed(context, '/');
+                }
               },
             ),
             const SizedBox(height: 20.0),

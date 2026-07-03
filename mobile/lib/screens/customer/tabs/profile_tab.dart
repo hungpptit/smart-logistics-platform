@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_styles.dart';
+import '../../../services/auth_service.dart';
 
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
@@ -178,9 +179,11 @@ class ProfileTab extends StatelessWidget {
             width: double.infinity,
             height: 48.0,
             child: ElevatedButton.icon(
-              onPressed: () {
-                // Logout flow: navigate back to login
-                Navigator.of(context).pushReplacementNamed('/login');
+              onPressed: () async {
+                await AuthService.clearAuthData();
+                if (context.mounted) {
+                  Navigator.of(context).pushReplacementNamed('/');
+                }
               },
               icon: const Icon(Icons.logout, size: 18.0),
               label: const Text('Đăng xuất'),

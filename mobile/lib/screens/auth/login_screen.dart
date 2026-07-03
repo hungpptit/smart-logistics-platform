@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_styles.dart';
+import '../../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,53 +39,78 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  void _handleLogin() {
+  void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
-      // Show toast / snackbar feedback
-      final message = _currentRole == 'customer'
-          ? 'Đang kết nối Cổng Khách hàng...'
-          : 'Đang khởi tạo Định vị & Tuyến đường Tài xế...';
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.verified_user, color: AppColors.logisticsRed),
-              const SizedBox(width: 12.0),
-              Expanded(
-                child: Text(
-                  message,
-                  style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: AppColors.deepOnyx,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-          margin: const EdgeInsets.all(AppStyles.marginMobile),
-          duration: const Duration(seconds: 2),
-        ),
+      final result = await AuthService.login(
+        _usernameController.text.trim(),
+        _passwordController.text,
       );
 
-      // Simulate network request
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (!mounted) return;
-        setState(() {
-          _isLoading = false;
-        });
+      if (!mounted) return;
 
-        // Simple routing placeholder
-        if (_currentRole == 'customer') {
-          Navigator.pushReplacementNamed(context, '/customer/dashboard');
-        } else {
-          Navigator.pushReplacementNamed(context, '/driver/dashboard');
-        }
+      setState(() {
+        _isLoading = false;
       });
+
+      if (result['success'] == true) {
+        final role = result['role'];
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.verified_user, color: Colors.green),
+                const SizedBox(width: 12.0),
+                Expanded(
+                  child: Text(
+                    'Đăng nhập thành công!',
+                    style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.deepOnyx,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+            margin: const EdgeInsets.all(AppStyles.marginMobile),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          if (!mounted) return;
+          if (role == 'SHIPPER') {
+            Navigator.pushReplacementNamed(context, '/driver/dashboard');
+          } else {
+            Navigator.pushReplacementNamed(context, '/customer/dashboard');
+          }
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: AppColors.logisticsRed),
+                const SizedBox(width: 12.0),
+                Expanded(
+                  child: Text(
+                    result['message'] ?? 'Đăng nhập thất bại',
+                    style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.deepOnyx,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+            margin: const EdgeInsets.all(AppStyles.marginMobile),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 

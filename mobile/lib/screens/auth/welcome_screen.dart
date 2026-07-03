@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_styles.dart';
+import '../../services/auth_service.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -25,6 +26,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
     _floatAnimation = Tween<double>(begin: 0, end: -10).animate(
       CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
     );
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final loggedIn = await AuthService.isLoggedIn();
+    if (loggedIn && mounted) {
+      final role = await AuthService.getStoredRole();
+      if (role == 'SHIPPER') {
+        Navigator.pushReplacementNamed(context, '/driver/dashboard');
+      } else {
+        Navigator.pushReplacementNamed(context, '/customer/dashboard');
+      }
+    }
   }
 
   @override

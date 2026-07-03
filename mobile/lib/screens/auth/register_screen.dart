@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_styles.dart';
+import '../../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -32,41 +33,80 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _handleRegister() {
+  void _handleRegister() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.green),
-              const SizedBox(width: 12.0),
-              Expanded(
-                child: Text(
-                  'Đăng ký tài khoản thành công! Đang chuyển đến Đăng nhập...',
-                  style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: AppColors.deepOnyx,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-          margin: const EdgeInsets.all(AppStyles.marginMobile),
-          duration: const Duration(seconds: 2),
-        ),
+      // Tạo username tự động từ họ tên (xóa khoảng trắng, viết thường) hoặc lấy trước phần @ của email
+      final nameParts = _fullNameController.text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+      final defaultUsername = nameParts.isNotEmpty ? nameParts : _emailController.text.split('@')[0];
+
+      final result = await AuthService.register(
+        username: defaultUsername,
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        phone: _phoneController.text.trim(),
+        roleCode: 'CUSTOMER',
       );
 
-      Future.delayed(const Duration(milliseconds: 2000), () {
-        if (!mounted) return;
-        setState(() {
-          _isLoading = false;
-        });
-        Navigator.pushReplacementNamed(context, '/login');
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
       });
+
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green),
+                const SizedBox(width: 12.0),
+                Expanded(
+                  child: Text(
+                    'Đăng ký tài khoản thành công! Đang chuyển đến Đăng nhập...',
+                    style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.deepOnyx,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+            margin: const EdgeInsets.all(AppStyles.marginMobile),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        Future.delayed(const Duration(seconds: 2), () {
+          if (!mounted) return;
+          Navigator.pushReplacementNamed(context, '/login');
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: AppColors.logisticsRed),
+                const SizedBox(width: 12.0),
+                Expanded(
+                  child: Text(
+                    result['message'] ?? 'Đăng ký tài khoản thất bại',
+                    style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.deepOnyx,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+            margin: const EdgeInsets.all(AppStyles.marginMobile),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
