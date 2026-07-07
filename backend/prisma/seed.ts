@@ -232,7 +232,7 @@ async function main() {
       roleCode: 'ADMIN',
     },
     {
-      username: 'dispatcher',
+      username: 'staff',
       email: 'staff@velocity.vn',
       password: 'StaffPassword123',
       phone: '0900000002',
