@@ -7,6 +7,8 @@ import dotenv from 'dotenv';
 import apiRouter from './routes';
 import { errorMiddleware } from './middlewares/error.middleware';
 import { connectRedis } from './config/redis';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger';
 
 dotenv.config();
 
@@ -23,6 +25,9 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+
+// Swagger API Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Mount central routing system
 app.use('/api/v1', apiRouter);
@@ -48,6 +53,7 @@ const startServer = async () => {
   await connectRedis();
   httpServer.listen(PORT, () => {
     console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+    console.log(`📚 API Swagger Docs available at http://localhost:${PORT}/api-docs`);
   });
 };
 

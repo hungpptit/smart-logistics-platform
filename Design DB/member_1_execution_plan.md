@@ -81,9 +81,9 @@ backend/src/
 
 ---
 
-### BƯỚC 5: TÀI LIỆU SWAGGER & BỘ KIỂM THỬ POSTMAN (Thời gian dự kiến: Ngày 7) - **[ĐẠT 70%]**
-*   **Tác vụ 5.1 — Hoàn thiện Swagger Docs:** Viết tài liệu mô tả cho các APIs mới thêm. (Đang thực hiện)
-*   **Tác vụ 5.2 — Tạo Postman Collection:** Tạo các kịch bản kiểm thử API tự động. (Đang thực hiện)
+### BƯỚC 5: TÀI LIỆU SWAGGER & BỘ KIỂM THỬ POSTMAN (Thời gian dự kiến: Ngày 7) - **[ĐÃ HOÀN THÀNH 100%]**
+*   **Tác vụ 5.1 — Hoàn thiện Swagger Docs:** Viết tài liệu mô tả cho các APIs mới thêm. (Đã hoàn thành - Tích hợp tại /api-docs sử dụng swagger-jsdoc)
+*   **Tác vụ 5.2 — Tạo Postman Collection:** Tạo các kịch bản kiểm thử API tự động. (Đã hoàn thành - File velocity_api_collection.json nằm trong thư mục Design DB)
 
 ---
 

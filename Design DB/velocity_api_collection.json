@@ -1,0 +1,754 @@
+{
+	"info": {
+		"_postman_id": "84323c21-cf7b-4b1c-99d0-60b6d214e21a",
+		"name": "Velocity Logistics API Collection",
+		"description": "Bộ kịch bản kiểm thử API tích hợp tự động cho dự án Smart Logistics Platform (SLP). Sau khi đăng nhập, token sẽ tự động lưu vào biến môi trường để sử dụng cho các yêu cầu sau.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "01. Authentication",
+			"item": [
+				{
+					"name": "Đăng ký Khách hàng mới",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"test_customer_postman\",\n  \"email\": \"postman_customer@gmail.com\",\n  \"password\": \"password123\",\n  \"phone\": \"0912345678\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Đăng nhập",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();",
+									"pm.test(\"Đăng nhập thành công\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    pm.expect(response.success).to.be.true;",
+									"});",
+									"if (response.success && response.data && response.data.accessToken) {",
+									"    pm.collectionVariables.set(\"accessToken\", response.data.accessToken);",
+									"    console.log(\"Đã lưu accessToken mới vào biến Collection!\");",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@slp.com\",\n  \"password\": \"admin123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Lấy thông tin tài khoản hiện tại",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Lấy thông tin thành công\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.data.email).to.exist;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/me",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"me"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Làm mới Access Token",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/refresh",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"refresh"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Đăng xuất",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/logout",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "02. Customers",
+			"item": [
+				{
+					"name": "Lấy danh sách Khách hàng",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Lấy danh sách thành công\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.data.items).to.be.an('array');",
+									"    if (response.data.items.length > 0) {",
+									"        pm.collectionVariables.set(\"testCustomerId\", response.data.items[0].id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/customers?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"customers"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Lấy chi tiết Khách hàng",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/customers/{{testCustomerId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"customers",
+								"{{testCustomerId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Thêm địa chỉ vào Sổ địa chỉ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Thêm địa chỉ thành công\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"addressLine1\": \"45 Trường Sơn\",\n  \"ward\": \"Phường 2\",\n  \"district\": \"Quận Tân Bình\",\n  \"province\": \"Thành phố Hồ Chí Minh\",\n  \"wardCode\": \"26890\",\n  \"addressType\": \"HOME\",\n  \"isDefault\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/customers/{{testCustomerId}}/addresses",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"customers",
+								"{{testCustomerId}}",
+								"addresses"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Lấy danh sách địa chỉ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Lấy địa chỉ thành công\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.data).to.be.an('array');",
+									"    if(response.data.length > 0) {",
+									"        pm.collectionVariables.set(\"testAddressId\", response.data[0].id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/customers/{{testCustomerId}}/addresses",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"customers",
+								"{{testCustomerId}}",
+								"addresses"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cập nhật địa chỉ",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"addressLine1\": \"45/1 Trường Sơn\",\n  \"addressType\": \"OFFICE\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/customers/{{testCustomerId}}/addresses/{{testAddressId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"customers",
+								"{{testCustomerId}}",
+								"addresses",
+								"{{testAddressId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "03. Facilities & Zones",
+			"item": [
+				{
+					"name": "Lấy danh sách bưu cục",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Lấy bưu cục thành công\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.data).to.be.an('array');",
+									"    if (response.data.length > 0) {",
+									"        pm.collectionVariables.set(\"testFacilityId\", response.data[0].id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/facilities",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"facilities"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Lấy loại hình bưu cục",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/facilities/types",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"facilities",
+								"types"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Tạo Phân khu lưu trữ (Cargo Zone)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Tạo phân khu thành công\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"zoneCode\": \"ZONE-TEST-01\",\n  \"zoneName\": \"Khu kiểm thử tự động\",\n  \"zoneType\": \"STORAGE\",\n  \"maxWeightKg\": 1000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/facilities/{{testFacilityId}}/zones",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"facilities",
+								"{{testFacilityId}}",
+								"zones"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Lấy danh sách Phân khu",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Lấy phân khu thành công\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const response = pm.response.json();",
+									"    if (response.data.length > 0) {",
+									"        pm.collectionVariables.set(\"testZoneId\", response.data[response.data.length - 1].id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/facilities/{{testFacilityId}}/zones",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"facilities",
+								"{{testFacilityId}}",
+								"zones"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cập nhật Phân khu",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"zoneName\": \"Khu kiểm thử đã cập nhật\",\n  \"maxWeightKg\": 1500,\n  \"status\": \"ACTIVE\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/facilities/{{testFacilityId}}/zones/{{testZoneId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"facilities",
+								"{{testFacilityId}}",
+								"zones",
+								"{{testZoneId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Xóa Phân khu",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/facilities/{{testFacilityId}}/zones/{{testZoneId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"facilities",
+								"{{testFacilityId}}",
+								"zones",
+								"{{testZoneId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "04. Orders",
+			"item": [
+				{
+					"name": "Đặt Đơn hàng mới (Tự động Geocode & Tính phí)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Tạo đơn thành công\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.data.orderCode).to.exist;",
+									"    pm.collectionVariables.set(\"testOrderId\", response.data.id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"customerId\": \"{{testCustomerId}}\",\n  \"serviceCode\": \"STANDARD\",\n  \"senderName\": \"Nguyễn Văn A\",\n  \"senderPhone\": \"0912345678\",\n  \"senderAddressLine1\": \"100 Lê Lợi\",\n  \"senderWard\": \"Phường Bến Thành\",\n  \"senderDistrict\": \"Quận 1\",\n  \"senderProvince\": \"Thành phố Hồ Chí Minh\",\n  \"senderWardCode\": \"26737\",\n  \"receiverName\": \"Trần Thị B\",\n  \"receiverPhone\": \"0987654321\",\n  \"receiverAddressLine1\": \"200 Quang Trung\",\n  \"receiverWard\": \"Phường 10\",\n  \"receiverDistrict\": \"Quận Gò Vấp\",\n  \"receiverProvince\": \"Thành phố Hồ Chí Minh\",\n  \"receiverWardCode\": \"26861\",\n  \"isFragile\": false,\n  \"codAmount\": 300000,\n  \"note\": \"Kiểm tra API tự động\",\n  \"packages\": [\n    {\n      \"packageName\": \"Sách giáo khoa\",\n      \"weightKg\": 2.3,\n      \"lengthCm\": 25,\n      \"widthCm\": 18,\n      \"heightCm\": 10\n    }\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Lấy danh sách Đơn hàng",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/orders?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Xem chi tiết Đơn hàng",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{testOrderId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{testOrderId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cập nhật Trạng thái Đơn (Staff/Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"ACCEPTED\",\n  \"reason\": \"Bưu cục đã tiếp nhận đơn hàng thành công qua API test\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{testOrderId}}/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{testOrderId}}",
+								"status"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "05. Shipping Services",
+			"item": [
+				{
+					"name": "Xem danh sách dịch vụ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Lấy dịch vụ thành công\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.data).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/services",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"services"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "testCustomerId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "testAddressId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "testFacilityId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "testZoneId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "testOrderId",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
