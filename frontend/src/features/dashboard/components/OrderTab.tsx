@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
+import { CreateOrderModal } from './CreateOrderModal';
 import {
   Search,
   Filter,
@@ -120,6 +121,7 @@ export const OrderTab: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
   const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [newStatus, setNewStatus] = useState<string>('');
   const [statusReason, setStatusReason] = useState<string>('');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
@@ -317,6 +319,13 @@ export const OrderTab: React.FC = () => {
               title="Làm mới danh sách"
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            </button>
+
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-[#bc0100] hover:bg-[#bc0100]/90 text-white px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              Tạo đơn hàng
             </button>
           </div>
         </div>
@@ -657,6 +666,18 @@ export const OrderTab: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Create Order Modal */}
+      <CreateOrderModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          setCurrentPage(1);
+          fetchOrders(1);
+        }}
+        token={token}
+        isAdminOrStaff={isAdminOrStaff}
+      />
     </div>
   );
 };
