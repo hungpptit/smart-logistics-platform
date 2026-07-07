@@ -84,6 +84,7 @@ export class AuthService {
         deletedAt: null,
       },
       include: {
+        managedFacilities: true,
         userRoles: {
           include: {
             role: true,
@@ -219,6 +220,7 @@ export class AuthService {
     const user = await prisma.user.findUnique({
       where: { id: userId, deletedAt: null },
       include: {
+        managedFacilities: true,
         userRoles: {
           include: {
             role: {

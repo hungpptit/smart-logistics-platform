@@ -9,6 +9,11 @@ export interface User {
   createdAt: string;
   roles: string[];
   permissions: string[];
+  managedFacilities?: Array<{
+    id: string;
+    facilityName: string;
+    facilityCode: string;
+  }>;
 }
 
 export interface AuthResponse {

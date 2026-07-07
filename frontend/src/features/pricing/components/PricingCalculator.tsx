@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CONFIG } from '../config';
+import { CONFIG } from '../../../config';
 import { Scale, MapPin, ShieldAlert, BadgeDollarSign, HelpCircle } from 'lucide-react';
 
 interface ServiceData {

@@ -122,7 +122,7 @@ export const FacilityTab: React.FC = () => {
 
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
-  const canManage = currentUser?.roles.includes('ADMIN') || currentUser?.roles.includes('STAFF');
+  const canManage = currentUser?.roles.includes('ADMIN');
 
   const fetchFacilityTypes = async () => {
     if (!token) return;

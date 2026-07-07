@@ -78,7 +78,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-xs font-bold truncate text-white">{user.username}</span>
-            <span className="text-[10px] text-gray-400 truncate">{user.email}</span>
+            <span className="text-[10px] text-gray-400 truncate mb-0.5">{user.email}</span>
+            {user.roles.includes('STAFF') && user.managedFacilities && user.managedFacilities.length > 0 ? (
+              <span className="text-[9px] text-[#bc0100] bg-[#bc0100]/10 px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wide truncate self-start mt-0.5">
+                📍 {user.managedFacilities[0].facilityName}
+              </span>
+            ) : user.roles.includes('STAFF') ? (
+              <span className="text-[9px] text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wide truncate self-start mt-0.5">
+                📍 Chưa gán kho
+              </span>
+            ) : null}
           </div>
         </div>
         <button
