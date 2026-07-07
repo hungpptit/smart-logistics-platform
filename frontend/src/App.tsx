@@ -13,7 +13,7 @@ import { Search, Earth } from 'lucide-react';
 import { Header } from './components/Header';
 
 const AppContent: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   // Virtual Routing State
   const [view, setView] = useState<'landing' | 'pricing' | 'dashboard'>('landing');
