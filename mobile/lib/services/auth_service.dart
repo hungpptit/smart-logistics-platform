@@ -64,7 +64,7 @@ class AuthService {
       
       if (response.statusCode == 200 && responseData['success'] == true) {
         final data = responseData['data'];
-        final token = data['token'];
+        final token = data['accessToken'] ?? data['token'];
         final user = data['user'];
         final List<dynamic> roles = user['roles'];
         
@@ -76,6 +76,10 @@ class AuthService {
           role = 'STAFF';
         } else if (roles.contains('SHIPPER')) {
           role = 'SHIPPER';
+        }
+
+        if (token == null) {
+          throw Exception('Token không được trả về từ máy chủ');
         }
 
         await saveAuthData(token, role, user['email'], user['username']);
