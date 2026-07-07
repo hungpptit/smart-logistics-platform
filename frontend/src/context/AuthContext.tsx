@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const resData = await response.json();
 
       if (response.ok && resData.success) {
-        const newToken = resData.data.token;
+        const newToken = resData.data.accessToken;
         localStorage.setItem('token', newToken);
         setToken(newToken);
         setUser(resData.data.user);
