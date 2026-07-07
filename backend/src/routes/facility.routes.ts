@@ -24,6 +24,11 @@ router.get(
 );
 
 router.get(
+  '/types',
+  facilityController.getTypes
+);
+
+router.get(
   '/:id',
   facilityController.getById
 );

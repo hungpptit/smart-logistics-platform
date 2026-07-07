@@ -369,4 +369,13 @@ export class FacilityService {
 
     return { success: true };
   }
+
+  /**
+   * Get all facility types
+   */
+  public async getFacilityTypes() {
+    return await prisma.facilityType.findMany({
+      orderBy: { typeCode: 'asc' },
+    });
+  }
 }

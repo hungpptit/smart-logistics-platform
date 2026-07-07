@@ -125,4 +125,17 @@ export class FacilityController {
       next(error);
     }
   };
+
+  public getTypes = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.facilityService.getFacilityTypes();
+      res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách loại kho bãi thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

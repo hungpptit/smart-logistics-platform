@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { OrderTab } from './OrderTab';
+import { CustomerTab } from './CustomerTab';
+import { FacilityTab } from './FacilityTab';
 import { 
   ClipboardList, 
   Users, 
@@ -18,34 +20,6 @@ import {
 interface AdminDashboardProps {
   onBackToHome?: () => void;
 }
-
-// Placeholders for tabs to be implemented in next steps
-
-const CustomerTabPlaceholder: React.FC = () => (
-  <div className="bg-white p-6 rounded-lg border border-[#e2e8f0] shadow-soft">
-    <div className="flex justify-between items-center mb-6">
-      <h3 className="text-lg font-bold text-[#161D25] uppercase tracking-wider">Danh sách Khách hàng</h3>
-      <span className="text-xs text-gray-400 font-mono">STEP 4 - COMING SOON</span>
-    </div>
-    <div className="flex flex-col items-center justify-center py-12 text-gray-400 gap-3">
-      <Users size={48} className="text-[#bc0100]/20" />
-      <p>Module Quản lý Khách hàng đang được chuẩn bị triển khai ở bước tiếp theo.</p>
-    </div>
-  </div>
-);
-
-const FacilityTabPlaceholder: React.FC = () => (
-  <div className="bg-white p-6 rounded-lg border border-[#e2e8f0] shadow-soft">
-    <div className="flex justify-between items-center mb-6">
-      <h3 className="text-lg font-bold text-[#161D25] uppercase tracking-wider">Quản lý Kho bãi & Phân khu</h3>
-      <span className="text-xs text-gray-400 font-mono">STEP 5 - COMING SOON</span>
-    </div>
-    <div className="flex flex-col items-center justify-center py-12 text-gray-400 gap-3">
-      <Warehouse size={48} className="text-[#bc0100]/20" />
-      <p>Module Quản lý Kho bãi đang được chuẩn bị triển khai ở bước tiếp theo.</p>
-    </div>
-  </div>
-);
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) => {
   const { user, logout } = useAuth();
@@ -78,14 +52,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
       id: 'customers',
       label: 'Quản lý Khách hàng',
       icon: Users,
-      component: CustomerTabPlaceholder,
+      component: CustomerTab,
       allowed: isAdminOrStaff
     },
     {
       id: 'facilities',
       label: 'Hệ thống Kho bãi',
       icon: Warehouse,
-      component: FacilityTabPlaceholder,
+      component: FacilityTab,
       allowed: isAdminOrStaff
     },
     {
