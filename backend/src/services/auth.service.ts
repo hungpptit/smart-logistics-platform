@@ -1,7 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prisma';
-import { RegisterDto, LoginDto } from '../dtos/auth.dto';
+import { redis } from '../config/redis';
+import { RegisterDto, LoginDto, RefreshTokenDto } from '../dtos/auth.dto';
 import { BadRequestException, UnauthorizedException, NotFoundException } from '../middlewares/error.middleware';
 
 export class AuthService {
@@ -112,31 +113,103 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    // 5. Generate JWT token
+    // 5. Generate Access & Refresh tokens
     const jwtSecret = process.env.JWT_SECRET || 'super_secret_key_slp_2026';
-    const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '24h';
+    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'super_refresh_secret_key_slp_2026';
 
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       {
         id: user.id,
         username: user.username,
         email: user.email,
       },
       jwtSecret,
-      { expiresIn: jwtExpiresIn as any }
+      { expiresIn: '15m' }
     );
+
+    const refreshToken = jwt.sign(
+      {
+        id: user.id,
+      },
+      jwtRefreshSecret,
+      { expiresIn: '7d' }
+    );
+
+    // Save refresh token to Redis (Expires in 7 days)
+    await redis.setEx(`refresh_token:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
 
     // 6. Exclude passwordHash from response
     const { passwordHash: _, ...userWithoutPassword } = user;
     const roles = user.userRoles.map((ur) => ur.role.roleCode);
 
     return {
-      token,
+      accessToken,
+      refreshToken,
       user: {
         ...userWithoutPassword,
         roles,
       },
     };
+  }
+
+  /**
+   * Refresh access token
+   */
+  public async refresh(dto: RefreshTokenDto) {
+    const jwtSecret = process.env.JWT_SECRET || 'super_secret_key_slp_2026';
+    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'super_refresh_secret_key_slp_2026';
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(dto.refreshToken, jwtRefreshSecret);
+    } catch (err) {
+      throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');
+    }
+
+    const userId = decoded.id;
+
+    // Verify token exists in Redis
+    const savedToken = await redis.get(`refresh_token:${userId}`);
+    if (!savedToken || savedToken !== dto.refreshToken) {
+      throw new UnauthorizedException('Refresh token đã bị vô hiệu hóa hoặc không tồn tại');
+    }
+
+    // Get user details
+    const user = await prisma.user.findUnique({
+      where: { id: userId, deletedAt: null },
+      include: {
+        userRoles: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Tài khoản người dùng không hợp lệ hoặc đã bị khóa');
+    }
+
+    // Generate new Access Token
+    const accessToken = jwt.sign(
+      {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+      },
+      jwtSecret,
+      { expiresIn: '15m' }
+    );
+
+    return { accessToken };
+  }
+
+  /**
+   * Revoke refresh token (Logout)
+   */
+  public async logout(userId: string) {
+    await redis.del(`refresh_token:${userId}`);
+    return { success: true };
   }
 
   /**

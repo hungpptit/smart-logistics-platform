@@ -1,0 +1,529 @@
+import { prisma } from '../config/prisma';
+import { GeocodingService } from './geocoding.service';
+import { PricingService } from './pricing/pricing.service';
+import { CreateOrderDto, UpdateOrderStatusDto } from '../dtos/order.dto';
+import { BadRequestException, NotFoundException, ForbiddenException } from '../middlewares/error.middleware';
+import { OrderStatus, OrderChangeSource } from '@prisma/client';
+import { resolveAddressDetails } from '../utils/address-resolver';
+
+export class OrderService {
+  private geocodingService = new GeocodingService();
+  private pricingService = new PricingService();
+
+  /**
+   * Helper to retrieve customer ID by User ID
+   */
+  private async getCustomerIdByUserId(userId: string): Promise<string> {
+    const customer = await prisma.customer.findUnique({
+      where: { userId },
+    });
+    if (!customer || customer.deletedAt) {
+      throw new BadRequestException('Không tìm thấy thông tin hồ sơ khách hàng liên kết với tài khoản này');
+    }
+    if (customer.status !== 'ACTIVE') {
+      throw new BadRequestException('Hồ sơ khách hàng của bạn đang bị khóa');
+    }
+    return customer.id;
+  }
+
+  /**
+   * Create a single order (single-hub booking)
+   */
+  public async createOrder(creatorId: string, userRoles: string[], dto: CreateOrderDto) {
+    let customerId = dto.customerId;
+
+    // If the creator is a customer, enforce using their own customer profile
+    if (userRoles.includes('CUSTOMER') && !userRoles.includes('ADMIN') && !userRoles.includes('STAFF')) {
+      customerId = await this.getCustomerIdByUserId(creatorId);
+    } else if (!customerId) {
+      throw new BadRequestException('Trường customerId là bắt buộc đối với Nhân viên/Admin');
+    }
+
+    // Check if customer exists
+    const customerWithUser = await prisma.customer.findUnique({
+      where: { id: customerId, deletedAt: null },
+      include: { user: true },
+    });
+    if (!customerWithUser) {
+      throw new NotFoundException('Không tìm thấy khách hàng');
+    }
+
+    // 1. Resolve Pickup Address
+    let pickupLat = 0;
+    let pickupLon = 0;
+    let pickupAddrSnapshot = '';
+    let resolvedPickupAddressId: string | null = null;
+
+    if (dto.pickupAddressId) {
+      const addr = await prisma.address.findUnique({
+        where: { id: dto.pickupAddressId },
+      });
+      if (!addr) throw new BadRequestException('Địa chỉ lấy hàng không tồn tại');
+      pickupLat = addr.latitude;
+      pickupLon = addr.longitude;
+      pickupAddrSnapshot = addr.formattedAddress;
+      resolvedPickupAddressId = addr.id;
+    } else if (dto.pickupAddress) {
+      // Resolve address details using administrative unit database
+      const resolved = await resolveAddressDetails(dto.pickupAddress);
+
+      // Geocode address
+      const rawAddr = `${dto.pickupAddress.addressLine1}, ${resolved.ward}, ${resolved.district}, ${resolved.province}`;
+      const geocoded = await this.geocodingService.geocode(rawAddr);
+      pickupLat = dto.pickupAddress.latitude ?? geocoded.latitude;
+      pickupLon = dto.pickupAddress.longitude ?? geocoded.longitude;
+      pickupAddrSnapshot = geocoded.formattedAddress;
+
+      // Save new address
+      const newAddr = await prisma.address.create({
+        data: {
+          addressLine1: dto.pickupAddress.addressLine1,
+          addressLine2: dto.pickupAddress.addressLine2 || null,
+          ward: resolved.ward,
+          district: resolved.district,
+          province: resolved.province,
+          country: dto.pickupAddress.country || 'Vietnam',
+          latitude: pickupLat,
+          longitude: pickupLon,
+          formattedAddress: geocoded.formattedAddress,
+          wardCode: resolved.wardCode,
+        },
+      });
+      resolvedPickupAddressId = newAddr.id;
+    } else {
+      throw new BadRequestException('Vui lòng chọn hoặc điền địa chỉ lấy hàng');
+    }
+
+    // 2. Resolve Delivery Address
+    let deliveryLat = 0;
+    let deliveryLon = 0;
+    let deliveryAddrSnapshot = '';
+    let resolvedDeliveryAddressId: string | null = null;
+
+    if (dto.deliveryAddressId) {
+      const addr = await prisma.address.findUnique({
+        where: { id: dto.deliveryAddressId },
+      });
+      if (!addr) throw new BadRequestException('Địa chỉ giao hàng không tồn tại');
+      deliveryLat = addr.latitude;
+      deliveryLon = addr.longitude;
+      deliveryAddrSnapshot = addr.formattedAddress;
+      resolvedDeliveryAddressId = addr.id;
+    } else if (dto.deliveryAddress) {
+      // Resolve address details using administrative unit database
+      const resolved = await resolveAddressDetails(dto.deliveryAddress);
+
+      // Geocode address
+      const rawAddr = `${dto.deliveryAddress.addressLine1}, ${resolved.ward}, ${resolved.district}, ${resolved.province}`;
+      const geocoded = await this.geocodingService.geocode(rawAddr);
+      deliveryLat = dto.deliveryAddress.latitude ?? geocoded.latitude;
+      deliveryLon = dto.deliveryAddress.longitude ?? geocoded.longitude;
+      deliveryAddrSnapshot = geocoded.formattedAddress;
+
+      // Save new address
+      const newAddr = await prisma.address.create({
+        data: {
+          addressLine1: dto.deliveryAddress.addressLine1,
+          addressLine2: dto.deliveryAddress.addressLine2 || null,
+          ward: resolved.ward,
+          district: resolved.district,
+          province: resolved.province,
+          country: dto.deliveryAddress.country || 'Vietnam',
+          latitude: deliveryLat,
+          longitude: deliveryLon,
+          formattedAddress: geocoded.formattedAddress,
+          wardCode: resolved.wardCode,
+        },
+      });
+      resolvedDeliveryAddressId = newAddr.id;
+    } else {
+      throw new BadRequestException('Vui lòng chọn hoặc điền địa chỉ giao hàng');
+    }
+
+    // 3. Calculate distance & duration
+    const distanceKm = this.geocodingService.calculateDistance(pickupLat, pickupLon, deliveryLat, deliveryLon);
+    // Giả định tốc độ trung bình 30km/h để tính thời gian di chuyển dự kiến (phút)
+    const durationMin = Math.ceil((distanceKm / 30) * 60) + 15; // + 15 phút thời gian chuẩn bị/xử lý
+
+    // 4. Resolve Contacts
+    let resolvedSenderContactId: string | null = dto.senderContactId || null;
+    let resolvedReceiverContactId: string | null = dto.receiverContactId || null;
+
+    if (dto.senderContact && !resolvedSenderContactId) {
+      const contact = await prisma.customerContact.create({
+        data: {
+          customerId,
+          fullName: dto.senderContact.fullName,
+          phone: dto.senderContact.phone,
+          email: dto.senderContact.email || null,
+          isPrimary: false,
+        },
+      });
+      resolvedSenderContactId = contact.id;
+    }
+
+    if (dto.receiverContact && !resolvedReceiverContactId) {
+      const contact = await prisma.customerContact.create({
+        data: {
+          customerId,
+          fullName: dto.receiverContact.fullName,
+          phone: dto.receiverContact.phone,
+          email: dto.receiverContact.email || null,
+          isPrimary: false,
+        },
+      });
+      resolvedReceiverContactId = contact.id;
+    }
+
+    // 5. Snapshot contact names and phones
+    let resolvedSenderName = '';
+    let resolvedSenderPhone = '';
+    if (resolvedSenderContactId) {
+      const contact = await prisma.customerContact.findUnique({
+        where: { id: resolvedSenderContactId },
+      });
+      if (contact) {
+        resolvedSenderName = contact.fullName;
+        resolvedSenderPhone = contact.phone;
+      }
+    } else if (dto.senderContact) {
+      resolvedSenderName = dto.senderContact.fullName;
+      resolvedSenderPhone = dto.senderContact.phone;
+    }
+
+    // Fallback default sender to user profile if still empty
+    if (!resolvedSenderName) {
+      resolvedSenderName = customerWithUser.user?.username || 'Khách hàng';
+      resolvedSenderPhone = customerWithUser.user?.phone || '0000000000';
+    }
+
+    let resolvedReceiverName = '';
+    let resolvedReceiverPhone = '';
+    if (resolvedReceiverContactId) {
+      const contact = await prisma.customerContact.findUnique({
+        where: { id: resolvedReceiverContactId },
+      });
+      if (contact) {
+        resolvedReceiverName = contact.fullName;
+        resolvedReceiverPhone = contact.phone;
+      }
+    } else if (dto.receiverContact) {
+      resolvedReceiverName = dto.receiverContact.fullName;
+      resolvedReceiverPhone = dto.receiverContact.phone;
+    }
+
+    if (!resolvedReceiverName || !resolvedReceiverPhone) {
+      throw new BadRequestException('Vui lòng cung cấp thông tin liên hệ của người nhận (tên và số điện thoại)');
+    }
+
+    // 6. Calculate total weight, volume & check fragile surcharge
+    let totalWeight = 0;
+    let totalVolume = 0;
+    let isFragile = false;
+
+    dto.packages.forEach((pkg) => {
+      totalWeight += pkg.weight;
+      // Thể tích = (dài x rộng x cao) / 1,000,000 để đổi ra m3
+      const vol = (pkg.length * pkg.width * pkg.height) / 1000000;
+      totalVolume += vol;
+      if (pkg.isFragile) isFragile = true;
+    });
+
+    // 7. Calculate Pricing
+    const pricing = await this.pricingService.calculatePrice(
+      dto.serviceCode,
+      distanceKm,
+      totalWeight,
+      isFragile,
+      dto.codAmount || 0
+    );
+
+    // 8. Generate order code
+    const count = await prisma.order.count();
+    const orderCode = `ORD-${Date.now().toString().slice(-4)}${String(count + 1).padStart(6, '0')}`;
+
+    // Estimated delivery date based on service hours
+    const service = await prisma.service.findUnique({ where: { serviceCode: dto.serviceCode } });
+    const estDeliveryDate = new Date();
+    estDeliveryDate.setHours(estDeliveryDate.getHours() + (service?.estimatedDeliveryHours || 24));
+
+    // 9. Create Order in Transaction
+    return await prisma.$transaction(async (tx) => {
+      const order = await tx.order.create({
+        data: {
+          customerId,
+          serviceId: pricing.serviceId,
+          pickupAddressId: resolvedPickupAddressId,
+          deliveryAddressId: resolvedDeliveryAddressId,
+          senderContactId: resolvedSenderContactId,
+          receiverContactId: resolvedReceiverContactId,
+          orderCode,
+          status: 'CREATED',
+          
+          // Address Snapshots
+          pickupAddressText: pickupAddrSnapshot,
+          pickupLatitude: pickupLat,
+          pickupLongitude: pickupLon,
+          senderName: resolvedSenderName,
+          senderPhone: resolvedSenderPhone,
+          
+          deliveryAddressText: deliveryAddrSnapshot,
+          deliveryLatitude: deliveryLat,
+          deliveryLongitude: deliveryLon,
+          receiverName: resolvedReceiverName,
+          receiverPhone: resolvedReceiverPhone,
+
+          shippingFee: pricing.shippingFee,
+          insuranceFee: pricing.insuranceFee,
+          codAmount: dto.codAmount || 0,
+          totalAmount: pricing.totalAmount,
+          estimatedDistance: distanceKm,
+          estimatedDuration: durationMin,
+          pricingVersion: pricing.pricingVersion,
+          estimatedDeliveryDate: estDeliveryDate,
+          createdBy: creatorId,
+        },
+      });
+
+      // Create Package records
+      let pkgSeq = 1;
+      for (const pkg of dto.packages) {
+        const pkgVol = (pkg.length * pkg.width * pkg.height) / 1000000;
+        await tx.package.create({
+          data: {
+            orderId: order.id,
+            packageCode: `${orderCode}-PKG-${String(pkgSeq++).padStart(2, '0')}`,
+            weight: pkg.weight,
+            length: pkg.length,
+            width: pkg.width,
+            height: pkg.height,
+            volume: pkgVol,
+            isFragile: pkg.isFragile || false,
+            temperatureRequirement: pkg.temperatureRequirement || null,
+            requiredVehicleTypeId: pkg.requiredVehicleTypeId || null,
+          },
+        });
+      }
+
+      // Create Payment info
+      await tx.orderPayment.create({
+        data: {
+          orderId: order.id,
+          shippingFee: pricing.shippingFee,
+          insuranceFee: pricing.insuranceFee,
+          codAmount: dto.codAmount || 0,
+          feePayer: dto.feePayer,
+          paymentMethod: dto.paymentMethod,
+          paymentStatus: 'UNPAID',
+        },
+      });
+
+      // Create History log
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          status: 'CREATED',
+          changedByUserId: creatorId,
+          changeSource: userRoles.includes('CUSTOMER') ? 'CUSTOMER' : 'ADMIN',
+          reason: 'Đơn hàng được khởi tạo thành công trên hệ thống',
+        },
+      });
+
+      // Fetch newly created order details to return
+      return await tx.order.findUnique({
+        where: { id: order.id },
+        include: {
+          packages: true,
+          payment: true,
+          statusHistory: true,
+        },
+      });
+    });
+  }
+
+  /**
+   * Get list of orders
+   */
+  public async getOrders(
+    userId: string,
+    userRoles: string[],
+    query: { page?: string; limit?: string; search?: string; status?: OrderStatus }
+  ) {
+    const page = parseInt(query.page || '1', 10);
+    const limit = parseInt(query.limit || '10', 10);
+    const skip = (page - 1) * limit;
+
+    const where: any = { deletedAt: null };
+
+    // If customer, only show their own orders
+    if (userRoles.includes('CUSTOMER') && !userRoles.includes('ADMIN') && !userRoles.includes('STAFF')) {
+      const customerId = await this.getCustomerIdByUserId(userId);
+      where.customerId = customerId;
+    }
+
+    if (query.search) {
+      where.OR = [
+        { orderCode: { contains: query.search, mode: 'insensitive' } },
+        { pickupAddressText: { contains: query.search, mode: 'insensitive' } },
+        { deliveryAddressText: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    const [total, orders] = await prisma.$transaction([
+      prisma.order.count({ where }),
+      prisma.order.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          customer: true,
+          service: true,
+          packages: true,
+          payment: true,
+        },
+      }),
+    ]);
+
+    return {
+      orders,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Get order detail by ID
+   */
+  public async getOrderById(id: string, userId: string, userRoles: string[]) {
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        customer: true,
+        service: true,
+        packages: true,
+        payment: true,
+        statusHistory: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            changedBy: {
+              select: {
+                username: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order || order.deletedAt) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    // Verify ownership
+    if (userRoles.includes('CUSTOMER') && !userRoles.includes('ADMIN') && !userRoles.includes('STAFF')) {
+      const customerId = await this.getCustomerIdByUserId(userId);
+      if (order.customerId !== customerId) {
+        throw new ForbiddenException('Bạn không có quyền xem chi tiết đơn hàng này');
+      }
+    }
+
+    return order;
+  }
+
+  /**
+   * Update order status (Admin/Staff only)
+   */
+  public async updateStatus(id: string, dto: UpdateOrderStatusDto, userId: string, changeSource: OrderChangeSource) {
+    const order = await prisma.order.findUnique({
+      where: { id, deletedAt: null },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      // Update order status
+      const updatedOrder = await tx.order.update({
+        where: { id },
+        data: { status: dto.status },
+      });
+
+      // Write status history
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: id,
+          status: dto.status,
+          changedByUserId: userId,
+          changeSource,
+          reason: dto.reason || `Cập nhật trạng thái đơn hàng sang ${dto.status}`,
+        },
+      });
+
+      return updatedOrder;
+    });
+  }
+
+  /**
+   * Cancel order (Soft-delete or state update)
+   */
+  public async cancelOrder(id: string, userId: string, userRoles: string[]) {
+    const order = await prisma.order.findUnique({
+      where: { id, deletedAt: null },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    // Enforce ownership for customer
+    if (userRoles.includes('CUSTOMER') && !userRoles.includes('ADMIN') && !userRoles.includes('STAFF')) {
+      const customerId = await this.getCustomerIdByUserId(userId);
+      if (order.customerId !== customerId) {
+        throw new ForbiddenException('Bạn không có quyền hủy đơn hàng này');
+      }
+    }
+
+    // Business rule: Only cancel when status is CREATED or WAITING_PICKUP
+    const allowedCancelStates: OrderStatus[] = ['CREATED', 'WAITING_PICKUP'];
+    if (!allowedCancelStates.includes(order.status)) {
+      throw new BadRequestException(`Không thể hủy đơn hàng đang ở trạng thái: ${order.status}`);
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      // Mark as deleted/cancelled
+      const cancelledOrder = await tx.order.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+
+      // Update payment to REFUNDED or leave as is
+      await tx.orderPayment.update({
+        where: { orderId: id },
+        data: { paymentStatus: 'REFUNDED' },
+      });
+
+      // Log status history
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: id,
+          status: order.status, // Keep original status but write history
+          changedByUserId: userId,
+          changeSource: userRoles.includes('CUSTOMER') ? 'CUSTOMER' : 'ADMIN',
+          reason: 'Khách hàng yêu cầu hủy đơn hàng',
+        },
+      });
+
+      return { success: true };
+    });
+  }
+}

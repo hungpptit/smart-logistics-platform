@@ -6,6 +6,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRouter from './routes';
 import { errorMiddleware } from './middlewares/error.middleware';
+import { connectRedis } from './config/redis';
 
 dotenv.config();
 
@@ -43,6 +44,11 @@ io.on('connection', (socket) => {
 // Error handling middleware (must be registered last)
 app.use(errorMiddleware);
 
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
+const startServer = async () => {
+  await connectRedis();
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  });
+};
+
+startServer();

@@ -33,3 +33,8 @@ export class LoginDto {
   @IsString({ message: 'Mật khẩu phải là một chuỗi ký tự' })
   password!: string;
 }
+
+export class RefreshTokenDto {
+  @IsString({ message: 'Refresh token phải là một chuỗi ký tự' })
+  refreshToken!: string;
+}

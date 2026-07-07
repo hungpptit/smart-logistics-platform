@@ -386,8 +386,10 @@ model Address {
   placeId          String?           @map("place_id") @db.VarChar(255)
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  wardCode         String?           @map("ward_code") @db.VarChar(20)
 
   // Relations
+  wardRelation     Ward?             @relation(fields: [wardCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   customerAddresses CustomerAddress[]
   facilityAddresses FacilityAddress[]
   pickupOrders      Order[]           @relation("OrderPickupAddress")
@@ -1114,4 +1116,62 @@ model SystemSetting {
   updater      User?          @relation(fields: [updatedBy], references: [id], onDelete: SetNull)
 
   @@map("system_settings")
+}
+
+// ==========================================
+// VIETNAMESE ADMINISTRATIVE UNITS MODULE
+// ==========================================
+
+model AdministrativeRegion {
+  id           Int      @id
+  name         String   @db.VarChar(255)
+  nameEn       String   @map("name_en") @db.VarChar(255)
+  codeName     String?  @map("code_name") @db.VarChar(255)
+  codeNameEn   String?  @map("code_name_en") @db.VarChar(255)
+
+  @@map("administrative_regions")
+}
+
+model AdministrativeUnit {
+  id          Int        @id
+  fullName    String?    @map("full_name") @db.VarChar(255)
+  fullNameEn  String?    @map("full_name_en") @db.VarChar(255)
+  shortName   String?    @map("short_name") @db.VarChar(255)
+  shortNameEn String?    @map("short_name_en") @db.VarChar(255)
+  codeName    String?    @map("code_name") @db.VarChar(255)
+  codeNameEn  String?    @map("code_name_en") @db.VarChar(255)
+  provinces   Province[]
+  wards       Ward[]
+
+  @@map("administrative_units")
+}
+
+model Province {
+  code                 String              @id @db.VarChar(20)
+  name                 String              @db.VarChar(255)
+  nameEn               String?             @map("name_en") @db.VarChar(255)
+  fullName             String              @map("full_name") @db.VarChar(255)
+  fullNameEn           String?             @map("full_name_en") @db.VarChar(255)
+  codeName             String?             @map("code_name") @db.VarChar(255)
+  administrativeUnitId Int?                @map("administrative_unit_id")
+  administrativeUnit   AdministrativeUnit? @relation(fields: [administrativeUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  wards                Ward[]
+
+  @@map("provinces")
+}
+
+model Ward {
+  code                 String              @id @db.VarChar(20)
+  name                 String              @db.VarChar(255)
+  nameEn               String?             @map("name_en") @db.VarChar(255)
+  fullName             String?             @map("full_name") @db.VarChar(255)
+  fullNameEn           String?             @map("full_name_en") @db.VarChar(255)
+  codeName             String?             @map("code_name") @db.VarChar(255)
+  provinceCode         String?             @map("province_code") @db.VarChar(20)
+  administrativeUnitId Int?                @map("administrative_unit_id")
+  administrativeUnit   AdministrativeUnit? @relation(fields: [administrativeUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  province             Province?           @relation(fields: [provinceCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
+  addresses            Address[]
+
+  @@map("wards")
 }

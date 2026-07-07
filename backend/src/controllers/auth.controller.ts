@@ -31,6 +31,33 @@ export class AuthController {
     }
   };
 
+  public refresh = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.authService.refresh(req.body);
+      res.status(200).json({
+        success: true,
+        message: 'Làm mới token thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public logout = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.id!;
+      const result = await this.authService.logout(userId);
+      res.status(200).json({
+        success: true,
+        message: 'Đăng xuất thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   public getProfile = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user?.id!;
