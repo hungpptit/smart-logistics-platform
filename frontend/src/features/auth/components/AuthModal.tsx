@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { Modal } from '../../../components/Modal';
+import { Modal } from '../../../components/ui/Modal';
 import { Eye, EyeOff } from 'lucide-react';
 
 interface AuthModalProps {
