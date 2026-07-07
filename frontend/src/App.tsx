@@ -9,7 +9,8 @@ import { AdminDashboard } from './features/dashboard/components/AdminDashboard';
 import { Toast } from './components/Toast';
 import { TRACKING_DATABASE } from './features/tracking/services/mockDb';
 import type { TrackingData } from './features/tracking/types';
-import { Truck, LogOut, User as UserIcon, Search, Earth } from 'lucide-react';
+import { Search, Earth } from 'lucide-react';
+import { Header } from './components/Header';
 
 const AppContent: React.FC = () => {
   const { user, logout } = useAuth();
@@ -87,74 +88,12 @@ const AppContent: React.FC = () => {
   return (
     <>
       {/* Top Navigation Bar */}
-      <nav className="navbar">
-        <div className="nav-container">
-          <button onClick={() => setView('landing')} className="brand-logo" style={{ border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Truck className="logo-icon" size={24} style={{ color: 'var(--color-primary)' }} />
-            <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '0.05em' }}>SMART</span><span className="logo-red" style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '0.05em' }}>LOGISTICS</span>
-          </button>
-          <ul className="nav-menu">
-            <li>
-              <button
-                onClick={() => setView('landing')}
-                className={`nav-link ${view === 'landing' ? 'active' : ''}`}
-                style={{ border: 'none', background: 'none', cursor: 'pointer', fontWeight: 700 }}
-              >
-                Tra Cứu
-              </button>
-            </li>
-            <li>
-              <button
-                onClick={() => setView('pricing')}
-                className={`nav-link ${view === 'pricing' ? 'active' : ''}`}
-                style={{ border: 'none', background: 'none', cursor: 'pointer', fontWeight: 700 }}
-              >
-                Chi Phí
-              </button>
-            </li>
-            <li>
-              <button
-                onClick={() => {
-                  setView('landing');
-                  setTimeout(() => {
-                    document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' });
-                  }, 100);
-                }}
-                className="nav-link"
-                style={{ border: 'none', background: 'none', cursor: 'pointer', fontWeight: 700 }}
-              >
-                Dịch Vụ
-              </button>
-            </li>
-            {user && (
-              <li>
-                <button
-                  onClick={() => setView('dashboard')}
-                  className={`nav-link ${view === 'dashboard' ? 'active' : ''}`}
-                  style={{ textDecoration: 'none', color: 'var(--color-secondary)', fontWeight: 700, border: 'none', background: 'none', cursor: 'pointer' }}
-                >
-                  Bảng Điều Khiển
-                </button>
-              </li>
-            )}
-          </ul>
-
-          <div className="nav-auth">
-            {!user ? (
-              <button className="btn btn-secondary btn-sm" onClick={() => setIsAuthOpen(true)}>
-                <UserIcon size={14} /> ĐĂNG NHẬP
-              </button>
-            ) : (
-              <div className="nav-user">
-                <span className="user-welcome">Xin chào, <strong>{user.username}</strong></span>
-                <button className="btn btn-secondary btn-sm" onClick={() => { logout(); triggerToast('Đã đăng xuất thành công', 'success'); }}>
-                  <LogOut size={14} /> ĐĂNG XUẤT
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
+      <Header
+        view={view}
+        setView={setView}
+        setIsAuthOpen={setIsAuthOpen}
+        triggerToast={triggerToast}
+      />
 
       {view === 'landing' ? (
         <>
