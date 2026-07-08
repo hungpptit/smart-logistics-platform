@@ -1,10 +1,18 @@
-import { IsString, IsOptional, IsEnum, IsBoolean, IsNumber, IsUUID, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsBoolean, IsNumber, IsUUID, IsNotEmpty, IsEmail } from 'class-validator';
 import { CustomerType, CustomerStatus, CustomerAddressType } from '@prisma/client';
 
 export class CreateCustomerDto {
-  @IsUUID('4', { message: 'ID người dùng phải là định dạng UUID hợp lệ' })
-  @IsOptional()
-  userId?: string;
+  @IsString({ message: 'Họ và tên không được để trống' })
+  @IsNotEmpty({ message: 'Họ và tên không được để trống' })
+  fullName!: string;
+
+  @IsEmail({}, { message: 'Địa chỉ email không hợp lệ' })
+  @IsNotEmpty({ message: 'Địa chỉ email không được để trống' })
+  email!: string;
+
+  @IsString({ message: 'Số điện thoại không được để trống' })
+  @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
+  phone!: string;
 
   @IsEnum(CustomerType, { message: 'Loại khách hàng không hợp lệ (INDIVIDUAL hoặc BUSINESS)' })
   customerType!: CustomerType;
@@ -57,10 +65,6 @@ export class CreateAddressDto {
   @IsNotEmpty({ message: 'Phường/Xã không được để trống' })
   ward!: string;
 
-  @IsString({ message: 'Quận/Huyện không được để trống' })
-  @IsNotEmpty({ message: 'Quận/Huyện không được để trống' })
-  district!: string;
-
   @IsString({ message: 'Tỉnh/Thành phố không được để trống' })
   @IsNotEmpty({ message: 'Tỉnh/Thành phố không được để trống' })
   province!: string;
@@ -103,10 +107,6 @@ export class UpdateAddressDto {
   @IsString({ message: 'Phường/Xã phải là một chuỗi ký tự' })
   @IsOptional()
   ward?: string;
-
-  @IsString({ message: 'Quận/Huyện phải là một chuỗi ký tự' })
-  @IsOptional()
-  district?: string;
 
   @IsString({ message: 'Tỉnh/Thành phố phải là một chuỗi ký tự' })
   @IsOptional()

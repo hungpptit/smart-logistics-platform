@@ -376,7 +376,6 @@ model Address {
   addressLine1     String            @map("address_line_1") @db.VarChar(255)
   addressLine2     String?           @map("address_line_2") @db.VarChar(255)
   ward             String            @db.VarChar(100)
-  district         String            @db.VarChar(100)
   province         String            @db.VarChar(100)
   country          String            @default("Vietnam") @db.VarChar(100)
   postalCode       String?           @map("postal_code") @db.VarChar(20)

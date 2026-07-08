@@ -32,7 +32,6 @@ router.use(requireRoles(['ADMIN', 'STAFF']));
  *               - facilityTypeId
  *               - addressLine1
  *               - ward
- *               - district
  *               - province
  *             properties:
  *               facilityCode:
@@ -57,9 +56,6 @@ router.use(requireRoles(['ADMIN', 'STAFF']));
  *               ward:
  *                 type: string
  *                 example: Phường 2
- *               district:
- *                 type: string
- *                 example: Quận Tân Bình
  *               province:
  *                 type: string
  *                 example: Thành phố Hồ Chí Minh
@@ -168,8 +164,6 @@ router.get(
  *               addressLine1:
  *                 type: string
  *               ward:
- *                 type: string
- *               district:
  *                 type: string
  *               province:
  *                 type: string

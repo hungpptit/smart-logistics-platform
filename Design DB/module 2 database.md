@@ -82,7 +82,6 @@ Bảng danh mục địa chỉ chuẩn hóa dùng chung toàn hệ thống. Bả
 | `address_line_1` | VARCHAR(255) | ❌ | Số nhà, tên đường, ngõ hẻm. |
 | `address_line_2` | VARCHAR(255) | ✅ | Căn hộ, tòa nhà, số tầng, số phòng... |
 | `ward` | VARCHAR(100) | ❌ | Phường / Xã. |
-| `district` | VARCHAR(100) | ❌ | Quận / Huyện. |
 | `province` | VARCHAR(100) | ❌ | Tỉnh / Thành phố. |
 | `country` | VARCHAR(100) | ❌ | Quốc gia (Mặc định: 'Vietnam'). |
 | `postal_code` | VARCHAR(20) | ✅ | Mã bưu chính. |

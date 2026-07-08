@@ -30,7 +30,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({ menuItems, onBac
   const CurrentTabComponent = currentTabItem.component;
 
   return (
-    <div className="min-h-screen bg-[#F4F4F4] flex flex-col md:flex-row font-montserrat">
+    <div className="h-screen bg-[#F4F4F4] flex flex-col md:flex-row overflow-hidden font-montserrat">
       <Sidebar
         menuItems={menuItems}
         activeTab={activeTab}

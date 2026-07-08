@@ -676,7 +676,7 @@ export const OrderTab: React.FC = () => {
           fetchOrders(1);
         }}
         token={token}
-        isAdminOrStaff={isAdminOrStaff}
+        isAdminOrStaff={!!isAdminOrStaff}
       />
     </div>
   );

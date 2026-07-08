@@ -33,13 +33,11 @@ router.use(authMiddleware);
  *               - senderPhone
  *               - senderAddressLine1
  *               - senderWard
- *               - senderDistrict
  *               - senderProvince
  *               - receiverName
  *               - receiverPhone
  *               - receiverAddressLine1
  *               - receiverWard
- *               - receiverDistrict
  *               - receiverProvince
  *               - packages
  *             properties:
@@ -65,9 +63,6 @@ router.use(authMiddleware);
  *               senderWard:
  *                 type: string
  *                 example: Phường Bến Thành
- *               senderDistrict:
- *                 type: string
- *                 example: Quận 1
  *               senderProvince:
  *                 type: string
  *                 example: Thành phố Hồ Chí Minh
@@ -88,9 +83,6 @@ router.use(authMiddleware);
  *               receiverWard:
  *                 type: string
  *                 example: Phường 10
- *               receiverDistrict:
- *                 type: string
- *                 example: Quận Gò Vấp
  *               receiverProvince:
  *                 type: string
  *                 example: Thành phố Hồ Chí Minh

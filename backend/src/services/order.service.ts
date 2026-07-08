@@ -68,7 +68,7 @@ export class OrderService {
       const resolved = await resolveAddressDetails(dto.pickupAddress);
 
       // Geocode address
-      const rawAddr = `${dto.pickupAddress.addressLine1}, ${resolved.ward}, ${resolved.district}, ${resolved.province}`;
+      const rawAddr = `${dto.pickupAddress.addressLine1}, ${resolved.ward}, ${resolved.province}`;
       const geocoded = await this.geocodingService.geocode(rawAddr);
       pickupLat = dto.pickupAddress.latitude ?? geocoded.latitude;
       pickupLon = dto.pickupAddress.longitude ?? geocoded.longitude;
@@ -80,7 +80,6 @@ export class OrderService {
           addressLine1: dto.pickupAddress.addressLine1,
           addressLine2: dto.pickupAddress.addressLine2 || null,
           ward: resolved.ward,
-          district: resolved.district,
           province: resolved.province,
           country: dto.pickupAddress.country || 'Vietnam',
           latitude: pickupLat,
@@ -114,7 +113,7 @@ export class OrderService {
       const resolved = await resolveAddressDetails(dto.deliveryAddress);
 
       // Geocode address
-      const rawAddr = `${dto.deliveryAddress.addressLine1}, ${resolved.ward}, ${resolved.district}, ${resolved.province}`;
+      const rawAddr = `${dto.deliveryAddress.addressLine1}, ${resolved.ward}, ${resolved.province}`;
       const geocoded = await this.geocodingService.geocode(rawAddr);
       deliveryLat = dto.deliveryAddress.latitude ?? geocoded.latitude;
       deliveryLon = dto.deliveryAddress.longitude ?? geocoded.longitude;
@@ -126,7 +125,6 @@ export class OrderService {
           addressLine1: dto.deliveryAddress.addressLine1,
           addressLine2: dto.deliveryAddress.addressLine2 || null,
           ward: resolved.ward,
-          district: resolved.district,
           province: resolved.province,
           country: dto.deliveryAddress.country || 'Vietnam',
           latitude: deliveryLat,

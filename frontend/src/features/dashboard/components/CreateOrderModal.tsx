@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, MapPin, Truck, CreditCard, User } from 'lucide-react';
+import { X, Package, MapPin, Truck, User } from 'lucide-react';
 import { CONFIG } from '../../../config';
 
 interface CreateOrderModalProps {
@@ -34,7 +34,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [senderPhone, setSenderPhone] = useState('');
   const [senderAddressLine1, setSenderAddressLine1] = useState('');
   const [senderWard, setSenderWard] = useState('');
-  const [senderDistrict, setSenderDistrict] = useState('');
   const [senderProvince, setSenderProvince] = useState('');
 
   // Receiver States
@@ -42,7 +41,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [receiverPhone, setReceiverPhone] = useState('');
   const [receiverAddressLine1, setReceiverAddressLine1] = useState('');
   const [receiverWard, setReceiverWard] = useState('');
-  const [receiverDistrict, setReceiverDistrict] = useState('');
   const [receiverProvince, setReceiverProvince] = useState('');
 
   // Package States
@@ -114,7 +112,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       pickupAddress: {
         addressLine1: senderAddressLine1,
         ward: senderWard,
-        district: senderDistrict,
         province: senderProvince,
         country: 'Vietnam'
       },
@@ -125,7 +122,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       deliveryAddress: {
         addressLine1: receiverAddressLine1,
         ward: receiverWard,
-        district: receiverDistrict,
         province: receiverProvince,
         country: 'Vietnam'
       },
@@ -251,7 +247,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Phường / Xã</label>
                     <input
@@ -260,17 +256,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       placeholder="Bến Thành"
                       value={senderWard}
                       onChange={(e) => setSenderWard(e.target.value)}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Quận / Huyện</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Quận 1"
-                      value={senderDistrict}
-                      onChange={(e) => setSenderDistrict(e.target.value)}
                       className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
                     />
                   </div>
@@ -329,7 +314,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Phường / Xã</label>
                     <input
@@ -338,17 +323,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       placeholder="Bến Nghé"
                       value={receiverWard}
                       onChange={(e) => setReceiverWard(e.target.value)}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Quận / Huyện</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Quận 1"
-                      value={receiverDistrict}
-                      onChange={(e) => setReceiverDistrict(e.target.value)}
                       className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
                     />
                   </div>

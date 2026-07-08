@@ -19,7 +19,6 @@ interface FacilityAddress {
   addressLine1: string;
   addressLine2?: string;
   ward: string;
-  district: string;
   province: string;
   country: string;
   latitude: number;
@@ -100,12 +99,12 @@ export const FacilityTab: React.FC = () => {
       addressLine1: '',
       addressLine2: '',
       ward: '',
-      district: '',
       province: '',
       country: 'Vietnam',
       latitude: 10.7765,
       longitude: 106.7009,
-      addressType: 'MAIN'
+      addressType: 'MAIN',
+      wardCode: ''
     }
   });
 
@@ -224,12 +223,12 @@ export const FacilityTab: React.FC = () => {
         addressLine1: '',
         addressLine2: '',
         ward: '',
-        district: '',
         province: '',
         country: 'Vietnam',
         latitude: 10.7765,
         longitude: 106.7009,
-        addressType: 'MAIN'
+        addressType: 'MAIN',
+        wardCode: ''
       }
     });
     setIsEditing(false);
@@ -250,12 +249,12 @@ export const FacilityTab: React.FC = () => {
         addressLine1: '',
         addressLine2: '',
         ward: '',
-        district: '',
         province: '',
         country: 'Vietnam',
         latitude: 10.7765,
         longitude: 106.7009,
-        addressType: 'MAIN'
+        addressType: 'MAIN',
+        wardCode: ''
       }
     });
     setSelectedFacility(f);
@@ -525,7 +524,7 @@ export const FacilityTab: React.FC = () => {
             onViewDetails={handleViewDetails}
             onEdit={handleOpenEditModal}
             onDelete={handleDeleteFacility}
-            canManage={canManage}
+            canManage={!!canManage}
           />
         </div>
 
@@ -539,7 +538,7 @@ export const FacilityTab: React.FC = () => {
             onAddZone={handleOpenCreateZone}
             onEditZone={handleOpenEditZone}
             onDeleteZone={handleDeleteZone}
-            canManage={canManage}
+            canManage={!!canManage}
           />
         )}
       </div>

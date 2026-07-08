@@ -15,10 +15,6 @@ export class FacilityAddressDto {
   @IsNotEmpty({ message: 'Phường/Xã không được để trống' })
   ward!: string;
 
-  @IsString({ message: 'Quận/Huyện không được để trống' })
-  @IsNotEmpty({ message: 'Quận/Huyện không được để trống' })
-  district!: string;
-
   @IsString({ message: 'Tỉnh/Thành phố không được để trống' })
   @IsNotEmpty({ message: 'Tỉnh/Thành phố không được để trống' })
   province!: string;

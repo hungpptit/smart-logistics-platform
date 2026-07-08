@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Truck, MapPin, Navigation, Smartphone, User, CheckCircle2 } from 'lucide-react';
 import { DashboardShell } from '../layouts/DashboardShell';
 import type { MenuItem } from '../layouts/Sidebar';
 
 // Today's Route Tab for Shipper
 const TodayRouteTab: React.FC = () => {
-  const [stops, setStops] = useState([
+  const stops = [
     { id: '1', code: 'TRK-10029381', address: '120 Lê Lợi, Phường Bến Thành, Quận 1, TP. HCM', type: 'PICKUP', status: 'COMPLETED', time: '08:30' },
     { id: '2', code: 'TRK-10029381', address: '350 Điện Biên Phủ, Phường 17, Bình Thạnh, TP. HCM', type: 'DELIVERY', status: 'IN_PROGRESS', time: '10:15' },
     { id: '3', code: 'TRK-10029382', address: '22 Bis Nguyễn Thị Minh Khai, Đa Kao, Quận 1, TP. HCM', type: 'PICKUP', status: 'PENDING', time: '11:00' },
     { id: '4', code: 'TRK-10029382', address: '15 Hoàng Hoa Thám, Phường 6, Bình Thạnh, TP. HCM', type: 'DELIVERY', status: 'PENDING', time: '11:45' },
-  ]);
+  ];
 
   return (
     <div className="space-y-6">

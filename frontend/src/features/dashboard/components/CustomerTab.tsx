@@ -12,7 +12,6 @@ interface AddressItem {
   addressLine1: string;
   addressLine2?: string;
   ward: string;
-  district: string;
   province: string;
   country: string;
   postalCode?: string;
@@ -20,6 +19,7 @@ interface AddressItem {
   longitude: number;
   addressType: 'HOME' | 'OFFICE' | 'WAREHOUSE' | 'RETURN';
   isDefault: boolean;
+  wardCode?: string;
 }
 
 interface Customer {
@@ -64,8 +64,11 @@ export const CustomerTab: React.FC = () => {
   // Customer Form States
   const [showCustomerModal, setShowCustomerModal] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    userId: '',
+    fullName: '',
+    email: '',
+    phone: '',
     customerType: 'INDIVIDUAL' as 'INDIVIDUAL' | 'BUSINESS',
     companyName: '',
     taxCode: '',
@@ -80,13 +83,13 @@ export const CustomerTab: React.FC = () => {
     addressLine1: '',
     addressLine2: '',
     ward: '',
-    district: '',
     province: '',
     country: 'Vietnam',
     latitude: 10.7765,
     longitude: 106.7009,
     addressType: 'HOME' as 'HOME' | 'OFFICE' | 'WAREHOUSE' | 'RETURN',
-    isDefault: false
+    isDefault: false,
+    wardCode: ''
   });
   const [isEditingAddress, setIsEditingAddress] = useState<boolean>(false);
 
@@ -150,7 +153,7 @@ export const CustomerTab: React.FC = () => {
 
   useEffect(() => {
     fetchCustomers(currentPage);
-  }, [currentPage, token]);
+  }, [currentPage, typeFilter, statusFilter, token]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,27 +173,32 @@ export const CustomerTab: React.FC = () => {
 
   const handleOpenCreateModal = () => {
     setFormData({
-      userId: '',
+      fullName: '',
+      email: '',
+      phone: '',
       customerType: 'INDIVIDUAL',
       companyName: '',
       taxCode: '',
       status: 'ACTIVE',
       note: ''
     });
+    setEditingCustomerId(null);
     setIsEditing(false);
     setShowCustomerModal(true);
   };
 
   const handleOpenEditModal = (c: Customer) => {
     setFormData({
-      userId: c.userId || '',
+      fullName: c.user?.username || '',
+      email: c.user?.email || '',
+      phone: c.user?.phone || '',
       customerType: c.customerType,
       companyName: c.companyName || '',
       taxCode: c.taxCode || '',
       status: c.status,
       note: c.note || ''
     });
-    setSelectedCustomer(c);
+    setEditingCustomerId(c.id);
     setIsEditing(true);
     setShowCustomerModal(true);
   };
@@ -201,14 +209,27 @@ export const CustomerTab: React.FC = () => {
     setActionLoading(true);
     try {
       const url = isEditing 
-        ? `${CONFIG.API_BASE_URL}/customers/${selectedCustomer?.id}`
+        ? `${CONFIG.API_BASE_URL}/customers/${editingCustomerId}`
         : `${CONFIG.API_BASE_URL}/customers`;
       const method = isEditing ? 'PUT' : 'POST';
 
-      const payload = { ...formData };
-      if (!payload.userId) {
-        delete (payload as any).userId;
-      }
+      const payload = isEditing 
+        ? {
+            customerType: formData.customerType,
+            companyName: formData.companyName,
+            taxCode: formData.taxCode,
+            status: formData.status,
+            note: formData.note
+          }
+        : {
+            fullName: formData.fullName,
+            email: formData.email,
+            phone: formData.phone,
+            customerType: formData.customerType,
+            companyName: formData.companyName,
+            taxCode: formData.taxCode,
+            note: formData.note
+          };
 
       const response = await fetch(url, {
         method,
@@ -222,8 +243,9 @@ export const CustomerTab: React.FC = () => {
       const data = await response.json();
       if (response.ok && data.success) {
         setShowCustomerModal(false);
+        setEditingCustomerId(null);
         fetchCustomers(currentPage);
-        if (isEditing && selectedCustomer) {
+        if (isEditing && selectedCustomer && selectedCustomer.id === editingCustomerId) {
           setSelectedCustomer(data.data);
         }
       } else {
@@ -267,13 +289,13 @@ export const CustomerTab: React.FC = () => {
       addressLine1: '',
       addressLine2: '',
       ward: '',
-      district: '',
       province: '',
       country: 'Vietnam',
       latitude: 10.7765,
       longitude: 106.7009,
       addressType: 'HOME',
-      isDefault: false
+      isDefault: false,
+      wardCode: ''
     });
     setIsEditingAddress(false);
     setShowAddressModal(true);
@@ -285,13 +307,13 @@ export const CustomerTab: React.FC = () => {
       addressLine1: addr.addressLine1,
       addressLine2: addr.addressLine2 || '',
       ward: addr.ward,
-      district: addr.district,
       province: addr.province,
       country: addr.country,
       latitude: addr.latitude,
       longitude: addr.longitude,
       addressType: addr.addressType,
-      isDefault: addr.isDefault
+      isDefault: addr.isDefault,
+      wardCode: addr.wardCode || ''
     });
     setIsEditingAddress(true);
     setShowAddressModal(true);
@@ -377,7 +399,7 @@ export const CustomerTab: React.FC = () => {
           <div className="flex items-center gap-2">
             <select
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
+              onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }}
               className="px-3 py-2 border border-[#e2e8f0] rounded-md text-xs focus:border-[#bc0100] outline-none"
             >
               <option value="">Tất cả loại KH</option>
@@ -387,7 +409,7 @@ export const CustomerTab: React.FC = () => {
 
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
               className="px-3 py-2 border border-[#e2e8f0] rounded-md text-xs focus:border-[#bc0100] outline-none"
             >
               <option value="">Tất cả trạng thái</option>
@@ -466,7 +488,7 @@ export const CustomerTab: React.FC = () => {
       {/* Customer Create/Edit Modal */}
       <CustomerModal
         isOpen={showCustomerModal}
-        onClose={() => setShowCustomerModal(false)}
+        onClose={() => { setShowCustomerModal(false); setEditingCustomerId(null); }}
         isEditing={isEditing}
         formData={formData}
         setFormData={setFormData}

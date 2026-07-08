@@ -10,8 +10,8 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { login, register } = useAuth();
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+  const { login, register, verifyOtp } = useAuth();
+  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'otp'>('login');
   
   const containerRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | 'auto'>('auto');
@@ -45,6 +45,73 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [regPhone, setRegPhone] = useState('');
   const [regRole, setRegRole] = useState('CUSTOMER');
 
+  // OTP State
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpValues, setOtpValues] = useState<string[]>(Array(6).fill(''));
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    if (activeTab === 'otp') {
+      setOtpValues(Array(6).fill(''));
+      setTimeout(() => {
+        otpInputRefs.current[0]?.focus();
+      }, 100);
+    }
+  }, [activeTab]);
+
+  const handleOtpChange = (value: string, index: number) => {
+    const cleanVal = value.replace(/[^0-9]/g, '');
+    if (!cleanVal) {
+      const newOtp = [...otpValues];
+      newOtp[index] = '';
+      setOtpValues(newOtp);
+      return;
+    }
+
+    const digit = cleanVal.slice(-1);
+    const newOtp = [...otpValues];
+    newOtp[index] = digit;
+    setOtpValues(newOtp);
+
+    // Auto-focus next box
+    if (index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (e.key === 'Backspace') {
+      if (!otpValues[index] && index > 0) {
+        const newOtp = [...otpValues];
+        newOtp[index - 1] = '';
+        setOtpValues(newOtp);
+        otpInputRefs.current[index - 1]?.focus();
+        e.preventDefault();
+      } else if (otpValues[index]) {
+        const newOtp = [...otpValues];
+        newOtp[index] = '';
+        setOtpValues(newOtp);
+        e.preventDefault();
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+      e.preventDefault();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').trim();
+    if (/^[0-9]{6}$/.test(pastedData)) {
+      const digits = pastedData.split('');
+      setOtpValues(digits);
+      otpInputRefs.current[5]?.focus();
+    }
+  };
+
   // Password Visibility States
   const [showLoginPass, setShowLoginPass] = useState(false);
   const [showRegPass, setShowRegPass] = useState(false);
@@ -71,6 +138,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [alert, setAlert] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const resetForm = () => {
+    setActiveTab('login');
     setLoginUser('');
     setLoginPass('');
     setRegUsername('');
@@ -79,6 +147,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     setRegConfirmPassword('');
     setRegPhone('');
     setRegRole('CUSTOMER');
+    setOtpEmail('');
+    setOtpValues(Array(6).fill(''));
     setErrors({});
     setLoginErrors({});
     setShowLoginPass(false);
@@ -199,14 +269,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       });
 
       if (result.success) {
-        setAlert({ message: 'Đăng ký tài khoản thành công! Đang chuyển hướng đăng nhập...', type: 'success' });
-        setTimeout(() => {
-          setActiveTab('login');
-          setLoginUser(regUsername);
-          setAlert(null);
-        }, 1500);
+        setOtpEmail(regEmail);
+        setAlert({ message: 'Đăng ký tài khoản thành công! Mã OTP đã được gửi đến email của bạn.', type: 'success' });
         
-        // Clear register form
+        // Clear register form (except email which is already copied to otpEmail)
         setRegUsername('');
         setRegEmail('');
         setRegPassword('');
@@ -214,6 +280,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         setRegPhone('');
         setRegRole('CUSTOMER');
         setErrors({});
+
+        setTimeout(() => {
+          setActiveTab('otp');
+          setAlert(null);
+        }, 1500);
       } else {
         let errorMsg = result.message;
         if (result.errors && result.errors.length > 0) {
@@ -228,25 +299,59 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     }
   };
 
+  const handleOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAlert(null);
+
+    const otpCode = otpValues.join('');
+    if (otpCode.length !== 6) {
+      setAlert({ message: 'Mã OTP phải có độ dài đúng 6 chữ số', type: 'error' });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await verifyOtp(otpEmail, otpCode);
+      if (result.success) {
+        onSuccess(result.message);
+        handleClose();
+      } else {
+        setAlert({ message: result.message, type: 'error' });
+      }
+    } catch (err) {
+      setAlert({ message: 'Có lỗi kết nối xảy ra. Vui lòng thử lại.', type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose}>
       {/* Tabs */}
-      <div className="auth-tabs">
-        <button 
-          type="button"
-          className={`auth-tab ${activeTab === 'login' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('login'); setAlert(null); }}
-        >
-          ĐĂNG NHẬP
-        </button>
-        <button 
-          type="button"
-          className={`auth-tab ${activeTab === 'register' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('register'); setAlert(null); }}
-        >
-          ĐĂNG KÝ
-        </button>
-      </div>
+      {activeTab !== 'otp' && (
+        <div className="auth-tabs">
+          <button 
+            type="button"
+            className={`auth-tab ${activeTab === 'login' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('login'); setAlert(null); }}
+          >
+            ĐĂNG NHẬP
+          </button>
+          <button 
+            type="button"
+            className={`auth-tab ${activeTab === 'register' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('register'); setAlert(null); }}
+          >
+            ĐĂNG KÝ
+          </button>
+        </div>
+      )}
+      {activeTab === 'otp' && (
+        <div className="p-4 text-center border-b border-gray-100 bg-[#bc0100]/5">
+          <h3 className="text-sm font-bold text-[#bc0100] tracking-wider uppercase">Xác Thực Tài Khoản</h3>
+          <p className="text-[11px] text-gray-500 mt-1">Một mã xác thực gồm 6 số đã được gửi đến email của bạn</p>
+        </div>
+      )}
 
       <div 
         style={{ 
@@ -452,6 +557,77 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 Đã có tài khoản?{' '}
                 <span onClick={() => { setActiveTab('login'); setAlert(null); }}>
                   Đăng nhập tại đây
+                </span>
+              </p>
+            </form>
+          )}
+
+          {/* OTP Verification Form */}
+          {activeTab === 'otp' && (
+            <form onSubmit={handleOtpSubmit} className="auth-form-wrapper">
+              <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-secondary)' }}>
+                  Email nhận mã: <strong style={{ color: 'var(--color-text-primary)' }}>{otpEmail}</strong>
+                </span>
+              </div>
+              <div className="form-group">
+                <label style={{ textAlign: 'center', display: 'block', fontWeight: 'bold', fontSize: '11px', color: '#4a5568', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  MÃ XÁC THỰC OTP (6 SỐ)
+                </label>
+                
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '12px', marginBottom: '8px' }}>
+                  {otpValues.map((val, idx) => (
+                    <input
+                      key={idx}
+                      ref={(el) => { otpInputRefs.current[idx] = el; }}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={val}
+                      onChange={(e) => handleOtpChange(e.target.value, idx)}
+                      onKeyDown={(e) => handleOtpKeyDown(e, idx)}
+                      onPaste={handleOtpPaste}
+                      disabled={isLoading}
+                      style={{
+                        width: '42px',
+                        height: '46px',
+                        textAlign: 'center',
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '6px',
+                        outline: 'none',
+                        transition: 'all 0.15s ease-in-out',
+                        color: '#bc0100',
+                        backgroundColor: '#f8fafc',
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#bc0100';
+                        e.target.style.backgroundColor = '#ffffff';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(188, 1, 0, 0.15)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#cbd5e1';
+                        e.target.style.backgroundColor = '#f8fafc';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <button 
+                type="submit" 
+                className="btn btn-primary auth-submit-btn" 
+                disabled={isLoading}
+                style={{ marginTop: '8px' }}
+              >
+                {isLoading ? 'ĐANG XỬ LÝ...' : 'XÁC NHẬN KÍCH HOẠT'}
+              </button>
+              <p className="auth-footer-text">
+                Không nhận được mã hoặc nhập sai email?{' '}
+                <span onClick={() => { setActiveTab('register'); setAlert(null); }}>
+                  Quay lại đăng ký
                 </span>
               </p>
             </form>

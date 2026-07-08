@@ -3,7 +3,7 @@ import { AuthController } from '../controllers/auth.controller';
 import { validationMiddleware } from '../middlewares/validation.middleware';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { rateLimiter } from '../middlewares/rateLimiter.middleware';
-import { RegisterDto, LoginDto, RefreshTokenDto } from '../dtos/auth.dto';
+import { RegisterDto, LoginDto, RefreshTokenDto, ChangePasswordDto } from '../dtos/auth.dto';
 
 const router = Router();
 const authController = new AuthController();
@@ -52,6 +52,43 @@ router.post(
   rateLimiter(5, 60 * 1000),
   validationMiddleware(RegisterDto),
   authController.register
+);
+
+/**
+ * @openapi
+ * /auth/verify-otp:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Xác thực mã OTP kích hoạt tài khoản
+ *     description: Gửi mã OTP đã nhận qua Email để kích hoạt tài khoản Customer và đăng nhập tự động.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - otp
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: customer@gmail.com
+ *               otp:
+ *                 type: string
+ *                 example: "123456"
+ *     responses:
+ *       200:
+ *         description: Kích hoạt tài khoản thành công, trả về tokens đăng nhập
+ *       400:
+ *         description: Mã OTP không hợp lệ hoặc đã hết hạn
+ */
+router.post(
+  '/verify-otp',
+  rateLimiter(5, 60 * 1000),
+  authController.verifyOtp
 );
 
 /**
@@ -167,6 +204,47 @@ router.get(
   '/me',
   authMiddleware,
   authController.getProfile
+);
+
+/**
+ * @openapi
+ * /auth/change-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Thay đổi mật khẩu tài khoản
+ *     description: Đổi mật khẩu của người dùng hiện tại đang đăng nhập.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - oldPassword
+ *               - newPassword
+ *             properties:
+ *               oldPassword:
+ *                 type: string
+ *                 example: password123
+ *               newPassword:
+ *                 type: string
+ *                 example: newPassword123
+ *     responses:
+ *       200:
+ *         description: Đổi mật khẩu thành công
+ *       400:
+ *         description: Mật khẩu cũ không chính xác hoặc mật khẩu mới không hợp lệ
+ *       401:
+ *         description: Không có quyền truy cập
+ */
+router.post(
+  '/change-password',
+  authMiddleware,
+  validationMiddleware(ChangePasswordDto),
+  authController.changePassword
 );
 
 export default router;

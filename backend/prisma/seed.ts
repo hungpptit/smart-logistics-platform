@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
+import path from 'path';
 
 declare const process: any;
 
@@ -292,6 +294,24 @@ async function main() {
     } else {
       console.log(`ℹ️ Test user already exists: ${tu.username}`);
     }
+  }
+
+  // 8. Seed Administrative Units (Provinces, Wards, etc.)
+  console.log('🇻🇳 Seeding Administrative Units...');
+  const provinceCount = await prisma.province.count();
+  if (provinceCount === 0) {
+    const sqlPath = path.join(__dirname, 'postgres_ImportData_vn_units.sql');
+    if (fs.existsSync(sqlPath)) {
+      console.log('Reading administrative units SQL dump...');
+      const sqlContent = fs.readFileSync(sqlPath, 'utf8');
+      console.log('Executing administrative units SQL dump... (this might take a few seconds)');
+      await prisma.$executeRawUnsafe(sqlContent);
+      console.log('✅ Administrative units seeded successfully!');
+    } else {
+      console.log('⚠️ postgres_ImportData_vn_units.sql not found at:', sqlPath);
+    }
+  } else {
+    console.log('ℹ️ Administrative units already seeded.');
   }
 
   console.log('✨ Seeding master lookup tables completed successfully!');

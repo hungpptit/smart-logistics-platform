@@ -79,7 +79,6 @@ erDiagram
         varchar address_line_1
         varchar address_line_2
         varchar ward
-        varchar district
         varchar province
         varchar country
         varchar postal_code

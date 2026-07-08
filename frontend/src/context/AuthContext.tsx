@@ -14,6 +14,8 @@ interface AuthContextType {
     phone?: string;
     roleCode?: string;
   }) => Promise<{ success: boolean; message: string; errors?: any[] }>;
+  verifyOtp: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
 }
 
@@ -117,6 +119,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const handleVerifyOtp = async (email: string, otp: string) => {
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, otp }),
+      });
+
+      const resData = await response.json();
+
+      if (response.ok && resData.success) {
+        const newToken = resData.data.accessToken;
+        localStorage.setItem('token', newToken);
+        setToken(newToken);
+        setUser(resData.data.user);
+        return { success: true, message: 'Xác thực OTP và đăng nhập thành công!' };
+      } else {
+        return { success: false, message: resData.message || 'Mã OTP không hợp lệ hoặc đã hết hạn.' };
+      }
+    } catch (error) {
+      console.error('OTP Verification request error:', error);
+      return { success: false, message: 'Không thể kết nối đến máy chủ backend.' };
+    }
+  };
+
+  const handleChangePassword = async (oldPassword: string, newPassword: string) => {
+    try {
+      if (!token) {
+        return { success: false, message: 'Bạn chưa đăng nhập.' };
+      }
+
+      const response = await fetch(`${CONFIG.API_BASE_URL}/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
+
+      const resData = await response.json();
+
+      if (response.ok && resData.success) {
+        return { success: true, message: 'Đổi mật khẩu thành công!' };
+      } else {
+        return { success: false, message: resData.message || 'Đổi mật khẩu thất bại.' };
+      }
+    } catch (error) {
+      console.error('Change password error:', error);
+      return { success: false, message: 'Không thể kết nối đến máy chủ backend.' };
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     setToken(null);
@@ -131,6 +188,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login: handleLogin,
         register: handleRegister,
+        verifyOtp: handleVerifyOtp,
+        changePassword: handleChangePassword,
         logout: handleLogout,
       }}
     >

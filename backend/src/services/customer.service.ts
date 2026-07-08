@@ -1,44 +1,121 @@
+import bcrypt from 'bcryptjs';
 import { prisma } from '../config/prisma';
 import { CreateCustomerDto, UpdateCustomerDto, CreateAddressDto, UpdateAddressDto } from '../dtos/customer.dto';
 import { BadRequestException, NotFoundException } from '../middlewares/error.middleware';
 import { resolveAddressDetails } from '../utils/address-resolver';
+import { rabbitMQService } from './rabbitmq.service';
 
 export class CustomerService {
   /**
    * Create a new customer profile
    */
   public async createCustomer(dto: CreateCustomerDto) {
-    // Check if userId is already associated with another customer
-    if (dto.userId) {
-      const existingCustomer = await prisma.customer.findUnique({
-        where: { userId: dto.userId },
-      });
-      if (existingCustomer) {
-        throw new BadRequestException('Tài khoản này đã được liên kết với một hồ sơ khách hàng khác');
-      }
+    // Check if email already exists
+    const emailExists = await prisma.user.findFirst({
+      where: {
+        email: dto.email,
+        deletedAt: null,
+      },
+    });
+    if (emailExists) {
+      throw new BadRequestException('Địa chỉ email tài khoản đã được đăng ký');
+    }
+
+    // Check if phone already exists
+    const phoneExists = await prisma.user.findFirst({
+      where: {
+        phone: dto.phone,
+        deletedAt: null,
+      },
+    });
+    if (phoneExists) {
+      throw new BadRequestException('Số điện thoại đã được đăng ký');
     }
 
     // Generate unique customer code
     const count = await prisma.customer.count();
     const customerCode = `CUST-${String(count + 1).padStart(6, '0')}`;
 
-    return await prisma.customer.create({
-      data: {
-        userId: dto.userId || null,
-        customerCode,
-        customerType: dto.customerType,
-        companyName: dto.companyName || null,
-        taxCode: dto.taxCode || null,
-        note: dto.note || null,
-        status: 'ACTIVE',
-      },
+    // Generate unique username from Full Name (lower case, remove accents/diacritics/spaces, append random number)
+    let slug = dto.fullName.toLowerCase();
+    slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    slug = slug.replace(/[đĐ]/g, "d");
+    slug = slug.replace(/\s+/g, "");
+    slug = slug.replace(/[^a-z0-9_]/g, "");
+    const usernamePrefix = slug.substring(0, 20);
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const username = `${usernamePrefix}_${randomSuffix}`;
+
+    const role = await prisma.role.findUnique({
+      where: { roleCode: 'CUSTOMER' },
     });
+    if (!role) {
+      throw new BadRequestException("Vai trò 'CUSTOMER' không tồn tại trên hệ thống");
+    }
+
+    // Generate a secure random password: Cust@ + 6 random digits
+    const rawPassword = `Cust@${Math.floor(100000 + Math.random() * 900000)}`;
+    const passwordHash = await bcrypt.hash(rawPassword, 10);
+
+    // Create User and Customer in a transaction
+    const customer = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          username,
+          email: dto.email,
+          passwordHash,
+          phone: dto.phone,
+          status: 'ACTIVE',
+        },
+      });
+
+      await tx.userRole.create({
+        data: {
+          userId: user.id,
+          roleId: role.id,
+        },
+      });
+
+      return await tx.customer.create({
+        data: {
+          userId: user.id,
+          customerCode,
+          customerType: dto.customerType,
+          companyName: dto.companyName || null,
+          taxCode: dto.taxCode || null,
+          note: dto.note || null,
+          status: 'ACTIVE',
+        },
+        include: {
+          user: {
+            select: {
+              username: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
+      });
+    });
+
+    // Publish notification message to RabbitMQ mail_queue
+    await rabbitMQService.publishToQueue('mail_queue', {
+      type: 'CUSTOMER_CREATED',
+      email: dto.email,
+      username,
+      fullName: dto.fullName,
+      phone: dto.phone || undefined,
+      password: rawPassword,
+      customerCode,
+    });
+
+    return customer;
   }
 
   /**
    * Get list of customers with pagination and search
    */
-  public async getCustomers(query: { page?: string; limit?: string; search?: string }) {
+  public async getCustomers(query: { page?: string; limit?: string; search?: string; customerType?: string; status?: string }) {
     const page = parseInt(query.page || '1', 10);
     const limit = parseInt(query.limit || '10', 10);
     const skip = (page - 1) * limit;
@@ -51,6 +128,14 @@ export class CustomerService {
         { companyName: { contains: query.search, mode: 'insensitive' } },
         { taxCode: { contains: query.search, mode: 'insensitive' } },
       ];
+    }
+
+    if (query.customerType) {
+      where.customerType = query.customerType;
+    }
+
+    if (query.status) {
+      where.status = query.status;
     }
 
     const [total, customers] = await prisma.$transaction([
@@ -143,6 +228,7 @@ export class CustomerService {
   public async deleteCustomer(id: string) {
     const customer = await prisma.customer.findUnique({
       where: { id },
+      include: { user: true },
     });
 
     if (!customer || customer.deletedAt) {
@@ -162,9 +248,30 @@ export class CustomerService {
       throw new BadRequestException('Không thể xóa khách hàng đang có đơn hàng trong hệ thống');
     }
 
-    await prisma.customer.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    const timestamp = Date.now();
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Soft delete the customer
+      await tx.customer.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+
+      // 2. Soft delete the associated User and release username/email
+      if (customer.userId && customer.user) {
+        const deletedEmail = `del_${timestamp}_${customer.user.email.slice(0, 50)}@deleted.com`;
+        const deletedUsername = `del_${timestamp.toString().slice(-6)}_${customer.user.username.slice(0, 30)}`;
+
+        await tx.user.update({
+          where: { id: customer.userId },
+          data: {
+            deletedAt: new Date(),
+            status: 'LOCKED',
+            email: deletedEmail.slice(0, 255),
+            username: deletedUsername.slice(0, 50),
+          },
+        });
+      }
     });
 
     return { success: true };
@@ -183,7 +290,7 @@ export class CustomerService {
     }
 
     const resolved = await resolveAddressDetails(dto);
-    const formattedAddress = `${dto.addressLine1}, ${resolved.ward}, ${resolved.district}, ${resolved.province}, ${dto.country || 'Vietnam'}`;
+    const formattedAddress = `${dto.addressLine1}, ${resolved.ward}, ${resolved.province}, ${dto.country || 'Vietnam'}`;
 
     return await prisma.$transaction(async (tx) => {
       // 1. Create Address record
@@ -192,7 +299,6 @@ export class CustomerService {
           addressLine1: dto.addressLine1,
           addressLine2: dto.addressLine2 || null,
           ward: resolved.ward,
-          district: resolved.district,
           province: resolved.province,
           country: dto.country || 'Vietnam',
           postalCode: dto.postalCode || null,
@@ -277,12 +383,11 @@ export class CustomerService {
       const resolved = await resolveAddressDetails({
         addressLine1: updatedAddressLine1,
         ward: dto.ward ?? customerAddress.address.ward,
-        district: dto.district ?? customerAddress.address.district,
         province: dto.province ?? customerAddress.address.province,
         wardCode: dto.wardCode ?? (customerAddress.address.wardCode || undefined),
       });
 
-      const formattedAddress = `${updatedAddressLine1}, ${resolved.ward}, ${resolved.district}, ${resolved.province}, ${updatedCountry}`;
+      const formattedAddress = `${updatedAddressLine1}, ${resolved.ward}, ${resolved.province}, ${updatedCountry}`;
 
       await tx.address.update({
         where: { id: addressId },
@@ -290,7 +395,6 @@ export class CustomerService {
           addressLine1: updatedAddressLine1,
           addressLine2: dto.addressLine2 !== undefined ? dto.addressLine2 : customerAddress.address.addressLine2,
           ward: resolved.ward,
-          district: resolved.district,
           province: resolved.province,
           country: updatedCountry,
           postalCode: dto.postalCode !== undefined ? dto.postalCode : customerAddress.address.postalCode,

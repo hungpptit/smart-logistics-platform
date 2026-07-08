@@ -13,7 +13,6 @@ interface FacilityAddress {
   addressLine1: string;
   addressLine2?: string;
   ward: string;
-  district: string;
   province: string;
   country: string;
   latitude: number;

@@ -6,7 +6,9 @@ interface CustomerModalProps {
   onClose: () => void;
   isEditing: boolean;
   formData: {
-    userId: string;
+    fullName: string;
+    email: string;
+    phone: string;
     customerType: 'INDIVIDUAL' | 'BUSINESS';
     companyName: string;
     taxCode: string;
@@ -14,7 +16,9 @@ interface CustomerModalProps {
     note: string;
   };
   setFormData: React.Dispatch<React.SetStateAction<{
-    userId: string;
+    fullName: string;
+    email: string;
+    phone: string;
     customerType: 'INDIVIDUAL' | 'BUSINESS';
     companyName: string;
     taxCode: string;
@@ -52,6 +56,64 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
         </div>
 
         <form onSubmit={onSubmit} className="p-5 flex flex-col gap-4 text-xs">
+          {/* Email, Phone, FullName account fields */}
+          {isEditing ? (
+            <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 border border-gray-200 rounded text-[11px]">
+              <div>
+                <span className="block text-[9px] font-bold text-gray-400 uppercase">Tên đăng nhập</span>
+                <span className="font-semibold text-gray-800">{formData.fullName || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-gray-400 uppercase">Email liên kết</span>
+                <span className="font-semibold text-gray-800">{formData.email || 'N/A'}</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Họ và tên khách hàng *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nhập họ và tên (cá nhân hoặc người đại diện)"
+                  value={formData.fullName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
+                  className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none focus:border-[#bc0100]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Email đăng ký *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="khachhang@gmail.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none focus:border-[#bc0100]"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Số điện thoại *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="09XXXXXXXX"
+                    value={formData.phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none focus:border-[#bc0100]"
+                  />
+                </div>
+              </div>
+              
+              <p className="text-[9px] text-gray-400 italic">
+                * Hệ thống sẽ tự động tạo tài khoản đăng nhập cho khách hàng, tạo mật khẩu ngẫu nhiên và gửi thông tin qua Email này.
+              </p>
+            </>
+          )}
+
           <div className="flex flex-col gap-1">
             <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Loại khách hàng</label>
             <select
@@ -63,19 +125,6 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
               <option value="BUSINESS">Doanh nghiệp (Business)</option>
             </select>
           </div>
-
-          {!isEditing && (
-            <div className="flex flex-col gap-1">
-              <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">ID Người dùng liên kết (UUID - Tùy chọn)</label>
-              <input
-                type="text"
-                placeholder="Nhập User ID nếu đã tạo tài khoản trước"
-                value={formData.userId}
-                onChange={(e) => setFormData(prev => ({ ...prev, userId: e.target.value }))}
-                className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none focus:border-[#bc0100]"
-              />
-            </div>
-          )}
 
           {formData.customerType === 'BUSINESS' && (
             <>

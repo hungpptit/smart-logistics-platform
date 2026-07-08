@@ -18,6 +18,20 @@ export class AuthController {
     }
   };
 
+  public verifyOtp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { email, otp } = req.body;
+      const result = await this.authService.verifyOtp(email, otp);
+      res.status(200).json({
+        success: true,
+        message: 'Kích hoạt tài khoản thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   public login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.authService.login(req.body);
@@ -65,6 +79,20 @@ export class AuthController {
       res.status(200).json({
         success: true,
         message: 'Lấy thông tin tài khoản thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public changePassword = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.id!;
+      const result = await this.authService.changePassword(userId, req.body);
+      res.status(200).json({
+        success: true,
+        message: 'Đổi mật khẩu thành công',
         data: result,
       });
     } catch (error) {

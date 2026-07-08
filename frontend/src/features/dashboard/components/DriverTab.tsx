@@ -1,0 +1,671 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../context/AuthContext';
+import { CONFIG } from '../../../config';
+import { 
+  Search, RefreshCw, Plus, Edit2, Trash2, ShieldAlert, AlertTriangle, 
+  Phone, ChevronLeft, ChevronRight, X, Loader2, Compass 
+} from 'lucide-react';
+
+interface Facility {
+  id: string;
+  facilityCode: string;
+  facilityName: string;
+}
+
+interface Driver {
+  id: string;
+  userId?: string;
+  employeeCode: string;
+  fullName: string;
+  phone: string;
+  driverLicenseNumber: string;
+  driverLicenseClass: string;
+  hireDate: string;
+  employmentStatus: 'ACTIVE' | 'OFFLINE' | 'SUSPENDED';
+  homeFacilityId?: string;
+  note?: string;
+  createdAt: string;
+  homeFacility?: {
+    id: string;
+    facilityCode: string;
+    facilityName: string;
+  };
+  user?: {
+    id: string;
+    username: string;
+    email: string;
+    status: string;
+  };
+}
+
+export const DriverTab: React.FC = () => {
+  const { token, user: currentUser } = useAuth();
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 1
+  });
+
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Search & Filter States
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [facilityFilter, setFacilityFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Modal states
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+
+  // Form states
+  const [formData, setFormData] = useState({
+    userId: '',
+    fullName: '',
+    phone: '',
+    driverLicenseNumber: '',
+    driverLicenseClass: '',
+    hireDate: new Date().toISOString().split('T')[0],
+    employmentStatus: 'ACTIVE' as 'ACTIVE' | 'OFFLINE' | 'SUSPENDED',
+    homeFacilityId: '',
+    note: '',
+    createUser: false,
+    email: '',
+    username: ''
+  });
+
+  const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const canManage = currentUser?.roles.includes('ADMIN') || currentUser?.permissions.includes('DRIVER_MANAGE');
+
+  useEffect(() => {
+    fetchDrivers(currentPage);
+  }, [currentPage, facilityFilter, statusFilter]);
+
+  useEffect(() => {
+    if (showModal) {
+      fetchFacilities();
+    }
+  }, [showModal]);
+
+  const fetchDrivers = async (page: number = 1) => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: '10',
+        search: searchTerm,
+        facilityId: facilityFilter,
+        status: statusFilter
+      });
+      const response = await fetch(`${CONFIG.API_BASE_URL}/drivers?${queryParams.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setDrivers(data.data || []);
+        if (data.pagination) {
+          setPagination(data.pagination);
+        }
+      } else {
+        setError(data.message || 'Không thể tải danh sách tài xế.');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Lỗi kết nối máy chủ khi lấy dữ liệu tài xế.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchFacilities = async () => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/facilities?limit=100`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setFacilities(data.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching facilities:', err);
+    }
+  };
+
+
+
+  // Pre-fill facilities for main dashboard filter as well
+  useEffect(() => {
+    fetchFacilities();
+  }, []);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCurrentPage(1);
+    fetchDrivers(1);
+  };
+
+  const handleOpenAddModal = () => {
+    setIsEditing(false);
+    setSelectedDriverId(null);
+    setFormData({
+      userId: '',
+      fullName: '',
+      phone: '',
+      driverLicenseNumber: '',
+      driverLicenseClass: '',
+      hireDate: new Date().toISOString().split('T')[0],
+      employmentStatus: 'ACTIVE',
+      homeFacilityId: '',
+      note: '',
+      createUser: false,
+      email: '',
+      username: ''
+    });
+    setActionError(null);
+    setShowModal(true);
+  };
+
+  const handleOpenEditModal = (driver: Driver) => {
+    setIsEditing(true);
+    setSelectedDriverId(driver.id);
+    setFormData({
+      userId: driver.userId || '',
+      fullName: driver.fullName,
+      phone: driver.phone,
+      driverLicenseNumber: driver.driverLicenseNumber,
+      driverLicenseClass: driver.driverLicenseClass,
+      hireDate: driver.hireDate ? driver.hireDate.split('T')[0] : '',
+      employmentStatus: driver.employmentStatus,
+      homeFacilityId: driver.homeFacilityId || '',
+      note: driver.note || '',
+      createUser: false,
+      email: driver.user?.email || '',
+      username: driver.user?.username || ''
+    });
+    setActionError(null);
+    setShowModal(true);
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+
+    setActionLoading(true);
+    setActionError(null);
+
+    const payload = {
+      ...formData,
+      homeFacilityId: formData.homeFacilityId === '' ? undefined : formData.homeFacilityId,
+      username: isEditing ? undefined : formData.username,
+      email: isEditing ? undefined : formData.email,
+    };
+
+    try {
+      const url = isEditing 
+        ? `${CONFIG.API_BASE_URL}/drivers/${selectedDriverId}` 
+        : `${CONFIG.API_BASE_URL}/drivers`;
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setShowModal(false);
+        fetchDrivers(currentPage);
+      } else {
+        setActionError(data.message || 'Có lỗi xảy ra trong quá trình xử lý.');
+      }
+    } catch (err) {
+      console.error(err);
+      setActionError('Lỗi máy chủ, vui lòng thử lại sau.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteDriver = async (id: string, name: string) => {
+    if (!confirm(`Bạn có chắc chắn muốn xóa hồ sơ tài xế "${name}"?`)) return;
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/drivers/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        fetchDrivers(currentPage);
+      } else {
+        alert(data.message || 'Không thể xóa tài xế này.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi kết nối khi xóa tài xế.');
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Top Filter Card */}
+      <div className="bg-white p-4 rounded-lg border border-[#e2e8f0] shadow-soft flex flex-col lg:flex-row gap-4 lg:items-start justify-between">
+        <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          {/* Search Input */}
+          <div className="relative min-w-[260px] flex-1 sm:flex-initial">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Tìm mã, tên, số điện thoại..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-[#e2e8f0] rounded-md text-xs focus:border-[#bc0100] focus:ring-1 focus:ring-[#bc0100] outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Warehouse Filter */}
+            <select
+              value={facilityFilter}
+              onChange={(e) => setFacilityFilter(e.target.value)}
+              className="px-3 py-2 border border-[#e2e8f0] rounded-md text-xs focus:border-[#bc0100] outline-none bg-white min-w-[200px]"
+            >
+              <option value="">Tất cả kho hoạt động</option>
+              {facilities.map((fac) => (
+                <option key={fac.id} value={fac.id}>
+                  {fac.facilityName} ({fac.facilityCode})
+                </option>
+              ))}
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border border-[#e2e8f0] rounded-md text-xs focus:border-[#bc0100] outline-none bg-white"
+            >
+              <option value="">Tất cả trạng thái</option>
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="OFFLINE">Ngoại tuyến</option>
+              <option value="SUSPENDED">Bị đình chỉ</option>
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            className="px-4 py-2 bg-[#161D25] hover:bg-black text-white text-xs font-bold uppercase tracking-wider rounded transition-colors cursor-pointer"
+          >
+            Lọc
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setFacilityFilter('');
+              setStatusFilter('');
+              setCurrentPage(1);
+              fetchDrivers();
+            }}
+            className="p-2 border border-[#e2e8f0] hover:bg-gray-50 rounded text-gray-500 cursor-pointer"
+            title="Tải lại dữ liệu"
+          >
+            <RefreshCw size={14} />
+          </button>
+        </form>
+
+        {canManage && (
+          <button
+            onClick={handleOpenAddModal}
+            className="flex items-center gap-2 px-4 py-2 bg-[#bc0100] hover:bg-[#a00100] text-white text-xs font-bold uppercase tracking-wider rounded shadow-md transition-colors cursor-pointer w-full lg:w-auto justify-center whitespace-nowrap shrink-0"
+          >
+            <Plus size={14} />
+            <span>Thêm tài xế mới</span>
+          </button>
+        )}
+      </div>
+
+      {/* Main Table Card */}
+      <div className="bg-white rounded-lg border border-[#e2e8f0] shadow-soft overflow-hidden">
+        {loading ? (
+          <div className="py-20 text-center flex flex-col items-center gap-2 text-gray-400">
+            <Loader2 size={30} className="animate-spin text-[#bc0100]" />
+            <p className="text-[10px] font-bold uppercase tracking-wider mt-2">Đang tải danh sách tài xế...</p>
+          </div>
+        ) : error ? (
+          <div className="py-16 text-center text-red-500 flex flex-col items-center gap-2">
+            <AlertTriangle size={36} />
+            <p className="text-xs font-bold uppercase tracking-wider">{error}</p>
+          </div>
+        ) : drivers.length === 0 ? (
+          <div className="py-20 text-center text-gray-400 flex flex-col items-center gap-3">
+            <Compass size={40} className="text-gray-300" />
+            <p className="text-xs font-semibold">Không tìm thấy tài xế nào</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[#e2e8f0] bg-gray-50 text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">
+                  <th className="p-4">Tài xế / Mã số</th>
+                  <th className="p-4">Kho hoạt động</th>
+                  <th className="p-4">Bằng lái xe</th>
+                  <th className="p-4">Trạng thái</th>
+                  <th className="p-4">Ngày ký HĐ</th>
+                  <th className="p-4 text-right">Hành động</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#e2e8f0] text-xs">
+                {drivers.map((drv) => (
+                  <tr key={drv.id} className="hover:bg-gray-50/70 transition-colors">
+                    <td className="p-4">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-bold text-[#161D25]">{drv.fullName}</span>
+                        <span className="text-[10px] font-mono text-gray-500">{drv.employeeCode}</span>
+                        <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                          <Phone size={10} /> {drv.phone}
+                        </span>
+                        {drv.user && (
+                          <span className="text-[9px] text-[#bc0100] bg-[#bc0100]/5 px-1.5 py-0.5 rounded self-start mt-1">
+                            L.kết tài khoản: {drv.user.username}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      {drv.homeFacility ? (
+                        <div className="flex flex-col">
+                          <span className="font-bold text-gray-700">{drv.homeFacility.facilityName}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">{drv.homeFacility.facilityCode}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">Chưa phân kho</span>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-gray-700">Hạng: {drv.driverLicenseClass}</span>
+                        <span className="text-[10px] text-gray-400 font-mono">Số: {drv.driverLicenseNumber}</span>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
+                        drv.employmentStatus === 'ACTIVE'
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : drv.employmentStatus === 'SUSPENDED'
+                          ? 'bg-red-50 text-red-700 border border-red-200'
+                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                      }`}>
+                        {drv.employmentStatus === 'ACTIVE' ? 'Đang hoạt động' : drv.employmentStatus === 'SUSPENDED' ? 'Đình chỉ' : 'Ngoại tuyến'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-gray-500 font-mono">
+                      {drv.hireDate ? new Date(drv.hireDate).toLocaleDateString('vi-VN') : 'N/A'}
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {canManage && (
+                          <>
+                            <button
+                              onClick={() => handleOpenEditModal(drv)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                              title="Chỉnh sửa thông tin"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDriver(drv.id, drv.fullName)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                              title="Xóa hồ sơ"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+              <div className="p-4 border-t border-[#e2e8f0] flex items-center justify-between text-xs text-gray-500 bg-gray-50/50">
+                <span>Trang {pagination.page} / {pagination.totalPages} (Tổng số: {pagination.total} tài xế)</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    className="p-1.5 border border-[#e2e8f0] rounded hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer bg-white"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    disabled={currentPage === pagination.totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, pagination.totalPages))}
+                    className="p-1.5 border border-[#e2e8f0] rounded hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer bg-white"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Add / Edit Driver Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-[#161D25]/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg border border-[#e2e8f0] shadow-soft w-full max-w-lg overflow-hidden flex flex-col my-8">
+            <div className="p-4 border-b border-[#e2e8f0] flex justify-between items-center bg-gray-50">
+              <h3 className="text-sm font-bold text-[#161D25] uppercase tracking-wider">
+                {isEditing ? 'Cập nhật thông tin tài xế' : 'Thêm hồ sơ tài xế mới'}
+              </h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleFormSubmit} className="p-6 flex-1 overflow-y-auto space-y-4">
+              {actionError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded text-xs flex items-center gap-2">
+                  <ShieldAlert size={16} />
+                  <span className="font-semibold">{actionError}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Full name */}
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Họ và tên *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.fullName}
+                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100]"
+                    placeholder="Nguyễn Văn A"
+                  />
+                </div>
+
+                {/* Phone number */}
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số điện thoại *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100]"
+                    placeholder="09XXXXXXXX"
+                  />
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Trạng thái hoạt động</label>
+                  <select
+                    value={formData.employmentStatus}
+                    onChange={(e) => setFormData({ ...formData, employmentStatus: e.target.value as any })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
+                  >
+                    <option value="ACTIVE">Đang hoạt động</option>
+                    <option value="OFFLINE">Ngoại tuyến</option>
+                    <option value="SUSPENDED">Bị đình chỉ</option>
+                  </select>
+                </div>
+
+                {/* License class */}
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Hạng bằng lái *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.driverLicenseClass}
+                    onChange={(e) => setFormData({ ...formData, driverLicenseClass: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100]"
+                    placeholder="A1, B2, C..."
+                  />
+                </div>
+
+                {/* License number */}
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số bằng lái *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.driverLicenseNumber}
+                    onChange={(e) => setFormData({ ...formData, driverLicenseNumber: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100]"
+                    placeholder="Số thẻ bằng lái"
+                  />
+                </div>
+
+                {/* Home Facility (Warehouse) */}
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Kho / Bưu cục trực thuộc *</label>
+                  <select
+                    required
+                    value={formData.homeFacilityId}
+                    onChange={(e) => setFormData({ ...formData, homeFacilityId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
+                  >
+                    <option value="">-- Chọn kho bãi hoạt động --</option>
+                    {facilities.map((fac) => (
+                      <option key={fac.id} value={fac.id}>
+                        {fac.facilityName} ({fac.facilityCode})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* User Credentials Account Creation */}
+                <div className="col-span-2">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-2 pb-1 border-b border-gray-100">
+                    Thông tin tài khoản đăng nhập (Shipper)
+                  </h4>
+                  {isEditing ? (
+                    <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 border border-gray-200 rounded text-xs">
+                      <div>
+                        <span className="block text-[9px] font-bold text-gray-500 uppercase">Tên đăng nhập</span>
+                        <span className="font-semibold text-gray-800">{formData.username || 'Chưa liên kết'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-bold text-gray-500 uppercase">Email liên kết</span>
+                        <span className="font-semibold text-gray-800">{formData.email || 'Chưa liên kết'}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-red-50/20 border border-red-100/50 rounded flex flex-col gap-2">
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-500 uppercase mb-1">Email đăng ký tài khoản *</label>
+                        <input
+                          type="email"
+                          required
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
+                          placeholder="taixe@gmail.com"
+                        />
+                      </div>
+                      <p className="text-[9px] text-gray-500 italic">
+                        * Hệ thống sẽ tự động tạo tên đăng nhập từ họ tên tài xế, tạo mật khẩu bảo mật ngẫu nhiên và gửi thông tin qua Email này.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Hire date */}
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Ngày ký hợp đồng *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.hireDate}
+                    onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100]"
+                  />
+                </div>
+
+                {/* Note */}
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Ghi chú</label>
+                  <textarea
+                    value={formData.note}
+                    onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] h-16 resize-none"
+                    placeholder="Nhập ghi chú thêm..."
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-[#e2e8f0] flex justify-end gap-2 bg-gray-50 -mx-6 -mb-6 p-4">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded text-xs font-semibold hover:bg-gray-50 text-gray-700 transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-[#bc0100] hover:bg-[#a00100] text-white rounded text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+                >
+                  {actionLoading && <Loader2 size={12} className="animate-spin" />}
+                  {isEditing ? 'Cập nhật' : 'Thêm mới'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

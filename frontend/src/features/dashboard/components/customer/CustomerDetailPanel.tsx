@@ -6,7 +6,6 @@ interface AddressItem {
   addressLine1: string;
   addressLine2?: string;
   ward: string;
-  district: string;
   province: string;
   country: string;
   postalCode?: string;
@@ -197,7 +196,7 @@ export const CustomerDetailPanel: React.FC<CustomerDetailPanelProps> = ({
                     <p className="font-semibold text-gray-800">{addr.addressLine1}</p>
                     {addr.addressLine2 && <p className="text-gray-500 text-[11px]">{addr.addressLine2}</p>}
                     <p className="text-gray-500 mt-0.5">
-                      {addr.ward}, {addr.district}, {addr.province}
+                      {addr.ward}, {addr.province}
                     </p>
                     <p className="text-gray-400 font-mono text-[9px] mt-1">
                       GPS: {addr.latitude.toFixed(6)}, {addr.longitude.toFixed(6)}

@@ -26,16 +26,20 @@ router.use(authMiddleware);
  *           schema:
  *             type: object
  *             required:
- *               - customerCode
+ *               - fullName
+ *               - email
+ *               - phone
  *               - customerType
  *             properties:
- *               userId:
+ *               fullName:
  *                 type: string
- *                 format: uuid
- *                 example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
- *               customerCode:
+ *                 example: Nguyễn Văn A
+ *               email:
  *                 type: string
- *                 example: CUST001
+ *                 example: anguyen@example.com
+ *               phone:
+ *                 type: string
+ *                 example: 0987654321
  *               customerType:
  *                 type: string
  *                 enum: [INDIVIDUAL, BUSINESS]
@@ -227,7 +231,6 @@ router.delete(
  *             required:
  *               - addressLine1
  *               - ward
- *               - district
  *               - province
  *               - addressType
  *             properties:
@@ -239,9 +242,6 @@ router.delete(
  *               ward:
  *                 type: string
  *                 example: Phường Bến Nghé
- *               district:
- *                 type: string
- *                 example: Quận 1
  *               province:
  *                 type: string
  *                 example: Thành phố Hồ Chí Minh
@@ -324,8 +324,6 @@ router.get(
  *               addressLine2:
  *                 type: string
  *               ward:
- *                 type: string
- *               district:
  *                 type: string
  *               province:
  *                 type: string

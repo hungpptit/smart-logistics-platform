@@ -105,13 +105,12 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 | `address_line_1`| VarChar(255) | Địa chỉ chi tiết (Số nhà, tên đường). VD: "Số 1 Đại Cồ Việt", "Tòa nhà Keangnam" |
 | `address_line_2`| VarChar(255) | Thông tin bổ sung địa chỉ (Tòa nhà, tầng, phòng). VD: "Tòa A, Căn hộ 1205" |
 | `ward` | VarChar(100) | Tên Phường / Xã. VD: "Phường Bách Khoa", "Xã Tiền Phong" |
-| `district` | VarChar(100) | Tên Quận / Huyện. VD: "Quận Hai Bà Trưng", "Huyện Mê Linh" |
 | `province` | VarChar(100) | Tên Tỉnh / Thành phố. VD: "Hà Nội", "Tỉnh Vĩnh Phúc" |
 | `country` | VarChar(100) | Quốc gia. VD: "Vietnam", "Japan" |
 | `postal_code` | VarChar(20) | Mã bưu chính khu vực. VD: `100000` (Hà Nội) |
 | `latitude` | DoublePrecision | Vĩ độ GPS dùng để xác định tọa độ chính xác trên bản đồ. VD: `21.0076` |
 | `longitude` | DoublePrecision | Kinh độ GPS dùng để xác định tọa độ chính xác trên bản đồ. VD: `105.8430` |
-| `formatted_address`| Text | Địa chỉ dạng chuỗi hoàn chỉnh. VD: "Số 1 Đại Cồ Việt, Phường Bách Khoa, Quận Hai Bà Trưng, Hà Nội, Vietnam" |
+| `formatted_address`| Text | Địa chỉ dạng chuỗi hoàn chỉnh. VD: "Số 1 Đại Cồ Việt, Phường Bách Khoa, Hà Nội, Vietnam" |
 | `place_id` | VarChar(255) | Mã địa điểm trên Google Maps / Goong Map để truy xuất nhanh. VD: `ChIJo-7_Qn2sNTER...` |
 | `created_at` | Timestamptz | Thời điểm tạo. |
 | `updated_at` | Timestamptz | Thời điểm cập nhật. |

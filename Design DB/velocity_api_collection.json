@@ -248,7 +248,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"addressLine1\": \"45 Trường Sơn\",\n  \"ward\": \"Phường 2\",\n  \"district\": \"Quận Tân Bình\",\n  \"province\": \"Thành phố Hồ Chí Minh\",\n  \"wardCode\": \"26890\",\n  \"addressType\": \"HOME\",\n  \"isDefault\": true\n}",
+							"raw": "{\n  \"addressLine1\": \"45 Trường Sơn\",\n  \"ward\": \"Phường 2\",\n  \"province\": \"Thành phố Hồ Chí Minh\",\n  \"wardCode\": \"26890\",\n  \"addressType\": \"HOME\",\n  \"isDefault\": true\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -547,7 +547,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"customerId\": \"{{testCustomerId}}\",\n  \"serviceCode\": \"STANDARD\",\n  \"senderName\": \"Nguyễn Văn A\",\n  \"senderPhone\": \"0912345678\",\n  \"senderAddressLine1\": \"100 Lê Lợi\",\n  \"senderWard\": \"Phường Bến Thành\",\n  \"senderDistrict\": \"Quận 1\",\n  \"senderProvince\": \"Thành phố Hồ Chí Minh\",\n  \"senderWardCode\": \"26737\",\n  \"receiverName\": \"Trần Thị B\",\n  \"receiverPhone\": \"0987654321\",\n  \"receiverAddressLine1\": \"200 Quang Trung\",\n  \"receiverWard\": \"Phường 10\",\n  \"receiverDistrict\": \"Quận Gò Vấp\",\n  \"receiverProvince\": \"Thành phố Hồ Chí Minh\",\n  \"receiverWardCode\": \"26861\",\n  \"isFragile\": false,\n  \"codAmount\": 300000,\n  \"note\": \"Kiểm tra API tự động\",\n  \"packages\": [\n    {\n      \"packageName\": \"Sách giáo khoa\",\n      \"weightKg\": 2.3,\n      \"lengthCm\": 25,\n      \"widthCm\": 18,\n      \"heightCm\": 10\n    }\n  ]\n}",
+							"raw": "{\n  \"customerId\": \"{{testCustomerId}}\",\n  \"serviceCode\": \"STANDARD\",\n  \"senderName\": \"Nguyễn Văn A\",\n  \"senderPhone\": \"0912345678\",\n  \"senderAddressLine1\": \"100 Lê Lợi\",\n  \"senderWard\": \"Phường Bến Thành\",\n  \"senderProvince\": \"Thành phố Hồ Chí Minh\",\n  \"senderWardCode\": \"26737\",\n  \"receiverName\": \"Trần Thị B\",\n  \"receiverPhone\": \"0987654321\",\n  \"receiverAddressLine1\": \"200 Quang Trung\",\n  \"receiverWard\": \"Phường 10\",\n  \"receiverProvince\": \"Thành phố Hồ Chí Minh\",\n  \"receiverWardCode\": \"26861\",\n  \"isFragile\": false,\n  \"codAmount\": 300000,\n  \"note\": \"Kiểm tra API tự động\",\n  \"packages\": [\n    {\n      \"packageName\": \"Sách giáo khoa\",\n      \"weightKg\": 2.3,\n      \"lengthCm\": 25,\n      \"widthCm\": 18,\n      \"heightCm\": 10\n    }\n  ]\n}",
 							"options": {
 								"raw": {
 									"language": "json"

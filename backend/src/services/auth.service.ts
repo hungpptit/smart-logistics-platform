@@ -2,30 +2,42 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prisma';
 import { redis } from '../config/redis';
-import { RegisterDto, LoginDto, RefreshTokenDto } from '../dtos/auth.dto';
+import { RegisterDto, LoginDto, RefreshTokenDto, ChangePasswordDto } from '../dtos/auth.dto';
 import { BadRequestException, UnauthorizedException, NotFoundException } from '../middlewares/error.middleware';
+import { rabbitMQService } from './rabbitmq.service';
 
 export class AuthService {
   /**
    * Register a new user
    */
   public async register(dto: RegisterDto) {
-    // 1. Check if user already exists
-    const existingUser = await prisma.user.findFirst({
+    // 1. Check if user already exists (by username, email or phone) and is ACTIVE
+    const orConditions: any[] = [
+      { username: dto.username },
+      { email: dto.email }
+    ];
+    if (dto.phone) {
+      orConditions.push({ phone: dto.phone });
+    }
+
+    const existingActiveUser = await prisma.user.findFirst({
       where: {
-        OR: [
-          { username: dto.username },
-          { email: dto.email },
-        ],
+        OR: orConditions,
+        status: 'ACTIVE',
         deletedAt: null,
       },
     });
 
-    if (existingUser) {
-      if (existingUser.username === dto.username) {
+    if (existingActiveUser) {
+      if (existingActiveUser.username === dto.username) {
         throw new BadRequestException('Tên tài khoản đã tồn tại trên hệ thống');
       }
-      throw new BadRequestException('Địa chỉ email đã được đăng ký tài khoản');
+      if (existingActiveUser.email === dto.email) {
+        throw new BadRequestException('Địa chỉ email đã được đăng ký tài khoản');
+      }
+      if (dto.phone && existingActiveUser.phone === dto.phone) {
+        throw new BadRequestException('Số điện thoại đã được đăng ký tài khoản');
+      }
     }
 
     // 2. Validate role
@@ -42,8 +54,26 @@ export class AuthService {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(dto.password, saltRounds);
 
-    // 4. Create user and assign role in a transaction
+    // 4. Create user and assign role in a transaction (with DISABLED status initially for OTP verification)
+    // Clean up any unverified (DISABLED) accounts matching the criteria first to avoid key conflicts
     const newUser = await prisma.$transaction(async (tx) => {
+      const duplicateDisabledUsers = await tx.user.findMany({
+        where: {
+          OR: orConditions,
+          status: 'DISABLED',
+          deletedAt: null,
+        },
+      });
+
+      for (const du of duplicateDisabledUsers) {
+        await tx.userRole.deleteMany({
+          where: { userId: du.id },
+        });
+        await tx.user.delete({
+          where: { id: du.id },
+        });
+      }
+
       const user = await tx.user.create({
         data: {
           username: dto.username,
@@ -51,7 +81,7 @@ export class AuthService {
           passwordHash,
           phone: dto.phone,
           avatarUrl: dto.avatarUrl,
-          status: 'ACTIVE',
+          status: 'DISABLED',
         },
       });
 
@@ -65,22 +95,47 @@ export class AuthService {
       return user;
     });
 
-    // 5. Exclude passwordHash from response
-    const { passwordHash: _, ...userWithoutPassword } = newUser;
+    // 5. Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 6. Save OTP in Redis (Expires in 5 minutes)
+    await redis.setEx(`otp:email:${dto.email}`, 300, otp);
+
+    // 7. Publish to RabbitMQ mail_queue
+    await rabbitMQService.publishToQueue('mail_queue', {
+      type: 'SEND_OTP',
+      email: dto.email,
+      username: dto.username,
+      otp,
+    });
+
     return {
-      user: userWithoutPassword,
-      assignedRole: roleCode,
+      status: 'PENDING_VERIFICATION',
+      email: dto.email,
+      message: 'Mã OTP xác thực đã được gửi tới email của bạn. Vui lòng xác minh để hoàn tất đăng ký.',
     };
+
   }
 
   /**
-   * Login user and issue JWT
+   * Verify registration OTP and activate user
    */
-  public async login(dto: LoginDto) {
-    // 1. Find user by email
+  public async verifyOtp(email: string, otp: string) {
+    // 1. Get OTP from Redis
+    const cachedOtp = await redis.get(`otp:email:${email}`);
+    if (!cachedOtp) {
+      throw new BadRequestException('Mã OTP đã hết hạn hoặc không tồn tại');
+    }
+
+    if (cachedOtp !== otp) {
+      throw new BadRequestException('Mã OTP không chính xác');
+    }
+
+    // 2. Find and activate user
     const user = await prisma.user.findFirst({
       where: {
-        email: dto.email,
+        email,
+        status: 'DISABLED',
         deletedAt: null,
       },
       include: {
@@ -94,7 +149,100 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
+      throw new NotFoundException('Không tìm thấy tài khoản tương ứng ở trạng thái chờ kích hoạt');
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { status: 'ACTIVE' },
+    });
+
+    // Check if the user has the CUSTOMER role and auto-create a Customer profile if not exists
+    const rolesList = user.userRoles.map((ur) => ur.role.roleCode);
+    if (rolesList.includes('CUSTOMER')) {
+      const existingCustomer = await prisma.customer.findUnique({
+        where: { userId: user.id },
+      });
+      if (!existingCustomer) {
+        const count = await prisma.customer.count();
+        const customerCode = `CUST-${String(count + 1).padStart(6, '0')}`;
+        await prisma.customer.create({
+          data: {
+            userId: user.id,
+            customerCode,
+            customerType: 'INDIVIDUAL',
+            status: 'ACTIVE',
+          },
+        });
+      }
+    }
+
+    // Delete OTP from Redis
+    await redis.del(`otp:email:${email}`);
+
+    // 3. Generate Access & Refresh tokens
+    const jwtSecret = process.env.JWT_SECRET || 'super_secret_key_slp_2026';
+    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'super_refresh_secret_key_slp_2026';
+
+    const accessToken = jwt.sign(
+      {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+      },
+      jwtSecret,
+      { expiresIn: '15m' }
+    );
+
+    const refreshToken = jwt.sign(
+      {
+        id: user.id,
+      },
+      jwtRefreshSecret,
+      { expiresIn: '7d' }
+    );
+
+    // Save refresh token to Redis (Expires in 7 days)
+    await redis.setEx(`refresh_token:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
+
+    const { passwordHash: _, ...userWithoutPassword } = user;
+    const roles = user.userRoles.map((ur) => ur.role.roleCode);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        ...userWithoutPassword,
+        roles,
+      },
+    };
+  }
+
+  /**
+   * Login user and issue JWT
+   */
+  public async login(dto: LoginDto) {
+    // 1. Find user by email or phone
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: dto.email },
+          { phone: dto.email },
+        ],
+        deletedAt: null,
+      },
+      include: {
+        managedFacilities: true,
+        userRoles: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Tài khoản hoặc mật khẩu không chính xác');
     }
 
     // 2. Validate status
@@ -105,7 +253,7 @@ export class AuthService {
     // 3. Compare password
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
+      throw new UnauthorizedException('Tài khoản hoặc mật khẩu không chính xác');
     }
 
     // 4. Update last login time
@@ -257,4 +405,37 @@ export class AuthService {
       permissions,
     };
   }
+
+  /**
+   * Change current user password
+   */
+  public async changePassword(userId: string, dto: ChangePasswordDto) {
+    // 1. Get user details including passwordHash
+    const user = await prisma.user.findUnique({
+      where: { id: userId, deletedAt: null },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy thông tin tài khoản người dùng');
+    }
+
+    // 2. Compare old password
+    const isPasswordValid = await bcrypt.compare(dto.oldPassword, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new BadRequestException('Mật khẩu cũ không chính xác');
+    }
+
+    // 3. Hash new password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(dto.newPassword, saltRounds);
+
+    // 4. Update password
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    return { success: true, message: 'Đổi mật khẩu thành công!' };
+  }
 }
+

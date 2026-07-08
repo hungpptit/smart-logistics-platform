@@ -27,7 +27,7 @@ export class RegisterDto {
 }
 
 export class LoginDto {
-  @IsEmail({}, { message: 'Email không đúng định dạng' })
+  @IsString({ message: 'Tài khoản đăng nhập phải là một chuỗi ký tự' })
   email!: string;
 
   @IsString({ message: 'Mật khẩu phải là một chuỗi ký tự' })
@@ -37,4 +37,13 @@ export class LoginDto {
 export class RefreshTokenDto {
   @IsString({ message: 'Refresh token phải là một chuỗi ký tự' })
   refreshToken!: string;
+}
+
+export class ChangePasswordDto {
+  @IsString({ message: 'Mật khẩu cũ phải là một chuỗi ký tự' })
+  oldPassword!: string;
+
+  @IsString({ message: 'Mật khẩu mới phải là một chuỗi ký tự' })
+  @MinLength(6, { message: 'Mật khẩu mới phải có ít nhất 6 ký tự' })
+  newPassword!: string;
 }

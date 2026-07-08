@@ -41,7 +41,7 @@ export class FacilityService {
     const facilityCode = `FAC-${String(count + 1).padStart(6, '0')}`;
 
     const resolved = await resolveAddressDetails(dto.address);
-    const formattedAddress = `${dto.address.addressLine1}, ${resolved.ward}, ${resolved.district}, ${resolved.province}, ${dto.address.country || 'Vietnam'}`;
+    const formattedAddress = `${dto.address.addressLine1}, ${resolved.ward}, ${resolved.province}, ${dto.address.country || 'Vietnam'}`;
 
     return await prisma.$transaction(async (tx) => {
       // 1. Create Address
@@ -50,7 +50,6 @@ export class FacilityService {
           addressLine1: dto.address.addressLine1,
           addressLine2: dto.address.addressLine2 || null,
           ward: resolved.ward,
-          district: resolved.district,
           province: resolved.province,
           country: dto.address.country || 'Vietnam',
           postalCode: dto.address.postalCode || null,
