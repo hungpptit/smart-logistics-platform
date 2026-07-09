@@ -355,18 +355,34 @@ export class DriverService {
 
     const timestamp = Date.now();
     const deletedPhone = `del_${driver.phone.substring(0, 10)}_${timestamp.toString().slice(-4)}`;
+    const deletedCitizenId = driver.citizenId
+      ? `del_${timestamp.toString().slice(-4)}_${driver.citizenId.substring(0, 11)}`
+      : null;
 
     await prisma.$transaction(async (tx) => {
-      // 1. Soft delete the driver and release the unique phone number
+      // 1. Soft delete the driver, release the unique phone number and citizen_id
       await tx.driver.update({
         where: { id },
         data: { 
           deletedAt: new Date(),
           phone: deletedPhone,
+          citizenId: deletedCitizenId,
         },
       });
 
-      // 2. Soft delete the associated User and release username/email
+      // 2. Deactivate any active vehicle assignments
+      await tx.driverVehicleAssignment.updateMany({
+        where: {
+          driverId: id,
+          isActive: true,
+        },
+        data: {
+          isActive: false,
+          assignedTo: new Date(),
+        },
+      });
+
+      // 3. Soft delete the associated User and release username/email
       if (driver.userId && driver.user) {
         const deletedEmail = `del_${timestamp}_${driver.user.email.slice(0, 50)}@deleted.com`;
         const deletedUsername = `del_${timestamp.toString().slice(-6)}_${driver.user.username.slice(0, 30)}`;

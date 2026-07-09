@@ -424,11 +424,18 @@ export class StaffService {
           },
         },
       },
+      include: {
+        staffProfile: true,
+      },
     });
 
     if (!staff) {
       throw new NotFoundException('Không tìm thấy nhân viên');
     }
+
+    const timestamp = Date.now();
+    const deletedEmail = `del_${timestamp}_${staff.email.slice(0, 50)}@deleted.com`;
+    const deletedUsername = `del_${timestamp.toString().slice(-6)}_${staff.username.slice(0, 30)}`;
 
     // Soft delete by updating deletedAt in transaction
     await prisma.$transaction(async (tx) => {
@@ -437,18 +444,21 @@ export class StaffService {
         data: {
           deletedAt: new Date(),
           status: 'DISABLED',
+          email: deletedEmail.slice(0, 255),
+          username: deletedUsername.slice(0, 50),
         },
       });
 
-      const profileExists = await tx.staffProfile.findUnique({
-        where: { userId: id }
-      });
+      if (staff.staffProfile) {
+        const deletedCitizenId = staff.staffProfile.citizenId
+          ? `del_${timestamp.toString().slice(-4)}_${staff.staffProfile.citizenId.substring(0, 11)}`
+          : null;
 
-      if (profileExists) {
         await tx.staffProfile.update({
           where: { userId: id },
           data: {
             deletedAt: new Date(),
+            citizenId: deletedCitizenId,
           },
         });
       }
