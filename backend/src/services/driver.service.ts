@@ -382,10 +382,13 @@ export class DriverService {
         },
       });
 
-      // 3. Soft delete the associated User and release username/email
+      // 3. Soft delete the associated User and release username/email/phone
       if (driver.userId && driver.user) {
         const deletedEmail = `del_${timestamp}_${driver.user.email.slice(0, 50)}@deleted.com`;
         const deletedUsername = `del_${timestamp.toString().slice(-6)}_${driver.user.username.slice(0, 30)}`;
+        const deletedUserPhone = driver.user.phone
+          ? `del_${driver.user.phone.substring(0, 10)}_${timestamp.toString().slice(-4)}`
+          : null;
 
         await tx.user.update({
           where: { id: driver.userId },
@@ -394,6 +397,7 @@ export class DriverService {
             status: 'LOCKED',
             email: deletedEmail.slice(0, 255),
             username: deletedUsername.slice(0, 50),
+            phone: deletedUserPhone,
           },
         });
       }

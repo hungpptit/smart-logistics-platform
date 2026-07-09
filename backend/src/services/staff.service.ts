@@ -436,6 +436,9 @@ export class StaffService {
     const timestamp = Date.now();
     const deletedEmail = `del_${timestamp}_${staff.email.slice(0, 50)}@deleted.com`;
     const deletedUsername = `del_${timestamp.toString().slice(-6)}_${staff.username.slice(0, 30)}`;
+    const deletedPhone = staff.phone
+      ? `del_${staff.phone.substring(0, 10)}_${timestamp.toString().slice(-4)}`
+      : null;
 
     // Soft delete by updating deletedAt in transaction
     await prisma.$transaction(async (tx) => {
@@ -446,6 +449,7 @@ export class StaffService {
           status: 'DISABLED',
           email: deletedEmail.slice(0, 255),
           username: deletedUsername.slice(0, 50),
+          phone: deletedPhone,
         },
       });
 
