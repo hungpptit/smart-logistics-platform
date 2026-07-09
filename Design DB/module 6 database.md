@@ -46,6 +46,7 @@ Hồ sơ nghiệp vụ tài xế. Tách biệt với bảng `Users` (Authenticat
 | `employee_code` | VARCHAR(30) | ❌ | Mã nhân viên/tài xế duy nhất (Ví dụ: `DRV0001`). |
 | `full_name` | VARCHAR(150) | ❌ | Họ và tên tài xế. |
 | `phone` | VARCHAR(20) | ❌ | Số điện thoại liên hệ (Duy nhất). |
+| `citizen_id` | VARCHAR(20) | ✅ | Số căn cước công dân của tài xế (Duy nhất). |
 | `driver_license_number`| VARCHAR(50)| ❌ | Số giấy phép lái xe (GPLX). |
 | `driver_license_class` | VARCHAR(10) | ❌ | Hạng GPLX (Ví dụ: `A1`, `A2`, `B2`, `C`, `FC`). |
 | `hire_date` | DATE | ❌ | Ngày ký hợp đồng/bắt đầu làm việc. |
@@ -66,6 +67,7 @@ Hồ sơ nghiệp vụ tài xế. Tách biệt với bảng `Users` (Authenticat
   PRIMARY KEY (id)
   UNIQUE (employee_code)
   UNIQUE (phone)
+  UNIQUE (citizen_id)
   UNIQUE (user_id) -- Một tài khoản user chỉ liên kết với tối đa 1 hồ sơ tài xế
   CREATE INDEX idx_drivers_status ON Drivers(employment_status);
   CREATE INDEX idx_drivers_home ON Drivers(home_facility_id);

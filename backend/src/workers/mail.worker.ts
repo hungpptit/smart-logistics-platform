@@ -34,6 +34,8 @@ class MailWorker {
 
           if (content.type === 'DRIVER_CREATED') {
             await this.sendDriverWelcomeEmail(content);
+          } else if (content.type === 'STAFF_CREATED') {
+            await this.sendStaffWelcomeEmail(content);
           } else if (content.type === 'CUSTOMER_CREATED') {
             await this.sendCustomerWelcomeEmail(content);
           } else if (content.type === 'SEND_OTP') {
@@ -221,6 +223,80 @@ class MailWorker {
                 <tr>
                   <td style="font-weight: bold; color: #4a5568;">Mã khách hàng:</td>
                   <td style="font-family: monospace; font-weight: bold; color: #1a202c;">${data.customerCode}</td>
+                </tr>
+              </table>
+            </div>
+            
+            <p style="background-color: #fffaf0; border-left: 4px solid #dd6b20; padding: 12px; border-radius: 4px; font-size: 13px; color: #7b341e;">
+              <strong>* Khuyến nghị bảo mật:</strong> Vui lòng đăng nhập và thay đổi mật khẩu ngay trong lần sử dụng đầu tiên để bảo vệ tài khoản của mình.
+            </p>
+          </div>
+          
+          <div style="background-color: #f7fafc; padding: 16px; text-align: center; font-size: 11px; color: #a0aec0; border-top: 1px solid #edf2f7;">
+            <p style="margin: 0;">Đây là email tự động từ hệ thống. Vui lòng không trả lời thư này.</p>
+            <p style="margin: 4px 0 0 0;">&copy; 2026 Velocity Logistics. All Rights Reserved.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    await this.transporter.sendMail(mailOptions);
+    console.log(`[MailWorker] Welcome email successfully sent to ${data.email}`);
+  }
+
+  private async sendStaffWelcomeEmail(data: {
+    email: string;
+    username: string;
+    fullName: string;
+    phone?: string;
+    password: string;
+    facilityCode?: string;
+    facilityName?: string;
+  }) {
+    const mailOptions = {
+      from: `"Velocity Logistics" <${process.env.EMAIL_USER}>`,
+      to: data.email,
+      subject: `[Velocity Logistics] Cấp tài khoản nhân viên vận hành mới - ${data.username}`,
+      html: `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          <div style="background-color: #bc0100; padding: 24px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px;">Velocity Logistics</h1>
+            <p style="margin: 4px 0 0 0; font-size: 12px; opacity: 0.85;">Hệ thống Quản lý Vận tải & Điều phối Thông minh</p>
+          </div>
+          
+          <div style="padding: 24px; background-color: #ffffff; color: #1a202c; line-height: 1.6;">
+            <h3 style="margin-top: 0; color: #bc0100;">Xin chào anh/chị, ${data.fullName}</h3>
+            <p>Hồ sơ nhân viên của anh/chị đã được thiết lập thành công trên hệ thống <strong>Velocity Logistics</strong> với vai trò <strong>Nhân viên vận hành kho (STAFF)</strong>.</p>
+            
+            <p>Dưới đây là thông tin tài khoản dùng để đăng nhập vào trang quản trị (Velocity Dashboard):</p>
+            
+            <div style="background-color: #f7fafc; border: 1px solid #edf2f7; padding: 16px; border-radius: 6px; margin: 20px 0;">
+              <table style="width: 100%; font-size: 14px;">
+                <tr>
+                  <td style="width: 170px; font-weight: bold; color: #4a5568; padding-bottom: 8px;">Tài khoản đăng nhập:</td>
+                  <td style="font-weight: bold; color: #1a202c; padding-bottom: 8px;">
+                    Sử dụng <span style="color: #bc0100;">Địa chỉ Email</span> hoặc <span style="color: #bc0100;">Số điện thoại</span> dưới đây
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; color: #4a5568; padding-bottom: 8px;">Địa chỉ email:</td>
+                  <td style="font-family: monospace; font-weight: bold; color: #1a202c; padding-bottom: 8px;">${data.email}</td>
+                </tr>
+                ${data.phone ? `
+                <tr>
+                  <td style="font-weight: bold; color: #4a5568; padding-bottom: 8px;">Số điện thoại:</td>
+                  <td style="font-family: monospace; font-weight: bold; color: #1a202c; padding-bottom: 8px;">${data.phone}</td>
+                </tr>
+                ` : ''}
+                <tr>
+                  <td style="font-weight: bold; color: #4a5568; padding-bottom: 8px;">Mật khẩu tạm thời:</td>
+                  <td style="font-family: monospace; font-weight: bold; color: #bc0100; font-size: 15px; padding-bottom: 8px;">${data.password}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; color: #4a5568;">Kho / Bưu cục gán:</td>
+                  <td style="font-weight: bold; color: #1a202c;">
+                    ${data.facilityCode ? `${data.facilityCode} - ${data.facilityName}` : 'Chưa phân công kho bãi'}
+                  </td>
                 </tr>
               </table>
             </div>

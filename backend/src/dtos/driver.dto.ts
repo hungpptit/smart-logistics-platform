@@ -25,6 +25,10 @@ export class CreateDriverDto {
   @IsDateString({}, { message: 'Ngày ký hợp đồng phải đúng định dạng ngày ISO' })
   hireDate!: string;
 
+  @IsString({ message: 'Số CCCD phải là chuỗi ký tự' })
+  @IsOptional()
+  citizenId?: string;
+
   @IsEnum(DriverEmploymentStatus, { message: 'Trạng thái hoạt động không hợp lệ' })
   @IsOptional()
   employmentStatus?: DriverEmploymentStatus;
@@ -62,6 +66,10 @@ export class UpdateDriverDto {
   @IsDateString({}, { message: 'Ngày ký hợp đồng phải đúng định dạng ngày ISO' })
   @IsOptional()
   hireDate?: string;
+
+  @IsString({ message: 'Số CCCD phải là chuỗi ký tự' })
+  @IsOptional()
+  citizenId?: string;
 
   @IsEnum(DriverEmploymentStatus, { message: 'Trạng thái hoạt động không hợp lệ' })
   @IsOptional()

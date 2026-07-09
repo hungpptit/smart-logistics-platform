@@ -286,6 +286,7 @@ model User {
   barcodeScans          BarcodeScan[]
   systemSettings        SystemSetting[]
   shipmentEvents        ShipmentEvent[]
+  staffProfile          StaffProfile?
 
   @@map("users")
 }
@@ -483,6 +484,7 @@ model Facility {
   routeStops        RouteStop[]
   shipmentEvents    ShipmentEvent[]
   barcodeScans      BarcodeScan[]
+  staffProfiles     StaffProfile[]
 
   @@index([parentFacilityId], name: "idx_facilities_parent")
   @@index([operatingStatus], name: "idx_facilities_status")
@@ -766,6 +768,7 @@ model Driver {
   employeeCode         String                 @unique @map("employee_code") @db.VarChar(30)
   fullName             String                 @map("full_name") @db.VarChar(150)
   phone                String                 @unique @db.VarChar(20)
+  citizenId            String?                @unique @map("citizen_id") @db.VarChar(20)
   driverLicenseNumber  String                 @map("driver_license_number") @db.VarChar(50)
   driverLicenseClass   String                 @map("driver_license_class") @db.VarChar(10)
   hireDate             DateTime               @map("hire_date") @db.Date
@@ -787,6 +790,22 @@ model Driver {
   @@index([employmentStatus], name: "idx_drivers_status")
   @@index([homeFacilityId], name: "idx_drivers_home")
   @@map("drivers")
+}
+
+model StaffProfile {
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String    @unique @map("user_id") @db.Uuid
+  citizenId          String?   @unique @map("citizen_id") @db.VarChar(20)
+  assignedFacilityId String?   @map("assigned_facility_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedFacility   Facility? @relation(fields: [assignedFacilityId], references: [id], onDelete: SetNull)
+
+  @@map("staff_profiles")
 }
 
 model Vehicle {

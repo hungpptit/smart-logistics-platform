@@ -17,7 +17,7 @@ Module này trả lời các câu hỏi:
 
 ---
 
-## 📊 Các Bảng Trong Module (5 Bảng)
+## 📊 Các Bảng Trong Module (6 Bảng)
 
 Mô hình phân quyền ở đây áp dụng chuẩn **RBAC (Role-Based Access Control)** để đảm bảo tính bảo mật và khả năng mở rộng linh hoạt:
 
@@ -28,6 +28,7 @@ Mô hình phân quyền ở đây áp dụng chuẩn **RBAC (Role-Based Access C
 | 3 | `Permissions` | Quản lý danh sách các quyền hạn trong hệ thống |
 | 4 | `UserRoles` | Liên kết N-N giữa User và Role (một user có thể có nhiều vai trò) |
 | 5 | `RolePermissions`| Liên kết N-N giữa Role và Permission (một vai trò có nhiều quyền) |
+| 6 | `StaffProfiles` | Hồ sơ chi tiết và phân công kho bãi của nhân sự vận hành |
 
 ---
 
@@ -36,6 +37,7 @@ Mô hình phân quyền ở đây áp dụng chuẩn **RBAC (Role-Based Access C
 ```mermaid
 graph TD
     Users[Users] -->|1..N| UserRoles[UserRoles]
+    Users -->|1..1| StaffProfiles[StaffProfiles]
     Roles[Roles] -->|1..N| UserRoles
     Roles -->|1..N| RolePermissions[RolePermissions]
     Permissions[Permissions] -->|1..N| RolePermissions
@@ -164,4 +166,29 @@ Bảng trung gian liên kết quyền hạn vào các vai trò.
 * **Indexes & Constraints:**
   ```sql
   PRIMARY KEY (role_id, permission_id) -- Chặn trùng lặp cặp quyền trên vai trò
+  ```
+
+---
+
+### BẢNG 6 — StaffProfiles
+Lưu trữ hồ sơ chi tiết và phân công kho bãi của nhân sự vận hành (Staff).
+
+* **Các trường dữ liệu:**
+
+| Field | PostgreSQL Type | Nullable | Chức năng |
+| :--- | :--- | :---: | :--- |
+| `id` | UUID | ❌ | Khóa chính (Primary Key). |
+| `user_id` | UUID | ❌ | Khóa ngoại tham chiếu → `Users(id)` (ON DELETE CASCADE), duy nhất. |
+| `citizen_id` | VARCHAR(20) | ✅ | Số căn cước công dân của nhân viên (Duy nhất). |
+| `assigned_facility_id` | UUID | ✅ | Khóa ngoại tham chiếu → `Facilities(id)` (ON DELETE SET NULL). |
+| `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo hồ sơ. |
+| `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật gần nhất. |
+| `deleted_at` | TIMESTAMPTZ | ✅ | Thời điểm xóa mềm. |
+
+* **Indexes & Constraints:**
+  ```sql
+  PRIMARY KEY (id)
+  UNIQUE (user_id)
+  UNIQUE (citizen_id)
+  CREATE INDEX idx_staff_profiles_facility ON StaffProfiles(assigned_facility_id);
   ```

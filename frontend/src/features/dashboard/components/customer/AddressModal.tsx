@@ -120,7 +120,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
     const fullAddress = [line1, wardName, provinceName].filter(Boolean).join(', ');
     
     try {
-      const coords = await geocodeAddress(fullAddress, token);
+      const coords = await geocodeAddress(fullAddress, token || '');
       if (coords) {
         setAddressFormData((prev: any) => ({
           ...prev,

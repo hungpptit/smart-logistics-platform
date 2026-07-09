@@ -1,6 +1,6 @@
 # 📊 SƠ ĐỒ LƯỢC ĐỒ CƠ SỞ DỮ LIỆU TỔNG THỂ (MERMAID ERD)
 
-Tài liệu này cung cấp lược đồ cơ sở dữ liệu chi tiết (Entity-Relationship Diagram - ERD) thể hiện đầy đủ cấu trúc của **38 bảng** thuộc **9 module** của Phase 1. 
+Tài liệu này cung cấp lược đồ cơ sở dữ liệu chi tiết (Entity-Relationship Diagram - ERD) thể hiện đầy đủ cấu trúc của **39 bảng** thuộc **9 module** của Phase 1. 
 
 Bạn có thể copy mã nguồn Mermaid bên dưới để nhúng trực tiếp vào các công cụ vẽ sơ đồ (như Draw.io, GitHub, Notion, hoặc Mermaid Live Editor).
 
@@ -51,12 +51,23 @@ erDiagram
         uuid role_id PK, FK
         uuid permission_id PK, FK
     }
+    StaffProfiles {
+        uuid id PK
+        uuid user_id FK, UK
+        varchar citizen_id UK
+        uuid assigned_facility_id FK
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
 
     Users ||--o{ UserRoles : "has"
     Roles ||--o{ UserRoles : "linked"
     Roles ||--o{ RolePermissions : "contains"
     Permissions ||--o{ RolePermissions : "linked"
     Users ||--o{ UserRoles : "assigned_by"
+    Users ||--o| StaffProfiles : "has_profile"
+    Facilities ||--o{ StaffProfiles : "assigned_facility"
 
     %% ==========================================
     %% MODULE 2: CUSTOMERS & ADDRESSES
@@ -300,6 +311,7 @@ erDiagram
         varchar employee_code UK
         varchar full_name
         varchar phone UK
+        varchar citizen_id UK
         varchar driver_license_number
         varchar driver_license_class
         date hire_date

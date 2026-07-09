@@ -13,16 +13,17 @@ graph TD
 
 ---
 
-## 📦 Danh sách Module & Bảng Chi Tiết (Tổng cộng: 38 Bảng)
+## 📦 Danh sách Module & Bảng Chi Tiết (Tổng cộng: 39 Bảng)
 
 ### Module 1 — Authentication & Authorization
 **Mục tiêu:** Quản lý tài khoản người dùng và phân quyền hệ thống.
-* **Các bảng (5 bảng):**
+* **Các bảng (6 bảng):**
   1. `Users`
   2. `Roles`
   3. `Permissions`
   4. `UserRoles`
   5. `RolePermissions`
+  6. `StaffProfiles` (Hồ sơ nhân sự kho gán theo cơ sở vận hành)
 
 ### Module 2 — Customer Management
 **Mục tiêu:** Quản lý thông tin khách hàng gửi hàng.
@@ -122,7 +123,7 @@ graph TD
 
 | STT | Module | Số lượng bảng |
 | :--- | :--- | :---: |
-| 1 | Authentication & Authorization | 5 |
+| 1 | Authentication & Authorization | 6 |
 | 2 | Customer Management | 4 |
 | 3 | Facility Network | 4 |
 | 4 | Order Management | 4 |
@@ -131,7 +132,7 @@ graph TD
 | 7 | Routing Engine | 5 |
 | 8 | Tracking, Scan & POD | 5 |
 | 9 | System Configuration | 1 |
-| | **👉 Tổng cộng** | **37 bảng** |
+| | **👉 Tổng cộng** | **38 bảng** |
 
 ---
 
@@ -140,6 +141,8 @@ graph TD
 ```mermaid
 graph TD
     Users[Users] --> Customers[Customers]
+    Users --> StaffProfiles[StaffProfiles]
+    StaffProfiles --> Facilities[Facilities]
     Customers --> CustomerAddresses[CustomerAddresses]
     CustomerAddresses --> Addresses[Addresses]
     Addresses --> Orders[Orders]

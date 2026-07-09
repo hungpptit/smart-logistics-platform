@@ -161,7 +161,7 @@ export const FacilityModal: React.FC<FacilityModalProps> = ({
     const fullAddress = [line1, wardName, provinceName].filter(Boolean).join(', ');
     
     try {
-      const coords = await geocodeAddress(fullAddress, token);
+      const coords = await geocodeAddress(fullAddress, token || '');
       if (coords) {
         setFormData((prev: any) => ({
           ...prev,

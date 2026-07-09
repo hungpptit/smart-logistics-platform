@@ -1,6 +1,6 @@
 # 📖 TỰ ĐIỂN CƠ SỞ DỮ LIỆU (DATABASE DICTIONARY) - PHASE 1
 
-Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Module phục vụ cho hệ thống Smart Logistics Platform. Định dạng được trình bày theo dạng bảng gồm: Tên trường, Kiểu dữ liệu, Ý nghĩa kèm ví dụ thực tế giúp bạn dễ dàng thuyết trình trước giáo viên.
+Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Module phục vụ cho hệ thống Smart Logistics Platform. Định dạng được trình bày theo dạng bảng gồm: Tên trường, Kiểu dữ liệu, Ý nghĩa kèm ví dụ thực tế giúp bạn dễ dàng thuyết trình trước giáo viên.
 
 ---
 
@@ -75,9 +75,26 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
+### 6. Bảng `staff_profiles` (Hồ sơ nhân sự vận hành)
+| Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
+| :--- | :--- | :--- |
+| `id` | Uuid (PK) | Mã định danh duy nhất của hồ sơ nhân viên. |
+| `user_id` | Uuid (FK, Unique) | Khóa ngoại liên kết với tài khoản người dùng `users(id)`. |
+| `citizen_id` | VarChar(20) | Số CCCD nhân viên (Duy nhất, Nullable). VD: `079123456789` |
+| `assigned_facility_id` | Uuid (FK) | Khóa ngoại liên kết với bưu cục/kho được phân công `facilities(id)`. |
+| `created_at` | Timestamptz | Thời điểm tạo hồ sơ. |
+| `updated_at` | Timestamptz | Thời điểm cập nhật hồ sơ gần nhất. |
+| `deleted_at` | Timestamptz | Thời điểm xóa mềm. |
+
+* **Giải thích liên kết:**
+  * `user_id` liên kết `users(id)`: Một tài khoản chỉ liên kết duy nhất với một hồ sơ nhân viên.
+  * `assigned_facility_id` liên kết `facilities(id)`: Xác định nhân viên này trực thuộc kho hàng/bưu cục nào.
+
+---
+
 ## 👥 MODULE 2: CUSTOMERS & ADDRESSES (Khách hàng & Sổ địa chỉ)
 
-### 6. Bảng `customers` (Thông tin khách hàng)
+### 7. Bảng `customers` (Thông tin khách hàng)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã định danh duy nhất của khách hàng. |
@@ -97,7 +114,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 7. Bảng `addresses` (Thông tin địa lý / Địa chỉ)
+### 8. Bảng `addresses` (Thông tin địa lý / Địa chỉ)
 *Bảng tập trung chứa toàn bộ địa chỉ trong hệ thống (văn phòng, kho bãi, người nhận, người gửi).*
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
@@ -117,7 +134,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 8. Bảng `customer_addresses` (Sổ địa chỉ của khách hàng)
+### 9. Bảng `customer_addresses` (Sổ địa chỉ của khách hàng)
 *Bảng liên kết Nhiều - Nhiều giữa khách hàng và các địa chỉ của họ.*
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
@@ -134,7 +151,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 9. Bảng `customer_contacts` (Danh bạ người liên hệ)
+### 10. Bảng `customer_contacts` (Danh bạ người liên hệ)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã định danh người liên hệ. |
@@ -154,7 +171,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ## 🏢 MODULE 3: FACILITY NETWORK (Mạng lưới Kho bãi)
 
-### 10. Bảng `facility_types` (Loại kho bãi)
+### 11. Bảng `facility_types` (Loại kho bãi)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã loại kho bãi. |
@@ -165,7 +182,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 11. Bảng `facilities` (Mạng lưới Kho bãi/Bưu cục)
+### 12. Bảng `facilities` (Mạng lưới Kho bãi/Bưu cục)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã kho bãi cụ thể. |
@@ -173,7 +190,6 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 | `facility_name`| VarChar(255) | Tên đầy đủ kho. VD: "Kho trung chuyển Bắc Ninh", "Bưu cục Cầu Giấy" |
 | `facility_type_id`| Uuid (FK) | Khóa ngoại loại kho bãi, nối tới `facility_types(id)`. |
 | `parent_facility_id`| Uuid (FK) | Khóa ngoại tự tham chiếu tới kho cấp trên để vẽ sơ đồ hình cây. VD: Bưu cục Cầu Giấy trực thuộc quản lý của Tổng kho Hà Nội. |
-| `manager_user_id`| Uuid (FK) | Khóa ngoại liên kết tới nhân viên quản lý kho, nối tới `users(id)`. |
 | `operating_status`| Enum (FacilityStatus)| Trạng thái hoạt động kho: `ACTIVE` (đang mở cửa), `INACTIVE` (ngừng hoạt động), `MAINTENANCE` (bảo trì hệ thống băng tải), `CLOSED` (đã đóng cửa) |
 | `opened_at` | Date | Ngày bắt đầu mở cửa vận hành. VD: `2026-01-01` |
 | `closed_at` | Date | Ngày đóng cửa (nếu dừng hoạt động). |
@@ -185,11 +201,10 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 * **Giải thích liên kết:**
   * `facility_type_id` liên kết `facility_types(id)`: Để định nghĩa kho này là tổng kho, kho phân loại cấp tỉnh, hay bưu cục địa phương.
   * `parent_facility_id` liên kết `facilities(id)` (Quan hệ cha-con): Giúp thiết lập mô hình cây phân cấp mạng lưới kho (Bưu cục cấp dưới trực thuộc Tổng kho cấp trên).
-  * `manager_user_id` liên kết `users(id)`: Xác định nhân viên nào được phân bổ quyền quản lý tại kho bãi này.
 
 ---
 
-### 12. Bảng `facility_addresses` (Địa chỉ của kho bãi)
+### 13. Bảng `facility_addresses` (Địa chỉ của kho bãi)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã định danh liên kết. |
@@ -205,7 +220,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 13. Bảng `facility_zones` (Phân khu trong kho bãi)
+### 14. Bảng `facility_zones` (Phân khu trong kho bãi)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã phân khu. |
@@ -224,7 +239,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ## 📦 MODULE 4: ORDERS & SERVICES (Dịch vụ & Quản lý Đơn hàng)
 
-### 14. Bảng `services` (Bảng giá & Dịch vụ Vận chuyển)
+### 15. Bảng `services` (Bảng giá & Dịch vụ Vận chuyển)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã dịch vụ. |
@@ -244,7 +259,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 15. Bảng `orders` (Quản lý Đơn hàng)
+### 16. Bảng `orders` (Quản lý Đơn hàng)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã đơn hàng. |
@@ -289,7 +304,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 16. Bảng `packages` (Kiện hàng vật lý)
+### 17. Bảng `packages` (Kiện hàng vật lý)
 *Một đơn hàng có thể có nhiều kiện hàng vật lý khác nhau.*
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
@@ -313,7 +328,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 17. Bảng `order_payments` (Thông tin Thanh toán Đơn hàng)
+### 18. Bảng `order_payments` (Thông tin Thanh toán Đơn hàng)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã thanh toán. |
@@ -332,7 +347,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 18. Bảng `order_status_history` (Lịch sử cập nhật trạng thái đơn hàng)
+### 19. Bảng `order_status_history` (Lịch sử cập nhật trạng thái đơn hàng)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã bản ghi lịch sử. |
@@ -351,7 +366,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ## 🚚 MODULE 5: SHIPMENT MANAGEMENT (Quản lý Vận đơn / Chuyến hàng)
 
-### 19. Bảng `shipments` (Quản lý Vận đơn / Chuyến xe gom)
+### 20. Bảng `shipments` (Quản lý Vận đơn / Chuyến xe gom)
 *Bảng này đại diện cho một đợt vận chuyển gom nhiều kiện hàng (gom hàng từ bưu cục về tổng kho hoặc gom đi giao hàng).*
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
@@ -370,7 +385,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 20. Bảng `shipment_packages` (Chi tiết Kiện hàng trong Vận đơn)
+### 21. Bảng `shipment_packages` (Chi tiết Kiện hàng trong Vận đơn)
 *Bảng liên kết Nhiều - Nhiều chỉ ra chuyến xe vận đơn này đang chứa những kiện hàng nào.*
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
@@ -385,7 +400,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 21. Bảng `shipment_events` (Sự kiện xảy ra với chuyến xe vận đơn)
+### 22. Bảng `shipment_events` (Sự kiện xảy ra với chuyến xe vận đơn)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã sự kiện. |
@@ -405,7 +420,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 22. Bảng `shipment_transfers` (Yêu cầu Trung chuyển Liên kho)
+### 23. Bảng `shipment_transfers` (Yêu cầu Trung chuyển Liên kho)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã yêu cầu trung chuyển. |
@@ -424,9 +439,9 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-## 🚛 MODULE 6: FLEET & DRIVER MANAGEMENT (Đội xe & Tài xế)
+## 🚚 MODULE 6: FLEET & DRIVER MANAGEMENT (Đội xe & Tài xế)
 
-### 23. Bảng `drivers` (Thông tin Tài xế)
+### 24. Bảng `drivers` (Thông tin Tài xế)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã tài xế. |
@@ -434,6 +449,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 | `employee_code`| VarChar(30) | Mã nhân viên tài xế. VD: `DRV-0089` |
 | `full_name` | VarChar(150) | Họ và tên tài xế. VD: "Nguyễn Văn Bính" |
 | `phone` | VarChar(20) | Số điện thoại tài xế (Duy nhất). VD: `0989123456` |
+| `citizen_id` | VarChar(20) | Số CCCD tài xế (Duy nhất, Nullable). VD: `079876543210` |
 | `driver_license_number`| VarChar(50)| Số bằng lái xe / Giấy phép lái xe. VD: `290123456789` |
 | `driver_license_class`| VarChar(10) | Hạng bằng lái xe cao nhất được cấp. VD: `B2`, `C`, `E` |
 | `hire_date` | Date | Ngày tuyển dụng vào công ty. VD: `2025-06-01` |
@@ -450,7 +466,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 24. Bảng `vehicles` (Thông tin Xe tải / Phương tiện)
+### 25. Bảng `vehicles` (Thông tin Xe tải / Phương tiện)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã phương tiện. |
@@ -473,7 +489,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 25. Bảng `vehicle_types` (Loại phương tiện)
+### 26. Bảng `vehicle_types` (Loại phương tiện)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã loại xe. |
@@ -485,7 +501,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 26. Bảng `driver_vehicle_assignments` (Lịch phân công Tài xế lái Xe)
+### 27. Bảng `driver_vehicle_assignments` (Lịch phân công Tài xế lái Xe)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã phiên phân công bàn giao xe. |
@@ -500,7 +516,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 27. Bảng `driver_locations` (Tọa độ GPS Trực tuyến của Tài xế)
+### 28. Bảng `driver_locations` (Tọa độ GPS Trực tuyến của Tài xế)
 *Cập nhật thời gian thực tọa độ GPS của tài xế phục vụ theo dõi trực tiếp đơn hàng.*
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
@@ -519,7 +535,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ## 🧭 MODULE 7: ROUTING ENGINE (Động cơ Định tuyến tối ưu)
 
-### 28. Bảng `routes` (Danh sách Tuyến đường đi tối ưu)
+### 29. Bảng `routes` (Danh sách Tuyến đường đi tối ưu)
 *Tuyến đường đi do thuật toán AI/VRP tối ưu đề xuất.*
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
@@ -548,7 +564,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 29. Bảng `route_stops` (Các Điểm dừng dọc đường của Lộ trình)
+### 30. Bảng `route_stops` (Các Điểm dừng dọc đường của Lộ trình)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã điểm dừng. |
@@ -573,7 +589,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 30. Bảng `dispatch_tasks` (Nhiệm vụ Điều phối gửi về App Tài xế)
+### 31. Bảng `dispatch_tasks` (Nhiệm vụ Điều phối gửi về App Tài xế)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã nhiệm vụ điều phối. |
@@ -595,7 +611,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 31. Bảng `route_location_logs` (Nhật ký hành trình di chuyển thực tế)
+### 32. Bảng `route_location_logs` (Nhật ký hành trình di chuyển thực tế)
 *Lưu lại vệt đường chạy GPS thực tế của xe phục vụ so sánh tuyến tối ưu AI vs tuyến thực chạy.*
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
@@ -613,7 +629,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 32. Bảng `route_optimizations` (Nhật ký Lịch sử chạy thuật toán AI tối ưu)
+### 33. Bảng `route_optimizations` (Nhật ký Lịch sử chạy thuật toán AI tối ưu)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã đợt chạy thuật toán. |
@@ -632,7 +648,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ## 📸 MODULE 8: TRACKING, SCAN & POD (Bằng chứng giao nhận & Quét mã)
 
-### 33. Bảng `tracking_events` (Nhật ký sự kiện Hành trình đơn hàng)
+### 34. Bảng `tracking_events` (Nhật ký sự kiện Hành trình đơn hàng)
 *Bảng này lưu dữ liệu hành trình lịch sử của vận đơn để khách hàng vào tra cứu (VD: "Đơn hàng đã rời kho Hà Nội").*
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
@@ -655,7 +671,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 34. Bảng `barcode_scans` (Nhật ký quét mã QR Code / Barcode)
+### 35. Bảng `barcode_scans` (Nhật ký quét mã QR Code / Barcode)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã bản ghi quét mã. |
@@ -677,7 +693,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 35. Bảng `delivery_proofs` (Bằng chứng giao nhận hàng POD)
+### 36. Bảng `delivery_proofs` (Bằng chứng giao nhận hàng POD)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã chứng từ POD. |
@@ -697,7 +713,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ---
 
-### 36. Bảng `driver_check_ins` (Nhật ký Check-in/Check-out của Tài xế tại điểm dừng)
+### 37. Bảng `driver_check_ins` (Nhật ký Check-in/Check-out của Tài xế tại điểm dừng)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã bản ghi check-in. |
@@ -710,11 +726,11 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 | `note` | Text | Báo cáo nhanh của tài xế tại điểm dừng. VD: "Ngõ nhỏ phải đi bộ vào giao hàng." |
 
 * **Giải thích liên kết:**
-  * `route_stop_id` liên kết `route_stops(id)` (1-1) và `driver_id` liên kết `drivers(id)`: Nhật ký này kiểm soát hiệu suất làm việc của tài xế tại mỗi điểm dừng để tính hiệu suất (KPI) thời gian bốc dỡ hàng hóa.
+  * `route_stop_id` liên kết `route_stops(id)` (1-1) and `driver_id` liên kết `drivers(id)`: Nhật ký này kiểm soát hiệu suất làm việc của tài xế tại mỗi điểm dừng để tính hiệu suất (KPI) thời gian bốc dỡ hàng hóa.
 
 ---
 
-### 37. Bảng `tracking_attachments` (Tệp ảnh đính kèm bằng chứng giao nhận)
+### 38. Bảng `tracking_attachments` (Tệp ảnh đính kèm bằng chứng giao nhận)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã tệp đính kèm. |
@@ -733,7 +749,7 @@ Tài liệu này tổng hợp toàn bộ 38 bảng dữ liệu chia theo 9 Modul
 
 ## ⚙️ MODULE 9: SYSTEM CONFIGURATION (Cấu hình Hệ thống)
 
-### 38. Bảng `system_settings` (Cấu hình hệ thống)
+### 39. Bảng `system_settings` (Cấu hình hệ thống)
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã cấu hình. |

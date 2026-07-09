@@ -6,6 +6,7 @@ import orderRouter from './order.routes';
 import serviceRouter from './service.routes';
 import driverRouter from './driver.routes';
 import locationRouter from './location.routes';
+import staffRouter from './staff.routes';
 
 const router = Router();
 
@@ -17,5 +18,6 @@ router.use('/orders', orderRouter);
 router.use('/services', serviceRouter);
 router.use('/drivers', driverRouter);
 router.use('/locations', locationRouter);
+router.use('/staff', staffRouter);
 
 export default router;

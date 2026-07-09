@@ -17,6 +17,16 @@ export class DriverService {
       throw new BadRequestException('Số điện thoại tài xế đã tồn tại trên hệ thống');
     }
 
+    // Check if citizenId already exists in drivers table if provided
+    if (dto.citizenId) {
+      const citizenExists = await prisma.driver.findUnique({
+        where: { citizenId: dto.citizenId },
+      });
+      if (citizenExists) {
+        throw new BadRequestException('Số CCCD tài xế đã tồn tại trên hệ thống');
+      }
+    }
+
     // Check home facility if provided
     if (dto.homeFacilityId) {
       const facilityExists = await prisma.facility.findUnique({
@@ -99,6 +109,7 @@ export class DriverService {
           employeeCode,
           fullName: dto.fullName,
           phone: dto.phone,
+          citizenId: dto.citizenId || null,
           driverLicenseNumber: dto.driverLicenseNumber,
           driverLicenseClass: dto.driverLicenseClass,
           hireDate: new Date(dto.hireDate),
@@ -251,6 +262,16 @@ export class DriverService {
       }
     }
 
+    // Check unique citizenId if it changed
+    if (dto.citizenId && dto.citizenId !== driver.citizenId) {
+      const citizenExists = await prisma.driver.findUnique({
+        where: { citizenId: dto.citizenId },
+      });
+      if (citizenExists) {
+        throw new BadRequestException('Số CCCD mới đã tồn tại trên hệ thống');
+      }
+    }
+
     // Check user linkage if it changed
     if (dto.userId && dto.userId !== driver.userId) {
       const userExists = await prisma.user.findUnique({
@@ -283,6 +304,7 @@ export class DriverService {
       data: {
         fullName: dto.fullName ?? driver.fullName,
         phone: dto.phone ?? driver.phone,
+        citizenId: dto.citizenId !== undefined ? dto.citizenId : driver.citizenId,
         driverLicenseNumber: dto.driverLicenseNumber ?? driver.driverLicenseNumber,
         driverLicenseClass: dto.driverLicenseClass ?? driver.driverLicenseClass,
         hireDate: dto.hireDate ? new Date(dto.hireDate) : driver.hireDate,
