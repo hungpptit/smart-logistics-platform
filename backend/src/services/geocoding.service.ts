@@ -3,6 +3,28 @@ export class GeocodingService {
    * Chuyển đổi địa chỉ văn bản thành tọa độ GPS [latitude, longitude]
    */
   public async geocode(address: string): Promise<{ latitude: number; longitude: number; formattedAddress: string }> {
+    const GOONG_API_KEY = process.env.GOONG_API_KEY;
+    
+    if (GOONG_API_KEY) {
+      try {
+        const url = `https://rsapi.goong.io/Geocode?address=${encodeURIComponent(address)}&api_key=${GOONG_API_KEY}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = (await response.json()) as any;
+          if (data.results && data.results.length > 0) {
+            const location = data.results[0].geometry.location;
+            return {
+              latitude: location.lat,
+              longitude: location.lng,
+              formattedAddress: data.results[0].formatted_address || address
+            };
+          }
+        }
+      } catch (error: any) {
+        console.warn('⚠️ Goong Geocoding API lỗi, fallback sang Nominatim:', error.message);
+      }
+    }
+
     try {
       // Gọi thử API Nominatim (OpenStreetMap) - miễn phí và không cần API key
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;

@@ -20,9 +20,15 @@ import { X, Minus, Plus, Locate, Maximize, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+const GOONG_MAP_KEY = import.meta.env.VITE_GOONG_MAP_KEY;
+
 const defaultStyles = {
-  dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-  light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+  dark: GOONG_MAP_KEY
+    ? `https://tiles.goong.io/assets/navigation_night.json?api_key=${GOONG_MAP_KEY}`
+    : "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+  light: GOONG_MAP_KEY
+    ? `https://tiles.goong.io/assets/navigation_day.json?api_key=${GOONG_MAP_KEY}`
+    : "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
 };
 
 // A tile-less, dependency-free style with a transparent background. Use it for
