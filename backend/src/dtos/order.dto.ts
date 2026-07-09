@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsUUID, IsEnum, IsNumber, IsBoolean, ValidateNested, IsNotEmpty, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
-import { FeePayer, PaymentMethod, OrderStatus } from '@prisma/client';
+import { FeePayer, PaymentMethod, OrderStatus, PickupType } from '@prisma/client';
 
 export class OrderAddressDto {
   @IsString({ message: 'Địa chỉ dòng 1 không được để trống' })
@@ -134,6 +134,10 @@ export class CreateOrderDto {
 
   @IsEnum(PaymentMethod, { message: 'Phương thức thanh toán không hợp lệ' })
   paymentMethod!: PaymentMethod;
+
+  @IsEnum(PickupType, { message: 'Hình thức gửi hàng không hợp lệ (PICKUP hoặc DROP_OFF)' })
+  @IsOptional()
+  pickupType?: PickupType;
 
   // Danh sách gói hàng/kiện hàng
   @IsArray({ message: 'Danh sách gói hàng phải là một mảng' })

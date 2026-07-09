@@ -53,6 +53,9 @@ interface Order {
   id: string;
   orderCode: string;
   status: string;
+  pickupType: 'PICKUP' | 'DROP_OFF';
+  originFacilityId?: string | null;
+  destinationFacilityId?: string | null;
   senderName: string;
   senderPhone: string;
   pickupAddressText: string;
@@ -87,6 +90,16 @@ interface Order {
   packages: PackageItem[];
   payment: OrderPayment;
   statusHistory?: OrderStatusHistory[];
+  originFacility?: {
+    id: string;
+    facilityCode: string;
+    facilityName: string;
+  };
+  destinationFacility?: {
+    id: string;
+    facilityCode: string;
+    facilityName: string;
+  };
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
@@ -127,13 +140,41 @@ export const OrderTab: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
   const isAdminOrStaff = user?.roles.includes('ADMIN') || user?.roles.includes('STAFF');
+  const isAdmin = user?.roles.includes('ADMIN');
+  const isStaff = user?.roles.includes('STAFF') && !user?.roles.includes('ADMIN');
+  const isStaffWithoutFacility = isStaff && !user?.staffProfile?.assignedFacilityId;
+
+  const [facilities, setFacilities] = useState<any[]>([]);
+  const [facilityFilter, setFacilityFilter] = useState<string>('');
+
+  useEffect(() => {
+    const fetchFacilitiesForFilter = async () => {
+      if (!token || !isAdmin) return;
+      try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/facilities?limit=100`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+          setFacilities(data.data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching facilities for filter:', err);
+      }
+    };
+    fetchFacilitiesForFilter();
+  }, [token, isAdmin]);
 
   const fetchOrders = async (page: number = 1) => {
     if (!token) return;
     setLoading(true);
     setError(null);
     try {
-      const url = `${CONFIG.API_BASE_URL}/orders?page=${page}&limit=10&search=${encodeURIComponent(searchTerm)}&status=${statusFilter}`;
+      const url = `${CONFIG.API_BASE_URL}/orders?page=${page}&limit=10&search=${encodeURIComponent(searchTerm)}&status=${statusFilter}&facilityId=${facilityFilter}`;
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -160,7 +201,7 @@ export const OrderTab: React.FC = () => {
 
   useEffect(() => {
     fetchOrders(currentPage);
-  }, [currentPage, statusFilter, token]);
+  }, [currentPage, statusFilter, facilityFilter, token]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -273,11 +314,67 @@ export const OrderTab: React.FC = () => {
       minute: '2-digit'
     });
   };
+  const getGroupedOrders = () => {
+    if (facilityFilter) {
+      const originOrders: Order[] = [];
+      const destOrders: Order[] = [];
+      const selectedFacName = facilities.find(f => f.id === facilityFilter)?.facilityName || 'Kho đang chọn';
+      
+      orders.forEach((order) => {
+        if (order.originFacilityId === facilityFilter) {
+          originOrders.push(order);
+        } else if (order.destinationFacilityId === facilityFilter) {
+          destOrders.push(order);
+        }
+      });
+      
+      const result = [];
+      if (originOrders.length > 0) {
+        result.push({
+          facilityName: `📤 Đơn xuất phát từ ${selectedFacName}`,
+          list: originOrders
+        });
+      }
+      if (destOrders.length > 0) {
+        result.push({
+          facilityName: `📥 Đơn gửi đến ${selectedFacName}`,
+          list: destOrders
+        });
+      }
+      return result;
+    } else {
+      const groups: Record<string, Order[]> = {};
+      orders.forEach((order) => {
+        const facilityName = order.originFacility?.facilityName || 'Chưa phân kho';
+        if (!groups[facilityName]) {
+          groups[facilityName] = [];
+        }
+        groups[facilityName].push(order);
+      });
+      return Object.entries(groups).map(([facilityName, list]) => ({
+        facilityName: `📍 Kho gửi: ${facilityName}`,
+        list
+      }));
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 relative font-montserrat">
       {/* Orders List Container */}
       <div className={`xl:col-span-8 flex flex-col gap-4 ${selectedOrder ? 'hidden xl:flex' : 'xl:col-span-12'}`}>
+        {isStaffWithoutFacility && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg flex items-start gap-3 shadow-sm">
+            <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={18} />
+            <div className="text-xs">
+              <p className="font-bold uppercase tracking-wider mb-0.5 text-amber-900">Cảnh báo: Chưa được phân công kho làm việc</p>
+              <p className="text-amber-700 leading-relaxed font-medium">
+                Tài khoản nhân viên của bạn hiện chưa được liên kết với bất kỳ kho bãi/hub nào. 
+                Do đó, bạn chỉ có thể xem và quản lý các đơn hàng do chính bạn tạo. 
+                Vui lòng liên hệ Quản trị viên (Admin) để được phân công kho làm việc.
+              </p>
+            </div>
+          </div>
+        )}
         <div className="bg-white p-4 rounded-lg border border-[#e2e8f0] shadow-soft flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Search bar */}
           <form onSubmit={handleSearchSubmit} className="flex-1 flex gap-2">
@@ -299,6 +396,24 @@ export const OrderTab: React.FC = () => {
           {/* Filters */}
           <div className="flex items-center gap-2">
             <Filter size={14} className="text-gray-400" />
+            {isAdmin && (
+              <select
+                value={facilityFilter}
+                onChange={(e) => {
+                  setFacilityFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-2 border border-[#e2e8f0] rounded text-xs focus:outline-none bg-white font-medium max-w-[150px] truncate"
+              >
+                <option value="">Tất cả kho bãi</option>
+                {facilities.map((fac) => (
+                  <option key={fac.id} value={fac.id}>
+                    {fac.facilityName}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -353,6 +468,7 @@ export const OrderTab: React.FC = () => {
                 <thead className="bg-[#F4F4F4] text-gray-500 font-bold uppercase tracking-wider">
                   <tr>
                     <th className="px-6 py-4 text-left">Mã Đơn</th>
+                    <th className="px-6 py-4 text-left">Hình Thức Gửi</th>
                     <th className="px-6 py-4 text-left">Gói Dịch Vụ</th>
                     <th className="px-6 py-4 text-left">Địa Chỉ Nhận</th>
                     <th className="px-6 py-4 text-left">Tổng Chi Phí</th>
@@ -361,45 +477,68 @@ export const OrderTab: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
-                  {orders.map((order) => {
-                    const statusInfo = STATUS_MAP[order.status] || { label: order.status, color: '#374151', bg: '#f3f4f6' };
-                    return (
-                      <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 font-mono font-bold text-[#161D25]">{order.orderCode}</td>
-                        <td className="px-6 py-4 font-medium text-gray-600">{order.service?.serviceName || 'N/A'}</td>
-                        <td className="px-6 py-4 text-gray-500 max-w-[200px] truncate" title={order.deliveryAddressText}>
-                          {order.deliveryAddressText}
-                        </td>
-                        <td className="px-6 py-4 font-bold text-[#bc0100]">{formatPrice(order.totalAmount)}</td>
-                        <td className="px-6 py-4">
-                          <span
-                            className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
-                            style={{ color: statusInfo.color, backgroundColor: statusInfo.bg }}
-                          >
-                            {statusInfo.label}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center flex justify-center gap-2">
-                          <button
-                            onClick={() => fetchOrderDetail(order.id)}
-                            className="bg-[#161D25] hover:bg-gray-800 text-white p-1.5 rounded transition-colors"
-                            title="Xem chi tiết"
-                          >
-                            <Eye size={12} />
-                          </button>
-                          {order.status === 'CREATED' && (
-                            <button
-                              onClick={() => handleCancelOrder(order.id)}
-                              className="border border-red-500 hover:bg-red-50 text-red-500 p-1.5 rounded transition-colors text-[10px] font-bold uppercase tracking-widest"
-                              title="Hủy đơn"
-                            >
-                              HỦY
-                            </button>
-                          )}
+                  {getGroupedOrders().map((group) => (
+                    <React.Fragment key={group.facilityName}>
+                      {/* Facility Group Header Row */}
+                      <tr className="bg-[#bc0100]/5 border-y border-[#bc0100]/10">
+                        <td colSpan={7} className="px-6 py-3 text-xs font-bold text-[#bc0100] select-none align-middle">
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-block w-1.5 h-3 bg-[#bc0100] rounded-sm"></span>
+                            <span>📍 {group.facilityName}</span>
+                            <span className="text-[10px] bg-[#bc0100]/10 text-[#bc0100] px-2 py-0.5 rounded-full font-medium ml-1">
+                              {group.list.length} đơn hàng
+                            </span>
+                          </div>
                         </td>
                       </tr>
-                    );
-                  })}
+                      {group.list.map((order) => {
+                        const statusInfo = STATUS_MAP[order.status] || { label: order.status, color: '#374151', bg: '#f3f4f6' };
+                        return (
+                          <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4 font-mono font-bold text-[#161D25]">{order.orderCode}</td>
+                            <td className="px-6 py-4 font-medium">
+                              {order.pickupType === 'PICKUP' ? (
+                                <span className="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded text-[10px]">🛵 Lấy tận nơi</span>
+                              ) : (
+                                <span className="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded text-[10px]">🏬 Gửi tại kho</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 font-medium text-gray-600">{order.service?.serviceName || 'N/A'}</td>
+                            <td className="px-6 py-4 text-gray-500 max-w-[200px] truncate" title={order.deliveryAddressText}>
+                              {order.deliveryAddressText}
+                            </td>
+                            <td className="px-6 py-4 font-bold text-[#bc0100]">{formatPrice(order.totalAmount)}</td>
+                            <td className="px-6 py-4">
+                              <span
+                                className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                                style={{ color: statusInfo.color, backgroundColor: statusInfo.bg }}
+                              >
+                                {statusInfo.label}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center flex justify-center gap-2">
+                              <button
+                                onClick={() => fetchOrderDetail(order.id)}
+                                className="bg-[#161D25] hover:bg-gray-800 text-white p-1.5 rounded transition-colors"
+                                title="Xem chi tiết"
+                              >
+                                <Eye size={12} />
+                              </button>
+                              {order.status === 'CREATED' && (
+                                <button
+                                  onClick={() => handleCancelOrder(order.id)}
+                                  className="border border-red-500 hover:bg-red-50 text-red-500 p-1.5 rounded transition-colors text-[10px] font-bold uppercase tracking-widest"
+                                  title="Hủy đơn"
+                                >
+                                  HỦY
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -464,6 +603,12 @@ export const OrderTab: React.FC = () => {
                     <span className="text-[10px] text-gray-400 block font-medium">Gói dịch vụ</span>
                     <span className="font-bold text-[#161D25]">{selectedOrder.service?.serviceName}</span>
                   </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 block font-medium">Hình thức gửi</span>
+                    <span className="font-bold text-[#161D25]">
+                      {selectedOrder.pickupType === 'PICKUP' ? '🛵 Lấy tận nơi' : '🏬 Gửi tại kho'}
+                    </span>
+                  </div>
                   <div className="text-right">
                     <span className="text-[10px] text-gray-400 block font-medium">Trạng thái</span>
                     <span
@@ -486,6 +631,11 @@ export const OrderTab: React.FC = () => {
                       <span className="text-gray-400 font-bold block text-[9px] uppercase tracking-wider mb-0.5">Người gửi & Điểm lấy</span>
                       <p className="font-bold text-[#161D25]">{selectedOrder.senderName} ({selectedOrder.senderPhone})</p>
                       <p className="text-gray-500 mt-0.5 leading-relaxed">{selectedOrder.pickupAddressText}</p>
+                      {selectedOrder.originFacility && (
+                        <p className="text-blue-600 font-bold text-[10px] mt-1.5 flex items-center gap-1">
+                          🏬 Kho xử lý gửi: {selectedOrder.originFacility.facilityName}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -497,6 +647,11 @@ export const OrderTab: React.FC = () => {
                       <span className="text-gray-400 font-bold block text-[9px] uppercase tracking-wider mb-0.5">Người nhận & Điểm giao</span>
                       <p className="font-bold text-[#161D25]">{selectedOrder.receiverName} ({selectedOrder.receiverPhone})</p>
                       <p className="text-gray-500 mt-0.5 leading-relaxed">{selectedOrder.deliveryAddressText}</p>
+                      {selectedOrder.destinationFacility && (
+                        <p className="text-green-600 font-bold text-[10px] mt-1.5 flex items-center gap-1">
+                          🏬 Kho xử lý nhận: {selectedOrder.destinationFacility.facilityName}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -28,6 +28,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [feePayer, setFeePayer] = useState<'SENDER' | 'RECEIVER'>('SENDER');
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'BANK_TRANSFER' | 'E_WALLET' | 'COD'>('CASH');
   const [codAmount, setCodAmount] = useState<number>(0);
+  const [pickupType, setPickupType] = useState<'PICKUP' | 'DROP_OFF'>('PICKUP');
 
   // Sender States
   const [senderName, setSenderName] = useState('');
@@ -105,6 +106,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       feePayer,
       paymentMethod,
       codAmount: Number(codAmount),
+      pickupType,
       senderContact: {
         fullName: senderName,
         phone: senderPhone,
@@ -446,6 +448,18 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       ))}
                     </select>
                   )}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Hình thức gửi hàng</label>
+                  <select
+                    value={pickupType}
+                    onChange={(e) => setPickupType(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-[#e2e8f0] rounded bg-white font-medium outline-none focus:border-[#bc0100]"
+                  >
+                    <option value="PICKUP">🛵 Shipper đến lấy hàng tận nơi (PICKUP)</option>
+                    <option value="DROP_OFF">🏬 Khách tự mang ra bưu cục gửi (DROP_OFF)</option>
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

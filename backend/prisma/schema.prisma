@@ -85,6 +85,11 @@ enum FeePayer {
   RECEIVER
 }
 
+enum PickupType {
+  PICKUP
+  DROP_OFF
+}
+
 enum PaymentMethod {
   CASH
   BANK_TRANSFER
@@ -485,6 +490,8 @@ model Facility {
   shipmentEvents    ShipmentEvent[]
   barcodeScans      BarcodeScan[]
   staffProfiles     StaffProfile[]
+  originOrders      Order[]           @relation("OrderOriginFacility")
+  destinationOrders Order[]           @relation("OrderDestinationFacility")
 
   @@index([parentFacilityId], name: "idx_facilities_parent")
   @@index([operatingStatus], name: "idx_facilities_status")
@@ -586,6 +593,9 @@ model Order {
   estimatedDuration     Int?          @map("estimated_duration")
   pricingVersion        Int           @default(1) @map("pricing_version")
   estimatedDeliveryDate DateTime?     @map("estimated_delivery_date") @db.Timestamptz
+  pickupType            PickupType    @default(PICKUP) @map("pickup_type")
+  originFacilityId      String?       @map("origin_facility_id") @db.Uuid
+  destinationFacilityId String?       @map("destination_facility_id") @db.Uuid
 
   // Audit Fields
   createdBy             String?       @map("created_by") @db.Uuid
@@ -603,6 +613,8 @@ model Order {
   receiverContact       CustomerContact? @relation("OrderReceiverContact", fields: [receiverContactId], references: [id], onDelete: SetNull)
   creator               User?         @relation("OrderCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   updater               User?         @relation("OrderUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  originFacility        Facility?     @relation("OrderOriginFacility", fields: [originFacilityId], references: [id], onDelete: SetNull)
+  destinationFacility   Facility?     @relation("OrderDestinationFacility", fields: [destinationFacilityId], references: [id], onDelete: SetNull)
   payment               OrderPayment?
   packages              Package[]
   statusHistory         OrderStatusHistory[]

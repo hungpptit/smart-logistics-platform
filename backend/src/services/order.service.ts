@@ -245,6 +245,10 @@ export class OrderService {
     const estDeliveryDate = new Date();
     estDeliveryDate.setHours(estDeliveryDate.getHours() + (service?.estimatedDeliveryHours || 24));
 
+    // Resolve origin and destination facilities based on distance
+    const originFacilityId = await this.findNearestFacility(pickupLat, pickupLon);
+    const destinationFacilityId = await this.findNearestFacility(deliveryLat, deliveryLon);
+
     // 9. Create Order in Transaction
     return await prisma.$transaction(async (tx) => {
       const order = await tx.order.create({
@@ -257,14 +261,17 @@ export class OrderService {
           receiverContactId: resolvedReceiverContactId,
           orderCode,
           status: 'CREATED',
-          
+          pickupType: dto.pickupType || 'PICKUP',
+          originFacilityId,
+          destinationFacilityId,
+
           // Address Snapshots
           pickupAddressText: pickupAddrSnapshot,
           pickupLatitude: pickupLat,
           pickupLongitude: pickupLon,
           senderName: resolvedSenderName,
           senderPhone: resolvedSenderPhone,
-          
+
           deliveryAddressText: deliveryAddrSnapshot,
           deliveryLatitude: deliveryLat,
           deliveryLongitude: deliveryLon,
@@ -345,30 +352,102 @@ export class OrderService {
   public async getOrders(
     userId: string,
     userRoles: string[],
-    query: { page?: string; limit?: string; search?: string; status?: OrderStatus }
+    query: { page?: string; limit?: string; search?: string; status?: OrderStatus; facilityId?: string }
   ) {
     const page = parseInt(query.page || '1', 10);
     const limit = parseInt(query.limit || '10', 10);
     const skip = (page - 1) * limit;
 
     const where: any = { deletedAt: null };
+    const andConditions: any[] = [];
 
     // If customer, only show their own orders
     if (userRoles.includes('CUSTOMER') && !userRoles.includes('ADMIN') && !userRoles.includes('STAFF')) {
       const customerId = await this.getCustomerIdByUserId(userId);
-      where.customerId = customerId;
+      andConditions.push({ customerId });
+    }
+
+    // Determine targetFacilityId for filtering
+    let targetFacilityId: string | undefined = undefined;
+
+    if (userRoles.includes('ADMIN')) {
+      if (query.facilityId) {
+        targetFacilityId = query.facilityId;
+      }
+    } else if (userRoles.includes('STAFF')) {
+      const staffProfile = await prisma.staffProfile.findUnique({
+        where: { userId },
+        select: { assignedFacilityId: true },
+      });
+      targetFacilityId = staffProfile?.assignedFacilityId || undefined;
+
+      // If staff has no facility assigned, restrict to orders created by them
+      if (!staffProfile?.assignedFacilityId) {
+        andConditions.push({ createdBy: userId });
+      }
+    }
+
+    // Apply facilityId filter if specified/determined
+    if (targetFacilityId) {
+      const facilityOrConditions: any[] = [
+        { originFacilityId: targetFacilityId },
+        { destinationFacilityId: targetFacilityId },
+        {
+          packages: {
+            some: {
+              barcodeScans: {
+                some: {
+                  facilityId: targetFacilityId,
+                },
+              },
+            },
+          },
+        },
+        {
+          packages: {
+            some: {
+              shipmentPackages: {
+                some: {
+                  shipment: {
+                    routeStops: {
+                      some: {
+                        facilityId: targetFacilityId,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      ];
+
+      // Only show orders created by this user as fallback if they are STAFF
+      if (!userRoles.includes('ADMIN')) {
+        facilityOrConditions.push({ createdBy: userId });
+      }
+
+      andConditions.push({
+        OR: facilityOrConditions
+      });
     }
 
     if (query.search) {
-      where.OR = [
-        { orderCode: { contains: query.search, mode: 'insensitive' } },
-        { pickupAddressText: { contains: query.search, mode: 'insensitive' } },
-        { deliveryAddressText: { contains: query.search, mode: 'insensitive' } },
-      ];
+      andConditions.push({
+        OR: [
+          { orderCode: { contains: query.search, mode: 'insensitive' } },
+          { pickupAddressText: { contains: query.search, mode: 'insensitive' } },
+          { deliveryAddressText: { contains: query.search, mode: 'insensitive' } },
+        ]
+      });
     }
 
     if (query.status) {
-      where.status = query.status;
+      andConditions.push({ status: query.status });
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     const [total, orders] = await prisma.$transaction([
@@ -383,6 +462,8 @@ export class OrderService {
           service: true,
           packages: true,
           payment: true,
+          originFacility: true,
+          destinationFacility: true,
         },
       }),
     ]);
@@ -409,6 +490,8 @@ export class OrderService {
         service: true,
         packages: true,
         payment: true,
+        originFacility: true,
+        destinationFacility: true,
         statusHistory: {
           orderBy: { createdAt: 'asc' },
           include: {
@@ -434,13 +517,57 @@ export class OrderService {
       }
     }
 
+    if (userRoles.includes('STAFF') && !userRoles.includes('ADMIN')) {
+      if (order.createdBy !== userId) {
+        const staffProfile = await prisma.staffProfile.findUnique({
+          where: { userId },
+          select: { assignedFacilityId: true },
+        });
+        const facilityId = staffProfile?.assignedFacilityId;
+
+        if (!facilityId) {
+          throw new ForbiddenException('Bạn không có quyền xem chi tiết đơn hàng này do chưa được gán kho');
+        }
+
+        const hasScan = await prisma.barcodeScan.findFirst({
+          where: {
+            facilityId,
+            package: {
+              orderId: order.id,
+            },
+          },
+        });
+
+        const hasRouteStop = await prisma.routeStop.findFirst({
+          where: {
+            facilityId,
+            shipment: {
+              shipmentPackages: {
+                some: {
+                  package: {
+                    orderId: order.id,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        const isAssignedToStaffFacility = order.originFacilityId === facilityId || order.destinationFacilityId === facilityId;
+
+        if (!hasScan && !hasRouteStop && !isAssignedToStaffFacility) {
+          throw new ForbiddenException('Bạn không có quyền xem chi tiết đơn hàng không thuộc kho quản lý của bạn');
+        }
+      }
+    }
+
     return order;
   }
 
   /**
    * Update order status (Admin/Staff only)
    */
-  public async updateStatus(id: string, dto: UpdateOrderStatusDto, userId: string, changeSource: OrderChangeSource) {
+  public async updateStatus(id: string, dto: UpdateOrderStatusDto, userId: string, userRoles: string[], changeSource: OrderChangeSource) {
     const order = await prisma.order.findUnique({
       where: { id, deletedAt: null },
     });
@@ -449,11 +576,62 @@ export class OrderService {
       throw new NotFoundException('Không tìm thấy đơn hàng');
     }
 
+    let staffFacilityId: string | null = null;
+
+    if (userRoles.includes('STAFF') && !userRoles.includes('ADMIN')) {
+      const staffProfile = await prisma.staffProfile.findUnique({
+        where: { userId },
+        select: { assignedFacilityId: true },
+      });
+      staffFacilityId = staffProfile?.assignedFacilityId || null;
+
+      if (order.createdBy !== userId) {
+        if (!staffFacilityId) {
+          throw new ForbiddenException('Bạn không có quyền cập nhật đơn hàng này do chưa được gán kho');
+        }
+
+        const hasScan = await prisma.barcodeScan.findFirst({
+          where: {
+            facilityId: staffFacilityId,
+            package: {
+              orderId: order.id,
+            },
+          },
+        });
+
+        const hasRouteStop = await prisma.routeStop.findFirst({
+          where: {
+            facilityId: staffFacilityId,
+            shipment: {
+              shipmentPackages: {
+                some: {
+                  package: {
+                    orderId: order.id,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        const isAssignedToStaffFacility = order.originFacilityId === staffFacilityId || order.destinationFacilityId === staffFacilityId;
+
+        if (!hasScan && !hasRouteStop && !isAssignedToStaffFacility) {
+          throw new ForbiddenException('Bạn không có quyền cập nhật đơn hàng không thuộc kho quản lý của bạn');
+        }
+      }
+    }
+
     return await prisma.$transaction(async (tx) => {
+      const updateData: any = { status: dto.status };
+      if (staffFacilityId && (order.pickupType === 'DROP_OFF' || dto.status === 'ARRIVED_ORIGIN_FACILITY')) {
+        updateData.originFacilityId = staffFacilityId;
+      }
+
       // Update order status
       const updatedOrder = await tx.order.update({
         where: { id },
-        data: { status: dto.status },
+        data: updateData,
       });
 
       // Write status history
@@ -491,6 +669,50 @@ export class OrderService {
       }
     }
 
+    if (userRoles.includes('STAFF') && !userRoles.includes('ADMIN')) {
+      if (order.createdBy !== userId) {
+        const staffProfile = await prisma.staffProfile.findUnique({
+          where: { userId },
+          select: { assignedFacilityId: true },
+        });
+        const facilityId = staffProfile?.assignedFacilityId;
+
+        if (!facilityId) {
+          throw new ForbiddenException('Bạn không có quyền hủy đơn hàng này do chưa được gán kho');
+        }
+
+        const hasScan = await prisma.barcodeScan.findFirst({
+          where: {
+            facilityId,
+            package: {
+              orderId: order.id,
+            },
+          },
+        });
+
+        const hasRouteStop = await prisma.routeStop.findFirst({
+          where: {
+            facilityId,
+            shipment: {
+              shipmentPackages: {
+                some: {
+                  package: {
+                    orderId: order.id,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        const isAssignedToStaffFacility = order.originFacilityId === facilityId || order.destinationFacilityId === facilityId;
+
+        if (!hasScan && !hasRouteStop && !isAssignedToStaffFacility) {
+          throw new ForbiddenException('Bạn không có quyền hủy đơn hàng không thuộc kho quản lý của bạn');
+        }
+      }
+    }
+
     // Business rule: Only cancel when status is CREATED or WAITING_PICKUP
     const allowedCancelStates: OrderStatus[] = ['CREATED', 'WAITING_PICKUP'];
     if (!allowedCancelStates.includes(order.status)) {
@@ -523,5 +745,43 @@ export class OrderService {
 
       return { success: true };
     });
+  }
+
+  private async findNearestFacility(lat: number, lon: number): Promise<string | null> {
+    const facilities = await prisma.facility.findMany({
+      where: {
+        operatingStatus: 'ACTIVE',
+        deletedAt: null,
+      },
+      include: {
+        facilityAddresses: {
+          where: { isPrimary: true },
+          include: { address: true }
+        }
+      }
+    });
+
+    if (facilities.length === 0) return null;
+
+    let nearestFacilityId: string | null = null;
+    let minDistance = Infinity;
+
+    for (const fac of facilities) {
+      const primaryAddr = fac.facilityAddresses[0]?.address;
+      if (primaryAddr) {
+        const dist = this.geocodingService.calculateDistance(
+          lat,
+          lon,
+          primaryAddr.latitude,
+          primaryAddr.longitude
+        );
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearestFacilityId = fac.id;
+        }
+      }
+    }
+
+    return nearestFacilityId;
   }
 }

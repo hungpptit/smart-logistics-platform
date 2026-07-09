@@ -57,7 +57,7 @@ export class OrderController {
       const userId = req.user?.id!;
       const roles = req.user?.roles || [];
       const changeSource = OrderChangeSource.ADMIN;
-      const result = await this.orderService.updateStatus(req.params.id, req.body, userId, changeSource);
+      const result = await this.orderService.updateStatus(req.params.id, req.body, userId, roles, changeSource);
       res.status(200).json({
         success: true,
         message: 'Cập nhật trạng thái đơn hàng thành công',
