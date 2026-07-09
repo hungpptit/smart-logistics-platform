@@ -88,6 +88,13 @@ export const FacilityModal: React.FC<FacilityModalProps> = ({
       } else {
         setMapCenter([105.8542, 21.0285]); // Hanoi default
       }
+      
+      // Fix map container size in modal
+      if (mapRef.current) {
+        setTimeout(() => {
+          mapRef.current.resize();
+        }, 300);
+      }
     }
   }, [isOpen]);
 
@@ -107,6 +114,12 @@ export const FacilityModal: React.FC<FacilityModalProps> = ({
   const mapCallbackRef = useCallback((mapInstance: any) => {
     mapRef.current = mapInstance;
     if (!mapInstance) return;
+
+    // Trigger map resize shortly after loading to ensure it sizes correctly in modal
+    setTimeout(() => {
+      mapInstance.resize();
+    }, 300);
+
     mapInstance.on('click', (e: any) => {
       clickHandlerRef.current?.(e);
     });
@@ -122,6 +135,17 @@ export const FacilityModal: React.FC<FacilityModalProps> = ({
       }
     }));
   };
+
+  const handleLocateCallback = useCallback((coords: { longitude: number; latitude: number }) => {
+    setFormData((prev: any) => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        latitude: parseFloat(coords.latitude.toFixed(6)),
+        longitude: parseFloat(coords.longitude.toFixed(6))
+      }
+    }));
+  }, [setFormData]);
 
   const handleAutoLocate = async () => {
     const provinceObj = provinces.find(p => p.code === selectedProvinceCode);
@@ -414,7 +438,7 @@ export const FacilityModal: React.FC<FacilityModalProps> = ({
                   </button>
                 </div>
                 
-                <div className="w-full h-44 rounded-md border border-[#e2e8f0] overflow-hidden relative mt-0.5 bg-gray-50">
+                <div className="w-full h-72 rounded-md border border-[#e2e8f0] overflow-hidden relative mt-0.5 bg-gray-50">
                   <Map
                     ref={mapCallbackRef}
                     center={mapCenter}
@@ -429,13 +453,21 @@ export const FacilityModal: React.FC<FacilityModalProps> = ({
                         onDragEnd={handleMarkerDragEnd}
                       >
                         <MarkerContent>
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#bc0100] shadow-md">
-                            <MapPin className="h-4 w-4 text-white" />
+                          <div 
+                            className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white shadow-sm text-white transition-transform hover:scale-110"
+                            style={{ backgroundColor: '#bc0100' }}
+                          >
+                            <MapPin className="h-3 w-3" />
                           </div>
                         </MarkerContent>
                       </MapMarker>
                     )}
-                    <MapControls showZoom showLocate className="bottom-2 right-2" />
+                     <MapControls 
+                      showZoom 
+                      showLocate 
+                      onLocate={handleLocateCallback}
+                      className="bottom-2 right-2" 
+                    />
                   </Map>
                   <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-xs px-2 py-0.5 rounded text-[8px] text-gray-500 shadow-xs pointer-events-none select-none">
                     Kéo marker hoặc click bản đồ để chọn tọa độ

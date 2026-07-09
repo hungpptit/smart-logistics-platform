@@ -22,10 +22,19 @@ export class AuthController {
     try {
       const { email, otp } = req.body;
       const result = await this.authService.verifyOtp(email, otp);
+      
+      const { refreshToken, ...rest } = result;
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
       res.status(200).json({
         success: true,
         message: 'Kích hoạt tài khoản thành công',
-        data: result,
+        data: rest,
       });
     } catch (error) {
       next(error);
@@ -35,10 +44,19 @@ export class AuthController {
   public login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.authService.login(req.body);
+      
+      const { refreshToken, ...rest } = result;
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
       res.status(200).json({
         success: true,
         message: 'Đăng nhập thành công',
-        data: result,
+        data: rest,
       });
     } catch (error) {
       next(error);
@@ -47,7 +65,25 @@ export class AuthController {
 
   public refresh = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.authService.refresh(req.body);
+      const cookieHeader = req.headers.cookie;
+      const cookies: { [key: string]: string } = {};
+      if (cookieHeader) {
+        cookieHeader.split(';').forEach((cookie) => {
+          const parts = cookie.split('=');
+          cookies[parts.shift()?.trim() || ''] = decodeURI(parts.join('='));
+        });
+      }
+
+      const refreshToken = cookies['refreshToken'];
+      if (!refreshToken) {
+        res.status(401).json({
+          success: false,
+          message: 'Refresh token không hợp lệ hoặc đã hết hạn',
+        });
+        return;
+      }
+
+      const result = await this.authService.refresh({ refreshToken });
       res.status(200).json({
         success: true,
         message: 'Làm mới token thành công',
@@ -62,6 +98,13 @@ export class AuthController {
     try {
       const userId = req.user?.id!;
       const result = await this.authService.logout(userId);
+      
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      });
+
       res.status(200).json({
         success: true,
         message: 'Đăng xuất thành công',

@@ -158,7 +158,6 @@ router.post(
  */
 router.post(
   '/refresh',
-  validationMiddleware(RefreshTokenDto),
   authController.refresh
 );
 

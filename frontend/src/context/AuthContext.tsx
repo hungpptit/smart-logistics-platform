@@ -26,6 +26,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const handleSilentRefresh = async (): Promise<boolean> => {
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      const resData = await response.json();
+      if (response.ok && resData.success) {
+        const newToken = resData.data.accessToken;
+        localStorage.setItem('token', newToken);
+        setToken(newToken);
+        
+        const profileResponse = await fetch(`${CONFIG.API_BASE_URL}/auth/me`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${newToken}`,
+          },
+        });
+        const profileData = await profileResponse.json();
+        if (profileResponse.ok && profileData.success) {
+          setUser(profileData.data);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Silent token refresh error:', error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       if (!token) {
@@ -44,8 +79,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const resData = await response.json();
         if (response.ok && resData.success) {
           setUser(resData.data);
+        } else if (response.status === 401) {
+          // Access token expired, attempt silent refresh
+          const success = await handleSilentRefresh();
+          if (!success) {
+            handleLogout();
+          }
         } else {
-          // Token expired or invalid
           handleLogout();
         }
       } catch (error) {
@@ -59,6 +99,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, [token]);
 
+  // Silent refresh timer: Runs every 10 minutes if user is logged in
+  useEffect(() => {
+    if (!token) return;
+
+    const intervalId = setInterval(() => {
+      console.log('Initiating silent token refresh...');
+      handleSilentRefresh();
+    }, 10 * 60 * 1000); // 10 minutes
+
+    return () => clearInterval(intervalId);
+  }, [token]);
+
   const handleLogin = async (email: string, password: string) => {
     try {
       const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, {
@@ -66,6 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -126,6 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ email, otp }),
       });
 
@@ -174,10 +228,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
+  const handleLogout = async () => {
+    try {
+      if (token) {
+        await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          credentials: 'include',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to logout on server:', error);
+    } finally {
+      localStorage.removeItem('token');
+      setToken(null);
+      setUser(null);
+    }
   };
 
   return (
