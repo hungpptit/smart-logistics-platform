@@ -14,6 +14,15 @@ export interface User {
     facilityName: string;
     facilityCode: string;
   }>;
+  staffProfile?: {
+    id: string;
+    assignedFacilityId: string | null;
+    assignedFacility?: {
+      id: string;
+      facilityName: string;
+      facilityCode: string;
+    } | null;
+  } | null;
 }
 
 export interface AuthResponse {

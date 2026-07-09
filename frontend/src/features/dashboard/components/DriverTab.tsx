@@ -3,7 +3,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
 import { 
   Search, RefreshCw, Plus, Edit2, Trash2, ShieldAlert, AlertTriangle, 
-  Phone, ChevronLeft, ChevronRight, X, Loader2, Compass 
+  Phone, ChevronLeft, ChevronRight, X, Loader2, Compass, Eye 
 } from 'lucide-react';
 
 interface Facility {
@@ -18,6 +18,7 @@ interface Driver {
   employeeCode: string;
   fullName: string;
   phone: string;
+  citizenId?: string | null;
   driverLicenseNumber: string;
   driverLicenseClass: string;
   hireDate: string;
@@ -62,12 +63,15 @@ export const DriverTab: React.FC = () => {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
+  const [selectedDriverDetail, setSelectedDriverDetail] = useState<Driver | null>(null);
 
   // Form states
   const [formData, setFormData] = useState({
     userId: '',
     fullName: '',
     phone: '',
+    citizenId: '',
     driverLicenseNumber: '',
     driverLicenseClass: '',
     hireDate: new Date().toISOString().split('T')[0],
@@ -165,6 +169,7 @@ export const DriverTab: React.FC = () => {
       userId: '',
       fullName: '',
       phone: '',
+      citizenId: '',
       driverLicenseNumber: '',
       driverLicenseClass: '',
       hireDate: new Date().toISOString().split('T')[0],
@@ -186,6 +191,7 @@ export const DriverTab: React.FC = () => {
       userId: driver.userId || '',
       fullName: driver.fullName,
       phone: driver.phone,
+      citizenId: driver.citizenId || '',
       driverLicenseNumber: driver.driverLicenseNumber,
       driverLicenseClass: driver.driverLicenseClass,
       hireDate: driver.hireDate ? driver.hireDate.split('T')[0] : '',
@@ -198,6 +204,11 @@ export const DriverTab: React.FC = () => {
     });
     setActionError(null);
     setShowModal(true);
+  };
+
+  const handleOpenDetailModal = (driver: Driver) => {
+    setSelectedDriverDetail(driver);
+    setShowDetailModal(true);
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -425,6 +436,13 @@ export const DriverTab: React.FC = () => {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleOpenDetailModal(drv)}
+                          className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                          title="Xem chi tiết"
+                        >
+                          <Eye size={14} />
+                        </button>
                         {canManage && (
                           <>
                             <button
@@ -527,6 +545,18 @@ export const DriverTab: React.FC = () => {
                   />
                 </div>
 
+                {/* Citizen ID (CCCD) */}
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số CCCD</label>
+                  <input
+                    type="text"
+                    value={formData.citizenId}
+                    onChange={(e) => setFormData({ ...formData, citizenId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100]"
+                    placeholder="Số CCCD tài xế"
+                  />
+                </div>
+
                 {/* Status */}
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Trạng thái hoạt động</label>
@@ -538,6 +568,24 @@ export const DriverTab: React.FC = () => {
                     <option value="ACTIVE">Đang hoạt động</option>
                     <option value="OFFLINE">Ngoại tuyến</option>
                     <option value="SUSPENDED">Bị đình chỉ</option>
+                  </select>
+                </div>
+
+                {/* Home Facility (Warehouse) */}
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Kho / Bưu cục trực thuộc *</label>
+                  <select
+                    required
+                    value={formData.homeFacilityId}
+                    onChange={(e) => setFormData({ ...formData, homeFacilityId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
+                  >
+                    <option value="">-- Chọn kho bãi hoạt động --</option>
+                    {facilities.map((fac) => (
+                      <option key={fac.id} value={fac.id}>
+                        {fac.facilityName} ({fac.facilityCode})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -565,24 +613,6 @@ export const DriverTab: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100]"
                     placeholder="Số thẻ bằng lái"
                   />
-                </div>
-
-                {/* Home Facility (Warehouse) */}
-                <div className="col-span-2">
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Kho / Bưu cục trực thuộc *</label>
-                  <select
-                    required
-                    value={formData.homeFacilityId}
-                    onChange={(e) => setFormData({ ...formData, homeFacilityId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
-                  >
-                    <option value="">-- Chọn kho bãi hoạt động --</option>
-                    {facilities.map((fac) => (
-                      <option key={fac.id} value={fac.id}>
-                        {fac.facilityName} ({fac.facilityCode})
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 {/* User Credentials Account Creation */}
@@ -663,6 +693,163 @@ export const DriverTab: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Detail Driver Modal */}
+      {showDetailModal && selectedDriverDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm font-montserrat animate-in fade-in duration-200">
+          <div className="bg-white rounded-lg shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-gray-100 bg-[#fafafa] flex items-center justify-between shrink-0">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-gray-800 flex items-center gap-2">
+                <Compass size={16} className="text-[#bc0100]" />
+                <span>Chi tiết hồ sơ tài xế</span>
+              </h3>
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setSelectedDriverDetail(null);
+                }}
+                className="p-1 hover:bg-gray-200 rounded-full transition-colors cursor-pointer text-gray-400 hover:text-gray-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-5 overflow-y-auto text-xs text-left">
+              {/* Header profile info */}
+              <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+                <div className="w-12 h-12 rounded-full bg-[#bc0100]/10 flex items-center justify-center text-[#bc0100] font-bold text-base">
+                  {selectedDriverDetail.fullName.substring(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-gray-800">{selectedDriverDetail.fullName}</h4>
+                  <p className="text-[10px] font-mono text-gray-500 mt-0.5">Mã số: {selectedDriverDetail.employeeCode}</p>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold mt-1.5 uppercase ${
+                    selectedDriverDetail.employmentStatus === 'ACTIVE'
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : selectedDriverDetail.employmentStatus === 'SUSPENDED'
+                      ? 'bg-red-50 text-red-700 border border-red-200'
+                      : 'bg-gray-100 text-gray-600 border border-gray-200'
+                  }`}>
+                    {selectedDriverDetail.employmentStatus === 'ACTIVE'
+                      ? 'Đang hoạt động'
+                      : selectedDriverDetail.employmentStatus === 'SUSPENDED'
+                      ? 'Đình chỉ'
+                      : 'Ngoại tuyến'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Grid 1: Personal Info */}
+              <div>
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-wider">Thông tin cá nhân</h4>
+                <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded border border-gray-100">
+                  <div>
+                    <span className="block text-[9px] font-bold text-gray-400 uppercase">Số điện thoại</span>
+                    <span className="font-semibold text-gray-800">{selectedDriverDetail.phone}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] font-bold text-gray-400 uppercase">Số CCCD (Citizen ID)</span>
+                    <span className="font-semibold text-[#bc0100]">{selectedDriverDetail.citizenId || 'Chưa cập nhật'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] font-bold text-gray-400 uppercase">Hạng bằng lái</span>
+                    <span className="font-semibold text-gray-800">{selectedDriverDetail.driverLicenseClass}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] font-bold text-gray-400 uppercase">Số bằng lái</span>
+                    <span className="font-semibold text-gray-800">{selectedDriverDetail.driverLicenseNumber}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid 2: Work & Location */}
+              <div>
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-wider">Hợp đồng & Nơi làm việc</h4>
+                <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded border border-gray-100">
+                  <div>
+                    <span className="block text-[9px] font-bold text-gray-400 uppercase">Ngày ký hợp đồng</span>
+                    <span className="font-semibold text-gray-800">
+                      {selectedDriverDetail.hireDate ? new Date(selectedDriverDetail.hireDate).toLocaleDateString('vi-VN') : 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] font-bold text-gray-400 uppercase">Ngày tạo hồ sơ</span>
+                    <span className="font-semibold text-gray-800">
+                      {new Date(selectedDriverDetail.createdAt).toLocaleDateString('vi-VN')}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="block text-[9px] font-bold text-gray-400 uppercase">Kho bãi trực thuộc</span>
+                    {selectedDriverDetail.homeFacility ? (
+                      <span className="block font-semibold text-gray-800 mt-1">
+                        {selectedDriverDetail.homeFacility.facilityName} ({selectedDriverDetail.homeFacility.facilityCode})
+                      </span>
+                    ) : (
+                      <span className="block text-gray-400 italic mt-1">Chưa phân kho</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid 3: Account Credentials */}
+              <div>
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-wider">Tài khoản đăng nhập</h4>
+                <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded border border-gray-100">
+                  {selectedDriverDetail.user ? (
+                    <>
+                      <div>
+                        <span className="block text-[9px] font-bold text-gray-400 uppercase">Tên đăng nhập</span>
+                        <span className="font-semibold text-gray-800">{selectedDriverDetail.user.username}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-bold text-gray-400 uppercase">Email</span>
+                        <span className="font-semibold text-gray-800 break-all">{selectedDriverDetail.user.email}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="block text-[9px] font-bold text-gray-400 uppercase">Trạng thái tài khoản</span>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-extrabold mt-1 uppercase ${
+                          selectedDriverDetail.user.status === 'ACTIVE'
+                            ? 'bg-green-50 text-green-700 border border-green-200'
+                            : 'bg-red-50 text-red-700 border border-red-200'
+                        }`}>
+                          {selectedDriverDetail.user.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm khóa / Vô hiệu hóa'}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="col-span-2 text-gray-400 italic">Tài xế này chưa liên kết tài khoản ứng dụng (shipper app)</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Note */}
+              {selectedDriverDetail.note && (
+                <div>
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Ghi chú</span>
+                  <p className="p-3 bg-amber-50/40 border border-amber-100 rounded text-gray-700 italic">
+                    {selectedDriverDetail.note}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50 flex justify-end text-xs shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setSelectedDriverDetail(null);
+                }}
+                className="px-4 py-2 bg-gray-800 hover:bg-black text-white font-bold uppercase rounded tracking-wider transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

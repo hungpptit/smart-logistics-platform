@@ -48,6 +48,8 @@ export const StaffTab: React.FC = () => {
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
+  const [selectedStaffDetail, setSelectedStaffDetail] = useState<Staff | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -168,6 +170,11 @@ export const StaffTab: React.FC = () => {
     setIsEditing(true);
     setEditingStaffId(staff.id);
     setShowModal(true);
+  };
+
+  const handleOpenDetailModal = (staff: Staff) => {
+    setSelectedStaffDetail(staff);
+    setShowDetailModal(true);
   };
 
   const handleSaveStaff = async (e: React.FormEvent) => {
@@ -419,6 +426,13 @@ export const StaffTab: React.FC = () => {
                     <td className="p-3 text-right">
                       <div className="inline-flex items-center gap-2">
                         <button
+                          onClick={() => handleOpenDetailModal(staff)}
+                          className="p-1 text-gray-600 hover:bg-gray-100 rounded cursor-pointer transition-colors"
+                          title="Xem chi tiết"
+                        >
+                          <Eye size={13} />
+                        </button>
+                        <button
                           onClick={() => handleOpenEditModal(staff)}
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors"
                           title="Sửa thông tin"
@@ -652,6 +666,93 @@ export const StaffTab: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Detail Staff Modal */}
+      {showDetailModal && selectedStaffDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-montserrat animate-in fade-in duration-200">
+          <div className="bg-white rounded-lg shadow-xl border border-gray-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-gray-100 bg-[#fafafa] flex items-center justify-between">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-gray-800 flex items-center gap-2">
+                <Shield size={16} className="text-[#bc0100]" />
+                <span>Chi tiết nhân viên</span>
+              </h3>
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setSelectedStaffDetail(null);
+                }}
+                className="p-1 hover:bg-gray-200 rounded-full transition-colors cursor-pointer text-gray-400 hover:text-gray-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4 text-xs text-left">
+              <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+                <div className="w-10 h-10 rounded-full bg-[#bc0100]/10 flex items-center justify-center text-[#bc0100] font-bold text-sm">
+                  {selectedStaffDetail.username.substring(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-gray-800">{selectedStaffDetail.username}</h4>
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-extrabold mt-1 ${
+                    selectedStaffDetail.status === 'ACTIVE'
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    {selectedStaffDetail.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm khóa'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase">Địa chỉ Email</span>
+                  <span className="font-semibold text-gray-800 break-all">{selectedStaffDetail.email}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase">Số điện thoại</span>
+                  <span className="font-semibold text-gray-800">{selectedStaffDetail.phone || 'Chưa cập nhật'}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase">Số CCCD (Citizen ID)</span>
+                  <span className="font-semibold text-[#bc0100]">{selectedStaffDetail.citizenId || 'Chưa cập nhật'}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase">Ngày tạo tài khoản</span>
+                  <span className="font-semibold text-gray-800">{new Date(selectedStaffDetail.createdAt).toLocaleString('vi-VN')}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase">Kho hàng phân công</span>
+                  {selectedStaffDetail.assignedFacility ? (
+                    <div className="mt-1 p-2 bg-blue-50 border border-blue-100 rounded text-blue-800 font-semibold">
+                      {selectedStaffDetail.assignedFacility.facilityCode} - {selectedStaffDetail.assignedFacility.facilityName}
+                    </div>
+                  ) : (
+                    <div className="mt-1 p-2 bg-amber-50 border border-amber-100 rounded text-amber-800 font-semibold">
+                      Chưa được phân công kho bãi hoạt động
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50 flex justify-end text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setSelectedStaffDetail(null);
+                }}
+                className="px-4 py-2 bg-gray-800 hover:bg-black text-white font-bold uppercase rounded tracking-wider transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

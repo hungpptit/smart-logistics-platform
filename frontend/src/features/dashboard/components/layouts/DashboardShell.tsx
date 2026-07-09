@@ -53,11 +53,11 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({ menuItems, onBac
               <span className="text-[10px] font-extrabold bg-[#bc0100]/10 text-[#bc0100] px-2 py-0.5 rounded uppercase tracking-wider">
                 {user.roles.join(' | ')}
               </span>
-              {user.roles.includes('STAFF') && user.managedFacilities && user.managedFacilities.length > 0 && (
+              {user.roles.includes('STAFF') && (user.staffProfile?.assignedFacility || (user.managedFacilities && user.managedFacilities.length > 0)) && (
                 <>
                   <span className="text-gray-300">|</span>
                   <span className="text-[10px] font-bold text-gray-600 uppercase bg-gray-100 px-2 py-0.5 rounded">
-                    Kho quản lý: {user.managedFacilities[0].facilityName}
+                    Kho quản lý: {user.staffProfile?.assignedFacility?.facilityName || user.managedFacilities?.[0]?.facilityName}
                   </span>
                 </>
               )}

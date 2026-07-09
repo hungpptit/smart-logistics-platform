@@ -140,6 +140,11 @@ export class AuthService {
       },
       include: {
         managedFacilities: true,
+        staffProfile: {
+          include: {
+            assignedFacility: true,
+          },
+        },
         userRoles: {
           include: {
             role: true,
@@ -233,6 +238,11 @@ export class AuthService {
       },
       include: {
         managedFacilities: true,
+        staffProfile: {
+          include: {
+            assignedFacility: true,
+          },
+        },
         userRoles: {
           include: {
             role: true,
@@ -369,6 +379,11 @@ export class AuthService {
       where: { id: userId, deletedAt: null },
       include: {
         managedFacilities: true,
+        staffProfile: {
+          include: {
+            assignedFacility: true,
+          },
+        },
         userRoles: {
           include: {
             role: {

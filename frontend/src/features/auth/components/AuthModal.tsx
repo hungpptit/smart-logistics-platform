@@ -166,11 +166,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const validateLoginForm = (): boolean => {
     const newErrors: typeof loginErrors = {};
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!loginUser.trim()) {
-      newErrors.username = 'Email đăng nhập không được để trống';
-    } else if (!emailRegex.test(loginUser.trim())) {
-      newErrors.username = 'Email đăng nhập không đúng định dạng (VD: name@domain.com)';
+    const trimmedUser = loginUser.trim();
+    if (!trimmedUser) {
+      newErrors.username = 'Tài khoản đăng nhập không được để trống';
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const phoneRegex = /^[0-9]{9,15}$/;
+      const isEmail = emailRegex.test(trimmedUser);
+      const isPhone = phoneRegex.test(trimmedUser);
+
+      if (!isEmail && !isPhone) {
+        newErrors.username = 'Tài khoản đăng nhập phải là Email hoặc Số điện thoại hợp lệ';
+      }
     }
 
     if (!loginPass) {
@@ -365,13 +372,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           {activeTab === 'login' && (
             <form onSubmit={handleLoginSubmit} className="auth-form-wrapper">
               <div className="form-group">
-                <label htmlFor="login-username">Email đăng nhập</label>
+                <label htmlFor="login-username">Tài khoản đăng nhập (Email / SĐT)</label>
                 <input 
-                  type="email" 
+                  type="text" 
                   id="login-username" 
                   className="form-input"
                   required 
-                  placeholder="Nhập địa chỉ email đăng nhập..."
+                  placeholder="Nhập Email hoặc Số điện thoại đăng nhập..."
                   value={loginUser}
                   onChange={(e) => setLoginUser(e.target.value)}
                   disabled={isLoading}
