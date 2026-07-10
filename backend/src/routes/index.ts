@@ -7,6 +7,7 @@ import serviceRouter from './service.routes';
 import driverRouter from './driver.routes';
 import locationRouter from './location.routes';
 import staffRouter from './staff.routes';
+import routingRouter from './routing.routes';
 
 const router = Router();
 
@@ -19,5 +20,6 @@ router.use('/services', serviceRouter);
 router.use('/drivers', driverRouter);
 router.use('/locations', locationRouter);
 router.use('/staff', staffRouter);
+router.use('/routes', routingRouter);
 
 export default router;

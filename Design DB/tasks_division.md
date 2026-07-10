@@ -36,29 +36,29 @@ Hệ thống đã hoàn thành **100% mục tiêu cốt lõi** của Tuần 1:
 #### 📋 Phân chia nhiệm vụ chi tiết:
 
 ##### 👤 Thành viên 1: APIs Nghiệp vụ Cốt lõi
-- [ ] **Xác thực & Phân quyền (RBAC):** Xây dựng APIs Đăng ký, Đăng nhập, Đăng xuất, Refresh Token (mã hóa bcrypt). Viết middleware phân quyền RBAC dựa trên JWT cho 4 vai trò (Admin, Staff, Customer, Shipper).
-- [ ] **APIs Quản lý Khách hàng & Kho bãi:** 
+- [x] **Xác thực & Phân quyền (RBAC):** Xây dựng APIs Đăng ký, Đăng nhập, Đăng xuất, Refresh Token (mã hóa bcrypt). Viết middleware phân quyền RBAC dựa trên JWT cho 4 vai trò (Admin, Staff, Customer, Shipper).
+- [x] **APIs Quản lý Khách hàng & Kho bãi:** 
   - APIs quản lý thông tin khách hàng, sổ địa chỉ (Address Book - mỗi khách hàng có nhiều địa chỉ).
   - APIs quản lý bưu cục (Facility) và phân khu lưu kho hàng hóa (nhận, phân loại, xuất).
-- [ ] **APIs Đơn hàng & Tính phí:**
+- [x] **APIs Đơn hàng & Tính phí:**
   - APIs CRUD đơn hàng, kiện hàng (Packages), timeline trạng thái và lịch sử thanh toán.
   - Tích hợp Geocoding API chuyển đổi địa chỉ gửi/nhận thành tọa độ `[Kinh độ, Vĩ độ]`.
   - Xây dựng công cụ tính phí cước tự động (Rule-based engine: khoảng cách + trọng lượng + gói cước + phụ phí).
   - Sinh mã vận đơn tự động dạng QR Code và lưu Snapshot thông tin đơn hàng tại thời điểm tạo để bảo toàn lịch sử giao dịch.
-- [ ] **Swagger & Postman:** Viết tài liệu Swagger API chi tiết và tạo bộ kiểm thử Postman để chạy Integration Testing cho các APIs trên.
+- [x] **Swagger & Postman:** Viết tài liệu Swagger API chi tiết và tạo bộ kiểm thử Postman để chạy Integration Testing cho các APIs trên.
 
 ##### 👤 Thành viên 2: Web Admin & Landing Page
-- [ ] **Trang Web giới thiệu (Landing Page):** Phát triển giao diện giới thiệu dịch vụ, tích hợp form tra cứu vận đơn nhanh qua mã vận đơn (hiển thị timeline trạng thái) và công cụ tính nhanh cước phí (Rule-based).
-- [ ] **Giao diện Auth & RBAC Web:** Thiết kế form Đăng nhập, cài đặt Route Guards bảo vệ các trang quản lý và phân quyền hiển thị menu theo vai trò.
-- [ ] **Giao diện Quản trị Cốt lõi:**
+- [x] **Trang Web giới thiệu (Landing Page):** Phát triển giao diện giới thiệu dịch vụ, tích hợp form tra cứu vận đơn nhanh qua mã vận đơn (hiển thị timeline trạng thái) và công cụ tính nhanh cước phí (Rule-based).
+- [x] **Giao diện Auth & RBAC Web:** Thiết kế form Đăng nhập, cài đặt Route Guards bảo vệ các trang quản lý và phân quyền hiển thị menu theo vai trò.
+- [x] **Giao diện Quản trị Cốt lõi:**
   - Trang quản lý Khách hàng & Sổ địa chỉ (danh sách, chi tiết, cập nhật thông tin).
   - Trang cấu trúc Kho bãi / Bưu cục và phân khu chứa hàng (nhận, phân loại, xuất).
   - Trang danh sách đơn hàng toàn cục cho nhân viên, cập nhật thông tin và kiểm tra trạng thái kiện hàng.
 
 ##### 👤 Thành viên 3: Customer Mobile App
-- [ ] **Xác thực di động:** Màn hình Đăng nhập, Đăng ký và Quên mật khẩu cho Khách hàng.
-- [ ] **Giao diện Khách hàng:** Trang chủ hiển thị danh sách đơn gần đây, phím tắt Tạo đơn và Tra cứu nhanh.
-- [ ] **Luồng Tạo đơn & Tracking:**
+- [x] **Xác thực di động:** Màn hình Đăng nhập, Đăng ký và Quên mật khẩu cho Khách hàng.
+- [x] **Giao diện Khách hàng:** Trang chủ hiển thị danh sách đơn gần đây, phím tắt Tạo đơn và Tra cứu nhanh.
+- [x] **Luồng Tạo đơn & Tracking:**
   - Màn hình tạo đơn hàng lẻ/hàng loạt (điền địa chỉ tự động, tính cước phí trước).
   - Màn hình hiển thị mã QR vận đơn để in/dán.
   - Màn hình đặt lịch hẹn lấy hàng, danh sách đơn hàng cá nhân, xem timeline trạng thái chi tiết, hủy đơn trước khi lấy hàng.

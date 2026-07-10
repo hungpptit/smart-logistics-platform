@@ -63,3 +63,4 @@ const startServer = async () => {
 };
 
 startServer();
+// Hot reload trigger
