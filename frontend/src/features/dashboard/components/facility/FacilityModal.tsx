@@ -293,18 +293,33 @@ export const FacilityModal: React.FC<FacilityModalProps> = ({
                 provinceCode={selectedProvinceCode}
                 wardCode={formData.address.wardCode || ''}
                 addressLine1={formData.address.addressLine1}
-                onChange={({ province, provinceCode, ward, wardCode, addressLine1 }) => {
+                onChange={({ province, provinceCode, ward, wardCode, addressLine1, latitude, longitude }) => {
                   setSelectedProvinceCode(provinceCode);
-                  setFormData((prev: any) => ({
-                    ...prev,
-                    address: {
+                  setFormData((prev: any) => {
+                    const newAddress = {
                       ...prev.address,
                       province,
                       ward,
                       wardCode,
                       addressLine1
+                    };
+                    if (latitude !== undefined && longitude !== undefined) {
+                      newAddress.latitude = latitude;
+                      newAddress.longitude = longitude;
                     }
-                  }));
+                    return {
+                      ...prev,
+                      address: newAddress
+                    };
+                  });
+                  if (latitude !== undefined && longitude !== undefined) {
+                    setMapCenter([longitude, latitude]);
+                    mapRef.current?.flyTo({
+                      center: [longitude, latitude],
+                      zoom: 15,
+                      duration: 1000
+                    });
+                  }
                 }}
                 required
               />

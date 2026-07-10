@@ -159,15 +159,32 @@ export const AddressModal: React.FC<AddressModalProps> = ({
             provinceName={addressFormData.province}
             wardCode={addressFormData.wardCode || ''}
             addressLine1={addressFormData.addressLine1}
-            onChange={({ province, provinceCode, ward, wardCode, addressLine1 }) => {
+            onChange={({ province, provinceCode, ward, wardCode, addressLine1, latitude, longitude }) => {
               setSelectedProvinceCode(provinceCode);
-              setAddressFormData((prev: any) => ({
-                ...prev,
-                province,
-                ward,
-                wardCode,
-                addressLine1
-              }));
+              setAddressFormData((prev: any) => {
+                const updates: any = {
+                  province,
+                  ward,
+                  wardCode,
+                  addressLine1
+                };
+                if (latitude !== undefined && longitude !== undefined) {
+                  updates.latitude = latitude;
+                  updates.longitude = longitude;
+                }
+                return {
+                  ...prev,
+                  ...updates
+                };
+              });
+              if (latitude !== undefined && longitude !== undefined) {
+                setMapCenter([longitude, latitude]);
+                mapRef.current?.flyTo({
+                  center: [longitude, latitude],
+                  zoom: 15,
+                  duration: 1000
+                });
+              }
             }}
             required
           />

@@ -55,4 +55,44 @@ export class LocationController {
       next(error);
     }
   };
+
+  public autocomplete = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { input } = req.query;
+      if (!input || typeof input !== 'string') {
+        res.status(400).json({
+          success: false,
+          message: 'Input parameter is required and must be a string',
+        });
+        return;
+      }
+      const predictions = await geocodingService.autocomplete(input);
+      res.status(200).json({
+        success: true,
+        data: predictions,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public getPlaceDetail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { placeId } = req.query;
+      if (!placeId || typeof placeId !== 'string') {
+        res.status(400).json({
+          success: false,
+          message: 'PlaceId parameter is required and must be a string',
+        });
+        return;
+      }
+      const detail = await geocodingService.getPlaceDetail(placeId);
+      res.status(200).json({
+        success: true,
+        data: detail,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

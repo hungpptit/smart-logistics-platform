@@ -219,7 +219,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   }, [receiverAddressLine1, receiverWard, receiverProvince, token]);
 
   // Package States
-  const [weight, setWeight] = useState<number>(1.5);
+  const [weight, setWeight] = useState<number>(1.0);
   const [length, setLength] = useState<number>(20);
   const [width, setWidth] = useState<number>(15);
   const [height, setHeight] = useState<number>(10);
@@ -368,10 +368,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     const freeWeightKg = activeService.freeWeightKg;
     const pricePerKg = Number(activeService.pricePerKg);
 
-    billableDistance = Math.max(0, distanceKm - freeDistanceKm);
-    distanceFee = billableDistance * pricePerKm;
+    const isDistanceBased = serviceCode === 'EXPRESS' || serviceCode === 'COLD_CHAIN';
+    billableDistance = isDistanceBased ? Math.max(0, distanceKm - freeDistanceKm) : 0;
+    distanceFee = isDistanceBased ? billableDistance * pricePerKm : 0;
 
-    billableWeight = Math.max(0, weight - freeWeightKg);
+    const volumetricWeight = (length * width * height) / 5000;
+    const chargeableWeight = Math.max(weight, volumetricWeight);
+
+    billableWeight = Math.max(0, chargeableWeight - freeWeightKg);
     weightFee = billableWeight * pricePerKg;
 
     fragileSurcharge = isFragile ? 15000 : 0;
@@ -460,12 +464,19 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   provinceCode={senderProvinceCode}
                   wardCode={senderWardCode}
                   addressLine1={senderAddressLine1}
-                  onChange={({ province, provinceCode, ward, wardCode, addressLine1 }) => {
+                  onChange={({ province, provinceCode, ward, wardCode, addressLine1, latitude, longitude }) => {
                     setSenderProvince(province);
                     setSenderProvinceCode(provinceCode);
                     setSenderWard(ward);
                     setSenderWardCode(wardCode);
                     setSenderAddressLine1(addressLine1);
+                    if (latitude !== undefined && longitude !== undefined) {
+                      setSenderLatitude(latitude);
+                      setSenderLongitude(longitude);
+                      setTempLatitude(latitude);
+                      setTempLongitude(longitude);
+                      setMapCenter([longitude, latitude]);
+                    }
                   }}
                   required
                 />
@@ -623,12 +634,16 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   provinceCode={receiverProvinceCode}
                   wardCode={receiverWardCode}
                   addressLine1={receiverAddressLine1}
-                  onChange={({ province, provinceCode, ward, wardCode, addressLine1 }) => {
+                  onChange={({ province, provinceCode, ward, wardCode, addressLine1, latitude, longitude }) => {
                     setReceiverProvince(province);
                     setReceiverProvinceCode(provinceCode);
                     setReceiverWard(ward);
                     setReceiverWardCode(wardCode);
                     setReceiverAddressLine1(addressLine1);
+                    if (latitude !== undefined && longitude !== undefined) {
+                      setReceiverLatitude(latitude);
+                      setReceiverLongitude(longitude);
+                    }
                   }}
                   required
                 />
@@ -702,6 +717,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     />
                   </div>
                 </div>
+                <div className="text-[10px] text-gray-400 mt-1 leading-normal">
+                  * Trọng lượng quy đổi thể tích: <span className="font-bold text-gray-600 font-mono">{((length * width * height) / 5000).toFixed(2)} kg</span> (áp dụng nếu lớn hơn trọng lượng thực tế). Công thức chuẩn: (Dài x Rộng x Cao) / 5000.
+                </div>
                 <div className="flex items-center gap-2 pt-1">
                   <input
                     type="checkbox"
@@ -727,18 +745,25 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   {loadingServices ? (
                     <div className="py-2 text-gray-400">Đang tải gói dịch vụ...</div>
                   ) : (
-                    <select
-                      value={serviceCode}
-                      onChange={(e) => setServiceCode(e.target.value)}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded bg-white font-medium outline-none focus:border-[#bc0100]"
-                      required
-                    >
-                      {services.map((s) => (
-                        <option key={s.id} value={s.serviceCode}>
-                          {s.serviceName} (Phí cơ bản: {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(s.basePrice)})
-                        </option>
-                      ))}
-                    </select>
+                    <>
+                      <select
+                        value={serviceCode}
+                        onChange={(e) => setServiceCode(e.target.value)}
+                        className="w-full px-3 py-2 border border-[#e2e8f0] rounded bg-white font-medium outline-none focus:border-[#bc0100]"
+                        required
+                      >
+                        {services.map((s) => (
+                          <option key={s.id} value={s.serviceCode}>
+                            {s.serviceName} (Phí cơ bản: {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(s.basePrice)})
+                          </option>
+                        ))}
+                      </select>
+                      {serviceCode === 'EXPRESS' && distanceKm > 20 && (
+                        <div className="mt-1.5 p-2.5 bg-red-50 border border-red-200 rounded text-red-700 text-[10px] font-semibold leading-relaxed">
+                          ⚠️ Dịch vụ Hỏa tốc 2h chỉ hỗ trợ giao hàng trong phạm vi bán kính tối đa 20 km. Vui lòng chọn gói dịch vụ khác.
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -802,40 +827,49 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       <span>Chi tiết cước tạm tính</span>
                       {distanceKm > 0 && <span className="text-gray-500 font-medium normal-case">(Khoảng cách: {distanceKm} km)</span>}
                     </div>
-                    <div className="flex flex-col gap-1.5 text-[11px]">
-                      <div className="flex justify-between items-center text-gray-500">
-                        <span>Cước cơ bản:</span>
-                        <span className="font-medium text-gray-800">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(basePrice)}</span>
+                    {serviceCode === 'EXPRESS' && distanceKm > 20 ? (
+                      <div className="text-[11px] text-red-600 font-bold text-center py-4 bg-red-50 border border-red-100 rounded">
+                        DỊCH VỤ HỎA TỐC KHÔNG KHẢ DỤNG<br/>(Khoảng cách vượt quá giới hạn 20 km)
                       </div>
-                      {distanceFee > 0 && (
+                    ) : (
+                      <div className="flex flex-col gap-1.5 text-[11px]">
                         <div className="flex justify-between items-center text-gray-500">
-                          <span>Phí vượt cự ly (vượt {billableDistance} km):</span>
-                          <span className="font-medium text-gray-800">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(distanceFee)}</span>
+                          <span>Cước cơ bản:</span>
+                          <span className="font-medium text-gray-800">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(basePrice)}</span>
                         </div>
-                      )}
-                      {weightFee > 0 && (
-                        <div className="flex justify-between items-center text-gray-500">
-                          <span>Phí quá tải (vượt {billableWeight} kg):</span>
-                          <span className="font-medium text-gray-800">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(weightFee)}</span>
+                        {distanceFee > 0 && (
+                          <div className="flex justify-between items-center text-gray-500">
+                            <span>Phí vượt cự ly (vượt {billableDistance} km):</span>
+                            <span className="font-medium text-gray-800">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(distanceFee)}</span>
+                          </div>
+                        )}
+                        {weightFee > 0 && (
+                          <div className="flex justify-between items-center text-gray-500">
+                            <span>
+                              Phí quá tải (vượt {billableWeight.toFixed(2)} kg
+                              {((length * width * height) / 5000) > weight ? ' - quy đổi thể tích' : ''}):
+                            </span>
+                            <span className="font-medium text-gray-800">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(weightFee)}</span>
+                          </div>
+                        )}
+                        {fragileSurcharge > 0 && (
+                          <div className="flex justify-between items-center text-gray-500">
+                            <span>Phụ thu hàng dễ vỡ:</span>
+                            <span className="font-medium text-[#bc0100]">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(fragileSurcharge)}</span>
+                          </div>
+                        )}
+                        {insuranceFee > 0 && (
+                          <div className="flex justify-between items-center text-gray-500">
+                            <span>Phí bảo hiểm COD (0.5%):</span>
+                            <span className="font-medium text-gray-800">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(insuranceFee)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center font-bold text-sm border-t pt-2 mt-1">
+                          <span className="text-[#161D25] uppercase tracking-wider text-[10px]">Tổng cước tạm tính:</span>
+                          <span className="text-base text-[#bc0100] font-extrabold">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalAmount)}</span>
                         </div>
-                      )}
-                      {fragileSurcharge > 0 && (
-                        <div className="flex justify-between items-center text-gray-500">
-                          <span>Phụ thu hàng dễ vỡ:</span>
-                          <span className="font-medium text-[#bc0100]">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(fragileSurcharge)}</span>
-                        </div>
-                      )}
-                      {insuranceFee > 0 && (
-                        <div className="flex justify-between items-center text-gray-500">
-                          <span>Phí bảo hiểm COD (0.5%):</span>
-                          <span className="font-medium text-gray-800">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(insuranceFee)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between items-center font-bold text-sm border-t pt-2 mt-1">
-                        <span className="text-[#161D25] uppercase tracking-wider text-[10px]">Tổng cước tạm tính:</span>
-                        <span className="text-base text-[#bc0100] font-extrabold">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalAmount)}</span>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -853,8 +887,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={actionLoading}
-              className="px-6 py-2.5 bg-[#bc0100] hover:bg-[#a00100] text-white rounded font-bold uppercase tracking-wider text-[10px] disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-md"
+              disabled={actionLoading || (serviceCode === 'EXPRESS' && distanceKm > 20)}
+              className="px-6 py-2.5 bg-[#bc0100] hover:bg-[#a00100] text-white rounded font-bold uppercase tracking-wider text-[10px] disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-md animate-pulse-once"
             >
               {actionLoading ? 'Đang tạo đơn...' : 'Xác nhận tạo đơn'}
             </button>

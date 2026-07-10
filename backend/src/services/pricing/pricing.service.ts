@@ -32,9 +32,10 @@ export class PricingService {
     const freeWeightKg = service.freeWeightKg;
     const pricePerKg = Number(service.pricePerKg);
 
-    // 2. Tính phí khoảng cách quá hạn
-    const billableDistance = Math.max(0, distanceKm - freeDistanceKm);
-    const distanceFee = billableDistance * pricePerKm;
+    // 2. Tính phí khoảng cách quá hạn (Chỉ áp dụng cho dịch vụ chặng cuối gom giao trực tiếp: EXPRESS, COLD_CHAIN. STANDARD và SAVING giao liên tỉnh không tính phí theo km đường bộ)
+    const isDistanceBased = serviceCode === 'EXPRESS' || serviceCode === 'COLD_CHAIN';
+    const billableDistance = isDistanceBased ? Math.max(0, distanceKm - freeDistanceKm) : 0;
+    const distanceFee = isDistanceBased ? billableDistance * pricePerKm : 0;
 
     // 3. Tính phí trọng lượng quá hạn
     const billableWeight = Math.max(0, totalWeightKg - freeWeightKg);

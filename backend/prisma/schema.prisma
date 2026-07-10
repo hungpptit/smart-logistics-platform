@@ -63,13 +63,22 @@ enum FacilityZoneType {
 
 enum OrderStatus {
   CREATED
-  WAITING_PICKUP
+  READY_FOR_PICKUP
   PICKUP_ASSIGNED
   PICKING
   PICK_FAILED
   PICKED_UP
   ARRIVED_ORIGIN_FACILITY
   READY_FOR_DISPATCH
+  IN_TRANSIT
+  AT_HUB
+  OUT_FOR_DELIVERY
+  DELIVERED
+  DELIVERY_FAILED
+  RETURNING
+  RETURNED
+  COMPLETED
+  CANCELLED
 }
 
 enum OrderChangeSource {
@@ -110,8 +119,9 @@ enum ShipmentStatus {
   AT_HUB
   OUT_FOR_DELIVERY
   DELIVERED
-  FAILED
+  DELIVERY_FAILED
   RETURNING
+  RETURNED
 }
 
 enum ShipmentEventType {
@@ -255,6 +265,11 @@ enum SettingCategory {
   SYSTEM
   MOBILE
   BUSINESS
+}
+
+enum DriverType {
+  HUB_DELIVERY
+  ON_DEMAND
 }
 
 // ==========================================
@@ -790,6 +805,10 @@ model Driver {
   createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz
   updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt            DateTime?              @map("deleted_at") @db.Timestamptz
+
+  preferredLatitude    Float?                 @map("preferred_latitude")
+  preferredLongitude   Float?                 @map("preferred_longitude")
+  driverType           DriverType             @default(HUB_DELIVERY) @map("driver_type")
 
   // Relations
   user                 User?                  @relation(fields: [userId], references: [id], onDelete: Restrict)

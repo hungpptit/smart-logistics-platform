@@ -140,6 +140,14 @@ export class OrderService {
 
     // 3. Calculate distance & duration
     const distanceKm = this.geocodingService.calculateDistance(pickupLat, pickupLon, deliveryLat, deliveryLon);
+    
+    // Validate distance for EXPRESS service (maximum 20km limit)
+    if (dto.serviceCode === 'EXPRESS' && distanceKm > 20) {
+      throw new BadRequestException(
+        `Dịch vụ giao hàng Hỏa tốc chỉ hỗ trợ giao hàng trong phạm vi bán kính tối đa 20km. Khoảng cách hiện tại của bạn là ${distanceKm.toFixed(2)} km.`
+      );
+    }
+
     // Giả định tốc độ trung bình 30km/h để tính thời gian di chuyển dự kiến (phút)
     const durationMin = Math.ceil((distanceKm / 30) * 60) + 15; // + 15 phút thời gian chuẩn bị/xử lý
 
@@ -214,13 +222,16 @@ export class OrderService {
       throw new BadRequestException('Vui lòng cung cấp thông tin liên hệ của người nhận (tên và số điện thoại)');
     }
 
-    // 6. Calculate total weight, volume & check fragile surcharge
-    let totalWeight = 0;
+    // 6. Calculate total chargeable weight (max of actual weight and volumetric weight = L*W*H/5000)
+    let totalChargeableWeight = 0;
     let totalVolume = 0;
     let isFragile = false;
 
     dto.packages.forEach((pkg) => {
-      totalWeight += pkg.weight;
+      const volumetricWeight = (pkg.length * pkg.width * pkg.height) / 5000;
+      const chargeableWeight = Math.max(pkg.weight, volumetricWeight);
+      totalChargeableWeight += chargeableWeight;
+
       // Thể tích = (dài x rộng x cao) / 1,000,000 để đổi ra m3
       const vol = (pkg.length * pkg.width * pkg.height) / 1000000;
       totalVolume += vol;
@@ -231,7 +242,7 @@ export class OrderService {
     const pricing = await this.pricingService.calculatePrice(
       dto.serviceCode,
       distanceKm,
-      totalWeight,
+      totalChargeableWeight,
       isFragile,
       dto.codAmount || 0
     );
@@ -713,8 +724,8 @@ export class OrderService {
       }
     }
 
-    // Business rule: Only cancel when status is CREATED or WAITING_PICKUP
-    const allowedCancelStates: OrderStatus[] = ['CREATED', 'WAITING_PICKUP'];
+    // Business rule: Only cancel when status is CREATED or READY_FOR_PICKUP
+    const allowedCancelStates: OrderStatus[] = ['CREATED', 'READY_FOR_PICKUP'];
     if (!allowedCancelStates.includes(order.status)) {
       throw new BadRequestException(`Không thể hủy đơn hàng đang ở trạng thái: ${order.status}`);
     }

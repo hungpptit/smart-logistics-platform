@@ -87,6 +87,42 @@ export class GeocodingService {
     return parseFloat(d.toFixed(2));
   }
 
+  public async autocomplete(input: string): Promise<any[]> {
+    const GOONG_API_KEY = process.env.GOONG_API_KEY;
+    if (!GOONG_API_KEY) {
+      return [];
+    }
+    try {
+      const url = `https://rsapi.goong.io/Place/Autocomplete?api_key=${GOONG_API_KEY}&input=${encodeURIComponent(input)}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = (await response.json()) as any;
+        return data.predictions || [];
+      }
+    } catch (error: any) {
+      console.warn('⚠️ Goong Autocomplete API lỗi:', error.message);
+    }
+    return [];
+  }
+
+  public async getPlaceDetail(placeId: string): Promise<any> {
+    const GOONG_API_KEY = process.env.GOONG_API_KEY;
+    if (!GOONG_API_KEY) {
+      return null;
+    }
+    try {
+      const url = `https://rsapi.goong.io/Place/Detail?place_id=${placeId}&api_key=${GOONG_API_KEY}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = (await response.json()) as any;
+        return data.result || null;
+      }
+    } catch (error: any) {
+      console.warn('⚠️ Goong Place Detail API lỗi:', error.message);
+    }
+    return null;
+  }
+
   private deg2rad(deg: number): number {
     return deg * (Math.PI / 180);
   }

@@ -454,6 +454,9 @@ Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Modul
 | `driver_license_class`| VarChar(10) | Hạng bằng lái xe cao nhất được cấp. VD: `B2`, `C`, `E` |
 | `hire_date` | Date | Ngày tuyển dụng vào công ty. VD: `2025-06-01` |
 | `employment_status`| Enum (DriverEmploymentStatus)| Trạng thái làm việc tài xế: `ACTIVE` (đang sẵn sàng chạy ca), `OFFLINE` (đang nghỉ ca), `SUSPENDED` (tạm dừng do vi phạm) |
+| `preferred_latitude`| DoublePrecision | Vĩ độ của điểm Driver Affinity (Khu vực hoạt động ưu tiên). VD: `10.7765` |
+| `preferred_longitude`| DoublePrecision| Kinh độ của điểm Driver Affinity (Khu vực hoạt động ưu tiên). VD: `106.7009` |
+| `driver_type` | Enum (DriverType) | Phân loại nhóm tài xế để phân luồng dịch vụ: `HUB_DELIVERY` (Tiêu chuẩn), `ON_DEMAND` (Hỏa tốc) |
 | `home_facility_id`| Uuid (FK) | Khóa ngoại xác định bưu cục/kho tài xế trực thuộc hoạt động chính, nối tới `facilities(id)`. |
 | `note` | Text | Ghi chú thêm về tài xế (Ví dụ: "Chuyên chạy xe tải đông lạnh tuyến dài") |
 | `created_at` | Timestamptz | Ngày tạo hồ sơ tài xế. |

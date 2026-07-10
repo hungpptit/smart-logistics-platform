@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
@@ -125,8 +126,8 @@ async function main() {
       serviceCode: 'STANDARD',
       serviceName: 'Giao hàng Tiêu chuẩn',
       basePrice: 20000.00,
-      freeDistanceKm: 2.0,
-      pricePerKm: 5000.00,
+      freeDistanceKm: 0.0,
+      pricePerKm: 0.00,
       freeWeightKg: 1.0,
       pricePerKg: 3000.00,
       estimatedDeliveryHours: 24,
@@ -138,8 +139,8 @@ async function main() {
       serviceCode: 'SAVING',
       serviceName: 'Giao hàng Tiết kiệm',
       basePrice: 15000.00,
-      freeDistanceKm: 2.0,
-      pricePerKm: 3000.00,
+      freeDistanceKm: 0.0,
+      pricePerKm: 0.00,
       freeWeightKg: 1.0,
       pricePerKg: 2000.00,
       estimatedDeliveryHours: 72,

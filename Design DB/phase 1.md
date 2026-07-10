@@ -78,7 +78,7 @@ graph TD
 ### Module 6 — Fleet & Driver Management
 **Mục tiêu:** Quản lý đội xe, phương tiện vận chuyển, hồ sơ tài xế và theo dõi vị trí.
 * **Các bảng (5 bảng):**
-  1. `Drivers`
+  1. `Drivers` (Có bổ sung `preferredLatitude`, `preferredLongitude` lưu tọa độ Driver Affinity Point; và `driverType` enum `HUB_DELIVERY`/`ON_DEMAND` để phân luồng dịch vụ)
   2. `Vehicles`
   3. `VehicleTypes` (Ví dụ: `Truck`, `Van`, `Motorbike`)
   4. `DriverVehicleAssignments` (Liên kết tài xế ↔ phương tiện)

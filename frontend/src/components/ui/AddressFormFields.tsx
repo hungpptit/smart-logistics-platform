@@ -14,6 +14,8 @@ interface AddressFormFieldsProps {
     ward: string;
     wardCode: string;
     addressLine1: string;
+    latitude?: number;
+    longitude?: number;
   }) => void;
   required?: boolean;
 }
@@ -31,6 +33,11 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
   const [loadingProvinces, setLoadingProvinces] = useState<boolean>(false);
   const [wards, setWards] = useState<any[]>([]);
   const [loadingWards, setLoadingWards] = useState<boolean>(false);
+
+  // Address Suggestions states
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState<boolean>(false);
 
   // Fetch all provinces
   useEffect(() => {
@@ -100,6 +107,34 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
     }
   }, [provinceCode, token]);
 
+  // Address suggestions autocomplete query with 500ms debounce
+  useEffect(() => {
+    if (!addressLine1 || addressLine1.length < 3 || !token) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setLoadingSuggestions(true);
+      try {
+        const res = await fetch(`${CONFIG.API_BASE_URL}/locations/autocomplete?input=${encodeURIComponent(addressLine1)}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setSuggestions(data.data || []);
+          setShowSuggestions(true);
+        }
+      } catch (err) {
+        console.error('Error fetching address suggestions:', err);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    }, 500); // 500ms debounce delay
+
+    return () => clearTimeout(timer);
+  }, [addressLine1, token]);
+
   const handleProvinceChange = (code: string) => {
     const matched = provinces.find((p) => p.code === code);
     onChange({
@@ -135,6 +170,76 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
     });
   };
 
+  const handleSelectSuggestion = async (suggestion: any) => {
+    setShowSuggestions(false);
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/locations/place-detail?placeId=${suggestion.place_id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.data) {
+        const detail = data.data;
+        const lat = detail.geometry?.location?.lat;
+        const lng = detail.geometry?.location?.lng;
+        const formattedAddress = detail.formatted_address || suggestion.description;
+
+        let matchedProvinceCode = provinceCode;
+        let matchedProvinceName = provinces.find(p => p.code === provinceCode)?.fullName || '';
+        let matchedWardCode = wardCode;
+        let matchedWardName = wards.find(w => w.code === wardCode)?.fullName || '';
+
+        if (detail.compound) {
+          const comp = detail.compound;
+          if (comp.province) {
+            const matchedP = provinces.find(
+              p => p.fullName?.toLowerCase().includes(comp.province.toLowerCase()) || 
+                   comp.province.toLowerCase().includes(p.fullName?.toLowerCase())
+            );
+            if (matchedP) {
+              matchedProvinceCode = matchedP.code;
+              matchedProvinceName = matchedP.fullName || matchedP.name;
+            }
+          }
+
+          if (matchedProvinceCode && comp.commune) {
+            try {
+              const wardsRes = await fetch(`${CONFIG.API_BASE_URL}/locations/provinces/${matchedProvinceCode}/wards`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              const wardsData = await wardsRes.json();
+              if (wardsRes.ok && wardsData.success) {
+                const matchedW = (wardsData.data || []).find(
+                  (w: any) => w.fullName?.toLowerCase().includes(comp.commune.toLowerCase()) ||
+                              comp.commune.toLowerCase().includes(w.fullName?.toLowerCase())
+                );
+                if (matchedW) {
+                  matchedWardCode = matchedW.code;
+                  matchedWardName = matchedW.fullName || matchedW.name;
+                }
+              }
+            } catch (err) {
+              console.error('Error matching ward:', err);
+            }
+          }
+        }
+
+        onChange({
+          province: matchedProvinceName,
+          provinceCode: matchedProvinceCode,
+          ward: matchedWardName,
+          wardCode: matchedWardCode,
+          addressLine1: formattedAddress,
+          latitude: lat,
+          longitude: lng
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching place detail:', err);
+    }
+  };
+
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
@@ -162,16 +267,33 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
           />
         </div>
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Địa chỉ chi tiết (Số nhà, đường)</label>
+      <div className="flex flex-col gap-1 relative">
+        <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+          Địa chỉ chi tiết (Số nhà, đường) {loadingSuggestions && <span className="text-[8px] text-gray-400 normal-case">(Đang tìm...)</span>}
+        </label>
         <input
           type="text"
           required={required}
           placeholder="Ví dụ: 123 Nguyễn Trãi"
           value={addressLine1}
           onChange={handleAddressLine1Change}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
           className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
         />
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#e2e8f0] rounded shadow-lg z-50 max-h-48 overflow-y-auto">
+            {suggestions.map((s, idx) => (
+              <div
+                key={idx}
+                onClick={() => handleSelectSuggestion(s)}
+                className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 text-[10px] text-gray-700 leading-snug"
+              >
+                {s.description}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

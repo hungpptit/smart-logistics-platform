@@ -104,13 +104,22 @@ interface Order {
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
   CREATED: { label: 'Đã tạo đơn', color: '#2563eb', bg: '#eff6ff' },
-  WAITING_PICKUP: { label: 'Chờ lấy hàng', color: '#d97706', bg: '#fef3c7' },
+  READY_FOR_PICKUP: { label: 'Chờ lấy hàng', color: '#d97706', bg: '#fef3c7' },
   PICKUP_ASSIGNED: { label: 'Đã phân công lấy hàng', color: '#4f46e5', bg: '#e0e7ff' },
   PICKING: { label: 'Đang lấy hàng', color: '#0891b2', bg: '#ecfeff' },
   PICK_FAILED: { label: 'Lấy hàng thất bại', color: '#dc2626', bg: '#fef2f2' },
   PICKED_UP: { label: 'Đã lấy hàng', color: '#16a34a', bg: '#f0fdf4' },
   ARRIVED_ORIGIN_FACILITY: { label: 'Đến kho gửi', color: '#059669', bg: '#ecfdf5' },
   READY_FOR_DISPATCH: { label: 'Sẵn sàng điều phối', color: '#7c3aed', bg: '#f5f3ff' },
+  IN_TRANSIT: { label: 'Đang vận chuyển', color: '#3b82f6', bg: '#dbeafe' },
+  AT_HUB: { label: 'Đã đến kho nhận', color: '#f59e0b', bg: '#fef3c7' },
+  OUT_FOR_DELIVERY: { label: 'Đang giao hàng', color: '#06b6d4', bg: '#e0f7fa' },
+  DELIVERED: { label: 'Giao hàng thành công', color: '#10b981', bg: '#d1fae5' },
+  DELIVERY_FAILED: { label: 'Giao hàng thất bại', color: '#ef4444', bg: '#fee2e2' },
+  RETURNING: { label: 'Đang chuyển hoàn', color: '#8b5cf6', bg: '#ede9fe' },
+  RETURNED: { label: 'Đã hoàn trả', color: '#6b7280', bg: '#f3f4f6' },
+  COMPLETED: { label: 'Đã hoàn thành', color: '#111827', bg: '#e5e7eb' },
+  CANCELLED: { label: 'Đã hủy đơn', color: '#9ca3af', bg: '#f3f4f6' },
 };
 
 export const OrderTab: React.FC = () => {
