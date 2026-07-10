@@ -118,9 +118,9 @@ export const ProfileTab: React.FC = () => {
                 <span className="text-gray-400 font-medium">Kho được phân công</span>
                 <span className="font-bold text-[#161D25] bg-[#F4F4F4] p-2 rounded border border-[#e2e8f0]">
                   {user.staffProfile?.assignedFacility?.facilityName ? (
-                    `📍 ${user.staffProfile.assignedFacility.facilityCode} - ${user.staffProfile.assignedFacility.facilityName}`
+                    `${user.staffProfile.assignedFacility.facilityCode} - ${user.staffProfile.assignedFacility.facilityName}`
                   ) : user.managedFacilities && user.managedFacilities.length > 0 ? (
-                    `📍 ${user.managedFacilities[0].facilityCode} - ${user.managedFacilities[0].facilityName}`
+                    `${user.managedFacilities[0].facilityCode} - ${user.managedFacilities[0].facilityName}`
                   ) : (
                     'Chưa được phân công kho'
                   )}

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { XCircle, MapPin } from 'lucide-react';
 import { useAuth } from '../../../../context/AuthContext';
-import { CONFIG } from '../../../../config';
-import { SearchableSelect } from '../../../../components/ui/SearchableSelect';
+import { AddressFormFields } from '../../../../components/ui/AddressFormFields';
 import { geocodeAddress } from '../../../../lib/geocoding';
 import { Map, MapMarker, MarkerContent, MapControls } from '../../../../components/ui/map';
 
@@ -38,11 +37,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   actionLoading
 }) => {
   const { token } = useAuth();
-  const [provinces, setProvinces] = useState<any[]>([]);
-  const [wards, setWards] = useState<any[]>([]);
   const [selectedProvinceCode, setSelectedProvinceCode] = useState<string>('');
-  const [loadingProvinces, setLoadingProvinces] = useState<boolean>(false);
-  const [loadingWards, setLoadingWards] = useState<boolean>(false);
 
   const [mapCenter, setMapCenter] = useState<[number, number]>([105.8542, 21.0285]);
   const [geocodingLoading, setGeocodingLoading] = useState<boolean>(false);
@@ -63,6 +58,8 @@ export const AddressModal: React.FC<AddressModalProps> = ({
           mapRef.current.resize();
         }, 300);
       }
+    } else {
+      setSelectedProvinceCode('');
     }
   }, [isOpen]);
 
@@ -107,11 +104,8 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   }, [setAddressFormData]);
 
   const handleAutoLocate = async () => {
-    const provinceObj = provinces.find(p => p.code === selectedProvinceCode);
-    const wardObj = wards.find(w => w.code === addressFormData.wardCode);
-    
-    const provinceName = provinceObj ? provinceObj.fullName : '';
-    const wardName = wardObj ? (wardObj.fullName || wardObj.name) : '';
+    const provinceName = addressFormData.province || '';
+    const wardName = addressFormData.ward || '';
     const line1 = addressFormData.addressLine1 || '';
 
     if (!provinceName && !wardName && !line1) return;
@@ -141,90 +135,6 @@ export const AddressModal: React.FC<AddressModalProps> = ({
     }
   };
 
-  // Fetch provinces when modal opens
-  useEffect(() => {
-    if (isOpen && token) {
-      const fetchProvinces = async () => {
-        setLoadingProvinces(true);
-        try {
-          const res = await fetch(`${CONFIG.API_BASE_URL}/locations/provinces`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await res.json();
-          if (res.ok && data.success) {
-            setProvinces(data.data || []);
-            
-            // If editing, try to find matching province and load its wards
-            const existingProvince = addressFormData.province;
-            if (existingProvince) {
-              const matched = (data.data || []).find((p: any) => 
-                p.fullName.toLowerCase() === existingProvince.toLowerCase() || 
-                p.name.toLowerCase() === existingProvince.toLowerCase()
-              );
-              if (matched) {
-                setSelectedProvinceCode(matched.code);
-              }
-            }
-          }
-        } catch (err) {
-          console.error('Error fetching provinces:', err);
-        } finally {
-          setLoadingProvinces(false);
-        }
-      };
-      fetchProvinces();
-    } else if (!isOpen) {
-      setProvinces([]);
-      setWards([]);
-      setSelectedProvinceCode('');
-    }
-  }, [isOpen, token, addressFormData.province]);
-
-  // Fetch wards when province code changes
-  useEffect(() => {
-    if (selectedProvinceCode && token) {
-      const fetchWards = async () => {
-        setLoadingWards(true);
-        try {
-          const res = await fetch(`${CONFIG.API_BASE_URL}/locations/provinces/${selectedProvinceCode}/wards`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await res.json();
-          if (res.ok && data.success) {
-            setWards(data.data || []);
-          }
-        } catch (err) {
-          console.error('Error fetching wards:', err);
-        } finally {
-          setLoadingWards(false);
-        }
-      };
-      fetchWards();
-    } else {
-      setWards([]);
-    }
-  }, [selectedProvinceCode, token]);
-
-  const handleProvinceChange = (code: string) => {
-    setSelectedProvinceCode(code);
-    const matched = provinces.find(p => p.code === code);
-    setAddressFormData((prev: any) => ({
-      ...prev,
-      province: matched ? matched.fullName : '',
-      ward: '',
-      wardCode: ''
-    }));
-  };
-
-  const handleWardChange = (code: string) => {
-    const matched = wards.find(w => w.code === code);
-    setAddressFormData((prev: any) => ({
-      ...prev,
-      ward: matched ? (matched.fullName || matched.name) : '',
-      wardCode: code
-    }));
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -243,43 +153,24 @@ export const AddressModal: React.FC<AddressModalProps> = ({
         </div>
 
         <form onSubmit={onSubmit} className="p-5 flex flex-col gap-4 text-xs">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Tỉnh / Thành phố</label>
-              <SearchableSelect
-                options={provinces.map(p => ({ value: p.code, label: p.fullName || p.name }))}
-                value={selectedProvinceCode}
-                onChange={handleProvinceChange}
-                placeholder="-- Chọn Tỉnh/TP --"
-                loading={loadingProvinces}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Phường / Xã</label>
-              <SearchableSelect
-                options={wards.map(w => ({ value: w.code, label: w.fullName || w.name }))}
-                value={addressFormData.wardCode || ''}
-                onChange={handleWardChange}
-                placeholder="-- Chọn Phường/Xã --"
-                disabled={!selectedProvinceCode}
-                loading={loadingWards}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Địa chỉ dòng 1 (Số nhà, Tên đường)</label>
-            <input
-              type="text"
-              required
-              placeholder="Ví dụ: 123 Nguyễn Huệ"
-              value={addressFormData.addressLine1}
-              onChange={(e) => setAddressFormData((prev: any) => ({ ...prev, addressLine1: e.target.value }))}
-              className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none focus:border-[#bc0100]"
-            />
-          </div>
+          <AddressFormFields
+            token={token}
+            provinceCode={selectedProvinceCode}
+            provinceName={addressFormData.province}
+            wardCode={addressFormData.wardCode || ''}
+            addressLine1={addressFormData.addressLine1}
+            onChange={({ province, provinceCode, ward, wardCode, addressLine1 }) => {
+              setSelectedProvinceCode(provinceCode);
+              setAddressFormData((prev: any) => ({
+                ...prev,
+                province,
+                ward,
+                wardCode,
+                addressLine1
+              }));
+            }}
+            required
+          />
 
           <div className="flex flex-col gap-1">
             <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Địa chỉ dòng 2 (Tên tòa nhà, Căn hộ - Tùy chọn)</label>

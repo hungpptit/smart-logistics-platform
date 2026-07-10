@@ -352,7 +352,7 @@ export const OrderTab: React.FC = () => {
         groups[facilityName].push(order);
       });
       return Object.entries(groups).map(([facilityName, list]) => ({
-        facilityName: `📍 Kho gửi: ${facilityName}`,
+        facilityName: `Kho gửi: ${facilityName}`,
         list
       }));
     }
@@ -484,7 +484,7 @@ export const OrderTab: React.FC = () => {
                         <td colSpan={7} className="px-6 py-3 text-xs font-bold text-[#bc0100] select-none align-middle">
                           <div className="flex items-center gap-1.5">
                             <span className="inline-block w-1.5 h-3 bg-[#bc0100] rounded-sm"></span>
-                            <span>📍 {group.facilityName}</span>
+                            <span>{group.facilityName}</span>
                             <span className="text-[10px] bg-[#bc0100]/10 text-[#bc0100] px-2 py-0.5 rounded-full font-medium ml-1">
                               {group.list.length} đơn hàng
                             </span>
@@ -498,9 +498,9 @@ export const OrderTab: React.FC = () => {
                             <td className="px-6 py-4 font-mono font-bold text-[#161D25]">{order.orderCode}</td>
                             <td className="px-6 py-4 font-medium">
                               {order.pickupType === 'PICKUP' ? (
-                                <span className="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded text-[10px]">🛵 Lấy tận nơi</span>
+                                <span className="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded text-[10px]">Lấy tận nơi</span>
                               ) : (
-                                <span className="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded text-[10px]">🏬 Gửi tại kho</span>
+                                <span className="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded text-[10px]">Gửi tại kho</span>
                               )}
                             </td>
                             <td className="px-6 py-4 font-medium text-gray-600">{order.service?.serviceName || 'N/A'}</td>
@@ -606,7 +606,7 @@ export const OrderTab: React.FC = () => {
                   <div>
                     <span className="text-[10px] text-gray-400 block font-medium">Hình thức gửi</span>
                     <span className="font-bold text-[#161D25]">
-                      {selectedOrder.pickupType === 'PICKUP' ? '🛵 Lấy tận nơi' : '🏬 Gửi tại kho'}
+                      {selectedOrder.pickupType === 'PICKUP' ? 'Lấy tận nơi' : 'Gửi tại kho'}
                     </span>
                   </div>
                   <div className="text-right">
@@ -633,7 +633,7 @@ export const OrderTab: React.FC = () => {
                       <p className="text-gray-500 mt-0.5 leading-relaxed">{selectedOrder.pickupAddressText}</p>
                       {selectedOrder.originFacility && (
                         <p className="text-blue-600 font-bold text-[10px] mt-1.5 flex items-center gap-1">
-                          🏬 Kho xử lý gửi: {selectedOrder.originFacility.facilityName}
+                          Kho xử lý gửi: {selectedOrder.originFacility.facilityName}
                         </p>
                       )}
                     </div>
@@ -649,7 +649,7 @@ export const OrderTab: React.FC = () => {
                       <p className="text-gray-500 mt-0.5 leading-relaxed">{selectedOrder.deliveryAddressText}</p>
                       {selectedOrder.destinationFacility && (
                         <p className="text-green-600 font-bold text-[10px] mt-1.5 flex items-center gap-1">
-                          🏬 Kho xử lý nhận: {selectedOrder.destinationFacility.facilityName}
+                          Kho xử lý nhận: {selectedOrder.destinationFacility.facilityName}
                         </p>
                       )}
                     </div>
