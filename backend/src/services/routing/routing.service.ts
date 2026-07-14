@@ -243,4 +243,128 @@ export class RoutingService {
 
     return createdRoutes;
   }
+
+  /**
+   * Fetch all routes based on optional filters.
+   */
+  public async getAllRoutes(filters: { status?: any; facilityId?: string; driverId?: string }) {
+    const where: any = {};
+    if (filters.status) {
+      where.status = filters.status;
+    }
+    if (filters.facilityId) {
+      where.startFacilityId = filters.facilityId;
+    }
+    if (filters.driverId) {
+      where.driverVehicleAssignment = {
+        driverId: filters.driverId,
+      };
+    }
+
+    return await prisma.route.findMany({
+      where,
+      include: {
+        startFacility: {
+          select: {
+            id: true,
+            facilityCode: true,
+            facilityName: true,
+          },
+        },
+        driverVehicleAssignment: {
+          include: {
+            driver: {
+              select: {
+                id: true,
+                employeeCode: true,
+                fullName: true,
+                phone: true,
+              },
+            },
+            vehicle: {
+              select: {
+                id: true,
+                vehicleCode: true,
+                licensePlate: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  /**
+   * Fetch a route by ID, including its stops, driver info, and current real-time location from Redis.
+   */
+  public async getRouteDetail(routeId: string) {
+    const route = await prisma.route.findUnique({
+      where: { id: routeId },
+      include: {
+        startFacility: {
+          select: {
+            id: true,
+            facilityCode: true,
+            facilityName: true,
+          },
+        },
+        endFacility: {
+          select: {
+            id: true,
+            facilityCode: true,
+            facilityName: true,
+          },
+        },
+        driverVehicleAssignment: {
+          include: {
+            driver: {
+              select: {
+                id: true,
+                employeeCode: true,
+                fullName: true,
+                phone: true,
+              },
+            },
+            vehicle: {
+              select: {
+                id: true,
+                vehicleCode: true,
+                licensePlate: true,
+              },
+            },
+          },
+        },
+        stops: {
+          orderBy: {
+            sequence: 'asc',
+          },
+        },
+      },
+    });
+
+    if (!route) {
+      throw new NotFoundException('Không tìm thấy thông tin lộ trình');
+    }
+
+    // Query real-time GPS location from Redis
+    let currentGpsLocation = null;
+    try {
+      const { redis } = await import('../../config/redis.js');
+      const gpsDataStr = await redis.get(`driver:location:${routeId}`);
+      if (gpsDataStr) {
+        currentGpsLocation = JSON.parse(gpsDataStr);
+      }
+    } catch (err) {
+      console.error('[RoutingService] Error fetching driver location from Redis:', err);
+    }
+
+    return {
+      ...route,
+      currentGpsLocation,
+    };
+  }
 }
+

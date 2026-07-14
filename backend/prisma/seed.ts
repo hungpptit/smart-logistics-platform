@@ -185,7 +185,7 @@ async function main() {
   // 6. Seed System Settings
   console.log('⚙️ Seeding System Settings...');
   const systemSettings = [
-    { settingKey: 'GPS_INTERVAL_SECONDS', settingValue: '5', valueType: 'INTEGER', category: 'GPS', description: 'Khoảng thời gian định kỳ (giây) chạy ngầm gửi vị trí GPS của Shipper.', isEditable: true, isActive: true },
+    { settingKey: 'GPS_INTERVAL_SECONDS', settingValue: '10', valueType: 'INTEGER', category: 'GPS', description: 'Khoảng thời gian định kỳ (giây) chạy ngầm gửi vị trí GPS của Shipper.', isEditable: true, isActive: true },
     { settingKey: 'ETA_REFRESH_INTERVAL_MIN', settingValue: '5', valueType: 'INTEGER', category: 'ROUTING', description: 'Chu kỳ tính toán lại thời gian dự kiến giao hàng (ETA) cho các stop.', isEditable: true, isActive: true },
     { settingKey: 'POPULATION_SIZE', settingValue: '100', valueType: 'INTEGER', category: 'AI', description: 'Kích thước quần thể khởi tạo cho thuật toán Genetic Algorithm (GA).', isEditable: true, isActive: true },
     { settingKey: 'MUTATION_RATE', settingValue: '0.15', valueType: 'DECIMAL', category: 'AI', description: 'Tần suất đột biến của thuật toán Genetic Algorithm (GA).', isEditable: true, isActive: true },

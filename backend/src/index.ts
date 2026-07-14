@@ -10,6 +10,8 @@ import { connectRedis } from './config/redis';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import { mailWorker } from './workers/mail.worker';
+import { TrackingGateway } from './gateways/tracking.gateway';
+import { locationWorker } from './workers/location.worker';
 
 dotenv.config();
 
@@ -41,14 +43,8 @@ app.get('/health', (req, res) => {
   res.json({ success: true, status: 'ok', service: 'Smart Logistics API' });
 });
 
-// Real-time Gateway connection
-io.on('connection', (socket) => {
-  console.log(`Client connected: ${socket.id}`);
-  
-  socket.on('disconnect', () => {
-    console.log(`Client disconnected: ${socket.id}`);
-  });
-});
+// Initialize real-time Gateway
+new TrackingGateway(io);
 
 // Error handling middleware (must be registered last)
 app.use(errorMiddleware);
@@ -56,6 +52,7 @@ app.use(errorMiddleware);
 const startServer = async () => {
   await connectRedis();
   await mailWorker.start();
+  locationWorker.start(); // Start GPS synchronization background worker
   httpServer.listen(PORT, () => {
     console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
     console.log(`📚 API Swagger Docs available at http://localhost:${PORT}/api-docs`);
@@ -64,3 +61,4 @@ const startServer = async () => {
 
 startServer();
 // Hot reload trigger
+

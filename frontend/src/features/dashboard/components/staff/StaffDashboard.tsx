@@ -1,10 +1,11 @@
 import React from 'react';
-import { Package, Users, Building2, User } from 'lucide-react';
+import { Package, Users, Building2, User, Earth } from 'lucide-react';
 import { DashboardShell } from '../layouts/DashboardShell';
 import type { MenuItem } from '../layouts/Sidebar';
 import { OrderTab } from '../OrderTab';
 import { CustomerTab } from '../CustomerTab';
 import { FacilityTab } from '../FacilityTab';
+import { LiveTrackingTab } from '../LiveTrackingTab';
 
 interface StaffDashboardProps {
   onBackToHome?: () => void;
@@ -17,6 +18,13 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onBackToHome }) 
       label: 'Quản lý Đơn hàng',
       icon: Package,
       component: OrderTab,
+      allowed: true,
+    },
+    {
+      id: 'live-tracking',
+      label: 'Giám sát Lộ trình',
+      icon: Earth,
+      component: LiveTrackingTab,
       allowed: true,
     },
     {

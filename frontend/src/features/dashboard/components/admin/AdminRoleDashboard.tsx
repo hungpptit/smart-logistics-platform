@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Building2, User, Settings, Package, Truck, UserCheck } from 'lucide-react';
+import { Users, Building2, User, Settings, Package, Truck, UserCheck, Earth } from 'lucide-react';
 import { DashboardShell } from '../layouts/DashboardShell';
 import type { MenuItem } from '../layouts/Sidebar';
 import { OrderTab } from '../OrderTab';
@@ -8,6 +8,7 @@ import { FacilityTab } from '../FacilityTab';
 import { SystemConfigTab } from './SystemConfigTab';
 import { DriverTab } from '../DriverTab';
 import { StaffTab } from '../StaffTab';
+import { LiveTrackingTab } from '../LiveTrackingTab';
 
 interface AdminRoleDashboardProps {
   onBackToHome?: () => void;
@@ -20,6 +21,13 @@ export const AdminRoleDashboard: React.FC<AdminRoleDashboardProps> = ({ onBackTo
       label: 'Quản lý Đơn hàng',
       icon: Package,
       component: OrderTab,
+      allowed: true,
+    },
+    {
+      id: 'live-tracking',
+      label: 'Giám sát Lộ trình',
+      icon: Earth,
+      component: LiveTrackingTab,
       allowed: true,
     },
     {

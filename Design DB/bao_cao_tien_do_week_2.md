@@ -27,11 +27,18 @@
     *   Viết tài liệu **Swagger OpenAPI Spec** chi tiết cho toàn bộ APIs cốt lõi.
     *   Xây dựng bộ kiểm thử tích hợp (Integration Tests) bằng Postman Collection.
 
+    *Ảnh minh họa:*
+    ![Tài liệu Swagger OpenAPI & Postman Tests](file:///D:/smart-logistics-platform/Design%20DB/screenshots/swagger_postman_api.png)
+
 ### 2. Phân hệ Frontend Web (Thành viên 2)
 *   **Landing Page & Tra cứu nhanh:** 
     *   Thiết kế và xây dựng giao diện Landing Page giới thiệu dịch vụ logistics trực quan.
     *   Tích hợp tính năng **Tra cứu vận đơn** nhanh (hiển thị timeline trạng thái đơn hàng thời gian thực).
     *   Công cụ ước tính cước phí nhanh (Rule-based Calculator) tiện lợi cho khách hàng vãng lai.
+    
+    *Ảnh minh họa:*
+    ![Landing Page & Tính năng tra cứu nhanh](file:///D:/smart-logistics-platform/Design%20DB/screenshots/landing_page_tracking.png)
+
 *   **Giao diện Đăng nhập & Route Guards:**
     *   Xây dựng Form đăng nhập an toàn kết hợp quản lý trạng thái JWT bằng Zustand.
     *   Triển khai **Route Guards** ở phía Frontend để ngăn chặn truy cập trái phép và ẩn/hiển thị các mục menu điều phối dựa trên quyền của tài khoản.
@@ -40,12 +47,18 @@
     *   Trang quản lý mạng lưới **Kho bãi & Phân khu hàng hóa** dành cho Admin.
     *   Màn hình danh sách đơn hàng toàn cục cho phép nhân viên cập nhật nhanh trạng thái đơn hàng và kiểm tra thông tin chi tiết kiện hàng.
 
+    *Ảnh minh họa:*
+    ![Bảng điều khiển Quản trị - Quản lý Khách hàng & Kho bãi](file:///D:/smart-logistics-platform/Design%20DB/screenshots/admin_dashboard.png)
+
 ### 3. Phân hệ Ứng dụng Di động cho Khách hàng (Thành viên 3)
 *   **Auth di động:** Hoàn thành giao diện Đăng nhập, Đăng ký và Quên mật khẩu.
 *   **Giao diện Tạo đơn & Tracking:**
     *   Xây dựng luồng tạo đơn hàng chi tiết (lẻ/hàng loạt) tự động điền địa chỉ thông qua Autocomplete API và tính phí trước (Pre-calculation).
     *   Hiển thị mã QR Code vận đơn để hỗ trợ nhân viên quét mã nhận hàng.
     *   Trang quản lý đơn hàng của tôi, xem chi tiết timeline trạng thái di chuyển và hỗ trợ hủy đơn trước khi bốc hàng.
+
+    *Ảnh minh họa:*
+    ![Giao diện Mobile App - Đăng nhập & Tạo đơn hàng](file:///D:/smart-logistics-platform/Design%20DB/screenshots/mobile_app_flow.png)
 
 ---
 
@@ -60,11 +73,4 @@
 
 ---
 
-## III. KẾ HOẠCH HÀNH ĐỘNG TUẦN 3 (WEEK 3 SPRINT PLAN)
-**Mục tiêu:** Tập trung vào phân hệ vận hành logistics thực địa (Shipment, Fleet, Route) và khởi tạo kết nối realtime (Socket.io + Redis Gateway).
 
-1.  **Quản lý Vận đơn (Shipment):** Xây dựng APIs gom kiện hàng (Packages) vào vận đơn tổng (Shipment).
-2.  **Quản lý Đội xe & Tài xế:** Hồ sơ phương tiện (`Vehicles`), hồ sơ tài xế (`Drivers`) và gán phương tiện (`DriverVehicleAssignments`).
-3.  **Lập tuyến thủ công (Manual Routing):** APIs tạo tuyến chạy (`Routes`) và thứ tự các điểm dừng (`RouteStops`).
-4.  **Real-time Tracking Setup:** Cấu hình Socket.io Server kết nối với Redis Cache để chuẩn bị nhận tọa độ GPS từ Driver App mỗi 3-5 giây.
-5.  **App Shipper Mobile:** Phát triển giao diện cho tài xế nhận tuyến chạy trong ngày, check-in điểm dừng và quét QR xác nhận giao hàng.

@@ -43,4 +43,66 @@ router.post(
   routingController.optimize
 );
 
+/**
+ * @openapi
+ * /routes:
+ *   get:
+ *     tags:
+ *       - Routing
+ *     summary: Lấy danh sách toàn bộ lộ trình
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Trạng thái lộ trình (PLANNED, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED)
+ *       - in: query
+ *         name: facilityId
+ *         schema:
+ *           type: string
+ *         description: ID kho bãi xuất phát
+ *       - in: query
+ *         name: driverId
+ *         schema:
+ *           type: string
+ *         description: ID tài xế
+ *     responses:
+ *       200:
+ *         description: Danh sách lộ trình
+ */
+router.get(
+  '/',
+  requireRoles(['ADMIN', 'STAFF', 'SHIPPER']),
+  routingController.getRoutes
+);
+
+/**
+ * @openapi
+ * /routes/{id}:
+ *   get:
+ *     tags:
+ *       - Routing
+ *     summary: Lấy chi tiết lộ trình kèm định vị GPS thời gian thực từ Redis
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Chi tiết lộ trình và tọa độ tài xế thời gian thực
+ */
+router.get(
+  '/:id',
+  requireRoles(['ADMIN', 'STAFF', 'SHIPPER']),
+  routingController.getRouteById
+);
+
 export default router;
+

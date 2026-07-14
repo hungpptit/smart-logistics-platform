@@ -17,6 +17,15 @@ const options: swaggerJsdoc.Options = {
         description: 'Cổng API Cục bộ (Local Development)',
       },
     ],
+    tags: [
+      { name: 'Authentication', description: 'Các API xác thực, đăng nhập và quản lý phiên làm việc' },
+      { name: 'Customers', description: 'Quản lý thông tin khách hàng và sổ địa chỉ' },
+      { name: 'Facilities', description: 'Quản lý mạng lưới bưu cục, kho bãi và phân khu hàng hóa' },
+      { name: 'Orders', description: 'Tạo đơn hàng, tra cứu vận đơn, tính phí cước và xử lý kiện hàng' },
+      { name: 'Drivers', description: 'Quản lý hồ sơ tài xế và phân bổ phương tiện' },
+      { name: 'Routing', description: 'Định tuyến tự động bằng thuật toán AI và thủ công' },
+      { name: 'Settings', description: 'Các cấu hình tham số hệ thống' }
+    ],
     components: {
       securitySchemes: {
         bearerAuth: {

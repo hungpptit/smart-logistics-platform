@@ -27,4 +27,37 @@ export class RoutingController {
       next(error);
     }
   };
+
+  public getRoutes = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { status, facilityId, driverId } = req.query;
+      const routes = await this.routingService.getAllRoutes({
+        status: status as string,
+        facilityId: facilityId as string,
+        driverId: driverId as string,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: routes,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public getRouteById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const routeDetail = await this.routingService.getRouteDetail(id);
+
+      return res.status(200).json({
+        success: true,
+        data: routeDetail,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
+
