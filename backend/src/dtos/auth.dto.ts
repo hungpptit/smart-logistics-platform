@@ -47,3 +47,30 @@ export class ChangePasswordDto {
   @MinLength(6, { message: 'Mật khẩu mới phải có ít nhất 6 ký tự' })
   newPassword!: string;
 }
+
+export class ForgotPasswordDto {
+  @IsEmail({}, { message: 'Địa chỉ email không hợp lệ' })
+  email!: string;
+}
+
+export class ResetPasswordDto {
+  @IsEmail({}, { message: 'Địa chỉ email không hợp lệ' })
+  email!: string;
+
+  @IsString({ message: 'Mã OTP phải là một chuỗi ký tự' })
+  otp!: string;
+
+  @IsString({ message: 'Mật khẩu mới phải là một chuỗi ký tự' })
+  @MinLength(6, { message: 'Mật khẩu mới phải có ít nhất 6 ký tự' })
+  newPassword!: string;
+}
+
+export class VerifyForgotOtpDto {
+  @IsEmail({}, { message: 'Địa chỉ email không hợp lệ' })
+  email!: string;
+
+  @IsString({ message: 'Mã OTP phải là một chuỗi ký tự' })
+  otp!: string;
+}
+
+

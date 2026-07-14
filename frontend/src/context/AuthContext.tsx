@@ -16,6 +16,9 @@ interface AuthContextType {
   }) => Promise<{ success: boolean; message: string; errors?: any[] }>;
   verifyOtp: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
   changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
+  forgotPassword: (email: string) => Promise<{ success: boolean; message: string }>;
+  verifyForgotOtp: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
+  resetPassword: (email: string, otp: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
 }
 
@@ -228,6 +231,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const handleForgotPassword = async (email: string) => {
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const resData = await response.json();
+      if (response.ok && resData.success) {
+        return { success: true, message: resData.message || 'Mã OTP đã được gửi đến email của bạn.' };
+      } else {
+        return { success: false, message: resData.message || 'Yêu cầu thất bại.' };
+      }
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      return { success: false, message: 'Không thể kết nối đến máy chủ backend.' };
+    }
+  };
+
+  const handleVerifyForgotOtp = async (email: string, otp: string) => {
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/auth/verify-forgot-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, otp }),
+      });
+
+      const resData = await response.json();
+      if (response.ok && resData.success) {
+        return { success: true, message: resData.message || 'Xác thực OTP thành công!' };
+      } else {
+        return { success: false, message: resData.message || 'Mã OTP không hợp lệ hoặc đã hết hạn.' };
+      }
+    } catch (error) {
+      console.error('Verify forgot OTP error:', error);
+      return { success: false, message: 'Không thể kết nối đến máy chủ backend.' };
+    }
+  };
+
+  const handleResetPassword = async (email: string, otp: string, newPassword: string) => {
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, otp, newPassword }),
+      });
+
+      const resData = await response.json();
+      if (response.ok && resData.success) {
+        return { success: true, message: resData.message || 'Đặt lại mật khẩu thành công!' };
+      } else {
+        return { success: false, message: resData.message || 'Đặt lại mật khẩu thất bại.' };
+      }
+    } catch (error) {
+      console.error('Reset password error:', error);
+      return { success: false, message: 'Không thể kết nối đến máy chủ backend.' };
+    }
+  };
+
   const handleLogout = async () => {
     try {
       if (token) {
@@ -258,6 +327,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register: handleRegister,
         verifyOtp: handleVerifyOtp,
         changePassword: handleChangePassword,
+        forgotPassword: handleForgotPassword,
+        verifyForgotOtp: handleVerifyForgotOtp,
+        resetPassword: handleResetPassword,
         logout: handleLogout,
       }}
     >

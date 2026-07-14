@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prisma';
 import { redis } from '../config/redis';
-import { RegisterDto, LoginDto, RefreshTokenDto, ChangePasswordDto } from '../dtos/auth.dto';
+import { RegisterDto, LoginDto, RefreshTokenDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto, VerifyForgotOtpDto } from '../dtos/auth.dto';
 import { BadRequestException, UnauthorizedException, NotFoundException } from '../middlewares/error.middleware';
 import { rabbitMQService } from './rabbitmq.service';
 
@@ -451,6 +451,113 @@ export class AuthService {
     });
 
     return { success: true, message: 'Đổi mật khẩu thành công!' };
+  }
+
+  /**
+   * Request forgot password OTP
+   */
+  public async forgotPassword(dto: ForgotPasswordDto) {
+    // 1. Find user by email
+    const user = await prisma.user.findFirst({
+      where: {
+        email: dto.email,
+        deletedAt: null,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy tài khoản người dùng tương ứng với email này');
+    }
+
+    if (user.status !== 'ACTIVE') {
+      throw new BadRequestException(`Tài khoản của bạn đang ở trạng thái ${user.status.toLowerCase()} và không thể khôi phục mật khẩu`);
+    }
+
+    // 2. Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 3. Save OTP in Redis (Expires in 5 minutes)
+    await redis.setEx(`otp:forgot-password:${dto.email}`, 300, otp);
+
+    // 4. Publish to RabbitMQ mail_queue
+    await rabbitMQService.publishToQueue('mail_queue', {
+      type: 'FORGOT_PASSWORD_OTP',
+      email: dto.email,
+      username: user.username,
+      otp,
+    });
+
+    return {
+      success: true,
+      message: 'Mã OTP khôi phục mật khẩu đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư.',
+    };
+  }
+
+  /**
+   * Reset password using OTP
+   */
+  public async resetPassword(dto: ResetPasswordDto) {
+    // 1. Get OTP from Redis
+    const cachedOtp = await redis.get(`otp:forgot-password:${dto.email}`);
+    if (!cachedOtp) {
+      throw new BadRequestException('Mã OTP đã hết hạn hoặc không tồn tại. Vui lòng gửi lại yêu cầu.');
+    }
+
+    if (cachedOtp !== dto.otp) {
+      throw new BadRequestException('Mã OTP không chính xác. Vui lòng kiểm tra lại.');
+    }
+
+    // 2. Find user
+    const user = await prisma.user.findFirst({
+      where: {
+        email: dto.email,
+        deletedAt: null,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy tài khoản người dùng tương ứng');
+    }
+
+    // 3. Hash new password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(dto.newPassword, saltRounds);
+
+    // 4. Update user password
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    // 5. Delete OTP from Redis
+    await redis.del(`otp:forgot-password:${dto.email}`);
+
+    // 6. Optionally revoke existing refresh tokens to force re-login on all devices
+    await redis.del(`refresh_token:${user.id}`);
+
+    return {
+      success: true,
+      message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.',
+    };
+  }
+
+  /**
+   * Verify forgot password OTP
+   */
+  public async verifyForgotOtp(dto: VerifyForgotOtpDto) {
+    const cachedOtp = await redis.get(`otp:forgot-password:${dto.email}`);
+    if (!cachedOtp) {
+      throw new BadRequestException('Mã OTP đã hết hạn hoặc không tồn tại. Vui lòng gửi lại yêu cầu.');
+    }
+
+    if (cachedOtp !== dto.otp) {
+      throw new BadRequestException('Mã OTP không chính xác. Vui lòng kiểm tra lại.');
+    }
+
+    return {
+      success: true,
+      message: 'Xác thực mã OTP thành công.',
+    };
   }
 }
 

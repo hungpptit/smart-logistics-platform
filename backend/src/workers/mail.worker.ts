@@ -40,6 +40,8 @@ class MailWorker {
             await this.sendCustomerWelcomeEmail(content);
           } else if (content.type === 'SEND_OTP') {
             await this.sendOtpEmail(content);
+          } else if (content.type === 'FORGOT_PASSWORD_OTP') {
+            await this.sendForgotPasswordOtpEmail(content);
           }
 
           channel.ack(msg);
@@ -171,6 +173,49 @@ class MailWorker {
 
     await this.transporter.sendMail(mailOptions);
     console.log(`[MailWorker] Verification OTP email successfully sent to ${data.email}`);
+  }
+
+  private async sendForgotPasswordOtpEmail(data: {
+    email: string;
+    username: string;
+    otp: string;
+  }) {
+    const mailOptions = {
+      from: `"Velocity Logistics" <${process.env.EMAIL_USER}>`,
+      to: data.email,
+      subject: `[Velocity Logistics] Yêu cầu khôi phục mật khẩu`,
+      html: `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          <div style="background-color: #bc0100; padding: 24px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px;">Velocity Logistics</h1>
+            <p style="margin: 4px 0 0 0; font-size: 12px; opacity: 0.85;">Khôi Phục Mật Khẩu</p>
+          </div>
+          
+          <div style="padding: 24px; background-color: #ffffff; color: #1a202c; line-height: 1.6;">
+            <h3 style="margin-top: 0; color: #bc0100;">Xin chào ${data.username},</h3>
+            <p>Chúng tôi nhận được yêu cầu khôi phục mật khẩu cho tài khoản của bạn. Vui lòng sử dụng mã OTP dưới đây để tiến hành thiết lập lại mật khẩu:</p>
+            
+            <div style="background-color: #f7fafc; border: 1px solid #edf2f7; padding: 20px; border-radius: 6px; margin: 20px 0; text-align: center;">
+              <span style="font-family: monospace; font-size: 32px; font-weight: bold; color: #bc0100; letter-spacing: 6px; display: inline-block;">${data.otp}</span>
+            </div>
+            
+            <p style="background-color: #fffaf0; border-left: 4px solid #dd6b20; padding: 12px; border-radius: 4px; font-size: 13px; color: #7b341e; margin-bottom: 20px;">
+              <strong>* Lưu ý bảo mật:</strong> Mã OTP này sẽ có hiệu lực trong vòng <strong>5 phút</strong>. Vui lòng không chia sẻ mã này cho bất kỳ ai khác.
+            </p>
+            
+            <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này hoặc liên hệ hỗ trợ nếu nghi ngờ tài khoản bị xâm nhập.</p>
+          </div>
+          
+          <div style="background-color: #f7fafc; padding: 16px; text-align: center; font-size: 11px; color: #a0aec0; border-top: 1px solid #edf2f7;">
+            <p style="margin: 0;">Đây là email tự động từ hệ thống. Vui lòng không trả lời thư này.</p>
+            <p style="margin: 4px 0 0 0;">&copy; 2026 Velocity Logistics. All Rights Reserved.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    await this.transporter.sendMail(mailOptions);
+    console.log(`[MailWorker] Forgot password OTP email successfully sent to ${data.email}`);
   }
 
   private async sendCustomerWelcomeEmail(data: {

@@ -3,7 +3,7 @@ import { AuthController } from '../controllers/auth.controller';
 import { validationMiddleware } from '../middlewares/validation.middleware';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { rateLimiter } from '../middlewares/rateLimiter.middleware';
-import { RegisterDto, LoginDto, RefreshTokenDto, ChangePasswordDto } from '../dtos/auth.dto';
+import { RegisterDto, LoginDto, RefreshTokenDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto, VerifyForgotOtpDto } from '../dtos/auth.dto';
 
 const router = Router();
 const authController = new AuthController();
@@ -244,6 +244,125 @@ router.post(
   authMiddleware,
   validationMiddleware(ChangePasswordDto),
   authController.changePassword
+);
+
+/**
+ * @openapi
+ * /auth/forgot-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Yêu cầu mã OTP khôi phục mật khẩu
+ *     description: Gửi email để nhận mã OTP khôi phục mật khẩu tài khoản.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: customer@gmail.com
+ *     responses:
+ *       200:
+ *         description: Mã OTP đã được gửi đến email thành công
+ *       400:
+ *         description: Tài khoản không hợp lệ hoặc không ở trạng thái ACTIVE
+ *       404:
+ *         description: Không tìm thấy tài khoản người dùng tương ứng với email
+ */
+router.post(
+  '/forgot-password',
+  rateLimiter(5, 60 * 1000),
+  validationMiddleware(ForgotPasswordDto),
+  authController.forgotPassword
+);
+
+/**
+ * @openapi
+ * /auth/reset-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Thiết lập lại mật khẩu mới sử dụng mã OTP
+ *     description: Xác thực mã OTP và cập nhật mật khẩu mới của người dùng.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - otp
+ *               - newPassword
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: customer@gmail.com
+ *               otp:
+ *                 type: string
+ *                 example: "123456"
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 example: newPassword123
+ *     responses:
+ *       200:
+ *         description: Đặt lại mật khẩu thành công
+ *       400:
+ *         description: Mã OTP không chính xác, đã hết hạn hoặc mật khẩu không hợp lệ
+ *       404:
+ *         description: Không tìm thấy tài khoản người dùng tương ứng
+ */
+router.post(
+  '/reset-password',
+  rateLimiter(5, 60 * 1000),
+  validationMiddleware(ResetPasswordDto),
+  authController.resetPassword
+);
+
+/**
+ * @openapi
+ * /auth/verify-forgot-otp:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Xác thực mã OTP khôi phục mật khẩu
+ *     description: Xác minh mã OTP trước khi chuyển sang bước đặt mật khẩu mới.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - otp
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: customer@gmail.com
+ *               otp:
+ *                 type: string
+ *                 example: "123456"
+ *     responses:
+ *       200:
+ *         description: Xác thực OTP thành công
+ *       400:
+ *         description: Mã OTP không chính xác hoặc đã hết hạn
+ */
+router.post(
+  '/verify-forgot-otp',
+  rateLimiter(5, 60 * 1000),
+  validationMiddleware(VerifyForgotOtpDto),
+  authController.verifyForgotOtp
 );
 
 export default router;
