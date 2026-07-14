@@ -23,7 +23,7 @@ export const authMiddleware = async (
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Authentication token missing or invalid');
+      throw new UnauthorizedException('Thiếu token xác thực hoặc token không hợp lệ');
     }
 
     const token = authHeader.split(' ')[1];
@@ -33,7 +33,7 @@ export const authMiddleware = async (
     try {
       decoded = jwt.verify(token, jwtSecret);
     } catch (err) {
-      throw new UnauthorizedException('Invalid or expired authentication token');
+      throw new UnauthorizedException('Token xác thực không hợp lệ hoặc đã hết hạn');
     }
 
     // Fetch user details with roles and permissions to ensure they are active and valid
@@ -57,11 +57,11 @@ export const authMiddleware = async (
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found or deactivated');
+      throw new UnauthorizedException('Người dùng không tồn tại hoặc đã bị ngừng hoạt động');
     }
 
     if (user.status !== 'ACTIVE') {
-      throw new ForbiddenException('User account is locked or disabled');
+      throw new ForbiddenException('Tài khoản người dùng đã bị khóa hoặc bị vô hiệu hóa');
     }
 
     // Extract roles and flat map permissions
@@ -93,7 +93,7 @@ export const requirePermissions = (requiredPermissions: string[]) => {
   return (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        throw new UnauthorizedException('User authentication required');
+        throw new UnauthorizedException('Yêu cầu xác thực tài khoản người dùng');
       }
 
       // Admin has absolute access bypass
@@ -106,7 +106,7 @@ export const requirePermissions = (requiredPermissions: string[]) => {
       );
 
       if (!hasAllPermissions) {
-        throw new ForbiddenException('You do not have the required permissions to perform this action');
+        throw new ForbiddenException('Bạn không có đủ quyền hạn để thực hiện hành động này');
       }
 
       next();
@@ -121,13 +121,13 @@ export const requireRoles = (allowedRoles: string[]) => {
   return (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        throw new UnauthorizedException('User authentication required');
+        throw new UnauthorizedException('Yêu cầu xác thực tài khoản người dùng');
       }
 
       const hasRole = allowedRoles.some((role) => req.user?.roles.includes(role));
 
       if (!hasRole) {
-        throw new ForbiddenException('You do not have the required role to access this resource');
+        throw new ForbiddenException('Bạn không có vai trò phù hợp để truy cập tài nguyên này');
       }
 
       next();

@@ -13,7 +13,7 @@ export const validationMiddleware = (type: any, skipMissingProperties = false) =
         field: error.property,
         constraints: Object.values(error.constraints || {}),
       }));
-      next(new BadRequestException('Validation failed', formattedErrors));
+      next(new BadRequestException('Dữ liệu không hợp lệ', formattedErrors));
     } else {
       req.body = dtoInstance;
       next();

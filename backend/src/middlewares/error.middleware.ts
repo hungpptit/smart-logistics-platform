@@ -13,25 +13,25 @@ export class HttpException extends Error {
 }
 
 export class BadRequestException extends HttpException {
-  constructor(message: string = 'Bad Request', errors?: any[]) {
+  constructor(message: string = 'Yêu cầu không hợp lệ', errors?: any[]) {
     super(400, message, errors);
   }
 }
 
 export class UnauthorizedException extends HttpException {
-  constructor(message: string = 'Unauthorized') {
+  constructor(message: string = 'Không có quyền truy cập (Chưa đăng nhập hoặc phiên làm việc hết hạn)') {
     super(401, message);
   }
 }
 
 export class ForbiddenException extends HttpException {
-  constructor(message: string = 'Forbidden') {
+  constructor(message: string = 'Bạn không có quyền truy cập tài nguyên này') {
     super(403, message);
   }
 }
 
 export class NotFoundException extends HttpException {
-  constructor(message: string = 'Not Found') {
+  constructor(message: string = 'Không tìm thấy tài nguyên yêu cầu') {
     super(404, message);
   }
 }
@@ -43,7 +43,7 @@ export const errorMiddleware = (
   next: NextFunction
 ) => {
   const status = error.status || 500;
-  const message = error.message || 'Something went wrong';
+  const message = error.message || 'Có lỗi xảy ra trên hệ thống';
   const errors = error.errors || [];
 
   console.error(`[Error] ${req.method} ${req.url} - Status: ${status} - Message: ${message}`);
