@@ -7,8 +7,10 @@ import { CustomerTab } from '../CustomerTab';
 import { FacilityTab } from '../FacilityTab';
 import { SystemConfigTab } from './SystemConfigTab';
 import { DriverTab } from '../DriverTab';
+import { VehicleTab } from '../VehicleTab';
 import { StaffTab } from '../StaffTab';
 import { LiveTrackingTab } from '../LiveTrackingTab';
+
 
 interface AdminRoleDashboardProps {
   onBackToHome?: () => void;
@@ -49,6 +51,13 @@ export const AdminRoleDashboard: React.FC<AdminRoleDashboardProps> = ({ onBackTo
       label: 'Quản lý Tài xế',
       icon: Truck,
       component: DriverTab,
+      allowed: true,
+    },
+    {
+      id: 'vehicles',
+      label: 'Quản lý Phương tiện',
+      icon: Truck,
+      component: VehicleTab,
       allowed: true,
     },
     {

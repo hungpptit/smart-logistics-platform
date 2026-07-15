@@ -26,20 +26,21 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({ menuItems, onBac
     );
   }
 
-  const currentTabItem = menuItems.find(item => item.id === activeTab) || menuItems[0];
-  const CurrentTabComponent = currentTabItem.component;
+  const allowedMenuItems = menuItems.filter(item => item.allowed !== false);
+  const currentTabItem = allowedMenuItems.find(item => item.id === activeTab) || allowedMenuItems[0];
+  const CurrentTabComponent = currentTabItem?.component;
 
   return (
     <div className="h-screen bg-[#F4F4F4] flex flex-col md:flex-row overflow-hidden font-montserrat">
       <Sidebar
-        menuItems={menuItems}
+        menuItems={allowedMenuItems}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onBackToHome={onBackToHome}
       />
       
       <MobileHeader
-        menuItems={menuItems}
+        menuItems={allowedMenuItems}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onBackToHome={onBackToHome}

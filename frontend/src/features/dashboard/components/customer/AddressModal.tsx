@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { XCircle, MapPin } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { XCircle } from 'lucide-react';
 import { useAuth } from '../../../../context/AuthContext';
 import { AddressFormFields } from '../../../../components/ui/AddressFormFields';
-import { geocodeAddress } from '../../../../lib/geocoding';
-import { Map, MapMarker, MarkerContent, MapControls } from '../../../../components/ui/map';
+import { MapPicker } from '../../../../components/ui/MapPicker';
 
 interface AddressModalProps {
   isOpen: boolean;
@@ -39,101 +38,12 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   const { token } = useAuth();
   const [selectedProvinceCode, setSelectedProvinceCode] = useState<string>('');
 
-  const [mapCenter, setMapCenter] = useState<[number, number]>([105.8542, 21.0285]);
-  const [geocodingLoading, setGeocodingLoading] = useState<boolean>(false);
-  const mapRef = useRef<any>(null);
-
-  // Sync map center if coordinates exist on load
+  // Sync state on open/close
   useEffect(() => {
-    if (isOpen) {
-      if (addressFormData.latitude && addressFormData.longitude) {
-        setMapCenter([addressFormData.longitude, addressFormData.latitude]);
-      } else {
-        setMapCenter([105.8542, 21.0285]); // Hanoi default
-      }
-      
-      // Fix map container size in modal
-      if (mapRef.current) {
-        setTimeout(() => {
-          mapRef.current.resize();
-        }, 300);
-      }
-    } else {
+    if (!isOpen) {
       setSelectedProvinceCode('');
     }
   }, [isOpen]);
-
-  const clickHandlerRef = useRef<any>(null);
-  clickHandlerRef.current = (e: any) => {
-    const { lng, lat } = e.lngLat;
-    setAddressFormData((prev: any) => ({
-      ...prev,
-      latitude: parseFloat(lat.toFixed(6)),
-      longitude: parseFloat(lng.toFixed(6))
-    }));
-  };
-
-  const mapCallbackRef = useCallback((mapInstance: any) => {
-    mapRef.current = mapInstance;
-    if (!mapInstance) return;
-
-    // Trigger map resize shortly after loading to ensure it sizes correctly in modal
-    setTimeout(() => {
-      mapInstance.resize();
-    }, 300);
-
-    mapInstance.on('click', (e: any) => {
-      clickHandlerRef.current?.(e);
-    });
-  }, []);
-
-  const handleMarkerDragEnd = (lngLat: { lng: number; lat: number }) => {
-    setAddressFormData((prev: any) => ({
-      ...prev,
-      latitude: parseFloat(lngLat.lat.toFixed(6)),
-      longitude: parseFloat(lngLat.lng.toFixed(6))
-    }));
-  };
-
-  const handleLocateCallback = useCallback((coords: { longitude: number; latitude: number }) => {
-    setAddressFormData((prev: any) => ({
-      ...prev,
-      latitude: parseFloat(coords.latitude.toFixed(6)),
-      longitude: parseFloat(coords.longitude.toFixed(6))
-    }));
-  }, [setAddressFormData]);
-
-  const handleAutoLocate = async () => {
-    const provinceName = addressFormData.province || '';
-    const wardName = addressFormData.ward || '';
-    const line1 = addressFormData.addressLine1 || '';
-
-    if (!provinceName && !wardName && !line1) return;
-
-    setGeocodingLoading(true);
-    const fullAddress = [line1, wardName, provinceName].filter(Boolean).join(', ');
-    
-    try {
-      const coords = await geocodeAddress(fullAddress, token || '');
-      if (coords) {
-        setAddressFormData((prev: any) => ({
-          ...prev,
-          latitude: parseFloat(coords.latitude.toFixed(6)),
-          longitude: parseFloat(coords.longitude.toFixed(6))
-        }));
-        setMapCenter([coords.longitude, coords.latitude]);
-        mapRef.current?.flyTo({
-          center: [coords.longitude, coords.latitude],
-          zoom: 15,
-          duration: 1000
-        });
-      }
-    } catch (err) {
-      console.error('Error auto-locating address:', err);
-    } finally {
-      setGeocodingLoading(false);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -177,14 +87,6 @@ export const AddressModal: React.FC<AddressModalProps> = ({
                   ...updates
                 };
               });
-              if (latitude !== undefined && longitude !== undefined) {
-                setMapCenter([longitude, latitude]);
-                mapRef.current?.flyTo({
-                  center: [longitude, latitude],
-                  zoom: 15,
-                  duration: 1000
-                });
-              }
             }}
             required
           />
@@ -200,80 +102,19 @@ export const AddressModal: React.FC<AddressModalProps> = ({
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between items-center text-gray-400 font-bold uppercase tracking-wider text-[9px]">
-              <span>Bản đồ định vị</span>
-              <button
-                type="button"
-                onClick={handleAutoLocate}
-                disabled={geocodingLoading || !addressFormData.addressLine1}
-                className="text-[#bc0100] hover:text-[#900000] font-bold lowercase tracking-normal text-[10px] flex items-center gap-1 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
-              >
-                {geocodingLoading ? 'Đang định vị...' : '🔍 [Nhấn để định vị tự động]'}
-              </button>
-            </div>
-            
-            <div className="w-full h-72 rounded-md border border-[#e2e8f0] overflow-hidden relative mt-0.5 bg-gray-50">
-              <Map
-                ref={mapCallbackRef}
-                center={mapCenter}
-                zoom={13}
-                className="w-full h-full"
-              >
-                {addressFormData.latitude !== 0 && addressFormData.longitude !== 0 && (
-                  <MapMarker
-                    longitude={addressFormData.longitude}
-                    latitude={addressFormData.latitude}
-                    draggable
-                    onDragEnd={handleMarkerDragEnd}
-                  >
-                    <MarkerContent>
-                      <div 
-                        className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white shadow-sm text-white transition-transform hover:scale-110"
-                        style={{ backgroundColor: '#bc0100' }}
-                      >
-                        <MapPin className="h-3 w-3" />
-                      </div>
-                    </MarkerContent>
-                  </MapMarker>
-                )}
-                <MapControls 
-                  showZoom 
-                  showLocate 
-                  onLocate={handleLocateCallback}
-                  className="bottom-2 right-2" 
-                />
-              </Map>
-              <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-xs px-2 py-0.5 rounded text-[8px] text-gray-500 shadow-xs pointer-events-none select-none">
-                Kéo marker hoặc click bản đồ để chọn tọa độ
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Vĩ độ (Latitude)</label>
-              <input
-                type="number"
-                step="0.000001"
-                required
-                disabled
-                value={addressFormData.latitude || ''}
-                className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none bg-gray-100 text-gray-500 cursor-not-allowed font-mono"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Kinh độ (Longitude)</label>
-              <input
-                type="number"
-                step="0.000001"
-                required
-                disabled
-                value={addressFormData.longitude || ''}
-                className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none bg-gray-100 text-gray-500 cursor-not-allowed font-mono"
-              />
-            </div>
-          </div>
+          <MapPicker
+            latitude={addressFormData.latitude}
+            longitude={addressFormData.longitude}
+            onChange={(lat, lng) => setAddressFormData((prev: any) => ({
+              ...prev,
+              latitude: lat,
+              longitude: lng
+            }))}
+            addressLine1={addressFormData.addressLine1}
+            ward={addressFormData.ward}
+            province={addressFormData.province}
+            token={token || ''}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">

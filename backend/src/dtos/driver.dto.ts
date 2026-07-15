@@ -1,5 +1,5 @@
-import { IsString, IsOptional, IsUUID, IsEnum, IsNotEmpty, IsDateString, IsBoolean, IsEmail } from 'class-validator';
-import { DriverEmploymentStatus } from '@prisma/client';
+import { IsString, IsOptional, IsUUID, IsEnum, IsNotEmpty, IsDateString, IsBoolean, IsEmail, IsNumber } from 'class-validator';
+import { DriverEmploymentStatus, DriverType } from '@prisma/client';
 
 export class CreateDriverDto {
   @IsEmail({}, { message: 'Địa chỉ email tài khoản không hợp lệ' })
@@ -40,6 +40,18 @@ export class CreateDriverDto {
   @IsString({ message: 'Ghi chú phải là một chuỗi ký tự' })
   @IsOptional()
   note?: string;
+
+  @IsNumber({}, { message: 'Vĩ độ mong muốn phải là một số thực' })
+  @IsOptional()
+  preferredLatitude?: number;
+
+  @IsNumber({}, { message: 'Kinh độ mong muốn phải là một số thực' })
+  @IsOptional()
+  preferredLongitude?: number;
+
+  @IsEnum(DriverType, { message: 'Loại tài xế không hợp lệ' })
+  @IsOptional()
+  driverType?: DriverType;
 }
 
 export class UpdateDriverDto {
@@ -82,4 +94,16 @@ export class UpdateDriverDto {
   @IsString({ message: 'Ghi chú phải là một chuỗi ký tự' })
   @IsOptional()
   note?: string;
+
+  @IsNumber({}, { message: 'Vĩ độ mong muốn phải là một số thực' })
+  @IsOptional()
+  preferredLatitude?: number;
+
+  @IsNumber({}, { message: 'Kinh độ mong muốn phải là một số thực' })
+  @IsOptional()
+  preferredLongitude?: number;
+
+  @IsEnum(DriverType, { message: 'Loại tài xế không hợp lệ' })
+  @IsOptional()
+  driverType?: DriverType;
 }

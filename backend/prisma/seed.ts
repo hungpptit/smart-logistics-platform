@@ -297,6 +297,86 @@ async function main() {
     }
   }
 
+  // 7b. Seed Role Permissions
+  console.log('🔑 Seeding Role Permissions...');
+  // Clear existing role permissions to avoid duplicates and ensure sync
+  await prisma.rolePermission.deleteMany();
+
+  const dbRoles = await prisma.role.findMany();
+  const dbPermissions = await prisma.permission.findMany();
+
+  const adminRole = dbRoles.find(r => r.roleCode === 'ADMIN');
+  const staffRole = dbRoles.find(r => r.roleCode === 'STAFF');
+  const shipperRole = dbRoles.find(r => r.roleCode === 'SHIPPER');
+  const customerRole = dbRoles.find(r => r.roleCode === 'CUSTOMER');
+
+  if (adminRole) {
+    for (const p of dbPermissions) {
+      await prisma.rolePermission.create({
+        data: {
+          roleId: adminRole.id,
+          permissionId: p.id,
+        },
+      });
+    }
+  }
+
+  if (staffRole) {
+    const staffPermissionsCodes = [
+      'FACILITY_VIEW',
+      'ORDER_VIEW', 'ORDER_CREATE', 'ORDER_UPDATE',
+      'SHIPMENT_VIEW', 'SHIPMENT_CREATE', 'SHIPMENT_UPDATE',
+      'DRIVER_VIEW',
+      'VEHICLE_VIEW',
+      'ROUTE_PLAN', 'ROUTE_OPTIMIZE',
+      'POD_VERIFY', 'SCAN_BARCODE'
+    ];
+    for (const p of dbPermissions) {
+      if (staffPermissionsCodes.includes(p.permissionCode)) {
+        await prisma.rolePermission.create({
+          data: {
+            roleId: staffRole.id,
+            permissionId: p.id,
+          },
+        });
+      }
+    }
+  }
+
+  if (shipperRole) {
+    const shipperPermissionsCodes = [
+      'ORDER_VIEW',
+      'SHIPMENT_VIEW',
+      'POD_VERIFY', 'SCAN_BARCODE'
+    ];
+    for (const p of dbPermissions) {
+      if (shipperPermissionsCodes.includes(p.permissionCode)) {
+        await prisma.rolePermission.create({
+          data: {
+            roleId: shipperRole.id,
+            permissionId: p.id,
+          },
+        });
+      }
+    }
+  }
+
+  if (customerRole) {
+    const customerPermissionsCodes = [
+      'ORDER_CREATE', 'ORDER_VIEW'
+    ];
+    for (const p of dbPermissions) {
+      if (customerPermissionsCodes.includes(p.permissionCode)) {
+        await prisma.rolePermission.create({
+          data: {
+            roleId: customerRole.id,
+            permissionId: p.id,
+          },
+        });
+      }
+    }
+  }
+
   // 8. Seed Administrative Units (Provinces, Wards, etc.)
   console.log('🇻🇳 Seeding Administrative Units...');
   const provinceCount = await prisma.province.count();

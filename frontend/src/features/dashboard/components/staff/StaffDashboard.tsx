@@ -1,17 +1,22 @@
 import React from 'react';
-import { Package, Users, Building2, User, Earth } from 'lucide-react';
+import { Package, Users, Building2, User, Earth, Truck } from 'lucide-react';
 import { DashboardShell } from '../layouts/DashboardShell';
 import type { MenuItem } from '../layouts/Sidebar';
 import { OrderTab } from '../OrderTab';
 import { CustomerTab } from '../CustomerTab';
 import { FacilityTab } from '../FacilityTab';
 import { LiveTrackingTab } from '../LiveTrackingTab';
+import { DriverTab } from '../DriverTab';
+import { VehicleTab } from '../VehicleTab';
+import { useAuth } from '../../../../context/AuthContext';
 
 interface StaffDashboardProps {
   onBackToHome?: () => void;
 }
 
 export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onBackToHome }) => {
+  const { user } = useAuth();
+
   const menuItems: MenuItem[] = [
     {
       id: 'orders',
@@ -32,14 +37,44 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onBackToHome }) 
       label: 'Quản lý Khách hàng',
       icon: Users,
       component: CustomerTab,
-      allowed: true,
+      allowed: !!(
+        user?.roles.includes('ADMIN') ||
+        user?.permissions.includes('CUSTOMER_VIEW') ||
+        user?.permissions.includes('CUSTOMER_MANAGE')
+      ),
+    },
+    {
+      id: 'drivers',
+      label: 'Quản lý Tài xế',
+      icon: Truck,
+      component: DriverTab,
+      allowed: !!(
+        user?.roles.includes('ADMIN') ||
+        user?.permissions.includes('DRIVER_VIEW') ||
+        user?.permissions.includes('DRIVER_MANAGE')
+      ),
+    },
+    {
+      id: 'vehicles',
+      label: 'Quản lý Phương tiện',
+      icon: Truck,
+      component: VehicleTab,
+      allowed: !!(
+        user?.roles.includes('ADMIN') ||
+        user?.permissions.includes('VEHICLE_VIEW') ||
+        user?.permissions.includes('VEHICLE_MANAGE')
+      ),
     },
     {
       id: 'facilities',
       label: 'Hệ thống Kho bãi',
       icon: Building2,
       component: FacilityTab,
-      allowed: true,
+      allowed: !!(
+        user?.roles.includes('ADMIN') ||
+        user?.permissions.includes('FACILITY_VIEW') ||
+        user?.permissions.includes('FACILITY_MANAGE')
+      ),
     },
     {
       id: 'profile',

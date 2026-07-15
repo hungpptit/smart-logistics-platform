@@ -117,6 +117,9 @@ export class DriverService {
           userId: user.id,
           homeFacilityId: dto.homeFacilityId || null,
           note: dto.note || null,
+          preferredLatitude: dto.preferredLatitude !== undefined ? dto.preferredLatitude : null,
+          preferredLongitude: dto.preferredLongitude !== undefined ? dto.preferredLongitude : null,
+          driverType: dto.driverType || 'HUB_DELIVERY',
         },
         include: {
           homeFacility: true,
@@ -312,6 +315,9 @@ export class DriverService {
         userId: dto.userId !== undefined ? dto.userId : driver.userId,
         homeFacilityId: dto.homeFacilityId !== undefined ? dto.homeFacilityId : driver.homeFacilityId,
         note: dto.note !== undefined ? dto.note : driver.note,
+        preferredLatitude: dto.preferredLatitude !== undefined ? dto.preferredLatitude : driver.preferredLatitude,
+        preferredLongitude: dto.preferredLongitude !== undefined ? dto.preferredLongitude : driver.preferredLongitude,
+        driverType: dto.driverType ?? driver.driverType,
       },
       include: {
         homeFacility: true,
@@ -427,6 +433,153 @@ export class DriverService {
         username: true,
         email: true,
         phone: true,
+      },
+    });
+  }
+
+  /**
+   * Assign a vehicle to a driver
+   */
+  public async assignVehicle(dto: { driverId: string; vehicleId: string }) {
+    // 1. Fetch driver and vehicle
+    const driver = await prisma.driver.findUnique({
+      where: { id: dto.driverId, deletedAt: null },
+    });
+    if (!driver) {
+      throw new NotFoundException('Không tìm thấy tài xế hoạt động');
+    }
+
+    if (driver.employmentStatus !== 'ACTIVE') {
+      throw new BadRequestException('Tài xế đang không ở trạng thái hoạt động (ACTIVE)');
+    }
+
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: dto.vehicleId },
+      include: { vehicleType: true },
+    });
+    if (!vehicle) {
+      throw new NotFoundException('Không tìm thấy phương tiện');
+    }
+
+    if (vehicle.operatingStatus !== 'ACTIVE') {
+      throw new BadRequestException('Phương tiện đang không ở trạng thái hoạt động tốt (ACTIVE)');
+    }
+
+    // 2. Validate License compatibility
+    const licenseHierarchy: Record<string, number> = {
+      'A1': 1,
+      'A2': 2,
+      'B1': 3,
+      'B2': 4,
+      'C': 5,
+      'D': 6,
+      'E': 7,
+      'FC': 8,
+      'FE': 9
+    };
+
+    const driverRank = licenseHierarchy[driver.driverLicenseClass.toUpperCase()] || 0;
+    const vehicleTypeCode = vehicle.vehicleType.typeCode.toUpperCase();
+
+    let isCompatible = true;
+    if (vehicleTypeCode === 'VAN' || vehicleTypeCode === 'TRUCK_1T5') {
+      isCompatible = driverRank >= licenseHierarchy['B2'];
+    } else if (vehicleTypeCode === 'REFRIGERATED_TRUCK') {
+      isCompatible = driverRank >= licenseHierarchy['C'];
+    } else if (vehicleTypeCode === 'CONTAINER') {
+      isCompatible = driverRank >= licenseHierarchy['FC'];
+    }
+
+    if (!isCompatible) {
+      throw new BadRequestException(
+        `Tài xế có bằng hạng ${driver.driverLicenseClass} không đủ điều kiện điều khiển phương tiện loại ${vehicle.vehicleType.typeName} (Yêu cầu tối thiểu ${
+          vehicleTypeCode === 'CONTAINER' ? 'FC' : (vehicleTypeCode === 'REFRIGERATED_TRUCK' ? 'C' : 'B2')
+        })`
+      );
+    }
+
+    // 3. Perform 1:1 assignment inside a Transaction
+    return await prisma.$transaction(async (tx) => {
+      // A. Deactivate any active assignments of this driver
+      await tx.driverVehicleAssignment.updateMany({
+        where: { driverId: dto.driverId, isActive: true },
+        data: { isActive: false, assignedTo: new Date() },
+      });
+
+      // B. Deactivate any active assignments of this vehicle
+      await tx.driverVehicleAssignment.updateMany({
+        where: { vehicleId: dto.vehicleId, isActive: true },
+        data: { isActive: false, assignedTo: new Date() },
+      });
+
+      // C. Create new assignment
+      return await tx.driverVehicleAssignment.create({
+        data: {
+          driverId: dto.driverId,
+          vehicleId: dto.vehicleId,
+          assignedFrom: new Date(),
+          isActive: true,
+        },
+        include: {
+          driver: true,
+          vehicle: {
+            include: {
+              vehicleType: true,
+            },
+          },
+        },
+      });
+    });
+  }
+
+  /**
+   * Terminate active vehicle assignment for a driver
+   */
+  public async terminateAssignment(driverId: string) {
+    const activeAssignment = await prisma.driverVehicleAssignment.findFirst({
+      where: { driverId, isActive: true },
+    });
+
+    if (!activeAssignment) {
+      throw new NotFoundException('Tài xế hiện tại không có phương tiện nào đang gán');
+    }
+
+    return await prisma.driverVehicleAssignment.update({
+      where: { id: activeAssignment.id },
+      data: {
+        isActive: false,
+        assignedTo: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Get active vehicle assignments
+   */
+  public async getActiveAssignments() {
+    return await prisma.driverVehicleAssignment.findMany({
+      where: { isActive: true },
+      include: {
+        driver: {
+          select: {
+            id: true,
+            employeeCode: true,
+            fullName: true,
+            phone: true,
+            driverLicenseClass: true,
+          },
+        },
+        vehicle: {
+          include: {
+            vehicleType: true,
+            homeFacility: {
+              select: {
+                id: true,
+                facilityName: true,
+              },
+            },
+          },
+        },
       },
     });
   }

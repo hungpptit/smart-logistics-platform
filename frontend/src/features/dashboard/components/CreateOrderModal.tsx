@@ -4,6 +4,7 @@ import { CONFIG } from '../../../config';
 import { geocodeAddress } from '../../../lib/geocoding';
 import { Map, MapMarker, MarkerContent, MapControls } from '../../../components/ui/map';
 import { AddressFormFields } from '../../../components/ui/AddressFormFields';
+import { useMapConfirmation } from '../../../hooks/useMapConfirmation';
 
 interface CreateOrderModalProps {
   isOpen: boolean;
@@ -45,19 +46,36 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   // Sender Coordinates & Map States
   const [senderLatitude, setSenderLatitude] = useState<number>(0);
   const [senderLongitude, setSenderLongitude] = useState<number>(0);
-  const [tempLatitude, setTempLatitude] = useState<number>(0);
-  const [tempLongitude, setTempLongitude] = useState<number>(0);
   const [mapCenter, setMapCenter] = useState<[number, number]>([105.8542, 21.0285]);
   const [geocodingLoading, setGeocodingLoading] = useState<boolean>(false);
   const mapRef = useRef<any>(null);
+
+  const {
+    tempLatitude,
+    tempLongitude,
+    setTempLatitude,
+    setTempLongitude,
+    onMapClick,
+    onMarkerDragEnd,
+    onLocate,
+    handleCancel,
+    handleConfirm,
+    hasChanges
+  } = useMapConfirmation({
+    latitude: senderLatitude,
+    longitude: senderLongitude,
+    onChange: (lat, lng) => {
+      setSenderLatitude(lat);
+      setSenderLongitude(lng);
+    },
+    mapRef
+  });
 
   // Reset coordinates and center map on open
   useEffect(() => {
     if (isOpen) {
       setSenderLatitude(0);
       setSenderLongitude(0);
-      setTempLatitude(0);
-      setTempLongitude(0);
       setReceiverLatitude(0);
       setReceiverLongitude(0);
       setMapCenter([105.8542, 21.0285]);
@@ -86,13 +104,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     }
   }, [isOpen]);
 
-  const clickHandlerRef = useRef<any>(null);
-  clickHandlerRef.current = (e: any) => {
-    const { lng, lat } = e.lngLat;
-    setTempLatitude(parseFloat(lat.toFixed(6)));
-    setTempLongitude(parseFloat(lng.toFixed(6)));
-  };
-
   const mapCallbackRef = useCallback((mapInstance: any) => {
     mapRef.current = mapInstance;
     if (!mapInstance) return;
@@ -102,20 +113,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       mapInstance.resize();
     }, 300);
 
-    mapInstance.on('click', (e: any) => {
-      clickHandlerRef.current?.(e);
-    });
-  }, []);
-
-  const handleMarkerDragEnd = (lngLat: { lng: number; lat: number }) => {
-    setTempLatitude(parseFloat(lngLat.lat.toFixed(6)));
-    setTempLongitude(parseFloat(lngLat.lng.toFixed(6)));
-  };
-
-  const handleLocateCallback = useCallback((coords: { longitude: number; latitude: number }) => {
-    setTempLatitude(parseFloat(coords.latitude.toFixed(6)));
-    setTempLongitude(parseFloat(coords.longitude.toFixed(6)));
-  }, []);
+    mapInstance.on('click', onMapClick);
+  }, [onMapClick]);
 
   const handleAutoLocate = async () => {
     if (!senderAddressLine1 && !senderWard && !senderProvince) return;
@@ -507,7 +506,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                           longitude={tempLongitude}
                           latitude={tempLatitude}
                           draggable
-                          onDragEnd={handleMarkerDragEnd}
+                          onDragEnd={onMarkerDragEnd}
                         >
                           <MarkerContent>
                             <div 
@@ -522,13 +521,13 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                        <MapControls 
                         showZoom 
                         showLocate 
-                        onLocate={handleLocateCallback}
+                        onLocate={onLocate}
                         className="top-2 right-2" 
                       />
                     </Map>
-
+ 
                     {/* Accidental click protection / Confirmation Panel */}
-                    {(tempLatitude !== senderLatitude || tempLongitude !== senderLongitude) && (
+                    {hasChanges && (
                       <div className="absolute inset-x-0 bottom-0 bg-[#161D25]/90 backdrop-blur-xs p-2 flex justify-between items-center text-[10px] text-white animate-fade-in shadow-lg z-10">
                         <span className="font-medium text-gray-300">
                           Vị trí thay đổi chưa lưu
@@ -536,27 +535,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                         <div className="flex gap-1.5">
                           <button
                             type="button"
-                            onClick={() => {
-                              setTempLatitude(senderLatitude);
-                              setTempLongitude(senderLongitude);
-                              if (senderLatitude !== 0 && senderLongitude !== 0) {
-                                mapRef.current?.flyTo({
-                                  center: [senderLongitude, senderLatitude],
-                                  zoom: 15,
-                                  duration: 800
-                                });
-                              }
-                            }}
+                            onClick={handleCancel}
                             className="px-2 py-1 bg-gray-600 hover:bg-gray-500 rounded text-white font-bold transition-colors cursor-pointer"
                           >
                             Hủy
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              setSenderLatitude(tempLatitude);
-                              setSenderLongitude(tempLongitude);
-                            }}
+                            onClick={handleConfirm}
                             className="px-2 py-1 bg-[#bc0100] hover:bg-[#a00100] rounded text-white font-bold transition-colors cursor-pointer"
                           >
                             Xác nhận lưu
@@ -564,8 +550,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                         </div>
                       </div>
                     )}
-
-                    {!(tempLatitude !== senderLatitude || tempLongitude !== senderLongitude) && (
+ 
+                    {!hasChanges && (
                       <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-xs px-2 py-0.5 rounded text-[8px] text-gray-500 shadow-xs pointer-events-none select-none">
                         Kéo marker hoặc click bản đồ để chọn tọa độ
                       </div>

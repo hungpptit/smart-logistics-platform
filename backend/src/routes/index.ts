@@ -9,6 +9,8 @@ import locationRouter from './location.routes';
 import staffRouter from './staff.routes';
 import routingRouter from './routing.routes';
 import settingRouter from './setting.routes';
+import vehicleRouter from './vehicle.routes';
+import shipmentRouter from './shipment.routes';
 
 const router = Router();
 
@@ -23,5 +25,7 @@ router.use('/locations', locationRouter);
 router.use('/staff', staffRouter);
 router.use('/routes', routingRouter);
 router.use('/settings', settingRouter);
+router.use('/vehicles', vehicleRouter);
+router.use('/shipments', shipmentRouter);
 
 export default router;

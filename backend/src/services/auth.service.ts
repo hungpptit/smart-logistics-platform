@@ -147,7 +147,15 @@ export class AuthService {
         },
         userRoles: {
           include: {
-            role: true,
+            role: {
+              include: {
+                rolePermissions: {
+                  include: {
+                    permission: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -212,6 +220,13 @@ export class AuthService {
 
     const { passwordHash: _, ...userWithoutPassword } = user;
     const roles = user.userRoles.map((ur) => ur.role.roleCode);
+    const permissions = Array.from(
+      new Set(
+        user.userRoles.flatMap((ur) =>
+          ur.role.rolePermissions.map((rp) => rp.permission.permissionCode)
+        )
+      )
+    );
 
     return {
       accessToken,
@@ -219,6 +234,7 @@ export class AuthService {
       user: {
         ...userWithoutPassword,
         roles,
+        permissions,
       },
     };
   }
@@ -245,7 +261,15 @@ export class AuthService {
         },
         userRoles: {
           include: {
-            role: true,
+            role: {
+              include: {
+                rolePermissions: {
+                  include: {
+                    permission: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -300,6 +324,13 @@ export class AuthService {
     // 6. Exclude passwordHash from response
     const { passwordHash: _, ...userWithoutPassword } = user;
     const roles = user.userRoles.map((ur) => ur.role.roleCode);
+    const permissions = Array.from(
+      new Set(
+        user.userRoles.flatMap((ur) =>
+          ur.role.rolePermissions.map((rp) => rp.permission.permissionCode)
+        )
+      )
+    );
 
     return {
       accessToken,
@@ -307,6 +338,7 @@ export class AuthService {
       user: {
         ...userWithoutPassword,
         roles,
+        permissions,
       },
     };
   }

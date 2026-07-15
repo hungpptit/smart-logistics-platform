@@ -82,4 +82,43 @@ export class DriverController {
       next(error);
     }
   };
+
+  public assignVehicle = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.driverService.assignVehicle(req.body);
+      res.status(201).json({
+        success: true,
+        message: 'Phân công phương tiện cho tài xế thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public terminateAssignment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.driverService.terminateAssignment(req.body.driverId);
+      res.status(200).json({
+        success: true,
+        message: 'Thu hồi phương tiện thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public getActiveAssignments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.driverService.getActiveAssignments();
+      res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách phân công đang hoạt động thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

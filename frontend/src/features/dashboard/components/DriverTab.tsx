@@ -592,14 +592,22 @@ export const DriverTab: React.FC = () => {
                 {/* License class */}
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Hạng bằng lái *</label>
-                  <input
-                    type="text"
+                  <select
                     required
                     value={formData.driverLicenseClass}
                     onChange={(e) => setFormData({ ...formData, driverLicenseClass: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100]"
-                    placeholder="A1, B2, C..."
-                  />
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
+                  >
+                    <option value="">-- Chọn hạng bằng lái --</option>
+                    <option value="A1">A1 (Xe máy dưới 175cc)</option>
+                    <option value="A2">A2 (Xe mô tô trên 175cc)</option>
+                    <option value="B1">B1 (Ô tô số tự động dưới 9 chỗ, bán tải)</option>
+                    <option value="B2">B2 (Xe tải/Van số sàn dưới 3.5 Tấn)</option>
+                    <option value="C">C (Xe tải trên 3.5 Tấn & xe đông lạnh)</option>
+                    <option value="D">D (Xe khách dưới 30 chỗ)</option>
+                    <option value="E">E (Xe khách trên 30 chỗ)</option>
+                    <option value="FC">FC (Xe đầu kéo Container)</option>
+                  </select>
                 </div>
 
                 {/* License number */}
