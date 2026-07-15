@@ -1,6 +1,6 @@
 # 📖 TỰ ĐIỂN CƠ SỞ DỮ LIỆU (DATABASE DICTIONARY) - PHASE 1
 
-Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Module phục vụ cho hệ thống Smart Logistics Platform. Định dạng được trình bày theo dạng bảng gồm: Tên trường, Kiểu dữ liệu, Ý nghĩa kèm ví dụ thực tế giúp bạn dễ dàng thuyết trình trước giáo viên.
+Tài liệu này tổng hợp toàn bộ 43 bảng dữ liệu chia theo 10 Module phục vụ cho hệ thống Smart Logistics Platform. Định dạng được trình bày theo dạng bảng gồm: Tên trường, Kiểu dữ liệu, Ý nghĩa kèm ví dụ thực tế giúp bạn dễ dàng thuyết trình trước giáo viên.
 
 ---
 
@@ -27,8 +27,8 @@ Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Modul
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã định danh duy nhất của vai trò. VD: `a1b2c3d4-e5f6...` |
-| `role_code` | VarChar(30) | Mã vai trò viết liền viết hoa. VD: `ADMIN`, `DRIVER`, `CUSTOMER`, `DISPATCHER` |
-| `role_name` | VarChar(100) | Tên hiển thị của vai trò. VD: "Quản trị viên", "Tài xế giao nhận", "Nhân viên điều phối" |
+| `role_code` | VarChar(30) | Mã vai trò viết liền viết hoa. VD: `ADMIN`, `STAFF`, `SHIPPER`, `CUSTOMER` |
+| `role_name` | VarChar(100) | Tên hiển thị của vai trò. VD: "Quản trị hệ thống", "Nhân viên", "Tài xế giao hàng", "Khách hàng" |
 | `description` | Text | Mô tả chức năng của vai trò. VD: "Tài xế được quyền dùng app mobile xem lộ trình giao nhận hàng." |
 | `created_at` | Timestamptz | Thời gian tạo vai trò trong hệ thống. |
 
@@ -129,8 +129,12 @@ Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Modul
 | `longitude` | DoublePrecision | Kinh độ GPS dùng để xác định tọa độ chính xác trên bản đồ. VD: `105.8430` |
 | `formatted_address`| Text | Địa chỉ dạng chuỗi hoàn chỉnh. VD: "Số 1 Đại Cồ Việt, Phường Bách Khoa, Hà Nội, Vietnam" |
 | `place_id` | VarChar(255) | Mã địa điểm trên Google Maps / Goong Map để truy xuất nhanh. VD: `ChIJo-7_Qn2sNTER...` |
+| `ward_code` | VarChar(20) (FK) | Mã phường/xã liên kết với bảng wards(code). VD: `00034` |
 | `created_at` | Timestamptz | Thời điểm tạo. |
 | `updated_at` | Timestamptz | Thời điểm cập nhật. |
+
+* **Giải thích liên kết:**
+  * `ward_code` liên kết với `wards(code)`: Định danh hành chính cấp Phường/Xã cho địa chỉ này nhằm chuẩn hóa thông tin địa điểm.
 
 ---
 
@@ -190,6 +194,7 @@ Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Modul
 | `facility_name`| VarChar(255) | Tên đầy đủ kho. VD: "Kho trung chuyển Bắc Ninh", "Bưu cục Cầu Giấy" |
 | `facility_type_id`| Uuid (FK) | Khóa ngoại loại kho bãi, nối tới `facility_types(id)`. |
 | `parent_facility_id`| Uuid (FK) | Khóa ngoại tự tham chiếu tới kho cấp trên để vẽ sơ đồ hình cây. VD: Bưu cục Cầu Giấy trực thuộc quản lý của Tổng kho Hà Nội. |
+| `manager_user_id`| Uuid (FK) | Khóa ngoại liên kết tài khoản quản lý bưu cục/kho, nối tới `users(id)`. |
 | `operating_status`| Enum (FacilityStatus)| Trạng thái hoạt động kho: `ACTIVE` (đang mở cửa), `INACTIVE` (ngừng hoạt động), `MAINTENANCE` (bảo trì hệ thống băng tải), `CLOSED` (đã đóng cửa) |
 | `opened_at` | Date | Ngày bắt đầu mở cửa vận hành. VD: `2026-01-01` |
 | `closed_at` | Date | Ngày đóng cửa (nếu dừng hoạt động). |
@@ -201,6 +206,7 @@ Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Modul
 * **Giải thích liên kết:**
   * `facility_type_id` liên kết `facility_types(id)`: Để định nghĩa kho này là tổng kho, kho phân loại cấp tỉnh, hay bưu cục địa phương.
   * `parent_facility_id` liên kết `facilities(id)` (Quan hệ cha-con): Giúp thiết lập mô hình cây phân cấp mạng lưới kho (Bưu cục cấp dưới trực thuộc Tổng kho cấp trên).
+  * `manager_user_id` liên kết `users(id)`: Xác định người quản lý phụ trách của bưu cục/kho bãi này.
 
 ---
 
@@ -265,7 +271,7 @@ Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Modul
 | `id` | Uuid (PK) | Mã đơn hàng. |
 | `customer_id` | Uuid (FK) | Khóa ngoại chỉ định khách hàng tạo đơn, nối tới `customers(id)`. |
 | `order_code` | VarChar(30) | Mã đơn hàng hiển thị (Duy nhất). VD: `ORD-2026-000492` |
-| `status` | Enum (OrderStatus) | Trạng thái đơn: `CREATED` (Mới tạo), `WAITING_PICKUP` (Chờ tài xế đến lấy), `PICKING` (Tài xế đang đi lấy), `ARRIVED_ORIGIN_FACILITY` (Hàng đã về bưu cục gốc)... |
+| `status` | Enum (OrderStatus) | Trạng thái đơn: `CREATED` (Mới tạo), `READY_FOR_PICKUP` (Sẵn sàng lấy hàng), `PICKUP_ASSIGNED` (Đã gán tài xế), `PICKING` (Tài xế đang đi lấy), `ARRIVED_ORIGIN_FACILITY` (Hàng về bưu cục gốc)... |
 | `service_id` | Uuid (FK) | Khóa ngoại nối sang gói dịch vụ áp dụng, nối tới `services(id)`. |
 | `pickup_address_id`| Uuid (FK) | Khóa ngoại nối sang địa chỉ gốc lấy hàng, nối tới `addresses(id)`. |
 | `sender_contact_id`| Uuid (FK) | Khóa ngoại nối sang danh bạ người gửi, nối tới `customer_contacts(id)`. |
@@ -289,6 +295,9 @@ Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Modul
 | `estimated_duration`| Int | Thời gian di chuyển dự kiến (tính bằng phút). VD: `25` phút |
 | `pricing_version`| Int | Phiên bản bảng giá áp dụng khi tạo đơn. VD: `1` |
 | `estimated_delivery_date`| Timestamptz| Thời gian cam kết giao hàng thành công. VD: `2026-07-03 17:00:00+07` |
+| `pickup_type` | Enum (PickupType) | Hình thức lấy hàng: `PICKUP` (Tài xế đến lấy), `DROP_OFF` (Khách gửi tại bưu cục). |
+| `origin_facility_id` | Uuid (FK) | Khóa ngoại bưu cục gửi gốc, nối tới `facilities(id)`. |
+| `destination_facility_id` | Uuid (FK) | Khóa ngoại bưu cục giao đích, nối tới `facilities(id)`. |
 | `created_by` | Uuid (FK) | Khóa ngoại nhân viên thực hiện tạo đơn (nếu tạo hộ khách trên tổng đài). Nối tới `users(id)`. |
 | `updated_by` | Uuid (FK) | Người cập nhật đơn gần nhất. Nối tới `users(id)`. |
 | `created_at` | Timestamptz | Thời điểm tạo đơn. |
@@ -300,6 +309,7 @@ Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Modul
   * `service_id` liên kết `services(id)`: Đơn hàng chạy theo gói dịch vụ nào (Express, Standard) để áp công thức tính tiền cước.
   * `pickup_address_id` / `delivery_address_id` liên kết `addresses(id)`: Chỉ đến tọa độ gốc và tọa độ đích thực tế để chạy thuật toán định tuyến.
   * `sender_contact_id` / `receiver_contact_id` liên kết `customer_contacts(id)`: Lấy thông tin liên hệ của người gửi và người nhận.
+  * `origin_facility_id` / `destination_facility_id` liên kết `facilities(id)`: Xác định bưu cục gốc (gom đơn) và bưu cục đích (phân phối) phục vụ gom/giao hàng.
   * `created_by` / `updated_by` liên kết `users(id)`: Nhân viên admin hoặc tổng đài viên tạo/sửa đơn cho khách.
 
 ---
@@ -496,9 +506,9 @@ Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Modul
 | Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
 | :--- | :--- | :--- |
 | `id` | Uuid (PK) | Mã loại xe. |
-| `type_code` | VarChar(30) | Mã phân loại viết liền. VD: `MOTORBIKE`, `VAN_1T`, `TRUCK_5T`, `TRUCK_10T` |
-| `type_name` | VarChar(100) | Tên hiển thị loại xe. VD: "Xe máy giao nhận", "Xe tải 5 tấn" |
-| `max_default_weight`| Decimal(10,2) | Khối lượng tải mặc định cho nhóm xe này (kg). VD: `1000.00` kg |
+| `type_code` | VarChar(30) | Mã phân loại viết liền. VD: `MOTORBIKE`, `VAN`, `TRUCK_1T5`, `CONTAINER`, `REFRIGERATED_TRUCK` |
+| `type_name` | VarChar(100) | Tên hiển thị loại xe. VD: "Xe máy", "Xe bán tải / Van", "Xe tải 1.5 Tấn", "Xe Container cỡ lớn", "Xe tải đông lạnh" |
+| `max_default_weight`| Decimal(10,2) | Khối lượng tải mặc định cho nhóm xe này (kg). VD: `1500.00` kg |
 | `description` | Text | Mô tả chi tiết thùng xe hoặc kích cỡ. |
 | `created_at` | Timestamptz | Ngày tạo. |
 
@@ -769,3 +779,64 @@ Tài liệu này tổng hợp toàn bộ 39 bảng dữ liệu chia theo 9 Modul
 
 * **Giải thích liên kết:**
   * `updated_by` liên kết `users(id)`: Định danh người quản trị hệ thống đã thực hiện điều chỉnh cấu hình này.
+
+---
+
+## 🇻🇳 MODULE 10: VIETNAMESE ADMINISTRATIVE UNITS (Đơn vị hành chính Việt Nam)
+
+### 40. Bảng `administrative_regions` (Vùng hành chính Việt Nam)
+| Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
+| :--- | :--- | :--- |
+| `id` | Int (PK) | Mã định danh vùng hành chính. VD: `1`, `2` |
+| `name` | VarChar(255) | Tên vùng hành chính (Tiếng Việt). VD: `Đồng bằng sông Hồng`, `Đông Nam Bộ` |
+| `name_en` | VarChar(255) | Tên vùng hành chính (Tiếng Anh). VD: `Red River Delta` |
+| `code_name` | VarChar(255) | Code name của vùng. VD: `dong_bang_song_hong` |
+| `code_name_en` | VarChar(255) | Code name Tiếng Anh. VD: `red_river_delta` |
+
+---
+
+### 41. Bảng `administrative_units` (Phân cấp đơn vị hành chính)
+| Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
+| :--- | :--- | :--- |
+| `id` | Int (PK) | Mã phân cấp hành chính. VD: `1` (Tỉnh/Thành phố), `2` (Quận/Huyện) |
+| `full_name` | VarChar(255) | Tên gọi đầy đủ (Tiếng Việt). VD: `Thành phố`, `Phường`, `Xã` |
+| `full_name_en` | VarChar(255) | Tên gọi đầy đủ (Tiếng Anh). VD: `City`, `Ward` |
+| `short_name` | VarChar(255) | Tên gọi viết tắt. VD: `TP`, `P` |
+| `short_name_en` | VarChar(255) | Tên gọi viết tắt Tiếng Anh. VD: `City`, `Ward` |
+| `code_name` | VarChar(255) | Code name đơn vị. VD: `thanh_pho`, `phuong` |
+| `code_name_en` | VarChar(255) | Code name Tiếng Anh. VD: `city`, `ward` |
+
+---
+
+### 42. Bảng `provinces` (Tỉnh / Thành phố)
+| Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
+| :--- | :--- | :--- |
+| `code` | VarChar(20) (PK) | Mã tỉnh/thành phố (Ví dụ mã Tổng cục Thống kê). VD: `01` (Hà Nội), `79` (TP. Hồ Chí Minh) |
+| `name` | VarChar(255) | Tên tỉnh/thành phố. VD: `Hà Nội`, `Hồ Chí Minh` |
+| `name_en` | VarChar(255) | Tên Tiếng Anh. VD: `Ha Noi`, `Ho Chi Minh` |
+| `full_name` | VarChar(255) | Tên đầy đủ. VD: `Thành phố Hà Nội` |
+| `full_name_en` | VarChar(255) | Tên đầy đủ Tiếng Anh. VD: `Ha Noi City` |
+| `code_name` | VarChar(255) | Code name tỉnh. VD: `ha_noi` |
+| `administrative_unit_id`| Int (FK) | Liên kết với `administrative_units(id)` để xác định cấp đơn vị hành chính. |
+
+* **Giải thích liên kết:**
+  * `administrative_unit_id` liên kết `administrative_units(id)`: Định dạng loại hình đơn vị của Tỉnh/Thành phố.
+
+---
+
+### 43. Bảng `wards` (Phường / Xã / Thị trấn)
+| Tên trường | Kiểu dữ liệu | Ý nghĩa & Ví dụ |
+| :--- | :--- | :--- |
+| `code` | VarChar(20) (PK) | Mã phường/xã. VD: `00001` |
+| `name` | VarChar(255) | Tên phường/xã. |
+| `name_en` | VarChar(255) | Tên Tiếng Anh. |
+| `full_name` | VarChar(255) | Tên đầy đủ. VD: `Phường Phúc Xá` |
+| `full_name_en` | VarChar(255) | Tên đầy đủ Tiếng Anh. |
+| `code_name` | VarChar(255) | Code name phường/xã. |
+| `province_code` | VarChar(20) (FK) | Liên kết trực tiếp tới `provinces(code)`. (Hệ thống đã làm phẳng, bỏ qua cấp quận/huyện trung gian). |
+| `administrative_unit_id`| Int (FK) | Liên kết tới `administrative_units(id)` để xác định đây là Phường, Xã hay Thị trấn. |
+
+* **Giải thích liên kết:**
+  * `province_code` liên kết `provinces(code)`: Xác định phường xã trực thuộc Tỉnh/Thành phố nào (bỏ qua quận/huyện để tăng tốc độ phân tích).
+  * `administrative_unit_id` liên kết `administrative_units(id)`: Xác định loại hình phân cấp hành chính.
+
