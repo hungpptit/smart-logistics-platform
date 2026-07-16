@@ -125,6 +125,11 @@ router.get(
  *         description: Không tìm thấy khách hàng
  */
 router.get(
+  '/me/addresses',
+  customerController.getMeAddresses
+);
+
+router.get(
   '/:id',
   customerController.getById
 );
@@ -259,6 +264,12 @@ router.delete(
  *       201:
  *         description: Thêm địa chỉ thành công
  */
+router.post(
+  '/me/addresses',
+  validationMiddleware(CreateAddressDto),
+  customerController.addMeAddress
+);
+
 router.post(
   '/:id/addresses',
   validationMiddleware(CreateAddressDto),

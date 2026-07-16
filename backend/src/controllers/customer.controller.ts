@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { CustomerService } from '../services/customer.service';
 import { RequestWithUser } from '../middlewares/auth.middleware';
-import { ForbiddenException, UnauthorizedException } from '../middlewares/error.middleware';
+import { ForbiddenException, UnauthorizedException, NotFoundException } from '../middlewares/error.middleware';
 import { prisma } from '../config/prisma';
 
 export class CustomerController {
@@ -92,6 +92,28 @@ export class CustomerController {
 
   // --- Address Book Controller Methods ---
 
+  public addMeAddress = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedException('Yêu cầu xác thực tài khoản');
+      }
+      const customer = await prisma.customer.findUnique({
+        where: { userId: req.user.id }
+      });
+      if (!customer) {
+        throw new NotFoundException('Không tìm thấy thông tin khách hàng tương ứng');
+      }
+      const result = await this.customerService.addAddress(customer.id, req.body);
+      res.status(201).json({
+        success: true,
+        message: 'Thêm địa chỉ vào sổ thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   public addAddress = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
       await this.checkOwnership(req, req.params.id);
@@ -99,6 +121,33 @@ export class CustomerController {
       res.status(201).json({
         success: true,
         message: 'Thêm địa chỉ vào sổ thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public getMeAddresses = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedException('Yêu cầu xác thực tài khoản');
+      }
+      const customer = await prisma.customer.findUnique({
+        where: { userId: req.user.id }
+      });
+      if (!customer) {
+        res.status(200).json({
+          success: true,
+          message: 'Không tìm thấy hồ sơ khách hàng',
+          data: [],
+        });
+        return;
+      }
+      const result = await this.customerService.getAddresses(customer.id);
+      res.status(200).json({
+        success: true,
+        message: 'Lấy sổ địa chỉ thành công',
         data: result,
       });
     } catch (error) {

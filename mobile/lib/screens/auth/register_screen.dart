@@ -58,32 +58,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
 
       if (result['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.green),
-                const SizedBox(width: 12.0),
-                Expanded(
-                  child: Text(
-                    'Đăng ký tài khoản thành công! Đang chuyển đến Đăng nhập...',
-                    style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: AppColors.deepOnyx,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-            margin: const EdgeInsets.all(AppStyles.marginMobile),
-            duration: const Duration(seconds: 2),
-          ),
+        final registeredEmail = _emailController.text.trim();
+        Navigator.pushReplacementNamed(
+          context,
+          '/otp',
+          arguments: registeredEmail,
         );
-
-        Future.delayed(const Duration(seconds: 2), () {
-          if (!mounted) return;
-          Navigator.pushReplacementNamed(context, '/login');
-        });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -157,7 +137,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             width: 64.0,
                             height: 64.0,
                             decoration: BoxDecoration(
-                              color: AppColors.tertiary.withOpacity(0.08),
+                              color: AppColors.tertiary.withValues(alpha: 0.08),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -357,8 +337,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     // Footer Redirect
                     Padding(
                       padding: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 32.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
                             'Đã có tài khoản? ',

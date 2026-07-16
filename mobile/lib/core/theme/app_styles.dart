@@ -17,7 +17,7 @@ class AppStyles {
   // Custom Box Shadows (extremely soft deep-onyx at 5-8% opacity)
   static List<BoxShadow> softShadow = [
     BoxShadow(
-      color: const Color(0xFF161D25).withOpacity(0.06),
+      color: const Color(0xFF161D25).withValues(alpha: 0.06),
       blurRadius: 16.0,
       offset: const Offset(0, 4),
     ),
@@ -25,7 +25,7 @@ class AppStyles {
 
   static List<BoxShadow> ambientShadow = [
     BoxShadow(
-      color: const Color(0xFF161D25).withOpacity(0.04),
+      color: const Color(0xFF161D25).withValues(alpha: 0.04),
       blurRadius: 8.0,
       offset: const Offset(0, 2),
     ),

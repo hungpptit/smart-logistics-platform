@@ -795,4 +795,59 @@ export class OrderService {
 
     return nearestFacilityId;
   }
+
+  /**
+   * Process payment for an order
+   */
+  public async payOrder(orderId: string, paymentMethod: string, userId: string, userRoles: string[]) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payment: true, customer: { include: { user: true } } },
+    });
+
+    if (!order || order.deletedAt) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    // Verify ownership for customer role
+    if (userRoles.includes('CUSTOMER') && !userRoles.includes('ADMIN') && !userRoles.includes('STAFF')) {
+      const customerId = await this.getCustomerIdByUserId(userId);
+      if (order.customerId !== customerId) {
+        throw new ForbiddenException('Bạn không có quyền thực hiện thao tác này');
+      }
+    }
+
+    if (!order.payment) {
+      throw new BadRequestException('Không tìm thấy thông tin thanh toán của đơn hàng');
+    }
+
+    if (order.payment.paymentStatus === 'PAID') {
+      throw new BadRequestException('Đơn hàng này đã được thanh toán trước đó');
+    }
+
+    // Validate payment method
+    const validMethods = ['CASH', 'BANK_TRANSFER', 'E_WALLET', 'COD'];
+    if (!validMethods.includes(paymentMethod)) {
+      throw new BadRequestException('Phương thức thanh toán không hợp lệ');
+    }
+
+    // Update payment status to PAID
+    const updatedPayment = await prisma.orderPayment.update({
+      where: { id: order.payment.id },
+      data: {
+        paymentStatus: 'PAID',
+        paymentMethod: paymentMethod as any,
+      },
+    });
+
+    console.log(`💳 [PAYMENT] Order ${order.orderCode} paid via ${paymentMethod} by user ${userId}`);
+    return {
+      orderId: order.id,
+      orderCode: order.orderCode,
+      paymentStatus: updatedPayment.paymentStatus,
+      paymentMethod: updatedPayment.paymentMethod,
+      shippingFee: updatedPayment.shippingFee,
+      codAmount: updatedPayment.codAmount,
+    };
+  }
 }

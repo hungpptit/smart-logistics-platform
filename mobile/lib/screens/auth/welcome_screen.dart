@@ -106,7 +106,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                     Container(
                       height: 2.0,
                       width: 24.0,
-                      color: AppColors.logisticsRed.withOpacity(0.5),
+                      color: AppColors.logisticsRed.withValues(alpha: 0.5),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -121,7 +121,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                     Container(
                       height: 2.0,
                       width: 24.0,
-                      color: AppColors.logisticsRed.withOpacity(0.5),
+                      color: AppColors.logisticsRed.withValues(alpha: 0.5),
                     ),
                   ],
                 ),
@@ -149,8 +149,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         colors: [
-                          AppColors.deepOnyx.withOpacity(0.95),
-                          AppColors.deepOnyx.withOpacity(0.2),
+                          AppColors.deepOnyx.withValues(alpha: 0.95),
+                          AppColors.deepOnyx.withValues(alpha: 0.2),
                           Colors.transparent,
                         ],
                       ),
@@ -171,7 +171,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                         Text(
                           'Vận chuyển liền mạch tới hơn 200 quốc gia.',
                           style: AppTypography.labelMd.copyWith(
-                            color: AppColors.pureWhite.withOpacity(0.85),
+                            color: AppColors.pureWhite.withValues(alpha: 0.85),
                           ),
                         ),
                       ],
@@ -310,7 +310,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
                   decoration: BoxDecoration(
                     border: Border(
-                      top: BorderSide(color: AppColors.surfaceContainerHighest.withOpacity(0.5)),
+                      top: BorderSide(color: AppColors.surfaceContainerHighest.withValues(alpha: 0.5)),
                     ),
                   ),
                   child: const Wrap(
@@ -353,12 +353,12 @@ class _BadgeItem extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16.0, color: AppColors.deepOnyx.withOpacity(0.6)),
+        Icon(icon, size: 16.0, color: AppColors.deepOnyx.withValues(alpha: 0.6)),
         const SizedBox(width: 4.0),
         Text(
           label,
           style: AppTypography.labelMd.copyWith(
-            color: AppColors.deepOnyx.withOpacity(0.7),
+            color: AppColors.deepOnyx.withValues(alpha: 0.7),
             fontSize: 11.0,
           ),
         ),

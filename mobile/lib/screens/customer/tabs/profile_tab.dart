@@ -4,8 +4,242 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_styles.dart';
 import '../../../services/auth_service.dart';
 
-class ProfileTab extends StatelessWidget {
+class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
+
+  @override
+  State<ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<ProfileTab> {
+  String _username = 'Khách hàng';
+  String _email = 'loading...';
+  String _phone = 'loading...';
+  List<Map<String, dynamic>> _addresses = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    final username = await AuthService.getStoredUsername();
+    final email = await AuthService.getStoredEmail();
+    final phone = await AuthService.getStoredPhone();
+    final addresses = await AuthService.fetchAddresses();
+
+    if (mounted) {
+      setState(() {
+        if (username != null && username.isNotEmpty) _username = username;
+        if (email != null && email.isNotEmpty) _email = email;
+        if (phone != null && phone.isNotEmpty) {
+          _phone = phone;
+        } else {
+          _phone = 'Chưa thiết lập';
+        }
+        
+        _addresses = addresses.map((item) {
+          final addrType = item['addressType'] ?? 'HOME';
+          final isDefault = item['isDefault'] ?? false;
+          final addrObj = item['address'] ?? {};
+          final label = addrType == 'HOME' ? 'Địa chỉ nhận hàng (Nhà riêng)' : 'Địa chỉ lấy hàng (Văn phòng)';
+          final addressText = addrObj['formattedAddress'] ?? addrObj['addressLine1'] ?? '';
+          return {
+            'label': label,
+            'address': addressText,
+            'isDefault': isDefault,
+          };
+        }).toList();
+      });
+    }
+  }
+
+  void _showAddAddressDialog() {
+    final addressLineController = TextEditingController();
+    final wardController = TextEditingController();
+    final provinceController = TextEditingController();
+    String selectedType = 'HOME';
+    bool isDefault = false;
+    bool dialogLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppColors.pureWhite,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+              title: Text(
+                'Thêm địa chỉ mới',
+                style: AppTypography.headlineMd.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.deepOnyx,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Address Line 1
+                    Text('Địa chỉ (Số nhà, tên đường)', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
+                    const SizedBox(height: 6.0),
+                    TextField(
+                      controller: addressLineController,
+                      decoration: InputDecoration(
+                        hintText: 'VD: 120 Lê Lợi',
+                        border: OutlineInputBorder(borderRadius: AppStyles.roundedLg),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                      ),
+                    ),
+                    const SizedBox(height: 12.0),
+
+                    // Ward
+                    Text('Phường / Xã', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
+                    const SizedBox(height: 6.0),
+                    TextField(
+                      controller: wardController,
+                      decoration: InputDecoration(
+                        hintText: 'VD: Phường Bến Thành',
+                        border: OutlineInputBorder(borderRadius: AppStyles.roundedLg),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                      ),
+                    ),
+                    const SizedBox(height: 12.0),
+
+                    // Province
+                    Text('Tỉnh / Thành phố', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
+                    const SizedBox(height: 6.0),
+                    TextField(
+                      controller: provinceController,
+                      decoration: InputDecoration(
+                        hintText: 'VD: Hồ Chí Minh',
+                        border: OutlineInputBorder(borderRadius: AppStyles.roundedLg),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                      ),
+                    ),
+                    const SizedBox(height: 12.0),
+
+                    // Address Type
+                    Text('Loại địa chỉ', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
+                    const SizedBox(height: 6.0),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedType,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: AppStyles.roundedLg),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'HOME', child: Text('Nhà riêng')),
+                        DropdownMenuItem(value: 'WORK', child: Text('Văn phòng')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() {
+                            selectedType = val;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12.0),
+
+                    // Default Checkbox
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: isDefault,
+                          activeColor: AppColors.logisticsRed,
+                          onChanged: (val) {
+                            if (val != null) {
+                              setDialogState(() {
+                                isDefault = val;
+                              });
+                            }
+                          },
+                        ),
+                        Text(
+                          'Đặt làm địa chỉ mặc định',
+                          style: AppTypography.bodyMd.copyWith(color: AppColors.deepOnyx),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: dialogLoading ? null : () => Navigator.pop(context),
+                  child: Text('Hủy', style: AppTypography.labelLg.copyWith(color: AppColors.secondary)),
+                ),
+                ElevatedButton(
+                  onPressed: dialogLoading
+                      ? null
+                      : () async {
+                          final addrLine = addressLineController.text.trim();
+                          final ward = wardController.text.trim();
+                          final prov = provinceController.text.trim();
+
+                          if (addrLine.isEmpty || ward.isEmpty || prov.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Vui lòng điền đầy đủ các thông tin địa chỉ')),
+                            );
+                            return;
+                          }
+
+                          setDialogState(() {
+                            dialogLoading = true;
+                          });
+
+                          final res = await AuthService.addAddress(
+                            addressLine1: addrLine,
+                            ward: ward,
+                            province: prov,
+                            addressType: selectedType,
+                            isDefault: isDefault,
+                          );
+
+                          if (context.mounted) {
+                            Navigator.pop(context); // close dialog
+                            if (res['success'] == true) {
+                              _loadProfileData(); // Reload list!
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(res['message'] ?? 'Thêm địa chỉ thành công!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(res['message'] ?? 'Có lỗi xảy ra'),
+                                  backgroundColor: AppColors.logisticsRed,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.logisticsRed,
+                    shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                  ),
+                  child: dialogLoading
+                      ? const SizedBox(
+                          width: 20.0,
+                          height: 20.0,
+                          child: CircularProgressIndicator(color: AppColors.pureWhite, strokeWidth: 2.0),
+                        )
+                      : Text('Lưu', style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +294,7 @@ class ProfileTab extends StatelessWidget {
 
           // Name and Member Tier Badge
           Text(
-            'Trần Minh Quân',
+            _username,
             style: AppTypography.headlineLgMobile.copyWith(
               fontWeight: FontWeight.bold,
               color: AppColors.deepOnyx,
@@ -79,7 +313,7 @@ class ProfileTab extends StatelessWidget {
                 const Icon(Icons.star, color: AppColors.logisticsRed, size: 14.0),
                 const SizedBox(width: 4.0),
                 Text(
-                  'Khách hàng VVIP',
+                  'Thành viên Velocity',
                   style: AppTypography.labelMd.copyWith(
                     color: AppColors.logisticsRed,
                     fontWeight: FontWeight.bold,
@@ -101,12 +335,12 @@ class ProfileTab extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildContactRow(Icons.phone, 'Số điện thoại', '+84 901 234 567'),
+                _buildContactRow(Icons.phone, 'Số điện thoại', _phone),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12.0),
                   child: Divider(height: 1.0, color: AppColors.surfaceContainerHighest),
                 ),
-                _buildContactRow(Icons.mail, 'Email', 'quan.tran@velocity.vn'),
+                _buildContactRow(Icons.mail, 'Email', _email),
               ],
             ),
           ),
@@ -124,39 +358,101 @@ class ProfileTab extends StatelessWidget {
                   fontSize: 18.0,
                 ),
               ),
-              Text(
-                'Quản lý',
-                style: AppTypography.labelMd.copyWith(
-                  color: AppColors.logisticsRed,
-                  fontWeight: FontWeight.bold,
+              if (_addresses.isNotEmpty)
+                GestureDetector(
+                  onTap: _showAddAddressDialog,
+                  child: Text(
+                    'Quản lý',
+                    style: AppTypography.labelMd.copyWith(
+                      color: AppColors.logisticsRed,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 12.0),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.pureWhite,
-              borderRadius: AppStyles.roundedXl,
-              border: Border.all(color: AppColors.surfaceContainer),
-              boxShadow: AppStyles.ambientShadow,
-            ),
-            child: Column(
-              children: [
-                _buildAddressRow(
-                  'Địa chỉ nhận hàng (Nhà riêng)',
-                  '120 Lê Lợi, Phường Bến Thành, Quận 1, TP. HCM',
-                  isDefault: true,
+          _addresses.isNotEmpty
+              ? Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.pureWhite,
+                    borderRadius: AppStyles.roundedXl,
+                    border: Border.all(color: AppColors.surfaceContainer),
+                    boxShadow: AppStyles.ambientShadow,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _addresses.length,
+                    separatorBuilder: (context, index) => const Divider(height: 1.0, color: AppColors.surfaceContainer),
+                    itemBuilder: (context, index) {
+                      final addr = _addresses[index];
+                      return _buildAddressRow(
+                        addr['label'] ?? '',
+                        addr['address'] ?? '',
+                        isDefault: addr['isDefault'] ?? false,
+                      );
+                    },
+                  ),
+                )
+              : Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                  decoration: BoxDecoration(
+                    color: AppColors.pureWhite,
+                    borderRadius: AppStyles.roundedXl,
+                    border: Border.all(color: AppColors.surfaceContainer),
+                    boxShadow: AppStyles.ambientShadow,
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.map_outlined,
+                        size: 48.0,
+                        color: AppColors.secondary.withValues(alpha: 0.3),
+                      ),
+                      const SizedBox(height: 12.0),
+                      Text(
+                        'Chưa có địa chỉ lưu trữ',
+                        style: AppTypography.headlineMd.copyWith(
+                          color: AppColors.deepOnyx,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15.0,
+                        ),
+                      ),
+                      const SizedBox(height: 6.0),
+                      Text(
+                        'Thêm địa chỉ nhà riêng hoặc văn phòng để đặt giao nhận hàng nhanh chóng hơn.',
+                        style: AppTypography.bodyMd.copyWith(
+                          color: AppColors.secondary,
+                          fontSize: 13.0,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16.0),
+                      SizedBox(
+                        height: 36.0,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            _showAddAddressDialog();
+                          },
+                          icon: const Icon(Icons.add, size: 16.0, color: AppColors.logisticsRed),
+                          label: Text(
+                            'Thêm địa chỉ mới',
+                            style: AppTypography.labelMd.copyWith(
+                              color: AppColors.logisticsRed,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.logisticsRed, width: 1.2),
+                            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const Divider(height: 1.0, color: AppColors.surfaceContainer),
-                _buildAddressRow(
-                  'Địa chỉ lấy hàng (Văn phòng)',
-                  '450 Điện Biên Phủ, Phường 25, Quận Bình Thạnh, TP. HCM',
-                  isDefault: false,
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 28.0),
 
           // Action Buttons

@@ -51,36 +51,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (result['success'] == true) {
         final role = result['role'];
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.verified_user, color: Colors.green),
-                const SizedBox(width: 12.0),
-                Expanded(
-                  child: Text(
-                    'Đăng nhập thành công!',
-                    style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: AppColors.deepOnyx,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-            margin: const EdgeInsets.all(AppStyles.marginMobile),
-            duration: const Duration(seconds: 1),
-          ),
-        );
-
-        Future.delayed(const Duration(milliseconds: 1000), () {
-          if (!mounted) return;
-          if (role == 'SHIPPER') {
-            Navigator.pushReplacementNamed(context, '/driver/dashboard');
-          } else {
-            Navigator.pushReplacementNamed(context, '/customer/dashboard');
-          }
-        });
+        if (role == 'SHIPPER') {
+          Navigator.pushReplacementNamed(context, '/driver/dashboard');
+        } else {
+          Navigator.pushReplacementNamed(context, '/customer/dashboard');
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -154,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: 64.0,
                             height: 64.0,
                             decoration: BoxDecoration(
-                              color: AppColors.logisticsRed.withOpacity(0.08),
+                              color: AppColors.logisticsRed.withValues(alpha: 0.08),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -223,11 +198,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style: AppTypography.labelLg.copyWith(color: AppColors.deepOnyx),
                                 ),
                                 GestureDetector(
-                                  onTap: () {
-                                    // Handle forgot password
-                                  },
-                                  child: Text(
-                                    'Quên mật khẩu?',
+                                   onTap: () {
+                                     Navigator.pushNamed(context, '/forgot-password');
+                                   },
+                                   child: Text(
+                                     'Quên mật khẩu?',
                                     style: AppTypography.labelMd.copyWith(
                                       color: AppColors.tertiary,
                                       fontWeight: FontWeight.w600,
@@ -270,7 +245,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.logisticsRed,
                                   foregroundColor: AppColors.pureWhite,
-                                  disabledBackgroundColor: AppColors.logisticsRed.withOpacity(0.6),
+                                  disabledBackgroundColor: AppColors.logisticsRed.withValues(alpha: 0.6),
                                 ),
                                 child: _isLoading
                                     ? const SizedBox(
@@ -306,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           Row(
                             children: [
-                              Expanded(child: Divider(color: AppColors.surfaceContainerHighest.withOpacity(0.5))),
+                              Expanded(child: Divider(color: AppColors.surfaceContainerHighest.withValues(alpha: 0.5))),
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                                 child: Text(
@@ -314,12 +289,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style: AppTypography.labelMd.copyWith(color: AppColors.secondary, letterSpacing: 1.0),
                                 ),
                               ),
-                              Expanded(child: Divider(color: AppColors.surfaceContainerHighest.withOpacity(0.5))),
+                              Expanded(child: Divider(color: AppColors.surfaceContainerHighest.withValues(alpha: 0.5))),
                             ],
                           ),
                           const SizedBox(height: 20.0),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Text(
                                 'Mới sử dụng Velocity? ',
