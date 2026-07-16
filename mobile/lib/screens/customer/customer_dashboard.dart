@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import 'tabs/home_tab.dart';
 import 'tabs/orders_tab.dart';
 import 'tabs/create_order_tab.dart';
 import 'tabs/tracking_tab.dart';
@@ -15,36 +16,58 @@ class CustomerDashboard extends StatefulWidget {
 
 class _CustomerDashboardState extends State<CustomerDashboard> {
   int _selectedIndex = 0;
+  int _selectedOrderType = 0;
+  int _orderTypeKey = 0;
+  int _ordersRefreshKey = 0;
+  int _trackingRefreshKey = 0;
 
-  late final List<Widget> _tabs;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabs = [
-      OrdersTab(
-        onCreateOrder: () {
-          setState(() {
-            _selectedIndex = 2;
-          });
-        },
-        onTrackOrder: () {
-          setState(() {
-            _selectedIndex = 1;
-          });
-        },
-      ),
-      const TrackingTab(),
-      CreateOrderTab(
-        onOrderCreated: () {
-          setState(() {
-            _selectedIndex = 0;
-          });
-        },
-      ),
-      const ProfileTab(),
-    ];
-  }
+  List<Widget> get _tabs => [
+        HomeTab(
+          onNavigate: (index, {orderType}) {
+            setState(() {
+              _selectedIndex = index;
+              if (orderType != null) {
+                _selectedOrderType = orderType;
+                _orderTypeKey = DateTime.now().millisecondsSinceEpoch;
+              }
+              if (index == 1) {
+                _ordersRefreshKey = DateTime.now().millisecondsSinceEpoch;
+              } else if (index == 2) {
+                _trackingRefreshKey = DateTime.now().millisecondsSinceEpoch;
+              }
+            });
+          },
+        ),
+        OrdersTab(
+          key: ValueKey(_ordersRefreshKey),
+          onCreateOrder: () {
+            setState(() {
+              _selectedOrderType = 0;
+              _orderTypeKey = DateTime.now().millisecondsSinceEpoch;
+              _selectedIndex = 3; // Switch to CreateOrderTab
+            });
+          },
+          onTrackOrder: () {
+            setState(() {
+              _selectedIndex = 2; // Switch to TrackingTab
+            });
+          },
+        ),
+        TrackingTab(
+          key: ValueKey(_trackingRefreshKey),
+        ),
+        CreateOrderTab(
+          key: ValueKey(_orderTypeKey),
+          initialOrderType: _selectedOrderType,
+          onOrderCreated: () {
+            setState(() {
+              _ordersRefreshKey = DateTime.now().millisecondsSinceEpoch;
+              _selectedIndex = 1; // Switch to OrdersTab
+            });
+          },
+        ),
+        const ProfileTab(),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -68,14 +91,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: AppColors.secondary),
-            onPressed: () {
-              setState(() {
-                _selectedIndex = 1; // go to tracking tab
-              });
-            },
-          ),
           Padding(
             padding: const EdgeInsets.only(right: 16.0, left: 8.0),
             child: Container(
@@ -119,10 +134,11 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(0, Icons.dashboard, 'Đơn hàng'),
-            _buildNavItem(1, Icons.local_shipping, 'Theo dõi'),
-            _buildNavItem(2, Icons.add_circle, 'Tạo đơn'),
-            _buildNavItem(3, Icons.person, 'Cá nhân'),
+            _buildNavItem(0, Icons.home_outlined, 'Trang chủ'),
+            _buildNavItem(1, Icons.dashboard_outlined, 'Đơn hàng'),
+            _buildNavItem(2, Icons.local_shipping_outlined, 'Theo dõi'),
+            _buildNavItem(3, Icons.add_circle_outline, 'Tạo đơn'),
+            _buildNavItem(4, Icons.person_outline, 'Cá nhân'),
           ],
         ),
       ),
@@ -135,11 +151,16 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       onTap: () {
         setState(() {
           _selectedIndex = index;
+          if (index == 1) {
+            _ordersRefreshKey = DateTime.now().millisecondsSinceEpoch;
+          } else if (index == 2) {
+            _trackingRefreshKey = DateTime.now().millisecondsSinceEpoch;
+          }
         });
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.primaryContainer.withValues(alpha: 0.1)
@@ -160,7 +181,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
               style: AppTypography.labelMd.copyWith(
                 color: isSelected ? AppColors.logisticsRed : AppColors.secondary,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontSize: 12.0,
+                fontSize: 11.0,
               ),
             ),
           ],
@@ -169,4 +190,3 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     );
   }
 }
-

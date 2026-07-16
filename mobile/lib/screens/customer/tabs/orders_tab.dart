@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_styles.dart';
+import '../../../services/order_service.dart';
 
 class OrdersTab extends StatefulWidget {
   final VoidCallback onCreateOrder;
@@ -21,41 +22,125 @@ class _OrdersTabState extends State<OrdersTab> {
   String _selectedFilter = 'Tất cả';
   String _searchQuery = '';
   final _searchController = TextEditingController();
+  bool _isLoading = false;
 
-  final List<Map<String, dynamic>> _allOrders = [
-    {
-      'code': '#VEL-7210-B',
-      'destination': 'Austin, TX',
-      'date': '18 thg 10, 2023',
-      'cost': '\$142.50',
-      'status': 'Đã giao',
-      'icon': Icons.inventory_2,
-    },
-    {
-      'code': '#VEL-9104-Z',
-      'destination': 'Seattle, WA',
-      'date': '20 thg 10, 2023',
-      'cost': '\$89.20',
-      'status': 'Chờ xử lý',
-      'icon': Icons.local_shipping,
-    },
-    {
-      'code': '#VEL-1033-Q',
-      'destination': 'Miami, FL',
-      'date': '21 thg 10, 2023',
-      'cost': '\$210.00',
-      'status': 'Đang xử lý',
-      'icon': Icons.inventory,
-    },
-    {
-      'code': '#VEL-0045-A',
-      'destination': 'Boston, MA',
-      'date': '15 thg 10, 2023',
-      'cost': '\$0.00',
-      'status': 'Đã hủy',
-      'icon': Icons.cancel,
-    },
-  ];
+  List<Map<String, dynamic>> _allOrders = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
+
+  Future<void> _loadOrders() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final realOrders = await OrderService.fetchOrders();
+    if (!mounted) return;
+
+    if (realOrders.isNotEmpty) {
+      final formatted = realOrders.map((item) {
+        final trackingCode = item['orderCode'] ?? item['trackingCode'] ?? item['orderNumber'] ?? item['id'] ?? 'N/A';
+        final deliveryAddr = item['deliveryAddressText'] ?? item['deliveryAddressSnapshot'] ?? item['deliveryAddress']?['formattedAddress'] ?? 'Việt Nam';
+        final statusRaw = item['status'] ?? 'PENDING';
+        
+        final totalFeeRaw = item['totalAmount'] ?? item['shippingFee'] ?? item['totalFee'] ?? item['subtotal'] ?? 0;
+        final double totalFee = double.tryParse(totalFeeRaw.toString()) ?? 0.0;
+
+        final createdAt = item['createdAt'] != null ? DateTime.tryParse(item['createdAt']) : DateTime.now();
+
+        String statusStr = 'Chờ xử lý';
+        IconData icon = Icons.hourglass_top;
+        if (statusRaw == 'DELIVERED' || statusRaw == 'COMPLETED') {
+          statusStr = 'Đã giao';
+          icon = Icons.inventory_2;
+        } else if (statusRaw == 'CANCELLED') {
+          statusStr = 'Đã hủy';
+          icon = Icons.cancel;
+        } else if (statusRaw == 'IN_TRANSIT' || statusRaw == 'DISPATCHED' || statusRaw == 'PICKED_UP' || statusRaw == 'AT_HUB' || statusRaw == 'READY_FOR_PICKUP' || statusRaw == 'ASSIGNED') {
+          statusStr = 'Đang xử lý';
+          icon = Icons.local_shipping;
+        }
+
+        final dateStr = createdAt != null ? '${createdAt.day}/${createdAt.month}/${createdAt.year}' : '';
+
+        return {
+          'id': item['id'] ?? '',
+          'code': '#$trackingCode',
+          'destination': deliveryAddr,
+          'date': dateStr,
+          'cost': '\$${totalFee.toStringAsFixed(2)}',
+          'status': statusStr,
+          'statusRaw': statusRaw,
+          'icon': icon,
+        };
+      }).toList();
+
+      setState(() {
+        _allOrders = formatted;
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _allOrders = [];
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _confirmCancelOrder(Map<String, dynamic> order) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.pureWhite,
+          title: Text(
+            'Xác nhận hủy đơn',
+            style: AppTypography.headlineMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.deepOnyx),
+          ),
+          content: Text(
+            'Bạn có chắc chắn muốn hủy đơn hàng ${order['code']} không?',
+            style: AppTypography.bodyMd.copyWith(color: AppColors.secondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Bỏ qua', style: TextStyle(color: AppColors.secondary)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.pop(context);
+                setState(() {
+                  _isLoading = true;
+                });
+                final res = await OrderService.cancelOrder(order['id']);
+                if (mounted) {
+                  setState(() {
+                    _isLoading = false;
+                  });
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(res['message'] ?? ''),
+                      backgroundColor: res['success'] == true ? Colors.green : AppColors.error,
+                    ),
+                  );
+                  _loadOrders();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.logisticsRed,
+                foregroundColor: AppColors.pureWhite,
+              ),
+              child: const Text('Đồng ý hủy', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -73,6 +158,11 @@ class _OrdersTabState extends State<OrdersTab> {
       return matchesFilter && matchesSearch;
     }).toList();
 
+    // Find active order to show on the top card
+    final activeOrdersList = _allOrders.where((o) => o['status'] == 'Đang xử lý' || o['status'] == 'Chờ xử lý').toList();
+    final hasActiveOrder = activeOrdersList.isNotEmpty;
+    final activeOrder = hasActiveOrder ? activeOrdersList.first : null;
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(
@@ -82,67 +172,7 @@ class _OrdersTabState extends State<OrdersTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header / Welcome section
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Danh sách đơn hàng',
-                      style: AppTypography.headlineLgMobile.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.deepOnyx,
-                      ),
-                    ),
-                    const SizedBox(height: 4.0),
-                    Text(
-                      'Quản lý và theo dõi các đơn hàng đang hoạt động trong thời gian thực.',
-                      style: AppTypography.bodyMd.copyWith(color: AppColors.secondary),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16.0),
 
-          // Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: widget.onTrackOrder,
-                  icon: const Icon(Icons.location_searching, size: 18.0),
-                  label: const Text('Tra cứu nhanh'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.deepOnyx,
-                    foregroundColor: AppColors.pureWhite,
-                    padding: const EdgeInsets.symmetric(vertical: 14.0),
-                    shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12.0),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: widget.onCreateOrder,
-                  icon: const Icon(Icons.add_circle, size: 18.0),
-                  label: const Text('Tạo đơn mới'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.logisticsRed,
-                    foregroundColor: AppColors.pureWhite,
-                    padding: const EdgeInsets.symmetric(vertical: 14.0),
-                    shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24.0),
 
           // Search & Filter Bar Container
           Container(
@@ -157,15 +187,16 @@ class _OrdersTabState extends State<OrdersTab> {
               children: [
                 // Search Input
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                   decoration: BoxDecoration(
-                    color: AppColors.cloudGray,
-                    borderRadius: AppStyles.roundedLg,
+                    color: AppColors.pureWhite,
+                    borderRadius: BorderRadius.circular(100.0),
+                    border: Border.all(color: AppColors.surfaceContainerHighest, width: 1.0),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.search, color: AppColors.secondary),
-                      const SizedBox(width: 8.0),
+                      const Icon(Icons.search, color: AppColors.secondary, size: 20.0),
+                      const SizedBox(width: 10.0),
                       Expanded(
                         child: TextFormField(
                           controller: _searchController,
@@ -174,10 +205,14 @@ class _OrdersTabState extends State<OrdersTab> {
                               _searchQuery = val;
                             });
                           },
-                          style: AppTypography.bodyMd,
+                          style: AppTypography.bodyMd.copyWith(color: AppColors.deepOnyx),
                           decoration: const InputDecoration(
                             hintText: 'Tìm kiếm theo mã đơn, điểm đến...',
                             border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            hintStyle: TextStyle(color: Colors.black38),
+                            isDense: true,
                             contentPadding: EdgeInsets.symmetric(vertical: 12.0),
                           ),
                         ),
@@ -238,140 +273,186 @@ class _OrdersTabState extends State<OrdersTab> {
           ),
           const SizedBox(height: 24.0),
 
-          // Active Shipment Hero Card
-          if (_selectedFilter == 'Tất cả' || _selectedFilter == 'Đang giao') ...[
+          // Active Shipment Hero Card (Show real active order details if one exists)
+          if ((_selectedFilter == 'Tất cả' || _selectedFilter == 'Đang giao') && activeOrder != null) ...[
             Container(
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: AppColors.pureWhite,
                 borderRadius: AppStyles.roundedXl,
-                border: const Border(
-                  left: BorderSide(color: AppColors.logisticsRed, width: 4.0),
-                ),
+                border: Border.all(color: AppColors.surfaceContainerHighest),
                 boxShadow: AppStyles.ambientShadow,
               ),
-              child: Column(
+              child: Stack(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 4.0,
+                    child: Container(color: AppColors.logisticsRed),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryContainer.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(20.0),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(20.0),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 8.0,
+                                        height: 8.0,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.green,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6.0),
+                                      Text(
+                                        'ĐANG VẬN CHUYỂN',
+                                        style: AppTypography.labelMd.copyWith(
+                                          color: Colors.green.shade800,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11.0,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  activeOrder['code'],
+                                  style: AppTypography.labelLg.copyWith(
+                                    color: AppColors.secondary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16.0),
+                            Text(
+                              'Đang giao đến ${activeOrder['destination'].toString().split(',').first}',
+                              style: AppTypography.headlineLgMobile.copyWith(
+                                color: AppColors.deepOnyx,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18.0,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 12.0),
+                            _buildStepper(),
+                            const SizedBox(height: 16.0),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Ngày tạo đơn',
+                                        style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
+                                      ),
+                                      const SizedBox(height: 4.0),
+                                      Text(
+                                        activeOrder['date'],
+                                        style: AppTypography.headlineMd.copyWith(
+                                          color: AppColors.deepOnyx,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15.0,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Vị trí hiện tại',
+                                        style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
+                                      ),
+                                      const SizedBox(height: 4.0),
+                                      Text(
+                                        'Đang xử lý lấy hàng',
+                                        style: AppTypography.headlineMd.copyWith(
+                                          color: AppColors.deepOnyx,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15.0,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Mini map image overlay
+                      Container(
+                        height: 140.0,
+                        width: double.infinity,
+                        decoration: const BoxDecoration(
+                          image: DecorationImage(
+                            image: NetworkImage(
+                              'https://lh3.googleusercontent.com/aida-public/AB6AXuCdr4zOfZ6wcMlC1wGHTGsspcbaQJhcbZ_eD8iNpFUE67Mvz3j8dCXNHhUPgfohoQKqCpTM2YbUCL6Pbt01X0cZ5gcM2dY9yNqlntQ1MHFMVO5lNFwCL3MZG0cz1szSHuFgXA6Ryty6ZxRMQX76oFWhdEyBe_bhu3zl4HC0WuEll8WeXEaEtKP2wJBzwsvwFL6Ou1C3J2gJ2dDKpYqjK8H955rHm556ZSVS7Z-oCFeOX0mQA065juzQog',
+                            ),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                AppColors.deepOnyx.withValues(alpha: 0.4),
+                              ],
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                          alignment: Alignment.bottomCenter,
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 44.0,
+                            child: ElevatedButton(
+                              onPressed: widget.onTrackOrder,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.pureWhite,
+                                foregroundColor: AppColors.deepOnyx,
+                                elevation: 3.0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(100.0),
+                                ),
                               ),
                               child: Text(
-                                'Đang vận chuyển',
-                                style: AppTypography.labelMd.copyWith(
-                                  color: AppColors.logisticsRed,
+                                'Theo dõi bản đồ',
+                                style: AppTypography.button.copyWith(
+                                  color: AppColors.deepOnyx,
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 14.0,
                                 ),
                               ),
                             ),
-                            Text(
-                              'Đơn hàng #VEL-8829-X',
-                              style: AppTypography.labelLg.copyWith(color: AppColors.secondary),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12.0),
-                        Text(
-                          'Vận chuyển hỏa tốc San Francisco đến New York',
-                          style: AppTypography.headlineMd.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.deepOnyx,
-                            fontSize: 18.0,
                           ),
                         ),
-                        const SizedBox(height: 16.0),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Dự kiến đến',
-                                    style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
-                                  ),
-                                  const SizedBox(height: 2.0),
-                                  Text(
-                                    '24 thg 10, 2023',
-                                    style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Vị trí hiện tại',
-                                    style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
-                                  ),
-                                  const SizedBox(height: 2.0),
-                                  Text(
-                                    'Hub Chicago',
-                                    style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20.0),
-
-                        // Simple stepper
-                        _buildStepper(),
-                      ],
-                    ),
-                  ),
-
-                  // Mini map image overlay
-                  Container(
-                    height: 160.0,
-                    width: double.infinity,
-                    decoration: const BoxDecoration(
-                      image: DecorationImage(
-                        image: NetworkImage(
-                          'https://lh3.googleusercontent.com/aida-public/AB6AXuCdr4zOfZ6wcMlC1wGHTGsspcbaQJhcbZ_eD8iNpFUE67Mvz3j8dCXNHhUPgfohoQKqCpTM2YbUCL6Pbt01X0cZ5gcM2dY9yNqlntQ1MHFMVO5lNFwCL3MZG0cz1szSHuFgXA6Ryty6ZxRMQX76oFWhdEyBe_bhu3zl4HC0WuEll8WeXEaEtKP2wJBzwsvwFL6Ou1C3J2gJ2dDKpYqjK8H955rHm556ZSVS7Z-oCFeOX0mQA065juzQog',
-                        ),
-                        fit: BoxFit.cover,
                       ),
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            AppColors.deepOnyx.withValues(alpha: 0.6),
-                          ],
-                        ),
-                      ),
-                      padding: const EdgeInsets.all(16.0),
-                      alignment: Alignment.bottomCenter,
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: 40.0,
-                        child: ElevatedButton(
-                          onPressed: widget.onTrackOrder,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.pureWhite,
-                            foregroundColor: AppColors.deepOnyx,
-                            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                          ),
-                          child: const Text('Theo dõi bản đồ'),
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -380,31 +461,71 @@ class _OrdersTabState extends State<OrdersTab> {
           ],
 
           // Orders List
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: filteredOrders.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12.0),
-            itemBuilder: (context, index) {
-              final order = filteredOrders[index];
-              return _buildOrderListItem(order);
-            },
-          ),
-          const SizedBox(height: 24.0),
+          _isLoading
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32.0),
+                    child: CircularProgressIndicator(color: AppColors.logisticsRed),
+                  ),
+                )
+              : filteredOrders.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 40.0),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.inventory_2_outlined,
+                              size: 64.0,
+                              color: AppColors.secondary.withValues(alpha: 0.3),
+                            ),
+                            const SizedBox(height: 16.0),
+                            Text(
+                              'Không có đơn hàng nào',
+                              style: AppTypography.headlineMd.copyWith(
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8.0),
+                            Text(
+                              'Đơn hàng thực tế của bạn sẽ được hiển thị tại đây.',
+                              style: AppTypography.bodyMd.copyWith(
+                                color: AppColors.secondary,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: filteredOrders.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 12.0),
+                      itemBuilder: (context, index) {
+                        final order = filteredOrders[index];
+                        return _buildOrderListItem(order);
+                      },
+                    ),
+          if (filteredOrders.isNotEmpty) ...[
+            const SizedBox(height: 24.0),
 
-          // Pagination / Load More button
-          Center(
-            child: OutlinedButton(
-              onPressed: () {},
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.deepOnyx,
-                side: const BorderSide(color: AppColors.surfaceContainerHighest),
-                shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+            // Pagination / Load More button
+            Center(
+              child: OutlinedButton(
+                onPressed: () {},
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.deepOnyx,
+                  side: const BorderSide(color: AppColors.surfaceContainerHighest),
+                  shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+                ),
+                child: const Text('Xem lịch sử cũ hơn'),
               ),
-              child: const Text('Xem lịch sử cũ hơn'),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -486,75 +607,103 @@ class _OrdersTabState extends State<OrdersTab> {
         break;
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: AppColors.pureWhite,
-        borderRadius: AppStyles.roundedXl,
-        border: Border.all(color: AppColors.surfaceContainer),
-        boxShadow: AppStyles.ambientShadow,
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48.0,
-            height: 48.0,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: AppStyles.roundedLg,
+    return InkWell(
+      onTap: () {
+        Navigator.pushNamed(
+          context,
+          '/customer/order-detail',
+          arguments: {'orderId': order['id']},
+        ).then((_) => _loadOrders());
+      },
+      borderRadius: AppStyles.roundedXl,
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: AppColors.pureWhite,
+          borderRadius: AppStyles.roundedXl,
+          border: Border.all(color: AppColors.surfaceContainer),
+          boxShadow: AppStyles.ambientShadow,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48.0,
+              height: 48.0,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: AppStyles.roundedLg,
+              ),
+              child: Icon(
+                order['icon'] as IconData,
+                color: order['status'] == 'Đã giao'
+                    ? AppColors.logisticsRed
+                    : order['status'] == 'Đang xử lý'
+                        ? AppColors.tertiary
+                        : AppColors.secondary,
+                size: 24.0,
+              ),
             ),
-            child: Icon(
-              order['icon'] as IconData,
-              color: order['status'] == 'Đã giao'
-                  ? AppColors.logisticsRed
-                  : order['status'] == 'Đang xử lý'
-                      ? AppColors.tertiary
-                      : AppColors.secondary,
-              size: 24.0,
+            const SizedBox(width: 16.0),
+            Expanded(
+              child: GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                childAspectRatio: 2.0,
+                crossAxisSpacing: 8.0,
+                mainAxisSpacing: 4.0,
+                children: [
+                  _buildGridItem('Mã đơn hàng', order['code'] as String, isBold: true),
+                  _buildGridItem('Điểm đến', order['destination'] as String),
+                  _buildGridItem('Ngày', order['date'] as String),
+                  _buildGridItem('Phí', order['cost'] as String),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 16.0),
-          Expanded(
-            child: GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              childAspectRatio: 2.5,
-              crossAxisSpacing: 8.0,
-              mainAxisSpacing: 4.0,
+            const SizedBox(width: 8.0),
+            Column(
               children: [
-                _buildGridItem('Mã đơn hàng', order['code'] as String, isBold: true),
-                _buildGridItem('Điểm đến', order['destination'] as String),
-                _buildGridItem('Ngày', order['date'] as String),
-                _buildGridItem('Phí', order['cost'] as String),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8.0),
-          Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                decoration: BoxDecoration(
-                  color: chipBg,
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                child: Text(
-                  order['status'] as String,
-                  style: AppTypography.labelMd.copyWith(
-                    color: chipText,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 10.0,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                  decoration: BoxDecoration(
+                    color: chipBg,
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  child: Text(
+                    order['status'] as String,
+                    style: AppTypography.labelMd.copyWith(
+                      color: chipText,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10.0,
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.more_vert, color: AppColors.secondary),
-                onPressed: () {},
-              ),
-            ],
-          ),
-        ],
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: AppColors.secondary),
+                  onSelected: (val) {
+                    if (val == 'cancel') {
+                      _confirmCancelOrder(order);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem<String>(
+                      value: 'cancel',
+                      enabled: order['statusRaw'] == 'CREATED' || order['statusRaw'] == 'READY_FOR_PICKUP' || order['statusRaw'] == 'PENDING' || order['statusRaw'] == 'DRAFT',
+                      child: Text(
+                        'Hủy đơn hàng',
+                        style: TextStyle(
+                          color: (order['statusRaw'] == 'CREATED' || order['statusRaw'] == 'READY_FOR_PICKUP' || order['statusRaw'] == 'PENDING' || order['statusRaw'] == 'DRAFT')
+                              ? AppColors.error
+                              : AppColors.secondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

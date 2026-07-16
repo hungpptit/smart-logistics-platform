@@ -21,6 +21,48 @@ class _DriverDashboardState extends State<DriverDashboard> {
   bool _showTrafficAlert = false;
   Timer? _alertTimer;
 
+  final List<Map<String, dynamic>> _driverStops = [
+    {
+      'index': 5,
+      'title': 'Velocity Tech Hub',
+      'address': '452 Industrial Way, Dock 4, Austin TX',
+      'packages': 3,
+      'eta': '10:45 SA',
+      'distance': '0.8 mi',
+      'status': 'ĐANG THỰC HIỆN',
+      'isActive': true,
+      'isCheckedIn': false,
+      'signature': null,
+      'photo': null,
+    },
+    {
+      'index': 6,
+      'title': 'Northside Retail Center',
+      'address': '8920 Burnet Rd, Suite 110, Austin TX',
+      'packages': 1,
+      'eta': '11:15 SA',
+      'distance': '2.4 mi',
+      'status': 'TIẾP THEO',
+      'isActive': false,
+      'isCheckedIn': false,
+      'signature': null,
+      'photo': null,
+    },
+    {
+      'index': 7,
+      'title': 'Summit Residential Park',
+      'address': '2200 Summit Vista Pkwy, Austin TX',
+      'packages': 2,
+      'eta': '11:45 SA',
+      'distance': '4.1 mi',
+      'status': 'ĐANG CHỜ',
+      'isActive': false,
+      'isCheckedIn': false,
+      'signature': null,
+      'photo': null,
+    },
+  ];
+
   String _driverName = 'Tài xế';
   String _driverEmail = 'driver@velocity.vn';
 
@@ -524,21 +566,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Intro
-            Text(
-              'Chào buổi sáng, $_driverName',
-              style: AppTypography.headlineLgMobile.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.deepOnyx,
-              ),
-            ),
-            const SizedBox(height: 4.0),
-            Text(
-              'Ca làm việc của bạn đã bắt đầu được 42 phút. Bạn đang theo đúng tiến độ cho 18 đơn hàng.',
-              style: AppTypography.bodyMd.copyWith(color: AppColors.secondary),
-            ),
-            const SizedBox(height: 16.0),
-
             // Actions row
             Row(
               children: [
@@ -559,7 +586,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      // Check-in scanner
+                      final activeStop = _driverStops.firstWhere((s) => s['isActive'] == true && s['isCheckedIn'] == false, orElse: () => <String, dynamic>{});
+                      if (activeStop.isNotEmpty) {
+                        _showQRScanner(activeStop);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Không có điểm dừng nào đang hoạt động chờ Check-in.'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                      }
                     },
                     icon: const Icon(Icons.qr_code_scanner, size: 18.0),
                     label: const Text('Quét Check-in'),
@@ -813,37 +850,15 @@ class _DriverDashboardState extends State<DriverDashboard> {
             ),
             const SizedBox(height: 12.0),
 
-            _buildStopCard(
-              index: 5,
-              title: 'Velocity Tech Hub',
-              address: '452 Industrial Way, Dock 4, Austin TX',
-              packages: 3,
-              eta: '10:45 SA',
-              distance: '0.8 mi',
-              status: 'ĐANG THỰC HIỆN',
-              isActive: true,
-            ),
-            const SizedBox(height: 12.0),
-            _buildStopCard(
-              index: 6,
-              title: 'Northside Retail Center',
-              address: '8920 Burnet Rd, Suite 110, Austin TX',
-              packages: 1,
-              eta: '11:15 SA',
-              distance: '2.4 mi',
-              status: 'TIẾP THEO',
-              isActive: false,
-            ),
-            const SizedBox(height: 12.0),
-            _buildStopCard(
-              index: 7,
-              title: 'Summit Residential Park',
-              address: '2200 Summit Vista Pkwy, Austin TX',
-              packages: 2,
-              eta: '11:45 SA',
-              distance: '4.1 mi',
-              status: 'ĐANG CHỜ',
-              isActive: false,
+            Column(
+              children: _driverStops.map((stop) {
+                return Column(
+                  children: [
+                    _buildStopCard(stop),
+                    const SizedBox(height: 12.0),
+                  ],
+                );
+              }).toList(),
             ),
           ],
         ),
@@ -851,20 +866,20 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  Widget _buildStopCard({
-    required int index,
-    required String title,
-    required String address,
-    required int packages,
-    required String eta,
-    required String distance,
-    required String status,
-    required bool isActive,
-  }) {
+  Widget _buildStopCard(Map<String, dynamic> stop) {
+    final int index = stop['index'] as int;
+    final String title = stop['title'] as String;
+    final String address = stop['address'] as String;
+    final int packages = stop['packages'] as int;
+    final String eta = stop['eta'] as String;
+    final String distance = stop['distance'] as String;
+    final String status = stop['status'] as String;
+    final bool isActive = stop['isActive'] as bool;
+
     return GestureDetector(
       onTap: () {
         if (isActive) {
-          _startNavigation();
+          _showStopDetailsDialog(stop);
         }
       },
       child: Container(
@@ -1427,4 +1442,542 @@ class _DriverDashboardState extends State<DriverDashboard> {
       ],
     );
   }
+
+  void _showQRScanner(Map<String, dynamic> stop) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        Timer(const Duration(seconds: 2), () {
+          Navigator.pop(context);
+          setState(() {
+            stop['isCheckedIn'] = true;
+          });
+          showDialog(
+            context: this.context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                backgroundColor: AppColors.pureWhite,
+                shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+                title: const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green),
+                    SizedBox(width: 8.0),
+                    Text('Check-in thành công', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                content: Text('Bạn đã check-in thành công tại điểm dừng ${stop['title']}. Hãy tiến hành lấy chữ ký và chụp ảnh POD.'),
+                actions: [
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showStopDetailsDialog(stop);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.logisticsRed,
+                      foregroundColor: AppColors.pureWhite,
+                    ),
+                    child: const Text('Tiếp tục'),
+                  ),
+                ],
+              );
+            },
+          );
+        });
+
+        return Dialog(
+          backgroundColor: const Color(0xD9000000),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('QUÉT MÃ QR CHECK-IN', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 280.0,
+                height: 280.0,
+                margin: const EdgeInsets.only(bottom: 24.0),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white54, width: 2.0),
+                  borderRadius: BorderRadius.circular(16.0),
+                ),
+                child: const Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    PulsingScanLine(),
+                  ],
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 24.0),
+                child: Text(
+                  'Đặt mã QR của bưu cục / điểm dừng vào khung hình',
+                  style: TextStyle(color: Colors.white70, fontSize: 12.0),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showStopDetailsDialog(Map<String, dynamic> stop) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final bool isCheckedIn = stop['isCheckedIn'] == true;
+            final bool hasSignature = stop['signature'] != null;
+            final bool hasPhoto = stop['photo'] != null;
+            final bool canComplete = isCheckedIn && hasSignature && hasPhoto;
+
+            return Dialog(
+              backgroundColor: AppColors.pureWhite,
+              shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            stop['title'] as String,
+                            style: AppTypography.headlineLgMobile.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.deepOnyx,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: AppColors.secondary),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      stop['address'] as String,
+                      style: AppTypography.bodyMd.copyWith(color: AppColors.secondary),
+                    ),
+                    const SizedBox(height: 20.0),
+
+                    Row(
+                      children: [
+                        Icon(
+                          isCheckedIn ? Icons.check_circle : Icons.radio_button_unchecked,
+                          color: isCheckedIn ? Colors.green : AppColors.secondary,
+                        ),
+                        const SizedBox(width: 12.0),
+                        Expanded(
+                          child: Text(
+                            '1. Quét QR Check-in',
+                            style: TextStyle(
+                              fontWeight: isCheckedIn ? FontWeight.bold : FontWeight.normal,
+                              color: isCheckedIn ? AppColors.deepOnyx : AppColors.secondary,
+                            ),
+                          ),
+                        ),
+                        if (!isCheckedIn)
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _showQRScanner(stop);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.logisticsRed,
+                              foregroundColor: AppColors.pureWhite,
+                            ),
+                            child: const Text('Quét QR'),
+                          ),
+                      ],
+                    ),
+                    const Divider(height: 24.0),
+
+                    Row(
+                      children: [
+                        Icon(
+                          hasSignature ? Icons.check_circle : Icons.radio_button_unchecked,
+                          color: hasSignature ? Colors.green : AppColors.secondary,
+                        ),
+                        const SizedBox(width: 12.0),
+                        Expanded(
+                          child: Text(
+                            '2. Chữ ký người nhận hàng',
+                            style: TextStyle(
+                              fontWeight: hasSignature ? FontWeight.bold : FontWeight.normal,
+                              color: hasSignature ? AppColors.deepOnyx : AppColors.secondary,
+                            ),
+                          ),
+                        ),
+                        if (isCheckedIn && !hasSignature)
+                          ElevatedButton(
+                            onPressed: () {
+                              _showSignaturePadDialog(stop, () {
+                                setDialogState(() {});
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.deepOnyx,
+                              foregroundColor: AppColors.pureWhite,
+                            ),
+                            child: const Text('Ký tên'),
+                          ),
+                      ],
+                    ),
+                    if (hasSignature) ...[
+                      const SizedBox(height: 8.0),
+                      Container(
+                        width: double.infinity,
+                        height: 60.0,
+                        decoration: BoxDecoration(
+                          color: AppColors.cloudGray,
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          '✍️ Đã ký tên thành công',
+                          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.green, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                    const Divider(height: 24.0),
+
+                    Row(
+                      children: [
+                        Icon(
+                          hasPhoto ? Icons.check_circle : Icons.radio_button_unchecked,
+                          color: hasPhoto ? Colors.green : AppColors.secondary,
+                        ),
+                        const SizedBox(width: 12.0),
+                        Expanded(
+                          child: Text(
+                            '3. Chụp hình bằng chứng giao nhận',
+                            style: TextStyle(
+                              fontWeight: hasPhoto ? FontWeight.bold : FontWeight.normal,
+                              color: hasPhoto ? AppColors.deepOnyx : AppColors.secondary,
+                            ),
+                          ),
+                        ),
+                        if (isCheckedIn && !hasPhoto)
+                          ElevatedButton(
+                            onPressed: () {
+                              _simulateCameraCapture(stop, () {
+                                setDialogState(() {});
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.deepOnyx,
+                              foregroundColor: AppColors.pureWhite,
+                            ),
+                            child: const Text('Chụp ảnh'),
+                          ),
+                      ],
+                    ),
+                    if (hasPhoto) ...[
+                      const SizedBox(height: 8.0),
+                      Container(
+                        width: double.infinity,
+                        height: 100.0,
+                        decoration: BoxDecoration(
+                          color: AppColors.cloudGray,
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.network(
+                          'https://picsum.photos/id/10/400/200',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24.0),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52.0,
+                      child: ElevatedButton(
+                        onPressed: canComplete
+                            ? () {
+                                Navigator.pop(context);
+                                _completeStop(stop);
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.logisticsRed,
+                          foregroundColor: AppColors.pureWhite,
+                        ),
+                        child: const Text(
+                          'HOÀN THÀNH GIAO HÀNG',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showSignaturePadDialog(Map<String, dynamic> stop, VoidCallback onSaved) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.pureWhite,
+          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+          title: const Text('Ký tên xác nhận', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: SignaturePad(
+            onSave: (points) {
+              Navigator.pop(context);
+              setState(() {
+                stop['signature'] = points;
+              });
+              onSaved();
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _simulateCameraCapture(Map<String, dynamic> stop, VoidCallback onCaptured) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: AppColors.logisticsRed),
+                SizedBox(height: 16.0),
+                Text('Đang mở máy ảnh & lưu ảnh lên cloud...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Future.delayed(const Duration(seconds: 1), () {
+      if (!mounted) return;
+      Navigator.pop(context);
+      setState(() {
+        stop['photo'] = 'captured_photo_url';
+      });
+      onCaptured();
+    });
+  }
+
+  void _completeStop(Map<String, dynamic> stop) {
+    setState(() {
+      stop['status'] = 'ĐÃ GIAO';
+      stop['isActive'] = false;
+
+      final currentIndex = stop['index'] as int;
+      final nextStop = _driverStops.firstWhere(
+        (s) => s['index'] == currentIndex + 1,
+        orElse: () => <String, dynamic>{},
+      );
+      if (nextStop.isNotEmpty) {
+        nextStop['isActive'] = true;
+        nextStop['status'] = 'ĐANG THỰC HIỆN';
+      }
+    });
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.pureWhite,
+          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green),
+              SizedBox(width: 8.0),
+              Text('Giao hàng thành công', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text('Đã cập nhật trạng thái Điểm dừng ${stop['title']} thành ĐÃ GIAO và truyền thông tin POD lên máy chủ.'),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.logisticsRed,
+                foregroundColor: AppColors.pureWhite,
+              ),
+              child: const Text('Đóng'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class PulsingScanLine extends StatefulWidget {
+  const PulsingScanLine({super.key});
+
+  @override
+  State<PulsingScanLine> createState() => _PulsingScanLineState();
+}
+
+class _PulsingScanLineState extends State<PulsingScanLine> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 40.0, end: 240.0).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Positioned(
+          top: _animation.value,
+          left: 40.0,
+          right: 40.0,
+          child: Container(
+            height: 2.0,
+            decoration: BoxDecoration(
+              color: AppColors.logisticsRed,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.logisticsRed.withValues(alpha: 0.5),
+                  blurRadius: 4.0,
+                  spreadRadius: 2.0,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class SignaturePad extends StatefulWidget {
+  final Function(List<Offset>) onSave;
+  const SignaturePad({super.key, required this.onSave});
+
+  @override
+  State<SignaturePad> createState() => _SignaturePadState();
+}
+
+class _SignaturePadState extends State<SignaturePad> {
+  final List<Offset> _points = [];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: double.infinity,
+          height: 180.0,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12.0),
+            border: Border.all(color: AppColors.surfaceContainerHighest),
+          ),
+          child: GestureDetector(
+            onPanUpdate: (details) {
+              setState(() {
+                RenderBox renderBox = context.findRenderObject() as RenderBox;
+                _points.add(renderBox.globalToLocal(details.globalPosition));
+              });
+            },
+            onPanEnd: (details) {
+              _points.add(Offset.infinite);
+            },
+            child: CustomPaint(
+              painter: SignaturePainter(_points),
+              size: Size.infinite,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12.0),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _points.clear();
+                });
+              },
+              child: const Text('Xóa chữ ký', style: TextStyle(color: AppColors.error)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                widget.onSave(_points);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.logisticsRed,
+                foregroundColor: AppColors.pureWhite,
+              ),
+              child: const Text('Lưu chữ ký'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class SignaturePainter extends CustomPainter {
+  final List<Offset> points;
+  SignaturePainter(this.points);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.deepOnyx
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 3.0;
+
+    for (int i = 0; i < points.length - 1; i++) {
+      if (points[i] != Offset.infinite && points[i + 1] != Offset.infinite) {
+        canvas.drawLine(points[i], points[i + 1], paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(SignaturePainter oldDelegate) => true;
 }

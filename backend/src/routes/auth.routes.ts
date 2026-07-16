@@ -246,4 +246,81 @@ router.post(
   authController.changePassword
 );
 
+/**
+ * @openapi
+ * /auth/forgot-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Yêu cầu đặt lại mật khẩu
+ *     description: Gửi mã OTP khôi phục mật khẩu vào Email người dùng.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: customer@gmail.com
+ *     responses:
+ *       200:
+ *         description: Đã gửi mã khôi phục mật khẩu thành công
+ *       404:
+ *         description: Không tìm thấy tài khoản với địa chỉ email này
+ */
+router.post(
+  '/forgot-password',
+  rateLimiter(5, 60 * 1000),
+  authController.forgotPassword
+);
+
+/**
+ * @openapi
+ * /auth/reset-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Đặt lại mật khẩu bằng mã OTP
+ *     description: Xác thực mã OTP nhận qua email và đặt lại mật khẩu mới cho tài khoản.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - otp
+ *               - newPassword
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: customer@gmail.com
+ *               otp:
+ *                 type: string
+ *                 example: "123456"
+ *               newPassword:
+ *                 type: string
+ *                 example: newPassword123
+ *     responses:
+ *       200:
+ *         description: Đặt lại mật khẩu thành công
+ *       400:
+ *         description: Mã OTP không đúng hoặc đã hết hạn
+ *       404:
+ *         description: Không tìm thấy tài khoản
+ */
+router.post(
+  '/reset-password',
+  rateLimiter(10, 60 * 1000),
+  authController.resetPassword
+);
+
 export default router;
+

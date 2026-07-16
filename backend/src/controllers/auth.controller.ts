@@ -142,4 +142,46 @@ export class AuthController {
       next(error);
     }
   };
+
+  public forgotPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          message: 'Vui lòng cung cấp địa chỉ email.',
+        });
+        return;
+      }
+      const result = await this.authService.forgotPassword(email);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { email, otp, newPassword } = req.body;
+      if (!email || !otp || !newPassword) {
+        res.status(400).json({
+          success: false,
+          message: 'Vui lòng cung cấp đầy đủ email, mã xác thực và mật khẩu mới.',
+        });
+        return;
+      }
+      if (newPassword.length < 6) {
+        res.status(400).json({
+          success: false,
+          message: 'Mật khẩu mới phải có ít nhất 6 ký tự.',
+        });
+        return;
+      }
+      const result = await this.authService.resetPassword(email, otp, newPassword);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
 }
+

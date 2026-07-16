@@ -40,6 +40,8 @@ class MailWorker {
             await this.sendCustomerWelcomeEmail(content);
           } else if (content.type === 'SEND_OTP') {
             await this.sendOtpEmail(content);
+          } else if (content.type === 'RESET_PASSWORD') {
+            await this.sendResetPasswordEmail(content);
           }
 
           channel.ack(msg);
@@ -316,6 +318,50 @@ class MailWorker {
 
     await this.transporter.sendMail(mailOptions);
     console.log(`[MailWorker] Welcome email successfully sent to ${data.email}`);
+  }
+
+  private async sendResetPasswordEmail(data: {
+    email: string;
+    username: string;
+    resetToken: string;
+  }) {
+    const resetLink = `http://localhost:3000/reset-password?token=${data.resetToken}&email=${data.email}`;
+    const mailOptions = {
+      from: `"Velocity Logistics" <${process.env.EMAIL_USER}>`,
+      to: data.email,
+      subject: `[Velocity Logistics] Yêu cầu khôi phục mật khẩu tài khoản`,
+      html: `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          <div style="background-color: #bc0100; padding: 24px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px;">Velocity Logistics</h1>
+            <p style="margin: 4px 0 0 0; font-size: 12px; opacity: 0.85;">Khôi Phục Mật Khẩu</p>
+          </div>
+          
+          <div style="padding: 24px; background-color: #ffffff; color: #1a202c; line-height: 1.6;">
+            <h3 style="margin-top: 0; color: #bc0100;">Xin chào ${data.username},</h3>
+            <p>Chúng tôi nhận được yêu cầu khôi phục mật khẩu cho tài khoản của bạn tại <strong>Velocity Logistics</strong>. Vui lòng sử dụng mã đặt lại dưới đây:</p>
+            
+            <div style="background-color: #f7fafc; border: 1px solid #edf2f7; padding: 20px; border-radius: 6px; margin: 20px 0; text-align: center;">
+              <span style="font-family: monospace; font-size: 28px; font-weight: bold; color: #bc0100; letter-spacing: 4px; display: inline-block;">${data.resetToken}</span>
+            </div>
+            
+            <p style="background-color: #fffaf0; border-left: 4px solid #dd6b20; padding: 12px; border-radius: 4px; font-size: 13px; color: #7b341e; margin-bottom: 20px;">
+              <strong>* Lưu ý bảo mật:</strong> Mã khôi phục mật khẩu này sẽ hết hạn sau <strong>15 phút</strong>.
+            </p>
+            
+            <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
+          </div>
+          
+          <div style="background-color: #f7fafc; padding: 16px; text-align: center; font-size: 11px; color: #a0aec0; border-top: 1px solid #edf2f7;">
+            <p style="margin: 0;">Đây là email tự động từ hệ thống. Vui lòng không trả lời thư này.</p>
+            <p style="margin: 4px 0 0 0;">&copy; 2026 Velocity Logistics. All Rights Reserved.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    await this.transporter.sendMail(mailOptions);
+    console.log(`[MailWorker] Reset password link email successfully sent to ${data.email}`);
   }
 }
 

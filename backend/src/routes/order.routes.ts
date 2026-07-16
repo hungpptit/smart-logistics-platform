@@ -190,6 +190,11 @@ router.get(
  *         description: Chi tiết đơn hàng
  */
 router.get(
+  '/by-code/:code',
+  orderController.getByCode
+);
+
+router.get(
   '/:id',
   orderController.getById
 );
@@ -264,6 +269,92 @@ router.put(
   requireRoles(['ADMIN', 'STAFF']),
   validationMiddleware(UpdateOrderStatusDto),
   orderController.updateStatus
+);
+
+/**
+ * @openapi
+ * /orders/{id}/pay:
+ *   post:
+ *     tags:
+ *       - Orders
+ *     summary: Thanh toán đơn hàng
+ *     description: Khách hàng xác nhận thanh toán đơn hàng với phương thức thanh toán đã chọn.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - paymentMethod
+ *             properties:
+ *               paymentMethod:
+ *                 type: string
+ *                 enum: [CASH, BANK_TRANSFER, E_WALLET, COD]
+ *                 example: BANK_TRANSFER
+ *     responses:
+ *       200:
+ *         description: Thanh toán thành công
+ *       400:
+ *         description: Đơn hàng đã thanh toán hoặc dữ liệu không hợp lệ
+ */
+router.post(
+  '/:id/pay',
+  orderController.pay
+);
+
+/**
+ * @openapi
+ * /orders/calculate-pricing:
+ *   post:
+ *     tags:
+ *       - Orders
+ *     summary: Tính toán cước phí ước tính cho đơn hàng
+ *     description: Tính cước phí dựa trên khoảng cách (km), khối lượng (kg), mã dịch vụ, tình trạng dễ vỡ và COD thu hộ.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - serviceCode
+ *               - distanceKm
+ *               - totalWeightKg
+ *             properties:
+ *               serviceCode:
+ *                 type: string
+ *                 example: STANDARD
+ *               distanceKm:
+ *                 type: number
+ *                 example: 5.5
+ *               totalWeightKg:
+ *                 type: number
+ *                 example: 2.0
+ *               isFragile:
+ *                 type: boolean
+ *                 default: false
+ *               codAmount:
+ *                 type: number
+ *                 default: 0
+ *     responses:
+ *       200:
+ *         description: Tính toán cước phí thành công
+ */
+router.post(
+  '/calculate-pricing',
+  orderController.calculatePricing
 );
 
 export default router;
