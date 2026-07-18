@@ -20,8 +20,14 @@ export class OrderService {
     if (!customer || customer.deletedAt) {
       throw new BadRequestException('Không tìm thấy thông tin hồ sơ khách hàng liên kết với tài khoản này');
     }
-    if (customer.status !== 'ACTIVE') {
+    if (customer.status === 'BLOCKED') {
       throw new BadRequestException('Hồ sơ khách hàng của bạn đang bị khóa');
+    }
+    if (customer.status === 'INACTIVE') {
+      throw new BadRequestException('Hồ sơ khách hàng của bạn đã ngưng hoạt động');
+    }
+    if (customer.status !== 'ACTIVE') {
+      throw new BadRequestException('Hồ sơ khách hàng của bạn đang không hoạt động');
     }
     return customer.id;
   }

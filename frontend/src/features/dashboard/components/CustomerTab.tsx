@@ -142,7 +142,21 @@ export const CustomerTab: React.FC = () => {
       });
       const data = await response.json();
       if (response.ok && data.success) {
-        setAddresses(data.data || []);
+        const flattened = (data.data || []).map((item: any) => ({
+          id: item.id,
+          addressLine1: item.address?.addressLine1 || '',
+          addressLine2: item.address?.addressLine2 || '',
+          ward: item.address?.ward || '',
+          province: item.address?.province || '',
+          country: item.address?.country || 'Vietnam',
+          postalCode: item.address?.postalCode || '',
+          latitude: item.address?.latitude ?? 0,
+          longitude: item.address?.longitude ?? 0,
+          addressType: item.addressType,
+          isDefault: item.isDefault,
+          wardCode: item.address?.wardCode || ''
+        }));
+        setAddresses(flattened);
       }
     } catch (err) {
       console.error('Error fetching addresses:', err);

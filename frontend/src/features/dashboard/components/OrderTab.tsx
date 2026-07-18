@@ -134,6 +134,12 @@ export const OrderTab: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const isCustomerDisabled = !!error && (
+    error.includes('Hồ sơ khách hàng') || 
+    error.includes('ngưng hoạt động') || 
+    error.includes('bị khóa')
+  );
+
   // Filter & Search states
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -446,8 +452,20 @@ export const OrderTab: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setShowCreateModal(true)}
-              className="bg-[#bc0100] hover:bg-[#bc0100]/90 text-white px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer"
+              onClick={() => {
+                if (isCustomerDisabled) {
+                  alert(error || 'Tài khoản của bạn đang bị khóa hoặc ngưng hoạt động. Không thể tạo đơn.');
+                  return;
+                }
+                setShowCreateModal(true);
+              }}
+              disabled={isCustomerDisabled}
+              className={`text-white px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${
+                isCustomerDisabled 
+                  ? 'bg-gray-400 opacity-50 cursor-not-allowed' 
+                  : 'bg-[#bc0100] hover:bg-[#bc0100]/90 cursor-pointer'
+              }`}
+              title={isCustomerDisabled ? (error || 'Hồ sơ đang bị khóa hoặc ngưng hoạt động') : 'Tạo đơn hàng mới'}
             >
               Tạo đơn hàng
             </button>
