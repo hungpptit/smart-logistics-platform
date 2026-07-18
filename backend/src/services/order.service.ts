@@ -84,7 +84,6 @@ export class OrderService {
       const newAddr = await prisma.address.create({
         data: {
           addressLine1: dto.pickupAddress.addressLine1,
-          addressLine2: dto.pickupAddress.addressLine2 || null,
           ward: resolved.ward,
           province: resolved.province,
           country: dto.pickupAddress.country || 'Vietnam',
@@ -129,7 +128,6 @@ export class OrderService {
       const newAddr = await prisma.address.create({
         data: {
           addressLine1: dto.deliveryAddress.addressLine1,
-          addressLine2: dto.deliveryAddress.addressLine2 || null,
           ward: resolved.ward,
           province: resolved.province,
           country: dto.deliveryAddress.country || 'Vietnam',
@@ -295,10 +293,10 @@ export class OrderService {
           receiverName: resolvedReceiverName,
           receiverPhone: resolvedReceiverPhone,
 
-          shippingFee: pricing.shippingFee,
-          insuranceFee: pricing.insuranceFee,
-          codAmount: dto.codAmount || 0,
-          totalAmount: pricing.totalAmount,
+          estimatedShippingFee: pricing.shippingFee,
+          estimatedInsuranceFee: pricing.insuranceFee,
+          estimatedCodAmount: dto.codAmount || 0,
+          estimatedTotalAmount: pricing.totalAmount,
           estimatedDistance: distanceKm,
           estimatedDuration: durationMin,
           pricingVersion: pricing.pricingVersion,
@@ -331,9 +329,9 @@ export class OrderService {
       await tx.orderPayment.create({
         data: {
           orderId: order.id,
-          shippingFee: pricing.shippingFee,
-          insuranceFee: pricing.insuranceFee,
-          codAmount: dto.codAmount || 0,
+          finalShippingFee: pricing.shippingFee,
+          finalInsuranceFee: pricing.insuranceFee,
+          finalCodAmount: dto.codAmount || 0,
           feePayer: dto.feePayer,
           paymentMethod: dto.paymentMethod,
           paymentStatus: 'UNPAID',
@@ -852,8 +850,8 @@ export class OrderService {
       orderCode: order.orderCode,
       paymentStatus: updatedPayment.paymentStatus,
       paymentMethod: updatedPayment.paymentMethod,
-      shippingFee: updatedPayment.shippingFee,
-      codAmount: updatedPayment.codAmount,
+      shippingFee: updatedPayment.finalShippingFee,
+      codAmount: updatedPayment.finalCodAmount,
     };
   }
 }

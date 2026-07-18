@@ -94,12 +94,6 @@ export class DriverService {
           passwordHash,
           phone: dto.phone,
           status: 'ACTIVE',
-        },
-      });
-
-      await tx.userRole.create({
-        data: {
-          userId: user.id,
           roleId: role.id,
         },
       });
@@ -420,12 +414,8 @@ export class DriverService {
       where: {
         deletedAt: null,
         driver: null,
-        userRoles: {
-          some: {
-            role: {
-              roleCode: 'SHIPPER',
-            },
-          },
+        role: {
+          roleCode: 'SHIPPER',
         },
       },
       select: {

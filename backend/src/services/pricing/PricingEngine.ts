@@ -36,7 +36,7 @@ export class PricingEngine {
 
     return {
       totalFee,
-      pricingVersion: serviceConfig.pricingVersion,
+      pricingVersion: 1,
       breakdown
     };
   }

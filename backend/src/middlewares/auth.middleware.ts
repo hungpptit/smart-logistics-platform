@@ -40,15 +40,11 @@ export const authMiddleware = async (
     const user = await prisma.user.findUnique({
       where: { id: decoded.id, deletedAt: null },
       include: {
-        userRoles: {
+        role: {
           include: {
-            role: {
+            rolePermissions: {
               include: {
-                rolePermissions: {
-                  include: {
-                    permission: true,
-                  },
-                },
+                permission: true,
               },
             },
           },
@@ -65,12 +61,10 @@ export const authMiddleware = async (
     }
 
     // Extract roles and flat map permissions
-    const roles = user.userRoles.map((ur) => ur.role.roleCode);
+    const roles = [user.role.roleCode];
     const permissions = Array.from(
       new Set(
-        user.userRoles.flatMap((ur) =>
-          ur.role.rolePermissions.map((rp) => rp.permission.permissionCode)
-        )
+        user.role.rolePermissions.map((rp) => rp.permission.permissionCode)
       )
     );
 

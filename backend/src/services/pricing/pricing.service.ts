@@ -56,7 +56,7 @@ export class PricingService {
 
     return {
       serviceId: service.id,
-      pricingVersion: service.pricingVersion,
+      pricingVersion: 1,
       basePrice,
       distanceFee,
       weightFee,

@@ -102,7 +102,6 @@ export class ShipmentService {
           eventType: ShipmentEventType.CREATED,
           eventTime: new Date(),
           createdBy: creatorId,
-          notes: 'Vận đơn được khởi tạo và gom hàng thành công',
         },
       });
 
@@ -291,7 +290,6 @@ export class ShipmentService {
           longitude: dto.longitude || null,
           eventTime: new Date(),
           createdBy: userId,
-          notes: dto.notes || `Cập nhật trạng thái vận đơn sang ${dto.status}`,
         },
       });
 

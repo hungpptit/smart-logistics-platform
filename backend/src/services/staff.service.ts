@@ -28,12 +28,8 @@ export class StaffService {
 
     const where: any = {
       deletedAt: null,
-      userRoles: {
-        some: {
-          role: {
-            roleCode: 'STAFF',
-          },
-        },
+      role: {
+        roleCode: 'STAFF',
       },
     };
 
@@ -122,12 +118,8 @@ export class StaffService {
       where: {
         id,
         deletedAt: null,
-        userRoles: {
-          some: {
-            role: {
-              roleCode: 'STAFF',
-            },
-          },
+        role: {
+          roleCode: 'STAFF',
         },
       },
       select: {
@@ -236,12 +228,6 @@ export class StaffService {
           passwordHash,
           phone: dto.phone || null,
           status: 'ACTIVE',
-        },
-      });
-
-      await tx.userRole.create({
-        data: {
-          userId: user.id,
           roleId: staffRole.id,
         },
       });
@@ -303,12 +289,8 @@ export class StaffService {
       where: {
         id,
         deletedAt: null,
-        userRoles: {
-          some: {
-            role: {
-              roleCode: 'STAFF',
-            },
-          },
+        role: {
+          roleCode: 'STAFF',
         },
       },
     });
@@ -416,12 +398,8 @@ export class StaffService {
       where: {
         id,
         deletedAt: null,
-        userRoles: {
-          some: {
-            role: {
-              roleCode: 'STAFF',
-            },
-          },
+        role: {
+          roleCode: 'STAFF',
         },
       },
       include: {

@@ -14,16 +14,16 @@ async function main() {
   // 1. Seed Roles
   console.log('🔑 Seeding Roles...');
   const roles = [
-    { roleCode: 'ADMIN', roleName: 'Quản trị hệ thống', description: 'Quản trị nhân sự và phân quyền, quản lý khách hàng, cấu hình tham số thuật toán AI, cấu hình hạ tầng kỹ thuật (chu kỳ GPS, API Keys bản đồ), báo cáo thống kê doanh thu và hiệu suất' },
-    { roleCode: 'STAFF', roleName: 'Nhân viên', description: 'Tiếp nhận và phân loại đơn hàng, cập nhật nhập/xuất kho, kích hoạt định tuyến tự động bằng AI, giám sát vị trí shipper realtime, điều phối và xử lý sự cố lộ trình' },
-    { roleCode: 'SHIPPER', roleName: 'Tài xế giao hàng', description: 'Tiếp nhận ca làm việc và lộ trình tối ưu, sử dụng bản đồ điều hướng, quét QR code cập nhật trạng thái đơn hàng (kèm ảnh và tọa độ), đồng bộ tọa độ GPS chạy ngầm' },
-    { roleCode: 'CUSTOMER', roleName: 'Khách hàng', description: 'Tạo đơn hàng lẻ/hàng loạt, in mã vận đơn QR, đặt lịch hẹn lấy hàng, tra cứu hành trình đơn hàng realtime, theo dõi vị trí shipper trên bản đồ' },
+    { roleCode: 'ADMIN', roleName: 'Quản trị hệ thống' },
+    { roleCode: 'STAFF', roleName: 'Nhân viên' },
+    { roleCode: 'SHIPPER', roleName: 'Tài xế giao hàng' },
+    { roleCode: 'CUSTOMER', roleName: 'Khách hàng' },
   ];
 
   for (const r of roles) {
     await prisma.role.upsert({
       where: { roleCode: r.roleCode },
-      update: { roleName: r.roleName, description: r.description },
+      update: { roleName: r.roleName },
       create: r,
     });
   }
@@ -32,40 +32,40 @@ async function main() {
   console.log('🛡️ Seeding Permissions...');
   const permissions = [
     // Auth Module
-    { permissionCode: 'USER_MANAGE', permissionName: 'Quản lý tài khoản', module: 'AUTH', description: 'Tạo, sửa, xóa, khóa tài khoản người dùng' },
-    { permissionCode: 'ROLE_MANAGE', permissionName: 'Quản lý phân quyền', module: 'AUTH', description: 'Quản lý vai trò và phân quyền hạn' },
+    { permissionCode: 'USER_MANAGE', permissionName: 'Quản lý tài khoản', description: 'Tạo, sửa, xóa, khóa tài khoản người dùng' },
+    { permissionCode: 'ROLE_MANAGE', permissionName: 'Quản lý phân quyền', description: 'Quản lý vai trò và phân quyền hạn' },
     // Customer Module
-    { permissionCode: 'CUSTOMER_MANAGE', permissionName: 'Quản lý khách hàng', module: 'CUSTOMER', description: 'Quản lý hồ sơ và sổ địa chỉ khách hàng' },
-    { permissionCode: 'CUSTOMER_VIEW', permissionName: 'Xem hồ sơ khách hàng', module: 'CUSTOMER', description: 'Xem danh sách và chi tiết khách hàng' },
+    { permissionCode: 'CUSTOMER_MANAGE', permissionName: 'Quản lý khách hàng', description: 'Quản lý hồ sơ và sổ địa chỉ khách hàng' },
+    { permissionCode: 'CUSTOMER_VIEW', permissionName: 'Xem hồ sơ khách hàng', description: 'Xem danh sách và chi tiết khách hàng' },
     // Facility Module
-    { permissionCode: 'FACILITY_MANAGE', permissionName: 'Quản lý mạng lưới kho', module: 'FACILITY', description: 'Quản lý tổng kho, hub, trạm giao nhận' },
-    { permissionCode: 'FACILITY_VIEW', permissionName: 'Xem thông tin kho bãi', module: 'FACILITY', description: 'Xem danh sách các trạm/kho bãi' },
+    { permissionCode: 'FACILITY_MANAGE', permissionName: 'Quản lý mạng lưới kho', description: 'Quản lý tổng kho, hub, trạm giao nhận' },
+    { permissionCode: 'FACILITY_VIEW', permissionName: 'Xem thông tin kho bãi', description: 'Xem danh sách các trạm/kho bãi' },
     // Order Module
-    { permissionCode: 'ORDER_CREATE', permissionName: 'Tạo đơn hàng', module: 'ORDER', description: 'Tạo đơn hàng mới trên hệ thống' },
-    { permissionCode: 'ORDER_UPDATE', permissionName: 'Cập nhật đơn hàng', module: 'ORDER', description: 'Sửa thông tin đơn hàng, đổi trạng thái' },
-    { permissionCode: 'ORDER_DELETE', permissionName: 'Xóa đơn hàng', module: 'ORDER', description: 'Xóa mềm đơn hàng' },
-    { permissionCode: 'ORDER_VIEW', permissionName: 'Xem danh sách đơn hàng', module: 'ORDER', description: 'Xem và tra cứu danh sách đơn hàng' },
+    { permissionCode: 'ORDER_CREATE', permissionName: 'Tạo đơn hàng', description: 'Tạo đơn hàng mới trên hệ thống' },
+    { permissionCode: 'ORDER_UPDATE', permissionName: 'Cập nhật đơn hàng', description: 'Sửa thông tin đơn hàng, đổi trạng thái' },
+    { permissionCode: 'ORDER_DELETE', permissionName: 'Xóa đơn hàng', description: 'Xóa mềm đơn hàng' },
+    { permissionCode: 'ORDER_VIEW', permissionName: 'Xem danh sách đơn hàng', description: 'Xem và tra cứu danh sách đơn hàng' },
     // Shipment Module
-    { permissionCode: 'SHIPMENT_CREATE', permissionName: 'Tạo chuyến hàng', module: 'SHIPMENT', description: 'Tạo phiếu vận chuyển gom nhiều kiện hàng' },
-    { permissionCode: 'SHIPMENT_UPDATE', permissionName: 'Cập nhật chuyến hàng', module: 'SHIPMENT', description: 'Điều chỉnh gom kiện, cập nhật trạng thái luân chuyển' },
-    { permissionCode: 'SHIPMENT_VIEW', permissionName: 'Xem phiếu vận chuyển', module: 'SHIPMENT', description: 'Tra cứu hành trình và trạng thái các chuyến hàng' },
+    { permissionCode: 'SHIPMENT_CREATE', permissionName: 'Tạo chuyến hàng', description: 'Tạo phiếu vận chuyển gom nhiều kiện hàng' },
+    { permissionCode: 'SHIPMENT_UPDATE', permissionName: 'Cập nhật chuyến hàng', description: 'Điều chỉnh gom kiện, cập nhật trạng thái luân chuyển' },
+    { permissionCode: 'SHIPMENT_VIEW', permissionName: 'Xem phiếu vận chuyển', description: 'Tra cứu hành trình và trạng thái các chuyến hàng' },
     // Fleet Module
-    { permissionCode: 'DRIVER_MANAGE', permissionName: 'Quản lý tài xế', module: 'FLEET', description: 'Quản lý hồ sơ tài xế và gán xe' },
-    { permissionCode: 'VEHICLE_MANAGE', permissionName: 'Quản lý phương tiện', module: 'FLEET', description: 'Quản lý danh mục xe và đăng kiểm' },
+    { permissionCode: 'DRIVER_MANAGE', permissionName: 'Quản lý tài xế', description: 'Quản lý hồ sơ tài xế và gán xe' },
+    { permissionCode: 'VEHICLE_MANAGE', permissionName: 'Quản lý phương tiện', description: 'Quản lý danh mục xe và đăng kiểm' },
     // Routing Module
-    { permissionCode: 'ROUTE_PLAN', permissionName: 'Lập tuyến đường', module: 'ROUTING', description: 'Tạo thủ công hoặc xếp tuyến cho xe chạy' },
-    { permissionCode: 'ROUTE_OPTIMIZE', permissionName: 'Tối ưu lộ trình AI', module: 'ROUTING', description: 'Chạy động cơ AI tối ưu hóa điểm dừng (VRP)' },
+    { permissionCode: 'ROUTE_PLAN', permissionName: 'Lập tuyến đường', description: 'Tạo thủ công hoặc xếp tuyến cho xe chạy' },
+    { permissionCode: 'ROUTE_OPTIMIZE', permissionName: 'Tối ưu lộ trình AI', description: 'Chạy động cơ AI tối ưu hóa điểm dừng (VRP)' },
     // Tracking & POD Module
-    { permissionCode: 'POD_VERIFY', permissionName: 'Xác thực bàn giao POD', module: 'TRACKING', description: 'Xác nhận chữ ký, ảnh chụp, mã OTP khi giao nhận' },
-    { permissionCode: 'SCAN_BARCODE', permissionName: 'Quét barcode kiểm kho', module: 'TRACKING', description: 'Quét barcode/QR nhập xuất kho, phân loại' },
+    { permissionCode: 'POD_VERIFY', permissionName: 'Xác thực bàn giao POD', description: 'Xác nhận chữ ký, ảnh chụp, mã OTP khi giao nhận' },
+    { permissionCode: 'SCAN_BARCODE', permissionName: 'Quét barcode kiểm kho', description: 'Quét barcode/QR nhập xuất kho, phân loại' },
     // System Module
-    { permissionCode: 'SYSTEM_CONFIG', permissionName: 'Cấu hình hệ thống', module: 'SYSTEM', description: 'Cấu hình thông số và siêu tham số AI' },
+    { permissionCode: 'SYSTEM_CONFIG', permissionName: 'Cấu hình hệ thống', description: 'Cấu hình thông số và siêu tham số AI' },
   ];
 
   for (const p of permissions) {
     await prisma.permission.upsert({
       where: { permissionCode: p.permissionCode },
-      update: { permissionName: p.permissionName, module: p.module, description: p.description },
+      update: { permissionName: p.permissionName, description: p.description },
       create: p,
     });
   }
@@ -73,17 +73,17 @@ async function main() {
   // 3. Seed Facility Types
   console.log('🏢 Seeding Facility Types...');
   const facilityTypes = [
-    { typeCode: 'MAIN_DEPOT', typeName: 'Tổng kho / Kho trung tâm', description: 'Nơi tập kết hàng hóa cấp vùng lớn nhất' },
-    { typeCode: 'REGIONAL_WAREHOUSE', typeName: 'Kho khu vực', description: 'Kho chứa hàng quy mô cấp tỉnh/thành phố' },
-    { typeCode: 'HUB', typeName: 'Trạm trung chuyển lớn', description: 'Điểm phân loại hàng hóa liên quận/huyện' },
-    { typeCode: 'MICRO_HUB', typeName: 'Bưu cục / Trạm giao nhận chặng cuối', description: 'Điểm tập kết hàng chặng cuối cho shipper lấy đi giao' },
-    { typeCode: 'FULFILLMENT_CENTER', typeName: 'Trung tâm xử lý đơn hàng', description: 'Kho chuyên biệt đóng gói, dán nhãn hoàn thiện đơn hàng' },
+    { typeCode: 'MAIN_DEPOT', typeName: 'Tổng kho / Kho trung tâm' },
+    { typeCode: 'REGIONAL_WAREHOUSE', typeName: 'Kho khu vực' },
+    { typeCode: 'HUB', typeName: 'Trạm trung chuyển lớn' },
+    { typeCode: 'MICRO_HUB', typeName: 'Bưu cục / Trạm giao nhận chặng cuối' },
+    { typeCode: 'FULFILLMENT_CENTER', typeName: 'Trung tâm xử lý đơn hàng' },
   ];
 
   for (const ft of facilityTypes) {
     await prisma.facilityType.upsert({
       where: { typeCode: ft.typeCode },
-      update: { typeName: ft.typeName, description: ft.description },
+      update: { typeName: ft.typeName },
       create: ft,
     });
   }
@@ -118,8 +118,6 @@ async function main() {
       freeWeightKg: 1.0,
       pricePerKg: 5000.00,
       estimatedDeliveryHours: 6,
-      pricingVersion: 1,
-      description: 'Cam kết giao trong vòng 2 giờ kể từ khi lấy hàng thành công',
       isActive: true
     },
     {
@@ -131,8 +129,6 @@ async function main() {
       freeWeightKg: 1.0,
       pricePerKg: 3000.00,
       estimatedDeliveryHours: 24,
-      pricingVersion: 1,
-      description: 'Thời gian giao hàng từ 1-3 ngày, phù hợp hàng thường',
       isActive: true
     },
     {
@@ -144,8 +140,6 @@ async function main() {
       freeWeightKg: 1.0,
       pricePerKg: 2000.00,
       estimatedDeliveryHours: 72,
-      pricingVersion: 1,
-      description: 'Cước phí tối ưu, giao từ 3-5 ngày',
       isActive: true
     },
     {
@@ -157,8 +151,6 @@ async function main() {
       freeWeightKg: 1.0,
       pricePerKg: 8000.00,
       estimatedDeliveryHours: 12,
-      pricingVersion: 1,
-      description: 'Đảm bảo dải nhiệt độ tiêu chuẩn cho hàng đông lạnh y tế',
       isActive: true
     },
   ];
@@ -174,8 +166,6 @@ async function main() {
         freeWeightKg: s.freeWeightKg,
         pricePerKg: s.pricePerKg,
         estimatedDeliveryHours: s.estimatedDeliveryHours,
-        pricingVersion: s.pricingVersion,
-        description: s.description,
         isActive: s.isActive
       },
       create: s,
@@ -235,14 +225,14 @@ async function main() {
       roleCode: 'ADMIN',
     },
     {
-      username: 'staff',
+      username: 'dispatcher',
       email: 'staff@velocity.vn',
       password: 'StaffPassword123',
       phone: '0900000002',
       roleCode: 'STAFF',
     },
     {
-      username: 'shipper',
+      username: 'Tài xế giao hàng (Shipper)',
       email: 'driver@velocity.vn',
       password: 'DriverPassword123',
       phone: '0900000003',
@@ -268,6 +258,15 @@ async function main() {
     });
 
     if (!existing) {
+      const role = await prisma.role.findUnique({
+        where: { roleCode: tu.roleCode }
+      });
+
+      if (!role) {
+        console.log(`❌ Role not found for code: ${tu.roleCode}`);
+        continue;
+      }
+
       const passwordHash = await bcrypt.hash(tu.password, 10);
       const user = await prisma.user.create({
         data: {
@@ -276,21 +275,10 @@ async function main() {
           passwordHash: passwordHash,
           phone: tu.phone,
           status: 'ACTIVE',
+          roleId: role.id,
         }
       });
 
-      const role = await prisma.role.findUnique({
-        where: { roleCode: tu.roleCode }
-      });
-
-      if (role) {
-        await prisma.userRole.create({
-          data: {
-            userId: user.id,
-            roleId: role.id,
-          }
-        });
-      }
       console.log(`✅ Created test user: ${tu.username} (${tu.roleCode})`);
     } else {
       console.log(`ℹ️ Test user already exists: ${tu.username}`);
@@ -386,7 +374,24 @@ async function main() {
       console.log('Reading administrative units SQL dump...');
       const sqlContent = fs.readFileSync(sqlPath, 'utf8');
       console.log('Executing administrative units SQL dump... (this might take a few seconds)');
-      await prisma.$executeRawUnsafe(sqlContent);
+      
+      const rawStatements = sqlContent.split(/;\s*[\r\n]+/);
+      const statements = rawStatements
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      console.log(`Found ${statements.length} SQL statements to execute.`);
+      
+      await prisma.$transaction(async (tx) => {
+        for (let i = 0; i < statements.length; i++) {
+          const stmt = statements[i];
+          console.log(`Executing SQL statement ${i + 1}/${statements.length}: ${stmt.substring(0, 80)}...`);
+          await tx.$executeRawUnsafe(stmt);
+        }
+      }, {
+        timeout: 90000, // 90 seconds timeout for large SQL seed
+      });
+
       console.log('✅ Administrative units seeded successfully!');
     } else {
       console.log('⚠️ postgres_ImportData_vn_units.sql not found at:', sqlPath);

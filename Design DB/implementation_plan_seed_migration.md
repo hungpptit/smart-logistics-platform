@@ -122,3 +122,7 @@ Sau khi kết thúc quá trình thử nghiệm thành công:
    ```bash
    npx prisma migrate reset --force
    ```
+3. **⚠️ QUY TẮC AN TOÀN GIT (CRITICAL GIT RULE)**:
+   - **Tuyệt đối không được commit hoặc push** các file script test tạm thời (như `test-login.ts` hoặc bất kỳ file nháp nào) lên Git repository để tránh làm ô nhiễm mã nguồn chung. không thực hiện hành vi push lên git. tôi sẽ review lại lần cuối và push sau khi tất cả hoàn thành.
+   - Các file nháp phục vụ cho kiểm thử chỉ được lưu trữ trong thư mục `scratch/` cục bộ.
+

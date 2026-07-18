@@ -66,12 +66,6 @@ export class CustomerService {
           passwordHash,
           phone: dto.phone,
           status: 'ACTIVE',
-        },
-      });
-
-      await tx.userRole.create({
-        data: {
-          userId: user.id,
           roleId: role.id,
         },
       });
@@ -83,7 +77,6 @@ export class CustomerService {
           customerType: dto.customerType,
           companyName: dto.companyName || null,
           taxCode: dto.taxCode || null,
-          note: dto.note || null,
           status: 'ACTIVE',
         },
         include: {
@@ -217,7 +210,6 @@ export class CustomerService {
         companyName: dto.companyName !== undefined ? dto.companyName : customer.companyName,
         taxCode: dto.taxCode !== undefined ? dto.taxCode : customer.taxCode,
         status: dto.status ?? customer.status,
-        note: dto.note !== undefined ? dto.note : customer.note,
       },
     });
   }
@@ -297,11 +289,9 @@ export class CustomerService {
       const address = await tx.address.create({
         data: {
           addressLine1: dto.addressLine1,
-          addressLine2: dto.addressLine2 || null,
           ward: resolved.ward,
           province: resolved.province,
           country: dto.country || 'Vietnam',
-          postalCode: dto.postalCode || null,
           latitude: dto.latitude,
           longitude: dto.longitude,
           formattedAddress,
@@ -393,11 +383,9 @@ export class CustomerService {
         where: { id: addressId },
         data: {
           addressLine1: updatedAddressLine1,
-          addressLine2: dto.addressLine2 !== undefined ? dto.addressLine2 : customerAddress.address.addressLine2,
           ward: resolved.ward,
           province: resolved.province,
           country: updatedCountry,
-          postalCode: dto.postalCode !== undefined ? dto.postalCode : customerAddress.address.postalCode,
           latitude: dto.latitude ?? customerAddress.address.latitude,
           longitude: dto.longitude ?? customerAddress.address.longitude,
           formattedAddress,

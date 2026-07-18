@@ -66,9 +66,6 @@ export class AuthService {
       });
 
       for (const du of duplicateDisabledUsers) {
-        await tx.userRole.deleteMany({
-          where: { userId: du.id },
-        });
         await tx.user.delete({
           where: { id: du.id },
         });
@@ -82,12 +79,6 @@ export class AuthService {
           phone: dto.phone,
           avatarUrl: dto.avatarUrl,
           status: 'DISABLED',
-        },
-      });
-
-      await tx.userRole.create({
-        data: {
-          userId: user.id,
           roleId: role.id,
         },
       });
@@ -145,15 +136,11 @@ export class AuthService {
             assignedFacility: true,
           },
         },
-        userRoles: {
+        role: {
           include: {
-            role: {
+            rolePermissions: {
               include: {
-                rolePermissions: {
-                  include: {
-                    permission: true,
-                  },
-                },
+                permission: true,
               },
             },
           },
@@ -171,7 +158,7 @@ export class AuthService {
     });
 
     // Check if the user has the CUSTOMER role and auto-create a Customer profile if not exists
-    const rolesList = user.userRoles.map((ur) => ur.role.roleCode);
+    const rolesList = [user.role.roleCode];
     if (rolesList.includes('CUSTOMER')) {
       const existingCustomer = await prisma.customer.findUnique({
         where: { userId: user.id },
@@ -219,12 +206,10 @@ export class AuthService {
     await redis.setEx(`refresh_token:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
 
     const { passwordHash: _, ...userWithoutPassword } = user;
-    const roles = user.userRoles.map((ur) => ur.role.roleCode);
+    const roles = [user.role.roleCode];
     const permissions = Array.from(
       new Set(
-        user.userRoles.flatMap((ur) =>
-          ur.role.rolePermissions.map((rp) => rp.permission.permissionCode)
-        )
+        user.role.rolePermissions.map((rp) => rp.permission.permissionCode)
       )
     );
 
@@ -259,15 +244,11 @@ export class AuthService {
             assignedFacility: true,
           },
         },
-        userRoles: {
+        role: {
           include: {
-            role: {
+            rolePermissions: {
               include: {
-                rolePermissions: {
-                  include: {
-                    permission: true,
-                  },
-                },
+                permission: true,
               },
             },
           },
@@ -323,12 +304,10 @@ export class AuthService {
 
     // 6. Exclude passwordHash from response
     const { passwordHash: _, ...userWithoutPassword } = user;
-    const roles = user.userRoles.map((ur) => ur.role.roleCode);
+    const roles = [user.role.roleCode];
     const permissions = Array.from(
       new Set(
-        user.userRoles.flatMap((ur) =>
-          ur.role.rolePermissions.map((rp) => rp.permission.permissionCode)
-        )
+        user.role.rolePermissions.map((rp) => rp.permission.permissionCode)
       )
     );
 
@@ -369,11 +348,7 @@ export class AuthService {
     const user = await prisma.user.findUnique({
       where: { id: userId, deletedAt: null },
       include: {
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
+        role: true,
       },
     });
 
@@ -416,15 +391,11 @@ export class AuthService {
             assignedFacility: true,
           },
         },
-        userRoles: {
+        role: {
           include: {
-            role: {
+            rolePermissions: {
               include: {
-                rolePermissions: {
-                  include: {
-                    permission: true,
-                  },
-                },
+                permission: true,
               },
             },
           },
@@ -437,12 +408,10 @@ export class AuthService {
     }
 
     const { passwordHash: _, ...userWithoutPassword } = user;
-    const roles = user.userRoles.map((ur) => ur.role.roleCode);
+    const roles = [user.role.roleCode];
     const permissions = Array.from(
       new Set(
-        user.userRoles.flatMap((ur) =>
-          ur.role.rolePermissions.map((rp) => rp.permission.permissionCode)
-        )
+        user.role.rolePermissions.map((rp) => rp.permission.permissionCode)
       )
     );
 

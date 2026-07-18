@@ -288,10 +288,10 @@ model User {
   createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz
+  roleId           String       @map("role_id") @db.Uuid
 
   // Relations
-  userRoles             UserRole[]           @relation("UserToUserRole")
-  assignedRoles         UserRole[]           @relation("UserAssignerToUserRole")
+  role                  Role                 @relation(fields: [roleId], references: [id], onDelete: Restrict)
   customer              Customer?
   managedFacilities     Facility[]           @relation("FacilityManager")
   createdOrders         Order[]              @relation("OrderCreator")
@@ -315,11 +315,10 @@ model Role {
   id              String           @id @default(uuid()) @db.Uuid
   roleCode        String           @unique @map("role_code") @db.VarChar(30)
   roleName        String           @map("role_name") @db.VarChar(100)
-  description     String?          @db.Text
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
-  userRoles       UserRole[]
+  users           User[]
   rolePermissions RolePermission[]
 
   @@map("roles")
@@ -329,7 +328,6 @@ model Permission {
   id             String           @id @default(uuid()) @db.Uuid
   permissionCode String           @unique @map("permission_code") @db.VarChar(50)
   permissionName String           @map("permission_name") @db.VarChar(100)
-  module         String           @db.VarChar(50)
   description    String?          @db.Text
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
@@ -337,21 +335,6 @@ model Permission {
   rolePermissions RolePermission[]
 
   @@map("permissions")
-}
-
-model UserRole {
-  userId     String   @map("user_id") @db.Uuid
-  roleId     String   @map("role_id") @db.Uuid
-  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz
-  assignedBy String?  @map("assigned_by") @db.Uuid
-
-  // Relations
-  user       User     @relation("UserToUserRole", fields: [userId], references: [id], onDelete: Cascade)
-  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  assigner   User?    @relation("UserAssignerToUserRole", fields: [assignedBy], references: [id], onDelete: SetNull)
-
-  @@id([userId, roleId])
-  @@map("user_roles")
 }
 
 model RolePermission {
@@ -378,9 +361,7 @@ model Customer {
   companyName  String?        @map("company_name") @db.VarChar(255)
   taxCode      String?        @map("tax_code") @db.VarChar(30)
   status       CustomerStatus @default(ACTIVE)
-  note         String?        @db.Text
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt    DateTime?      @map("deleted_at") @db.Timestamptz
 
   // Relations
@@ -395,17 +376,13 @@ model Customer {
 model Address {
   id               String            @id @default(uuid()) @db.Uuid
   addressLine1     String            @map("address_line_1") @db.VarChar(255)
-  addressLine2     String?           @map("address_line_2") @db.VarChar(255)
   ward             String            @db.VarChar(100)
   province         String            @db.VarChar(100)
   country          String            @default("Vietnam") @db.VarChar(100)
-  postalCode       String?           @map("postal_code") @db.VarChar(20)
   latitude         Float             @db.DoublePrecision
   longitude        Float             @db.DoublePrecision
   formattedAddress String            @map("formatted_address") @db.Text
-  placeId          String?           @map("place_id") @db.VarChar(255)
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
   wardCode         String?           @map("ward_code") @db.VarChar(20)
 
   // Relations
@@ -444,7 +421,6 @@ model CustomerContact {
   email      String?  @db.VarChar(255)
   position   String?  @db.VarChar(100)
   isPrimary  Boolean  @default(false) @map("is_primary")
-  note       String?  @db.Text
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
@@ -464,7 +440,6 @@ model FacilityType {
   id          String     @id @default(uuid()) @db.Uuid
   typeCode    String     @unique @map("type_code") @db.VarChar(30)
   typeName    String     @map("type_name") @db.VarChar(100)
-  description String?    @db.Text
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
@@ -483,7 +458,6 @@ model Facility {
   operatingStatus  FacilityStatus @map("operating_status")
   openedAt         DateTime       @map("opened_at") @db.Date
   closedAt         DateTime?      @map("closed_at") @db.Date
-  note             String?        @db.Text
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz
@@ -562,11 +536,8 @@ model Service {
   freeWeightKg           Float    @default(1.0) @map("free_weight_kg")
   pricePerKg             Decimal  @default(0.00) @map("price_per_kg") @db.Decimal(12, 2)
   estimatedDeliveryHours Int      @default(24) @map("estimated_delivery_hours")
-  pricingVersion         Int      @default(1) @map("pricing_version")
-  description            String?  @db.Text
   isActive               Boolean  @default(true) @map("is_active")
   createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   orders      Order[]
@@ -600,10 +571,10 @@ model Order {
   deliveryLongitude     Float         @map("delivery_longitude") @db.DoublePrecision
 
   // Financial Snapshot
-  shippingFee           Decimal       @default(0.00) @map("shipping_fee") @db.Decimal(12, 2)
-  insuranceFee          Decimal       @default(0.00) @map("insurance_fee") @db.Decimal(12, 2)
-  codAmount             Decimal       @default(0.00) @map("cod_amount") @db.Decimal(12, 2)
-  totalAmount           Decimal       @default(0.00) @map("total_amount") @db.Decimal(12, 2)
+  estimatedShippingFee  Decimal       @default(0.00) @map("estimated_shipping_fee") @db.Decimal(12, 2)
+  estimatedInsuranceFee Decimal       @default(0.00) @map("estimated_insurance_fee") @db.Decimal(12, 2)
+  estimatedCodAmount    Decimal       @default(0.00) @map("estimated_cod_amount") @db.Decimal(12, 2)
+  estimatedTotalAmount  Decimal       @default(0.00) @map("estimated_total_amount") @db.Decimal(12, 2)
   estimatedDistance     Decimal?      @map("estimated_distance") @db.Decimal(10, 2)
   estimatedDuration     Int?          @map("estimated_duration")
   pricingVersion        Int           @default(1) @map("pricing_version")
@@ -665,19 +636,19 @@ model Package {
 }
 
 model OrderPayment {
-  id            String        @id @default(uuid()) @db.Uuid
-  orderId       String        @unique @map("order_id") @db.Uuid
-  shippingFee   Decimal       @map("shipping_fee") @db.Decimal(12, 2)
-  insuranceFee  Decimal       @map("insurance_fee") @db.Decimal(12, 2)
-  codAmount     Decimal       @map("cod_amount") @db.Decimal(12, 2)
-  feePayer      FeePayer      @map("fee_payer")
-  paymentMethod PaymentMethod @map("payment_method")
-  paymentStatus PaymentStatus @map("payment_status")
-  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  id                 String        @id @default(uuid()) @db.Uuid
+  orderId            String        @unique @map("order_id") @db.Uuid
+  finalShippingFee   Decimal       @map("final_shipping_fee") @db.Decimal(12, 2)
+  finalInsuranceFee  Decimal       @map("final_insurance_fee") @db.Decimal(12, 2)
+  finalCodAmount     Decimal       @map("final_cod_amount") @db.Decimal(12, 2)
+  feePayer           FeePayer      @map("fee_payer")
+  paymentMethod      PaymentMethod @map("payment_method")
+  paymentStatus      PaymentStatus @map("payment_status")
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order              Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("order_payments")
 }
@@ -754,7 +725,6 @@ model ShipmentEvent {
   longitude   Float?            @db.DoublePrecision
   eventTime   DateTime          @map("event_time") @db.Timestamptz
   createdBy   String?           @map("created_by") @db.Uuid
-  notes       String?           @db.Text
 
   // Relations
   shipment    Shipment          @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
@@ -829,7 +799,6 @@ model StaffProfile {
   citizenId          String?   @unique @map("citizen_id") @db.VarChar(20)
   assignedFacilityId String?   @map("assigned_facility_id") @db.Uuid
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
 
   // Relations

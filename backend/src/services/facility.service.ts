@@ -48,11 +48,9 @@ export class FacilityService {
       const address = await tx.address.create({
         data: {
           addressLine1: dto.address.addressLine1,
-          addressLine2: dto.address.addressLine2 || null,
           ward: resolved.ward,
           province: resolved.province,
           country: dto.address.country || 'Vietnam',
-          postalCode: dto.address.postalCode || null,
           latitude: dto.address.latitude,
           longitude: dto.address.longitude,
           formattedAddress,
@@ -70,7 +68,6 @@ export class FacilityService {
           managerUserId: dto.managerUserId || null,
           operatingStatus: dto.operatingStatus || 'ACTIVE',
           openedAt: new Date(dto.openedAt),
-          note: dto.note || null,
         },
       });
 
@@ -222,7 +219,6 @@ export class FacilityService {
         managerUserId: dto.managerUserId !== undefined ? dto.managerUserId : facility.managerUserId,
         operatingStatus: dto.operatingStatus ?? facility.operatingStatus,
         closedAt: dto.closedAt ? new Date(dto.closedAt) : facility.closedAt,
-        note: dto.note !== undefined ? dto.note : facility.note,
       },
     });
   }
