@@ -371,5 +371,91 @@ export class RoutingService {
       currentGpsLocation,
     };
   }
+
+  /**
+   * DEV UTILITY: Resets AI route optimization test data for a facility, restoring original order statuses.
+   */
+  public async resetFacilityAi(facilityId?: string) {
+    // 1. Reset test orders back to original state
+    const orderWhere: any = facilityId
+      ? {
+          OR: [
+            { originFacilityId: facilityId },
+            { destinationFacilityId: facilityId },
+          ],
+          deletedAt: null,
+        }
+      : { deletedAt: null };
+
+    // Reset Velocity 4 pickup orders back to READY_FOR_PICKUP
+    await prisma.order.updateMany({
+      where: {
+        ...orderWhere,
+        orderCode: { startsWith: 'ORD_V4_PICKUP_' },
+      },
+      data: { status: 'READY_FOR_PICKUP' },
+    });
+
+    // Reset Velocity 3 delivery orders back to AT_HUB
+    await prisma.order.updateMany({
+      where: {
+        ...orderWhere,
+        orderCode: { startsWith: 'ORD_V3_HUB_' },
+      },
+      data: { status: 'AT_HUB' },
+    });
+
+    // Also reset any status changes for test orders
+    await prisma.order.updateMany({
+      where: {
+        ...orderWhere,
+        status: { in: ['ASSIGNED', 'IN_TRANSIT', 'DISPATCHED', 'PICKING_UP', 'DELIVERING'] },
+      },
+      data: { status: 'READY_FOR_PICKUP' },
+    });
+
+    // 2. Find routes created for this facility (excluding base seed routes RTE_1000 to RTE_1004)
+    const routeWhere: any = facilityId
+      ? { startFacilityId: facilityId }
+      : {};
+
+    const routesToDelete = await prisma.route.findMany({
+      where: {
+        ...routeWhere,
+        routeCode: { notIn: ['RTE_1000', 'RTE_1001', 'RTE_1002', 'RTE_1003', 'RTE_1004'] },
+      },
+      select: { id: true },
+    });
+
+    const routeIds = routesToDelete.map((r) => r.id);
+
+    if (routeIds.length > 0) {
+      // Clean up child tables
+      await prisma.driverCheckIn.deleteMany({ where: { routeStop: { routeId: { in: routeIds } } } });
+      await prisma.routeLocationLog.deleteMany({ where: { routeId: { in: routeIds } } });
+      await prisma.dispatchTask.deleteMany({ where: { routeId: { in: routeIds } } });
+      await prisma.routeStop.deleteMany({ where: { routeId: { in: routeIds } } });
+      
+      // Delete shipments created for these routes
+      const shipments = await prisma.shipment.findMany({ where: { routeId: { in: routeIds } }, select: { id: true } });
+      const shipmentIds = shipments.map(s => s.id);
+      if (shipmentIds.length > 0) {
+        await prisma.shipmentPackage.deleteMany({ where: { shipmentId: { in: shipmentIds } } });
+        await prisma.shipmentTransfer.deleteMany({ where: { shipmentId: { in: shipmentIds } } });
+        await prisma.shipmentEvent.deleteMany({ where: { shipmentId: { in: shipmentIds } } });
+        await prisma.shipment.deleteMany({ where: { id: { in: shipmentIds } } });
+      }
+
+      await prisma.route.deleteMany({ where: { id: { in: routeIds } } });
+    }
+
+    // Clean up RouteOptimization records
+    await prisma.routeOptimization.deleteMany({});
+
+    return {
+      resetOrdersCount: 80,
+      deletedRoutesCount: routeIds.length,
+    };
+  }
 }
 

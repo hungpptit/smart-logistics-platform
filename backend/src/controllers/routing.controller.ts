@@ -59,5 +59,20 @@ export class RoutingController {
       next(error);
     }
   };
+
+  public devReset = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { facilityId } = req.body;
+      const result = await this.routingService.resetFacilityAi(facilityId);
+
+      return res.status(200).json({
+        success: true,
+        message: '🔄 Hoàn tác dữ liệu AI về trạng thái ban đầu thành công!',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 

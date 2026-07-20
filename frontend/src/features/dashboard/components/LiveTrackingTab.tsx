@@ -4,7 +4,7 @@ import { CONFIG } from '../../../config';
 import { io, Socket } from 'socket.io-client';
 import { 
   Navigation, Earth, Truck, MapPin, Search, RefreshCw, 
-  Play, Square, Clock, Loader2, AlertCircle
+  Play, Square, Clock, Loader2, AlertCircle, Bot, RotateCcw
 } from 'lucide-react';
 import { Map, MapControls, MapMarker, MarkerContent, MapRoute, MarkerPopup } from '../../../components/ui/map';
 import MapLibreGL from 'maplibre-gl';
@@ -60,7 +60,7 @@ interface RouteData {
 }
 
 export const LiveTrackingTab: React.FC = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   
   // State
   const [routes, setRoutes] = useState<RouteData[]>([]);
@@ -70,12 +70,91 @@ export const LiveTrackingTab: React.FC = () => {
   const [routeGeometry, setRouteGeometry] = useState<[number, number][]>([]);
   
   // Filters
-  const [facilityFilter, setFacilityFilter] = useState<string>('');
+  const [facilityFilter, setFacilityFilter] = useState<string>(user?.staffProfile?.assignedFacilityId || '');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [optimizing, setOptimizing] = useState<boolean>(false);
+
+  const isAdminOrStaff = user?.roles.includes('ADMIN') || user?.roles.includes('STAFF');
+
+  const handleRunAiOptimization = async () => {
+    const targetFacilityId = facilityFilter || user?.staffProfile?.assignedFacilityId;
+    if (!targetFacilityId) {
+      alert('Vui lòng chọn Kho/Bưu cục cần chạy AI gom cụm đơn hàng!');
+      return;
+    }
+
+    const targetFacName = facilities.find(f => f.id === targetFacilityId)?.facilityName || 'Kho đang chọn';
+    if (!window.confirm(`🤖 Bạn có chắc chắn muốn kích hoạt AI Gom Cụm K-Means & VRP cho ${targetFacName}?`)) {
+      return;
+    }
+
+    setOptimizing(true);
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/routes/optimize`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ facilityId: targetFacilityId })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        alert(`🎉 ${data.message || 'Tối ưu định tuyến AI thành công!'}`);
+        fetchRoutes();
+      } else {
+        alert(`❌ Lỗi AI: ${data.message || 'Không thể chạy AI phân cụm.'}`);
+      }
+    } catch (err) {
+      console.error('Lỗi khi gọi API AI optimize:', err);
+      alert('❌ Đã xảy ra lỗi kết nối khi kích hoạt AI.');
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
+  const [resetting, setResetting] = useState<boolean>(false);
+
+  const handleDevResetAi = async () => {
+    const targetFacilityId = facilityFilter || user?.staffProfile?.assignedFacilityId;
+    const targetFacName = targetFacilityId ? (facilities.find(f => f.id === targetFacilityId)?.facilityName || 'kho đang chọn') : 'toàn hệ thống';
+
+    if (!window.confirm(`⚠️ [DEV RESET] Bạn có chắc muốn HOÀN TÁC tất cả các tuyến AI đã gom và trả lại 80 đơn hàng của ${targetFacName} về trạng thái chờ ban đầu?`)) {
+      return;
+    }
+
+    setResetting(true);
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/routes/dev-reset`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ facilityId: targetFacilityId })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        alert(`🎉 ${data.message || 'Đã hoàn tác dữ liệu AI về ban đầu!'}`);
+        setSelectedRouteId(null);
+        setSelectedRoute(null);
+        fetchRoutes();
+      } else {
+        alert(`❌ Lỗi hoàn tác: ${data.message || 'Không thể hoàn tác dữ liệu.'}`);
+      }
+    } catch (err) {
+      console.error('Lỗi khi gọi API dev-reset:', err);
+      alert('❌ Đã xảy ra lỗi kết nối khi hoàn tác.');
+    } finally {
+      setResetting(false);
+    }
+  };
   
   // Socket.io
   const socketRef = useRef<Socket | null>(null);
@@ -490,13 +569,38 @@ export const LiveTrackingTab: React.FC = () => {
               <Earth size={16} className="text-[#bc0100] animate-pulse" />
               <span>Định vị thời gian thực</span>
             </h3>
-            <button 
-              onClick={() => fetchRoutes(selectedRouteId || undefined)} 
-              className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors"
-              title="Làm mới"
-            >
-              <RefreshCw size={14} />
-            </button>
+            <div className="flex items-center gap-1.5">
+              {isAdminOrStaff && (
+                <>
+                  <button
+                    onClick={handleRunAiOptimization}
+                    disabled={optimizing || resetting}
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
+                    title="Kích hoạt thuật toán AI K-Means & VRP gom cụm phân đơn cho tài xế"
+                  >
+                    <Bot size={12} className={optimizing ? 'animate-bounce' : ''} />
+                    <span>{optimizing ? 'Đang gom...' : '🤖 AI Gom Cụm'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleDevResetAi}
+                    disabled={optimizing || resetting}
+                    className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
+                    title="[DEV TOOL] Hoàn tác toàn bộ lộ trình AI và khôi phục 80 đơn hàng về trạng thái ban đầu để test AI tiếp"
+                  >
+                    <RotateCcw size={12} className={resetting ? 'animate-spin' : ''} />
+                    <span>{resetting ? 'Đang reset...' : '↺ Hoàn tác AI (DEV)'}</span>
+                  </button>
+                </>
+              )}
+              <button 
+                onClick={() => fetchRoutes(selectedRouteId || undefined)} 
+                className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors"
+                title="Làm mới"
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
           </div>
 
           {error && (

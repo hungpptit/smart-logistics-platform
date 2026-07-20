@@ -43,6 +43,12 @@ router.post(
   routingController.optimize
 );
 
+router.post(
+  '/dev-reset',
+  requireRoles(['ADMIN', 'STAFF']),
+  routingController.devReset
+);
+
 /**
  * @openapi
  * /routes:
