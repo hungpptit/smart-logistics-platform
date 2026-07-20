@@ -48,22 +48,14 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onBackToHome }) 
       label: 'Quản lý Tài xế',
       icon: Truck,
       component: DriverTab,
-      allowed: !!(
-        user?.roles.includes('ADMIN') ||
-        user?.permissions.includes('DRIVER_VIEW') ||
-        user?.permissions.includes('DRIVER_MANAGE')
-      ),
+      allowed: true,
     },
     {
       id: 'vehicles',
       label: 'Quản lý Phương tiện',
       icon: Truck,
       component: VehicleTab,
-      allowed: !!(
-        user?.roles.includes('ADMIN') ||
-        user?.permissions.includes('VEHICLE_VIEW') ||
-        user?.permissions.includes('VEHICLE_MANAGE')
-      ),
+      allowed: true,
     },
     {
       id: 'facilities',

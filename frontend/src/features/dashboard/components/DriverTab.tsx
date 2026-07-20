@@ -53,11 +53,19 @@ export const DriverTab: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const userAssignedFacilityId = currentUser?.staffProfile?.assignedFacilityId;
+
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [facilityFilter, setFacilityFilter] = useState<string>('');
+  const [facilityFilter, setFacilityFilter] = useState<string>(userAssignedFacilityId || '');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
+
+  useEffect(() => {
+    if (userAssignedFacilityId && !facilityFilter) {
+      setFacilityFilter(userAssignedFacilityId);
+    }
+  }, [userAssignedFacilityId]);
 
   // Modal states
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -86,7 +94,7 @@ export const DriverTab: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const canManage = currentUser?.roles.includes('ADMIN') || currentUser?.permissions.includes('DRIVER_MANAGE');
+  const canManage = currentUser?.roles.includes('ADMIN') || currentUser?.roles.includes('STAFF') || currentUser?.permissions.includes('DRIVER_MANAGE');
 
   useEffect(() => {
     fetchDrivers(currentPage);

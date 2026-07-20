@@ -43,14 +43,21 @@ export class AssignmentService {
       let j0 = 0;
       const minv = new Array(n + 1).fill(Infinity);
       const used = new Array(n + 1).fill(false);
+      let innerLoopCount = 0;
       do {
+        if (innerLoopCount++ > 1000) {
+          console.warn('⚠️ [Hungarian Algorithm] Prevented infinite loop due to invalid matrix values.');
+          break;
+        }
         used[j0] = true;
         const i0 = p[j0];
         let delta = Infinity;
         let j1 = 0;
         for (let j = 1; j <= n; j++) {
           if (!used[j]) {
-            const cur = matrix[i0 - 1][j - 1] - u[i0] - v[j];
+            const val = matrix[i0 - 1][j - 1];
+            const cur = (isNaN(val) ? 999999 : val) - u[i0] - v[j];
+            if (isNaN(cur)) continue;
             if (cur < minv[j]) {
               minv[j] = cur;
               way[j] = j0;
@@ -72,7 +79,9 @@ export class AssignmentService {
         j0 = j1;
       } while (p[j0] !== 0);
 
+      let outerLoopCount = 0;
       do {
+        if (outerLoopCount++ > 1000) break;
         const j1 = way[j0];
         p[j0] = p[j1];
         j0 = j1;
@@ -104,22 +113,26 @@ export class AssignmentService {
 
     if (N === 0 || K === 0) return [];
 
-    // Calculate total weights for each cluster
-    const clusterWeights = await Promise.all(
-      clusters.map(async (cluster) => {
-        let totalWeight = 0;
-        for (const order of cluster.orders) {
-          const packages = await prisma.package.findMany({
-            where: { orderId: order.id },
-            select: { weight: true },
-          });
-          for (const pkg of packages) {
-            totalWeight += Number(pkg.weight || 0);
-          }
-        }
-        return totalWeight;
-      })
-    );
+    // Calculate total weights for each cluster using a single batch query
+    const allOrderIds = clusters.flatMap((c) => c.orders.map((o) => o.id));
+    const allPackages = await prisma.package.findMany({
+      where: { orderId: { in: allOrderIds } },
+      select: { orderId: true, weight: true },
+    });
+
+    const weightByOrderId = new Map<string, number>();
+    for (const pkg of allPackages) {
+      const current = weightByOrderId.get(pkg.orderId) || 0;
+      weightByOrderId.set(pkg.orderId, current + Number(pkg.weight || 0));
+    }
+
+    const clusterWeights = clusters.map((cluster) => {
+      let totalWeight = 0;
+      for (const order of cluster.orders) {
+        totalWeight += weightByOrderId.get(order.id) || 0;
+      }
+      return totalWeight;
+    });
 
     // Size of the square matrix
     const size = Math.max(N, K);
@@ -152,13 +165,17 @@ export class AssignmentService {
             driverLng = driver.preferredLongitude;
           }
 
+          const cLat = cluster.centroid?.lat ?? facilityLocation.lat;
+          const cLng = cluster.centroid?.lng ?? facilityLocation.lng;
+
           // 1. Distance cost (in km)
-          const dist = this.haversineDistance(
+          let dist = this.haversineDistance(
             driverLat,
             driverLng,
-            cluster.centroid.lat,
-            cluster.centroid.lng
+            cLat,
+            cLng
           );
+          if (isNaN(dist)) dist = 0;
 
           // Find active vehicle and capacity constraints
           const activeAssignment = driver.assignments?.find((a) => a.isActive);
@@ -177,7 +194,9 @@ export class AssignmentService {
           }
 
           // Composite cost
-          costMatrix[i][j] = dist + capacityPenalty + vehiclePenalty;
+          let totalCost = dist + capacityPenalty + vehiclePenalty;
+          if (isNaN(totalCost)) totalCost = 999999;
+          costMatrix[i][j] = totalCost;
         } else {
           // Dummy driver or dummy cluster cost is 0
           costMatrix[i][j] = 0;

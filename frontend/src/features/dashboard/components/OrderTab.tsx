@@ -156,11 +156,27 @@ export const OrderTab: React.FC = () => {
   const [statusReason, setStatusReason] = useState<string>('');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [optimizing, setOptimizing] = useState<boolean>(false);
+  const isAdminOrStaff = user?.roles.includes('ADMIN') || user?.roles.includes('STAFF');
+  const isAdmin = user?.roles.includes('ADMIN');
+  const isStaff = user?.roles.includes('STAFF') && !user?.roles.includes('ADMIN');
+  const isStaffWithoutFacility = isStaff && !user?.staffProfile?.assignedFacilityId;
+
+  const [facilities, setFacilities] = useState<any[]>([]);
+  const [facilityFilter, setFacilityFilter] = useState<string>(user?.staffProfile?.assignedFacilityId || '');
+
+  const isStaffOnly = isStaff;
+  const userAssignedFacilityId = user?.staffProfile?.assignedFacilityId;
+  const canOperateOnCurrentFacility = isAdmin || (isStaffOnly && facilityFilter === userAssignedFacilityId);
 
   const handleRunAiOptimization = async () => {
-    const targetFacilityId = facilityFilter || user?.staffProfile?.assignedFacilityId;
+    const targetFacilityId = facilityFilter || userAssignedFacilityId;
     if (!targetFacilityId) {
       alert('Vui lòng chọn Kho/Bưu cục cần chạy AI gom cụm đơn hàng!');
+      return;
+    }
+
+    if (!canOperateOnCurrentFacility) {
+      alert('❌ Quyền hạn không đủ! Bạn chỉ được phép thực hiện gom cụm đơn hàng tại Bưu cục mình quản lý.');
       return;
     }
 
@@ -198,10 +214,20 @@ export const OrderTab: React.FC = () => {
   const [resetting, setResetting] = useState<boolean>(false);
 
   const handleDevResetAi = async () => {
-    const targetFacilityId = facilityFilter || user?.staffProfile?.assignedFacilityId;
-    const targetFacName = targetFacilityId ? (facilities.find(f => f.id === targetFacilityId)?.facilityName || 'kho đang chọn') : 'toàn hệ thống';
+    const targetFacilityId = facilityFilter || userAssignedFacilityId;
+    if (!targetFacilityId) {
+      alert('Vui lòng chọn Kho/Bưu cục cần hoàn tác dữ liệu AI!');
+      return;
+    }
 
-    if (!window.confirm(`⚠️ [DEV RESET] Bạn có chắc muốn HOÀN TÁC tất cả các tuyến AI đã gom và trả lại 80 đơn hàng của ${targetFacName} về trạng thái chờ ban đầu?`)) {
+    if (!canOperateOnCurrentFacility) {
+      alert('❌ Quyền hạn không đủ! Bạn chỉ được phép hoàn tác dữ liệu AI tại Bưu cục mình quản lý.');
+      return;
+    }
+
+    const targetFacName = facilities.find(f => f.id === targetFacilityId)?.facilityName || 'kho đang chọn';
+
+    if (!window.confirm(`⚠️ [DEV RESET] Bạn có chắc muốn HOÀN TÁC tất cả các tuyến AI đã gom và trả lại các đơn hàng của ${targetFacName} về trạng thái chờ ban đầu?`)) {
       return;
     }
 
@@ -231,13 +257,7 @@ export const OrderTab: React.FC = () => {
     }
   };
 
-  const isAdminOrStaff = user?.roles.includes('ADMIN') || user?.roles.includes('STAFF');
-  const isAdmin = user?.roles.includes('ADMIN');
-  const isStaff = user?.roles.includes('STAFF') && !user?.roles.includes('ADMIN');
-  const isStaffWithoutFacility = isStaff && !user?.staffProfile?.assignedFacilityId;
 
-  const [facilities, setFacilities] = useState<any[]>([]);
-  const [facilityFilter, setFacilityFilter] = useState<string>(user?.staffProfile?.assignedFacilityId || '');
 
   useEffect(() => {
     if (user?.staffProfile?.assignedFacilityId && !facilityFilter) {
@@ -540,7 +560,13 @@ export const OrderTab: React.FC = () => {
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
 
-            {isAdminOrStaff && (
+            {isStaffOnly && facilityFilter !== userAssignedFacilityId && (
+              <span className="text-[10px] text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded border border-amber-200 font-bold flex items-center gap-1 shrink-0" title="Tài khoản nhân viên chỉ được thực hiện thao tác quản lý/gom cụm tại bưu cục được phân công.">
+                🔒 Xem bưu cục khác (Chỉ đọc)
+              </span>
+            )}
+
+            {isAdminOrStaff && canOperateOnCurrentFacility && (
               <>
                 <button
                   onClick={handleRunAiOptimization}

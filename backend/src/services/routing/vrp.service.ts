@@ -16,9 +16,9 @@ export class VRPService {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
@@ -41,7 +41,7 @@ export class VRPService {
       // Build OSRM table coordinates string: lng,lat;lng,lat...
       const coordsString = locations.map((loc) => `${loc.lng},${loc.lat}`).join(';');
       const url = `http://router.project-osrm.org/table/v1/driving/${coordsString}?annotations=distance,duration`;
-      
+
       const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
       const data = await response.json() as any;
 
@@ -179,7 +179,51 @@ export class VRPService {
       this.calculateFitness(individual, distanceMatrix, durationMatrix, estimatedDeliveryDates, startTime)
     );
     const bestIdx = finalFitnessScores.indexOf(Math.max(...finalFitnessScores));
-    return population[bestIdx];
+    const bestIndividual = population[bestIdx];
+
+    // Apply 2-Opt Local Search refinement to uncross paths and guarantee shortest distance
+    return this.applyTwoOpt(bestIndividual, distanceMatrix, durationMatrix, estimatedDeliveryDates, startTime);
+  }
+
+  /**
+   * Applies 2-Opt Local Search heuristic to eliminate route intersections and uncross paths.
+   */
+  private applyTwoOpt(
+    individual: number[],
+    distanceMatrix: number[][],
+    durationMatrix: number[][],
+    estimatedDeliveryDates: (Date | null)[],
+    startTime: Date
+  ): number[] {
+    let route = [...individual];
+    let improved = true;
+    let iterations = 0;
+    const maxIterations = 50;
+
+    while (improved && iterations < maxIterations) {
+      improved = false;
+      iterations++;
+
+      for (let i = 0; i < route.length - 1; i++) {
+        for (let k = i + 1; k < route.length; k++) {
+          const newRoute = this.twoOptSwap(route, i, k);
+          const currentFit = this.calculateFitness(route, distanceMatrix, durationMatrix, estimatedDeliveryDates, startTime);
+          const newFit = this.calculateFitness(newRoute, distanceMatrix, durationMatrix, estimatedDeliveryDates, startTime);
+
+          if (newFit > currentFit) {
+            route = newRoute;
+            improved = true;
+          }
+        }
+      }
+    }
+    return route;
+  }
+
+  private twoOptSwap(route: number[], i: number, k: number): number[] {
+    const newRoute = route.slice(0, i);
+    const middle = route.slice(i, k + 1).reverse();
+    return newRoute.concat(middle).concat(route.slice(k + 1));
   }
 
   /**
@@ -255,7 +299,7 @@ export class VRPService {
     const end = Math.floor(Math.random() * (size - start)) + start;
 
     const child = new Array(size).fill(-1);
-    
+
     // Copy subsegment from parent1
     for (let i = start; i <= end; i++) {
       child[i] = parent1[i];

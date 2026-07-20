@@ -1,0 +1,15 @@
+{
+  "name": "smart-logistics-platform",
+  "version": "1.0.0",
+  "description": "Smart Logistics Platform with AI Optimization Microservice",
+  "private": true,
+  "scripts": {
+    "dev:all": "concurrently \"npm --prefix backend run dev\" \"npm --prefix ai-service run dev\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:ai": "npm --prefix ai-service run dev",
+    "dev:frontend": "npm --prefix frontend run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

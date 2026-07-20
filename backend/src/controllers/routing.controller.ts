@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { RoutingService } from '../services/routing/routing.service';
+import { prisma } from '../config/prisma';
 
 export class RoutingController {
   private routingService = new RoutingService();
@@ -14,6 +15,20 @@ export class RoutingController {
           success: false,
           message: 'Trường facilityId là bắt buộc',
         });
+      }
+
+      // Enforce strict facility permission boundary for STAFF users
+      const user = (req as any).user;
+      if (user?.roles.includes('STAFF') && !user?.roles.includes('ADMIN')) {
+        const staffProfile = await prisma.staffProfile.findUnique({
+          where: { userId: user.id },
+        });
+        if (staffProfile && staffProfile.assignedFacilityId !== facilityId) {
+          return res.status(403).json({
+            success: false,
+            message: '❌ Bạn chỉ có quyền kích hoạt AI gom cụm tại Bưu cục được phân công quản lý!',
+          });
+        }
       }
 
       const routes = await this.routingService.optimizeRoutesForFacility(facilityId, creatorId);
@@ -63,6 +78,21 @@ export class RoutingController {
   public devReset = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { facilityId } = req.body;
+
+      // Enforce strict facility permission boundary for STAFF users
+      const user = (req as any).user;
+      if (user?.roles.includes('STAFF') && !user?.roles.includes('ADMIN')) {
+        const staffProfile = await prisma.staffProfile.findUnique({
+          where: { userId: user.id },
+        });
+        if (staffProfile && staffProfile.assignedFacilityId !== facilityId) {
+          return res.status(403).json({
+            success: false,
+            message: '❌ Bạn chỉ có quyền hoàn tác dữ liệu AI tại Bưu cục được phân công quản lý!',
+          });
+        }
+      }
+
       const result = await this.routingService.resetFacilityAi(facilityId);
 
       return res.status(200).json({
