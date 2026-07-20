@@ -148,6 +148,13 @@ async function main() {
     { username: 'driver_c', email: 'driver_c@velocity.vn', phone: '0901000008', roleCode: 'SHIPPER' },
     { username: 'driver_d', email: 'driver_d@velocity.vn', phone: '0901000009', roleCode: 'SHIPPER' },
     { username: 'driver_e', email: 'driver_e@velocity.vn', phone: '0901000010', roleCode: 'SHIPPER' },
+    // Drivers for Velocity 3 (3 Motorbike Drivers)
+    { username: 'driver_v3_1', email: 'driver_v3_1@velocity.vn', phone: '0905111001', roleCode: 'SHIPPER' },
+    { username: 'driver_v3_2', email: 'driver_v3_2@velocity.vn', phone: '0905111002', roleCode: 'SHIPPER' },
+    { username: 'driver_v3_3', email: 'driver_v3_3@velocity.vn', phone: '0905111003', roleCode: 'SHIPPER' },
+    // Drivers for Velocity 4 (2 Motorbike Drivers)
+    { username: 'driver_v4_1', email: 'driver_v4_1@velocity.vn', phone: '0905111004', roleCode: 'SHIPPER' },
+    { username: 'driver_v4_2', email: 'driver_v4_2@velocity.vn', phone: '0905111005', roleCode: 'SHIPPER' },
     { username: 'customer_a', email: 'customer_a@velocity.vn', phone: '0901000011', roleCode: 'CUSTOMER' },
     { username: 'customer_b', email: 'customer_b@velocity.vn', phone: '0901000012', roleCode: 'CUSTOMER' },
     { username: 'customer_c', email: 'customer_c@velocity.vn', phone: '0901000013', roleCode: 'CUSTOMER' },
@@ -337,24 +344,128 @@ async function main() {
   }
 
   // ==========================================
-  // 10. Drivers & Locations (Ensure at least 5)
+  // 10. Drivers & Locations
   // ==========================================
-  console.log('🛵 Seeding Drivers & Locations (Minimum 5)...');
+  console.log('🛵 Seeding Drivers & Locations (Including Velocity 3 & Velocity 4)...');
   const shipperUsers = dbUsers.filter(u => {
     const role = dbRoles.find(r => r.id === u.roleId);
     return role?.roleCode === 'SHIPPER';
   });
 
   const dbDrivers: any[] = [];
-  for (let i = 0; i < 5; i++) {
-    const sUser = shipperUsers[i] || shipperUsers[0];
-    const fac = dbFacilities[i % dbFacilities.length];
+  const dbVehicles: any[] = [];
+  const dbAssignments: any[] = [];
 
+  const motorbikeType = dbVehicleTypes.find(vt => vt.typeCode === 'MOTORBIKE') || dbVehicleTypes[0];
+
+  // Helper to create Driver + Motorbike + Assignment
+  const createDriverWithMotorbike = async (
+    sUser: any,
+    fac: any,
+    codeSuffix: string,
+    fullName: string,
+    phone: string,
+    baseLat: number,
+    baseLng: number
+  ) => {
+    const driver = await prisma.driver.create({
+      data: {
+        userId: sUser.id,
+        employeeCode: `DRV_${codeSuffix}`,
+        fullName,
+        phone,
+        citizenId: `03120000${codeSuffix}`,
+        driverLicenseNumber: `GPLX_${codeSuffix}`,
+        driverLicenseClass: 'A1',
+        hireDate: new Date('2025-02-15'),
+        employmentStatus: 'ACTIVE',
+        homeFacilityId: fac.id,
+        driverType: 'HUB_DELIVERY',
+      },
+    });
+    dbDrivers.push(driver);
+
+    await prisma.driverLocation.create({
+      data: {
+        driverId: driver.id,
+        latitude: baseLat,
+        longitude: baseLng,
+        heading: 90.0,
+        speed: 25.0,
+        accuracy: 5.0,
+        recordedAt: new Date(),
+      },
+    });
+
+    const vehicle = await prisma.vehicle.create({
+      data: {
+        vehicleCode: `VEH_${codeSuffix}`,
+        licensePlate: `59-A1-${codeSuffix}`,
+        vehicleTypeId: motorbikeType.id,
+        homeFacilityId: fac.id,
+        maxWeight: new Prisma.Decimal('80.00'),
+        maxVolume: new Prisma.Decimal('0.20'),
+        maxLength: new Prisma.Decimal('0.60'),
+        refrigerationSupported: false,
+        operatingStatus: 'ACTIVE',
+      },
+    });
+    dbVehicles.push(vehicle);
+
+    const assign = await prisma.driverVehicleAssignment.create({
+      data: {
+        driverId: driver.id,
+        vehicleId: vehicle.id,
+        assignedFrom: new Date(),
+        isActive: true,
+      },
+    });
+    dbAssignments.push(assign);
+    return driver;
+  };
+
+  // 1. Create 3 Motorbike Drivers for Velocity 3 (dbFacilities[2])
+  const facVelocity3 = dbFacilities[2]; // Velocity 3
+  const v3Users = shipperUsers.filter(u => u.username.startsWith('driver_v3_'));
+  for (let i = 0; i < 3; i++) {
+    const sUser = v3Users[i] || shipperUsers[i % shipperUsers.length];
+    await createDriverWithMotorbike(
+      sUser,
+      facVelocity3,
+      `V3_${i + 1}`,
+      `Tài xế Xe máy V3-${i + 1}`,
+      `090533300${i + 1}`,
+      10.745 + i * 0.005,
+      106.692 + i * 0.005
+    );
+  }
+
+  // 2. Create 2 Motorbike Drivers for Velocity 4 (dbFacilities[3])
+  const facVelocity4 = dbFacilities[3]; // Velocity 4
+  const v4Users = shipperUsers.filter(u => u.username.startsWith('driver_v4_'));
+  for (let i = 0; i < 2; i++) {
+    const sUser = v4Users[i] || shipperUsers[(i + 3) % shipperUsers.length];
+    await createDriverWithMotorbike(
+      sUser,
+      facVelocity4,
+      `V4_${i + 1}`,
+      `Tài xế Xe máy V4-${i + 1}`,
+      `090544400${i + 1}`,
+      10.845 + i * 0.005,
+      106.772 + i * 0.005
+    );
+  }
+
+  // 3. Create generic drivers for remaining facilities to maintain minimums
+  for (let i = 0; i < 5; i++) {
+    const fac = dbFacilities[i % dbFacilities.length];
+    const sUser = shipperUsers[i % shipperUsers.length];
+    const vType = dbVehicleTypes[i % dbVehicleTypes.length];
     const driver = await prisma.driver.create({
       data: {
         userId: sUser.id,
         employeeCode: `DRV_${100 + i}`,
-        fullName: `Tài xế giao hàng ${String.fromCharCode(65 + i)}`,
+        fullName: `Tài xế tổng hợp ${String.fromCharCode(65 + i)}`,
         phone: `090500000${i}`,
         citizenId: `03120000045${i}`,
         driverLicenseNumber: `GPLX_${2000 + i}`,
@@ -367,7 +478,6 @@ async function main() {
     });
     dbDrivers.push(driver);
 
-    // Driver Location
     await prisma.driverLocation.create({
       data: {
         driverId: driver.id,
@@ -379,19 +489,6 @@ async function main() {
         recordedAt: new Date(),
       },
     });
-  }
-
-  // ==========================================
-  // 11. Vehicles & Assignments (Ensure at least 5)
-  // ==========================================
-  console.log('🚚 Seeding Vehicles & Assignments (Minimum 5)...');
-  const dbVehicles: any[] = [];
-  const dbAssignments: any[] = [];
-
-  for (let i = 0; i < 5; i++) {
-    const vType = dbVehicleTypes[i % dbVehicleTypes.length];
-    const fac = dbFacilities[i % dbFacilities.length];
-    const driver = dbDrivers[i];
 
     const vehicle = await prisma.vehicle.create({
       data: {
@@ -400,15 +497,14 @@ async function main() {
         vehicleTypeId: vType.id,
         homeFacilityId: fac.id,
         maxWeight: new Prisma.Decimal(vType.maxDefaultWeight.toString()),
-        maxVolume: new Prisma.Decimal('10.5'),
-        maxLength: new Prisma.Decimal('3.2'),
-        refrigerationSupported: i === 4,
+        maxVolume: new Prisma.Decimal('3.50'),
+        maxLength: new Prisma.Decimal('2.00'),
+        refrigerationSupported: vType.typeCode === 'REFRIGERATED_TRUCK',
         operatingStatus: 'ACTIVE',
       },
     });
     dbVehicles.push(vehicle);
 
-    // Driver Vehicle Assignment
     const assign = await prisma.driverVehicleAssignment.create({
       data: {
         driverId: driver.id,
@@ -521,6 +617,212 @@ async function main() {
         changedByUserId: staff.id,
         changeSource: 'ADMIN',
         reason: 'Cập nhật trạng thái tự động theo hệ thống quét',
+      },
+    });
+  }
+
+  // Filter only 3 target services for AI testing: EXPRESS, STANDARD, SAVING
+  const targetServices = dbServices.filter(s => ['EXPRESS', 'STANDARD', 'SAVING'].includes(s.serviceCode));
+  if (targetServices.length === 0) targetServices.push(...dbServices);
+
+  // ==========================================
+  // 12a. 40 Orders for Velocity 4 (READY_FOR_PICKUP) for AI Pickup Clustering Test
+  // ==========================================
+  console.log('📦 Seeding 40 READY_FOR_PICKUP orders for Velocity 4 (AI Pickup Clustering)...');
+  const vel4Fac = dbFacilities[3]; // Velocity 4
+  for (let i = 0; i < 40; i++) {
+    const customer = dbCustomers[i % dbCustomers.length];
+    const service = targetServices[i % targetServices.length];
+    const contactFrom = dbContacts[i % dbContacts.length];
+    const contactTo = dbContacts[(i + 1) % dbContacts.length];
+    const staff = staffUsers[i % staffUsers.length];
+
+    // Pickup address clustered around Velocity 4 in Thu Duc / District 9 (Lat 10.845, Lng 106.772)
+    const pickLat = 10.845 + (Math.random() - 0.5) * 0.04;
+    const pickLng = 106.772 + (Math.random() - 0.5) * 0.04;
+    const pickAddr = await prisma.address.create({
+      data: {
+        addressLine1: `${10 + i} Đường Lê Văn Việt`,
+        ward: 'Hiệp Phú',
+        province: 'Hồ Chí Minh',
+        wardCode: ward1 || undefined,
+        formattedAddress: `${10 + i} Đường Lê Văn Việt, Phường Hiệp Phú, Thành phố Thủ Đức, TP. Hồ Chí Minh`,
+        latitude: pickLat,
+        longitude: pickLng,
+      },
+    });
+
+    const delivAddr = dbAddresses[i % dbAddresses.length];
+
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        orderCode: `ORD_V4_PKP_${100 + i}`,
+        status: 'READY_FOR_PICKUP',
+        serviceId: service.id,
+        pickupAddressId: pickAddr.id,
+        senderContactId: contactFrom.id,
+        senderName: `Khách gửi Thu Duc ${i + 1}`,
+        senderPhone: `09881110${i < 10 ? '0' + i : i}`,
+        pickupAddressText: pickAddr.formattedAddress,
+        pickupLatitude: pickLat,
+        pickupLongitude: pickLng,
+        deliveryAddressId: delivAddr.id,
+        receiverContactId: contactTo.id,
+        receiverName: `Người nhận ${i + 1}`,
+        receiverPhone: `09771110${i < 10 ? '0' + i : i}`,
+        deliveryAddressText: delivAddr.formattedAddress,
+        deliveryLatitude: delivAddr.latitude,
+        deliveryLongitude: delivAddr.longitude,
+        estimatedShippingFee: new Prisma.Decimal('30000.00'),
+        estimatedInsuranceFee: new Prisma.Decimal('500.00'),
+        estimatedCodAmount: new Prisma.Decimal(i % 3 === 0 ? '150000.00' : '0.00'),
+        estimatedTotalAmount: new Prisma.Decimal('30500.00'),
+        estimatedDistance: new Prisma.Decimal('8.5'),
+        estimatedDuration: 25,
+        pickupType: 'PICKUP',
+        originFacilityId: vel4Fac.id,
+        destinationFacilityId: dbFacilities[(i + 1) % dbFacilities.length].id,
+        createdBy: staff.id,
+      },
+    });
+    dbOrders.push(order);
+
+    const pack = await prisma.package.create({
+      data: {
+        orderId: order.id,
+        packageCode: `PKG_V4_PKP_${100 + i}`,
+        weight: new Prisma.Decimal((1.0 + (i % 5) * 0.5).toFixed(2)),
+        length: new Prisma.Decimal('15.0'),
+        width: new Prisma.Decimal('10.0'),
+        height: new Prisma.Decimal('10.0'),
+        volume: new Prisma.Decimal('0.0015'),
+        isFragile: i % 4 === 0,
+      },
+    });
+    dbPackages.push(pack);
+
+    const payment = await prisma.orderPayment.create({
+      data: {
+        orderId: order.id,
+        finalShippingFee: new Prisma.Decimal('30000.00'),
+        finalInsuranceFee: new Prisma.Decimal('500.00'),
+        finalCodAmount: new Prisma.Decimal(i % 3 === 0 ? '150000.00' : '0.00'),
+        feePayer: 'SENDER',
+        paymentMethod: 'COD',
+        paymentStatus: 'UNPAID',
+      },
+    });
+    dbPayments.push(payment);
+
+    await prisma.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        status: 'READY_FOR_PICKUP',
+        changedByUserId: staff.id,
+        changeSource: 'SYSTEM',
+        reason: 'Đơn hàng sẵn sàng để phân công Shipper lấy hàng tại Thủ Đức',
+      },
+    });
+  }
+
+  // ==========================================
+  // 12b. 40 Orders for Velocity 3 (AT_HUB) for AI Delivery Clustering Test
+  // ==========================================
+  console.log('📦 Seeding 40 AT_HUB orders for Velocity 3 (AI Delivery Clustering)...');
+  const vel3Fac = dbFacilities[2]; // Velocity 3
+  for (let i = 0; i < 40; i++) {
+    const customer = dbCustomers[i % dbCustomers.length];
+    const service = targetServices[i % targetServices.length];
+    const contactFrom = dbContacts[i % dbContacts.length];
+    const contactTo = dbContacts[(i + 1) % dbContacts.length];
+    const staff = staffUsers[i % staffUsers.length];
+
+    const pickAddr = dbAddresses[i % dbAddresses.length];
+
+    // Delivery address clustered around Velocity 3 in District 7 / Tan Binh (Lat 10.745, Lng 106.692)
+    const delivLat = 10.745 + (Math.random() - 0.5) * 0.04;
+    const delivLng = 106.692 + (Math.random() - 0.5) * 0.04;
+    const delivAddr = await prisma.address.create({
+      data: {
+        addressLine1: `${20 + i} Đường Nguyễn Hữu Thọ`,
+        ward: 'Tân Hưng',
+        province: 'Hồ Chí Minh',
+        wardCode: ward2 || undefined,
+        formattedAddress: `${20 + i} Đường Nguyễn Hữu Thọ, Phường Tân Hưng, Quận 7, TP. Hồ Chí Minh`,
+        latitude: delivLat,
+        longitude: delivLng,
+      },
+    });
+
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        orderCode: `ORD_V3_HUB_${100 + i}`,
+        status: 'AT_HUB',
+        serviceId: service.id,
+        pickupAddressId: pickAddr.id,
+        senderContactId: contactFrom.id,
+        senderName: `Khách gửi Giao Hàng ${i + 1}`,
+        senderPhone: `09662220${i < 10 ? '0' + i : i}`,
+        pickupAddressText: pickAddr.formattedAddress,
+        pickupLatitude: pickAddr.latitude,
+        pickupLongitude: pickAddr.longitude,
+        deliveryAddressId: delivAddr.id,
+        receiverContactId: contactTo.id,
+        receiverName: `Người nhận Q7 ${i + 1}`,
+        receiverPhone: `09552220${i < 10 ? '0' + i : i}`,
+        deliveryAddressText: delivAddr.formattedAddress,
+        deliveryLatitude: delivLat,
+        deliveryLongitude: delivLng,
+        estimatedShippingFee: new Prisma.Decimal('35000.00'),
+        estimatedInsuranceFee: new Prisma.Decimal('500.00'),
+        estimatedCodAmount: new Prisma.Decimal(i % 2 === 0 ? '250000.00' : '0.00'),
+        estimatedTotalAmount: new Prisma.Decimal('35500.00'),
+        estimatedDistance: new Prisma.Decimal('10.2'),
+        estimatedDuration: 30,
+        pickupType: 'PICKUP',
+        originFacilityId: dbFacilities[(i + 1) % dbFacilities.length].id,
+        destinationFacilityId: vel3Fac.id,
+        createdBy: staff.id,
+      },
+    });
+    dbOrders.push(order);
+
+    const pack = await prisma.package.create({
+      data: {
+        orderId: order.id,
+        packageCode: `PKG_V3_HUB_${100 + i}`,
+        weight: new Prisma.Decimal((1.2 + (i % 4) * 0.8).toFixed(2)),
+        length: new Prisma.Decimal('20.0'),
+        width: new Prisma.Decimal('15.0'),
+        height: new Prisma.Decimal('12.0'),
+        volume: new Prisma.Decimal('0.0036'),
+        isFragile: i % 3 === 0,
+      },
+    });
+    dbPackages.push(pack);
+
+    const payment = await prisma.orderPayment.create({
+      data: {
+        orderId: order.id,
+        finalShippingFee: new Prisma.Decimal('35000.00'),
+        finalInsuranceFee: new Prisma.Decimal('500.00'),
+        finalCodAmount: new Prisma.Decimal(i % 2 === 0 ? '250000.00' : '0.00'),
+        feePayer: 'RECEIVER',
+        paymentMethod: 'COD',
+        paymentStatus: 'UNPAID',
+      },
+    });
+    dbPayments.push(payment);
+
+    await prisma.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        status: 'AT_HUB',
+        changedByUserId: staff.id,
+        changeSource: 'SYSTEM',
+        reason: 'Đơn hàng đã đến kho Velocity 3 (Q7), sẵn sàng cho AI phân cụm giao hàng',
       },
     });
   }
@@ -650,20 +952,23 @@ async function main() {
       return role?.roleCode === 'ADMIN';
     }) || dbUsers[0];
 
-    const stop = await prisma.routeStop.create({
-      data: {
-        routeId: route.id,
-        shipmentId: shipment.id,
-        facilityId: fac.id,
-        stopType: 'DELIVERY',
-        sequence: i + 1,
-        addressSnapshot: fac.facilityName,
-        latitude: 10.776 + (i * 0.002),
-        longitude: 106.701 + (i * 0.002),
-        status: 'PENDING',
-      },
-    });
-    dbStops.push(stop);
+    // Create 3 stops per route so multi-stop routing and simulation works properly
+    for (let s = 1; s <= 3; s++) {
+      const stop = await prisma.routeStop.create({
+        data: {
+          routeId: route.id,
+          shipmentId: shipment.id,
+          facilityId: fac.id,
+          stopType: s === 1 ? 'PICKUP' : 'DELIVERY',
+          sequence: s,
+          addressSnapshot: `${fac.facilityName} - Điểm dừng ${s}`,
+          latitude: 10.776 + (i * 0.005) + (s * 0.003),
+          longitude: 106.701 + (i * 0.005) + (s * 0.003),
+          status: 'PENDING',
+        },
+      });
+      dbStops.push(stop);
+    }
 
     // Dispatch Task
     await prisma.dispatchTask.create({
@@ -682,7 +987,7 @@ async function main() {
     // Driver Check-in
     await prisma.driverCheckIn.create({
       data: {
-        routeStopId: stop.id,
+        routeStopId: dbStops[dbStops.length - 1].id,
         driverId: driver.id,
         latitude: 10.776 + (i * 0.002),
         longitude: 106.701 + (i * 0.002),

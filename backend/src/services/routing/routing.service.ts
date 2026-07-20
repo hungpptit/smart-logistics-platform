@@ -42,17 +42,19 @@ export class RoutingService {
       lng: primaryAddress.longitude,
     };
 
-    // 2. Fetch all orders ready for dispatch at this facility
+    // 2. Fetch all orders ready for AI routing at this facility (Pickup or Delivery)
     const orders = await prisma.order.findMany({
       where: {
-        destinationFacilityId: facilityId,
-        status: { in: ['READY_FOR_DISPATCH', 'AT_HUB'] },
+        OR: [
+          { originFacilityId: facilityId, status: 'READY_FOR_PICKUP' },
+          { destinationFacilityId: facilityId, status: 'AT_HUB' },
+        ],
         deletedAt: null,
       },
     });
 
     if (orders.length === 0) {
-      throw new BadRequestException('Không có đơn hàng nào ở trạng thái READY_FOR_DISPATCH hoặc AT_HUB tại kho này');
+      throw new BadRequestException('Không có đơn hàng nào ở trạng thái "Chờ lấy hàng" (READY_FOR_PICKUP) hoặc "Đã đến kho nhận" (AT_HUB) tại bưu cục này');
     }
 
     // 3. Fetch all active drivers assigned to this facility
@@ -201,25 +203,28 @@ export class RoutingService {
             });
           }
 
+          const isPickup = order.status === 'READY_FOR_PICKUP';
+          const nextStatus = isPickup ? 'PICKUP_ASSIGNED' : 'IN_TRANSIT';
+
           // Create RouteStop record
           await tx.routeStop.create({
             data: {
               routeId: route.id,
               shipmentId: shipment.id,
-              stopType: 'DELIVERY',
+              stopType: isPickup ? 'PICKUP' : 'DELIVERY',
               sequence: sequenceIndex++,
-              addressSnapshot: order.deliveryAddressText || 'Unknown Address',
-              latitude: order.deliveryLatitude!,
-              longitude: order.deliveryLongitude!,
+              addressSnapshot: (isPickup ? order.pickupAddressText : order.deliveryAddressText) || 'Unknown Address',
+              latitude: (isPickup ? order.pickupLatitude : order.deliveryLatitude)!,
+              longitude: (isPickup ? order.pickupLongitude : order.deliveryLongitude)!,
               status: 'PENDING',
             },
           });
 
-          // Update Order Status to READY_FOR_DISPATCH (or keep it and add history log)
+          // Update Order Status after AI assignment
           await tx.order.update({
             where: { id: order.id },
             data: {
-              status: 'READY_FOR_DISPATCH', // keep it ready for dispatch or in transit
+              status: nextStatus,
             },
           });
 
@@ -227,10 +232,10 @@ export class RoutingService {
           await tx.orderStatusHistory.create({
             data: {
               orderId: order.id,
-              status: 'READY_FOR_DISPATCH',
+              status: nextStatus,
               changedByUserId: creatorId,
               changeSource: 'SYSTEM',
-              reason: `Đơn hàng được phân bổ vào lộ trình tối ưu ${routeCode} cho tài xế ${driver.fullName}`,
+              reason: `Đơn hàng được AI phân bổ vào lộ trình tối ưu ${routeCode} cho tài xế ${driver.fullName} (${isPickup ? 'Tuyến lấy hàng' : 'Tuyến giao hàng'})`,
             },
           });
         }

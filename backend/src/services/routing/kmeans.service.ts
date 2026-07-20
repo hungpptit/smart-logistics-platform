@@ -31,10 +31,19 @@ export class KMeansService {
     if (orders.length === 0) return [];
     if (k <= 0) return [];
 
-    // Filter orders that have valid delivery coordinates
-    const validOrders = orders.filter(
-      (order) => order.deliveryLatitude !== null && order.deliveryLongitude !== null
-    );
+    // Extract correct coordinates based on order status (Pickup vs Delivery)
+    const getOrderCoords = (order: Order) => {
+      const isPickup = order.status === 'READY_FOR_PICKUP';
+      const lat = isPickup ? order.pickupLatitude : order.deliveryLatitude;
+      const lng = isPickup ? order.pickupLongitude : order.deliveryLongitude;
+      return { lat, lng };
+    };
+
+    // Filter orders that have valid coordinates
+    const validOrders = orders.filter((order) => {
+      const coords = getOrderCoords(order);
+      return coords.lat !== null && coords.lng !== null && coords.lat !== undefined && coords.lng !== undefined;
+    });
 
     if (validOrders.length === 0) return [];
 
@@ -49,10 +58,8 @@ export class KMeansService {
       const randIdx = Math.floor(Math.random() * validOrders.length);
       if (!usedIndices.has(randIdx)) {
         usedIndices.add(randIdx);
-        centroids.push({
-          lat: validOrders[randIdx].deliveryLatitude!,
-          lng: validOrders[randIdx].deliveryLongitude!,
-        });
+        const c = getOrderCoords(validOrders[randIdx]);
+        centroids.push({ lat: c.lat!, lng: c.lng! });
       }
     }
 
@@ -68,13 +75,14 @@ export class KMeansService {
       // Assign each order to the nearest centroid
       for (let i = 0; i < validOrders.length; i++) {
         const order = validOrders[i];
+        const coords = getOrderCoords(order);
         let minDistance = Infinity;
         let bestCluster = -1;
 
         for (let j = 0; j < centroids.length; j++) {
           const dist = this.haversineDistance(
-            order.deliveryLatitude!,
-            order.deliveryLongitude!,
+            coords.lat!,
+            coords.lng!,
             centroids[j].lat,
             centroids[j].lng
           );
@@ -99,10 +107,10 @@ export class KMeansService {
 
       for (let i = 0; i < validOrders.length; i++) {
         const clusterId = assignments[i];
-        const order = validOrders[i];
+        const coords = getOrderCoords(validOrders[i]);
         if (clusterId !== -1) {
-          newCentroids[clusterId].lat += order.deliveryLatitude!;
-          newCentroids[clusterId].lng += order.deliveryLongitude!;
+          newCentroids[clusterId].lat += coords.lat!;
+          newCentroids[clusterId].lng += coords.lng!;
           newCentroids[clusterId].count++;
         }
       }

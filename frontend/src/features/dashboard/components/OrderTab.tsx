@@ -160,11 +160,17 @@ export const OrderTab: React.FC = () => {
   const isStaffWithoutFacility = isStaff && !user?.staffProfile?.assignedFacilityId;
 
   const [facilities, setFacilities] = useState<any[]>([]);
-  const [facilityFilter, setFacilityFilter] = useState<string>('');
+  const [facilityFilter, setFacilityFilter] = useState<string>(user?.staffProfile?.assignedFacilityId || '');
+
+  useEffect(() => {
+    if (user?.staffProfile?.assignedFacilityId && !facilityFilter) {
+      setFacilityFilter(user.staffProfile.assignedFacilityId);
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchFacilitiesForFilter = async () => {
-      if (!token || !isAdmin) return;
+      if (!token || !isAdminOrStaff) return;
       try {
         const response = await fetch(`${CONFIG.API_BASE_URL}/facilities?limit=100`, {
           method: 'GET',
@@ -182,7 +188,7 @@ export const OrderTab: React.FC = () => {
       }
     };
     fetchFacilitiesForFilter();
-  }, [token, isAdmin]);
+  }, [token, isAdminOrStaff]);
 
   const fetchOrders = async (page: number = 1) => {
     if (!token) return;
@@ -220,8 +226,11 @@ export const OrderTab: React.FC = () => {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1);
-    fetchOrders(1);
+    if (currentPage === 1) {
+      fetchOrders(1);
+    } else {
+      setCurrentPage(1);
+    }
   };
 
   const fetchOrderDetail = async (orderId: string) => {
@@ -314,8 +323,11 @@ export const OrderTab: React.FC = () => {
     }
   };
 
-  const formatPrice = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+  const formatPrice = (value: any) => {
+    if (value === null || value === undefined || value === '') return '0 đ';
+    const num = typeof value === 'number' ? value : parseFloat(String(value));
+    if (isNaN(num)) return '0 đ';
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
   };
 
   const formatDate = (dateString?: string) => {
@@ -534,7 +546,9 @@ export const OrderTab: React.FC = () => {
                             <td className="px-6 py-4 text-gray-500 max-w-[200px] truncate" title={order.deliveryAddressText}>
                               {order.deliveryAddressText}
                             </td>
-                            <td className="px-6 py-4 font-bold text-[#bc0100]">{formatPrice(order.totalAmount)}</td>
+                            <td className="px-6 py-4 font-bold text-[#bc0100]">
+                              {formatPrice(order.totalAmount ?? (order as any).estimatedTotalAmount)}
+                            </td>
                             <td className="px-6 py-4">
                               <span
                                 className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
@@ -573,25 +587,90 @@ export const OrderTab: React.FC = () => {
 
           {/* Pagination Footer */}
           {pagination.totalPages > 1 && (
-            <div className="bg-[#F4F4F4] px-6 py-4 flex items-center justify-between border-t border-gray-100">
-              <span className="text-gray-500 text-xs">
+            <div className="bg-[#F4F4F4] px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 font-montserrat">
+              <span className="text-gray-500 text-xs font-medium">
                 Hiển thị trang <strong className="text-[#161D25]">{pagination.page}</strong> / <strong>{pagination.totalPages}</strong> ({pagination.total} đơn hàng)
               </span>
-              <div className="flex gap-1">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  className="p-1.5 border border-gray-300 rounded bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  disabled={currentPage === pagination.totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  className="p-1.5 border border-gray-300 rounded bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronRight size={16} />
-                </button>
+              <div className="flex items-center gap-2">
+                {/* Direct Page Select Dropdown */}
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 mr-2">
+                  <span className="font-semibold">Trang:</span>
+                  <select
+                    value={currentPage}
+                    onChange={(e) => setCurrentPage(Number(e.target.value))}
+                    className="px-2 py-1 border border-gray-300 rounded bg-white text-xs font-bold text-[#161D25] focus:outline-none focus:border-[#bc0100] cursor-pointer"
+                  >
+                    {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((p) => (
+                      <option key={p} value={p}>
+                        Trang {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Page Number Buttons with Ellipsis Windowing */}
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    className="p-1.5 border border-gray-300 rounded bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="Trang trước"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+
+                  {(() => {
+                    const total = pagination.totalPages;
+                    const current = currentPage;
+                    const pages: (number | string)[] = [];
+
+                    if (total <= 5) {
+                      for (let i = 1; i <= total; i++) pages.push(i);
+                    } else {
+                      pages.push(1);
+                      if (current > 3) pages.push('...');
+                      
+                      const start = Math.max(2, current - 1);
+                      const end = Math.min(total - 1, current + 1);
+                      for (let i = start; i <= end; i++) pages.push(i);
+
+                      if (current < total - 2) pages.push('...');
+                      pages.push(total);
+                    }
+
+                    return pages.map((p, idx) => {
+                      if (typeof p === 'string') {
+                        return (
+                          <span key={`ellipsis-${idx}`} className="px-1.5 text-gray-400 font-bold select-none">
+                            ...
+                          </span>
+                        );
+                      }
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setCurrentPage(p)}
+                          className={`min-w-[32px] h-[32px] px-2 text-xs font-bold rounded border transition-colors ${
+                            p === currentPage
+                              ? 'bg-[#bc0100] text-white border-[#bc0100] shadow-sm'
+                              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      );
+                    });
+                  })()}
+
+                  <button
+                    disabled={currentPage === pagination.totalPages}
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    className="p-1.5 border border-gray-300 rounded bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="Trang kế tiếp"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -692,22 +771,22 @@ export const OrderTab: React.FC = () => {
                   <div className="border-b border-gray-300/40 my-1"></div>
                   <div className="flex justify-between">
                     <span>Cước vận chuyển gốc</span>
-                    <span className="font-semibold">{formatPrice(selectedOrder.shippingFee)}</span>
+                    <span className="font-semibold">{formatPrice(selectedOrder.shippingFee ?? (selectedOrder as any).estimatedShippingFee)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Phí bảo hiểm khai giá</span>
-                    <span className="font-semibold">{formatPrice(selectedOrder.insuranceFee)}</span>
+                    <span className="font-semibold">{formatPrice(selectedOrder.insuranceFee ?? (selectedOrder as any).estimatedInsuranceFee)}</span>
                   </div>
-                  {selectedOrder.codAmount > 0 && (
+                  {(selectedOrder.codAmount > 0 || (selectedOrder as any).estimatedCodAmount > 0) && (
                     <div className="flex justify-between text-amber-600">
                       <span>Tiền thu hộ COD</span>
-                      <span className="font-semibold">{formatPrice(selectedOrder.codAmount)}</span>
+                      <span className="font-semibold">{formatPrice(selectedOrder.codAmount ?? (selectedOrder as any).estimatedCodAmount)}</span>
                     </div>
                   )}
                   <div className="border-b border-gray-300/40 my-1"></div>
                   <div className="flex justify-between font-bold text-[#bc0100] text-sm">
                     <span>Tổng chi phí đơn</span>
-                    <span>{formatPrice(selectedOrder.totalAmount)}</span>
+                    <span>{formatPrice(selectedOrder.totalAmount ?? (selectedOrder as any).estimatedTotalAmount)}</span>
                   </div>
                   <div className="text-[9px] text-gray-400 mt-1 uppercase font-bold tracking-wider">
                     Thanh toán bởi: {selectedOrder.payment?.feePayer === 'SENDER' ? 'Người gửi' : 'Người nhận'} ({selectedOrder.payment?.paymentMethod})

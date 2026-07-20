@@ -93,10 +93,15 @@ export class VRPService {
       return orders;
     }
 
-    // Compile list of locations: index 0 is facility, 1..N are orders
+    // Compile list of locations: index 0 is facility, 1..N are orders (Pickup or Delivery)
     const locations: Location[] = [
       facilityLocation,
-      ...orders.map((o) => ({ lat: o.deliveryLatitude!, lng: o.deliveryLongitude! })),
+      ...orders.map((o) => {
+        const isPickup = o.status === 'READY_FOR_PICKUP';
+        const lat = isPickup ? o.pickupLatitude : o.deliveryLatitude;
+        const lng = isPickup ? o.pickupLongitude : o.deliveryLongitude;
+        return { lat: lat!, lng: lng! };
+      }),
     ];
 
     const { distanceMatrix, durationMatrix } = await this.calculateDistanceAndDurationMatrices(locations);
