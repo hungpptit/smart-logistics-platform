@@ -11,15 +11,15 @@ export class VRPService {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
 
   /**
-   * Precomputes distance and duration matrices using OSRM, with fallback to Haversine.
+   * Precomputes distance and duration matrices using Goong Maps API, with fallback to OSRM and Haversine.
    */
   public async calculateDistanceAndDurationMatrices(
     locations: Location[]
@@ -32,12 +32,42 @@ export class VRPService {
       return { distanceMatrix, durationMatrix };
     }
 
+    // 1. Primary: Try Goong Maps Distance Matrix API if GOONG_API_KEY is available
+    const GOONG_API_KEY = process.env.GOONG_API_KEY;
+    if (GOONG_API_KEY) {
+      try {
+        const originsStr = locations.map((loc) => `${loc.lat},${loc.lng}`).join('|');
+        const url = `https://rsapi.goong.io/DistanceMatrix?origins=${encodeURIComponent(originsStr)}&destinations=${encodeURIComponent(originsStr)}&vehicle=bike&api_key=${GOONG_API_KEY}`;
+
+        const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        if (response.ok) {
+          const data = (await response.json()) as any;
+          if (data && data.rows && data.rows.length === n) {
+            for (let i = 0; i < n; i++) {
+              const elements = data.rows[i]?.elements;
+              if (elements && elements.length === n) {
+                for (let j = 0; j < n; j++) {
+                  distanceMatrix[i][j] = elements[j]?.distance?.value || 0;
+                  durationMatrix[i][j] = elements[j]?.duration?.value || 0;
+                }
+              }
+            }
+            console.log('🗺️ [AI Microservice] Successfully calculated Distance Matrix using Goong Maps API');
+            return { distanceMatrix, durationMatrix };
+          }
+        }
+      } catch (error) {
+        console.warn('[AI Microservice] Goong Distance Matrix failed, falling back to OSRM:', (error as Error).message);
+      }
+    }
+
+    // 2. Secondary: Fallback to OSRM public service
     try {
       const coordsString = locations.map((loc) => `${loc.lng},${loc.lat}`).join(';');
       const url = `http://router.project-osrm.org/table/v1/driving/${coordsString}?annotations=distance,duration`;
-      
+
       const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      const data = await response.json() as any;
+      const data = (await response.json()) as any;
 
       if (data && data.distances && data.durations) {
         for (let i = 0; i < n; i++) {
@@ -46,13 +76,14 @@ export class VRPService {
             durationMatrix[i][j] = data.durations[i][j] || 0;
           }
         }
+        console.log('🗺️ [AI Microservice] Successfully calculated Distance Matrix using OSRM API');
         return { distanceMatrix, durationMatrix };
       }
     } catch (error) {
       console.warn('[AI Microservice] OSRM service failed, falling back to Haversine calculations:', (error as Error).message);
     }
 
-    // Fallback to Haversine
+    // 3. Tertiary: Fallback to Haversine
     const averageSpeedMPS = 8.33; // 30 km/h in m/s
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
@@ -60,12 +91,13 @@ export class VRPService {
           distanceMatrix[i][j] = 0;
           durationMatrix[i][j] = 0;
         } else {
-          const distMeters = this.haversineDistance(
-            locations[i].lat,
-            locations[i].lng,
-            locations[j].lat,
-            locations[j].lng
-          ) * 1000;
+          const distMeters =
+            this.haversineDistance(
+              locations[i].lat,
+              locations[i].lng,
+              locations[j].lat,
+              locations[j].lng
+            ) * 1000;
           distanceMatrix[i][j] = distMeters;
           durationMatrix[i][j] = distMeters / averageSpeedMPS;
         }

@@ -196,8 +196,8 @@ async function main() {
   const addressesData = [
     { addressLine1: '120 Lê Lợi', ward: 'Bến Nghé', province: 'Hồ Chí Minh', latitude: 10.776, longitude: 106.701, formattedAddress: '120 Lê Lợi, Bến Nghé, Quận 1, Hồ Chí Minh', wardCode: ward1 },
     { addressLine1: '45 Cầu Giấy', ward: 'Quan Hoa', province: 'Hà Nội', latitude: 21.036, longitude: 105.801, formattedAddress: '45 Cầu Giấy, Quan Hoa, Cầu Giấy, Hà Nội', wardCode: ward2 },
-    { addressLine1: '88 Nguyễn Văn Linh', ward: 'Nam Dương', province: 'Đà Nẵng', latitude: 16.061, longitude: 108.215, formattedAddress: '88 Nguyễn Văn Linh, Nam Dương, Hải Châu, Đà Nẵng', wardCode: ward3 },
-    { addressLine1: '12 Trần Phú', ward: 'Lương Khánh Thiện', province: 'Hải Phòng', latitude: 20.862, longitude: 106.685, formattedAddress: '12 Trần Phú, Lương Khánh Thiện, Ngô Quyền, Hải Phòng', wardCode: ward4 },
+    { addressLine1: '300 Đường Nguyễn Hữu Thọ', ward: 'Tân Hưng', province: 'Hồ Chí Minh', latitude: 10.745, longitude: 106.692, formattedAddress: '300 Đường Nguyễn Hữu Thọ, Phường Tân Hưng, Quận 7, TP. Hồ Chí Minh', wardCode: ward3 },
+    { addressLine1: '100 Đường Lê Văn Việt', ward: 'Hiệp Phú', province: 'Hồ Chí Minh', latitude: 10.845, longitude: 106.772, formattedAddress: '100 Đường Lê Văn Việt, Phường Hiệp Phú, Thành phố Thủ Đức, TP. Hồ Chí Minh', wardCode: ward4 },
     { addressLine1: '54 Mậu Thân', ward: 'An Nghiệp', province: 'Cần Thơ', latitude: 10.038, longitude: 105.772, formattedAddress: '54 Mậu Thân, An Nghiệp, Ninh Kiều, Cần Thơ', wardCode: ward5 },
   ];
 

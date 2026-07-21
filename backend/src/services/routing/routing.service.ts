@@ -338,6 +338,11 @@ export class RoutingService {
             id: true,
             facilityCode: true,
             facilityName: true,
+            facilityAddresses: {
+              include: {
+                address: true,
+              },
+            },
           },
         },
         driverVehicleAssignment: {
@@ -378,6 +383,11 @@ export class RoutingService {
             id: true,
             facilityCode: true,
             facilityName: true,
+            facilityAddresses: {
+              include: {
+                address: true,
+              },
+            },
           },
         },
         endFacility: {
@@ -443,12 +453,12 @@ export class RoutingService {
     // 1. Reset test orders back to original state
     const orderWhere: any = facilityId
       ? {
-          OR: [
-            { originFacilityId: facilityId },
-            { destinationFacilityId: facilityId },
-          ],
-          deletedAt: null,
-        }
+        OR: [
+          { originFacilityId: facilityId },
+          { destinationFacilityId: facilityId },
+        ],
+        deletedAt: null,
+      }
       : { deletedAt: null };
 
     // Reset Velocity 4 pickup orders back to READY_FOR_PICKUP
@@ -499,7 +509,7 @@ export class RoutingService {
       await prisma.routeLocationLog.deleteMany({ where: { routeId: { in: routeIds } } });
       await prisma.dispatchTask.deleteMany({ where: { routeId: { in: routeIds } } });
       await prisma.routeStop.deleteMany({ where: { routeId: { in: routeIds } } });
-      
+
       // Delete shipments created for these routes
       const shipments = await prisma.shipment.findMany({ where: { routeId: { in: routeIds } }, select: { id: true } });
       const shipmentIds = shipments.map(s => s.id);

@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
 import { io, Socket } from 'socket.io-client';
-import { 
-  Navigation, Earth, Truck, MapPin, Search, RefreshCw, 
-  Play, Square, Clock, Loader2, AlertCircle, Bot, RotateCcw
+import {
+  Navigation, Earth, Truck, MapPin, Search, RefreshCw,
+  Play, Square, Clock, Loader2, AlertCircle, Bot, RotateCcw, Building2
 } from 'lucide-react';
 import { Map, MapControls, MapMarker, MarkerContent, MapRoute, MarkerPopup } from '../../../components/ui/map';
 import MapLibreGL from 'maplibre-gl';
@@ -35,6 +35,14 @@ interface RouteData {
   startFacility: {
     facilityCode: string;
     facilityName: string;
+    facilityAddresses?: Array<{
+      isPrimary?: boolean;
+      address?: {
+        latitude?: number;
+        longitude?: number;
+        addressLine1?: string;
+      };
+    }>;
   };
   driverVehicleAssignment: {
     driver: {
@@ -61,14 +69,14 @@ interface RouteData {
 
 export const LiveTrackingTab: React.FC = () => {
   const { token, user } = useAuth();
-  
+
   // State
   const [routes, setRoutes] = useState<RouteData[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<RouteData | null>(null);
   const [routeGeometry, setRouteGeometry] = useState<[number, number][]>([]);
-  
+
   // Filters
   const [facilityFilter, setFacilityFilter] = useState<string>(user?.staffProfile?.assignedFacilityId || '');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -173,7 +181,7 @@ export const LiveTrackingTab: React.FC = () => {
       setResetting(false);
     }
   };
-  
+
   // Socket.io
   const socketRef = useRef<Socket | null>(null);
   const mapRef = useRef<MapLibreGL.Map | null>(null);
@@ -214,7 +222,7 @@ export const LiveTrackingTab: React.FC = () => {
       const queryParams = new URLSearchParams();
       if (facilityFilter) queryParams.append('facilityId', facilityFilter);
       if (statusFilter) queryParams.append('status', statusFilter);
-      
+
       const response = await fetch(`${CONFIG.API_BASE_URL}/routes?${queryParams.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -299,9 +307,9 @@ export const LiveTrackingTab: React.FC = () => {
       recordedAt?: string;
     }) => {
       console.log('[Socket] Live GPS update received:', data);
-      
+
       // 1. Update the coordinate in the general route list
-      setRoutes(prevRoutes => 
+      setRoutes(prevRoutes =>
         prevRoutes.map(route => {
           if (route.id === data.routeId) {
             return {
@@ -406,7 +414,7 @@ export const LiveTrackingTab: React.FC = () => {
         if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
           const routeCoords = data.routes[0].geometry.coordinates as [number, number][];
           setRouteGeometry(routeCoords);
-          
+
           // Fit bounds to OSRM geometry coordinates
           if (map && routeCoords.length > 0) {
             const lons = routeCoords.map(c => c[0]);
@@ -470,10 +478,10 @@ export const LiveTrackingTab: React.FC = () => {
     // Start Simulation
     setIsSimulating(true);
     setSimulationIndex(0);
-    
+
     // Generate route coordinate steps
     const steps: { lat: number; lng: number }[] = [];
-    
+
     if (routeGeometry && routeGeometry.length > 0) {
       // Use OSRM road coordinates
       // Downsample to keep the simulation speed reasonable (max 45 steps)
@@ -507,11 +515,11 @@ export const LiveTrackingTab: React.FC = () => {
       const stopsList = selectedRoute.stops;
       let currentLat = 10.762622;
       let currentLng = 106.660172;
-      
+
       stopsList.forEach((stop) => {
         const nextLat = stop.latitude;
         const nextLng = stop.longitude;
-        
+
         for (let i = 0; i < 5; i++) {
           const ratio = i / 5;
           steps.push({
@@ -565,7 +573,7 @@ export const LiveTrackingTab: React.FC = () => {
   const filteredRoutes = routes.filter(route => {
     const term = searchTerm.toLowerCase().trim();
     if (!term) return true;
-    
+
     return (
       route.routeCode.toLowerCase().includes(term) ||
       route.driverVehicleAssignment.driver.fullName.toLowerCase().includes(term) ||
@@ -576,10 +584,10 @@ export const LiveTrackingTab: React.FC = () => {
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-140px)] gap-4 font-montserrat">
-      
+
       {/* 1. LEFT SIDEBAR: Routes list and Filters */}
       <div className="w-full lg:w-96 bg-white rounded-lg border border-[#e2e8f0] shadow-soft flex flex-col h-full overflow-hidden shrink-0">
-        
+
         {/* Header and Search */}
         <div className="p-4 border-b border-[#e2e8f0] bg-gray-50/50 space-y-3">
           <div className="flex items-center justify-between">
@@ -617,8 +625,8 @@ export const LiveTrackingTab: React.FC = () => {
                   </button>
                 </>
               )}
-              <button 
-                onClick={() => fetchRoutes(selectedRouteId || undefined)} 
+              <button
+                onClick={() => fetchRoutes(selectedRouteId || undefined)}
                 className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors"
                 title="Làm mới"
               >
@@ -686,16 +694,15 @@ export const LiveTrackingTab: React.FC = () => {
             filteredRoutes.map((route) => {
               const isSelected = selectedRouteId === route.id;
               const isOnline = !!route.currentGpsLocation;
-              
+
               return (
                 <div
                   key={route.id}
                   onClick={() => handleSelectRoute(route.id)}
-                  className={`p-4 cursor-pointer transition-all border-l-4 ${
-                    isSelected 
-                      ? 'bg-[#bc0100]/5 border-[#bc0100]' 
+                  className={`p-4 cursor-pointer transition-all border-l-4 ${isSelected
+                      ? 'bg-[#bc0100]/5 border-[#bc0100]'
                       : 'border-transparent hover:bg-gray-50/50'
-                  }`}
+                    }`}
                 >
                   <div className="flex justify-between items-start">
                     <div>
@@ -713,13 +720,12 @@ export const LiveTrackingTab: React.FC = () => {
                       </p>
                     </div>
 
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[8px] font-extrabold uppercase ${
-                      route.status === 'IN_PROGRESS' 
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[8px] font-extrabold uppercase ${route.status === 'IN_PROGRESS'
                         ? 'bg-blue-50 text-blue-700 border border-blue-200'
                         : route.status === 'COMPLETED'
-                        ? 'bg-green-50 text-green-700 border border-green-200'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}>
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
                       {route.status === 'IN_PROGRESS' ? 'Đang giao' : route.status === 'COMPLETED' ? 'Đã xong' : 'Chưa chạy'}
                     </span>
                   </div>
@@ -747,99 +753,117 @@ export const LiveTrackingTab: React.FC = () => {
 
       {/* 2. RIGHT SIDE: Real-time map & Route Details */}
       <div className="flex-1 bg-white rounded-lg border border-[#e2e8f0] shadow-soft overflow-hidden flex flex-col relative h-full">
-        
+
         {/* Map Container */}
         <div className="flex-1 relative">
-          <Map
-            ref={(instance) => {
-              if (instance) mapRef.current = instance;
-            }}
-            center={[106.660172, 10.762622]}
-            zoom={12}
-            className="w-full h-full"
-          >
-            {/* Draw Route Polyline */}
-            {routeGeometry.length > 0 && (
-              <MapRoute
-                coordinates={routeGeometry}
-                color="#bc0100"
-                width={4}
-                opacity={0.8}
-                dashArray={[2, 2]}
-              />
-            )}
+          {(() => {
+            const primaryDepotAddr = selectedRoute?.startFacility?.facilityAddresses?.find((fa) => fa.isPrimary)?.address || selectedRoute?.startFacility?.facilityAddresses?.[0]?.address;
+            const depotLat = primaryDepotAddr?.latitude || (selectedRoute?.stops?.[0] ? selectedRoute.stops[0].latitude - 0.003 : 10.762622);
+            const depotLng = primaryDepotAddr?.longitude || (selectedRoute?.stops?.[0] ? selectedRoute.stops[0].longitude - 0.003 : 106.660172);
 
-            {/* Depot Start Marker */}
-            <MapMarker longitude={106.660172} latitude={10.762622}>
-              <MarkerContent>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-slate-900 shadow-md">
-                  <Earth className="h-4 w-4 text-white" />
-                </div>
-              </MarkerContent>
-              <MarkerPopup closeButton={false}>
-                <div className="p-1 text-[10px]">
-                  <h4 className="font-bold text-slate-800">Kho trung tâm chính</h4>
-                  <p className="text-slate-500">Điểm xuất phát định tuyến</p>
-                </div>
-              </MarkerPopup>
-            </MapMarker>
-
-            {/* Stops Markers */}
-            {selectedRoute?.stops?.map((stop) => (
-              <MapMarker key={stop.id} longitude={stop.longitude} latitude={stop.latitude}>
-                <MarkerContent>
-                  <div className={`flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white shadow-md ${
-                    stop.status === 'COMPLETED' ? 'bg-green-600' : 'bg-red-600'
-                  }`}>
-                    {stop.sequence}
-                  </div>
-                </MarkerContent>
-                <MarkerPopup closeButton={false}>
-                  <div className="p-1 text-[10px] max-w-[180px]">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-bold text-slate-800">Điểm dừng {stop.sequence}</span>
-                      <span className={`px-1 rounded text-[8px] ${
-                        stop.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                      }`}>{stop.status}</span>
-                    </div>
-                    <p className="text-slate-500 truncate">{stop.addressSnapshot}</p>
-                  </div>
-                </MarkerPopup>
-              </MapMarker>
-            ))}
-
-            {/* Live Driver Marker */}
-            {selectedRoute?.currentGpsLocation && (
-              <MapMarker 
-                longitude={selectedRoute.currentGpsLocation.longitude} 
-                latitude={selectedRoute.currentGpsLocation.latitude}
+            return (
+              <Map
+                ref={(instance) => {
+                  if (instance) mapRef.current = instance;
+                }}
+                center={[depotLng, depotLat]}
+                zoom={12}
+                className="w-full h-full"
               >
-                <MarkerContent>
-                  <div className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-green-500 bg-slate-900 shadow-lg animate-bounce">
-                    <Truck className="h-5 w-5 text-white" />
-                    <span className="absolute -inset-1 animate-ping rounded-full border-2 border-green-400/40 opacity-75"></span>
-                  </div>
-                </MarkerContent>
-                <MarkerPopup closeButton={false}>
-                  <div className="p-2 text-xs font-sans max-w-[200px]">
-                    <h4 className="font-bold text-slate-800">{selectedRoute.driverVehicleAssignment.driver.fullName}</h4>
-                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">{selectedRoute.routeCode}</p>
-                    <div className="mt-2 space-y-1 text-slate-600">
-                      <p>Vận tốc: <span className="font-bold text-slate-800">
-                        {selectedRoute.currentGpsLocation.speedMps 
-                          ? `${Math.round(selectedRoute.currentGpsLocation.speedMps * 3.6)} km/h` 
-                          : 'Đang dừng'}
-                      </span></p>
-                      <p>Tọa độ: <span className="font-mono">{selectedRoute.currentGpsLocation.latitude.toFixed(5)}, {selectedRoute.currentGpsLocation.longitude.toFixed(5)}</span></p>
-                      <p className="text-[9px] text-gray-400 italic">Cập nhật: {selectedRoute.currentGpsLocation.recordedAt ? new Date(selectedRoute.currentGpsLocation.recordedAt).toLocaleTimeString('vi-VN') : 'Vừa xong'}</p>
-                    </div>
-                  </div>
-                </MarkerPopup>
-              </MapMarker>
-            )}
+                {/* Draw Route Polyline */}
+                {routeGeometry.length > 0 && (
+                  <MapRoute
+                    coordinates={routeGeometry}
+                    color="#bc0100"
+                    width={4}
+                    opacity={0.8}
+                    dashArray={[2, 2]}
+                  />
+                )}
 
-            <MapControls showZoom showCompass showFullscreen className="bottom-4 right-4" />
-          </Map>
+                {/* Depot Start Marker (Nổi bật Vị Trí Kho Rõ Ràng) */}
+                <MapMarker longitude={depotLng} latitude={depotLat}>
+                  <MarkerContent>
+                    <div className="relative group flex items-center justify-center cursor-pointer">
+                      <span className="animate-ping absolute inline-flex h-9 w-9 rounded-full bg-indigo-500 opacity-75"></span>
+                      <div className="relative flex items-center gap-1.5 bg-slate-900 text-amber-300 border-2 border-amber-400 px-2.5 py-1 rounded-full shadow-xl font-extrabold text-[10px] uppercase tracking-wider">
+                        <Building2 size={14} className="text-amber-400 animate-pulse shrink-0" />
+                        <span>🏠 KHO: {selectedRoute?.startFacility?.facilityCode || 'GỐC'}</span>
+                      </div>
+                    </div>
+                  </MarkerContent>
+                  <MarkerPopup closeButton={false}>
+                    <div className="p-2 text-[11px] max-w-[200px]">
+                      <div className="font-extrabold text-indigo-700 flex items-center gap-1 mb-1">
+                        <Building2 size={14} />
+                        <span>{selectedRoute?.startFacility?.facilityName || 'Kho trung tâm chính'}</span>
+                      </div>
+                      <p className="text-slate-600 text-[10px]">
+                        Mã bưu cục: <span className="font-bold text-slate-800">{selectedRoute?.startFacility?.facilityCode || 'N/A'}</span>
+                      </p>
+                      <p className="text-slate-500 text-[9px] mt-1 italic border-t border-slate-100 pt-1">
+                        📍 {primaryDepotAddr?.addressLine1 || 'Điểm xuất phát & điểm kết thúc của lộ trình (VRP)'}
+                      </p>
+                    </div>
+                  </MarkerPopup>
+                </MapMarker>
+
+                {/* Stops Markers */}
+                {selectedRoute?.stops?.map((stop) => (
+                  <MapMarker key={stop.id} longitude={stop.longitude} latitude={stop.latitude}>
+                    <MarkerContent>
+                      <div className={`flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white shadow-md ${stop.status === 'COMPLETED' ? 'bg-green-600' : 'bg-red-600'
+                        }`}>
+                        {stop.sequence}
+                      </div>
+                    </MarkerContent>
+                    <MarkerPopup closeButton={false}>
+                      <div className="p-1 text-[10px] max-w-[180px]">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-slate-800">Điểm dừng {stop.sequence}</span>
+                          <span className={`px-1 rounded text-[8px] ${stop.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                            }`}>{stop.status}</span>
+                        </div>
+                        <p className="text-slate-500 truncate">{stop.addressSnapshot}</p>
+                      </div>
+                    </MarkerPopup>
+                  </MapMarker>
+                ))}
+
+                {/* Live Driver Marker */}
+                {selectedRoute?.currentGpsLocation && (
+                  <MapMarker
+                    longitude={selectedRoute.currentGpsLocation.longitude}
+                    latitude={selectedRoute.currentGpsLocation.latitude}
+                  >
+                    <MarkerContent>
+                      <div className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-green-500 bg-slate-900 shadow-lg animate-bounce">
+                        <Truck className="h-5 w-5 text-white" />
+                        <span className="absolute -inset-1 animate-ping rounded-full border-2 border-green-400/40 opacity-75"></span>
+                      </div>
+                    </MarkerContent>
+                    <MarkerPopup closeButton={false}>
+                      <div className="p-2 text-xs font-sans max-w-[200px]">
+                        <h4 className="font-bold text-slate-800">{selectedRoute.driverVehicleAssignment.driver.fullName}</h4>
+                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">{selectedRoute.routeCode}</p>
+                        <div className="mt-2 space-y-1 text-slate-600">
+                          <p>Vận tốc: <span className="font-bold text-slate-800">
+                            {selectedRoute.currentGpsLocation.speedMps
+                              ? `${Math.round(selectedRoute.currentGpsLocation.speedMps * 3.6)} km/h`
+                              : 'Đang dừng'}
+                          </span></p>
+                          <p>Tọa độ: <span className="font-mono">{selectedRoute.currentGpsLocation.latitude.toFixed(5)}, {selectedRoute.currentGpsLocation.longitude.toFixed(5)}</span></p>
+                          <p className="text-[9px] text-gray-400 italic">Cập nhật: {selectedRoute.currentGpsLocation.recordedAt ? new Date(selectedRoute.currentGpsLocation.recordedAt).toLocaleTimeString('vi-VN') : 'Vừa xong'}</p>
+                        </div>
+                      </div>
+                    </MarkerPopup>
+                  </MapMarker>
+                )}
+
+                <MapControls showZoom showCompass showFullscreen className="bottom-4 right-4" />
+              </Map>
+            );
+          })()}
 
           {/* Quick Simulation Controller overlay */}
           {selectedRoute && selectedRoute.status !== 'COMPLETED' && (
@@ -848,18 +872,17 @@ export const LiveTrackingTab: React.FC = () => {
                 <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Trình mô phỏng GPS</span>
                 <h4 className="text-xs font-bold text-gray-800">{selectedRoute.routeCode}</h4>
               </div>
-              
+
               <p className="text-[10px] text-gray-500">
                 Mô phỏng tín hiệu phát tọa độ GPS từ điện thoại di động tài xế lên hệ thống Socket.io & Redis.
               </p>
 
               <button
                 onClick={handleToggleSimulation}
-                className={`w-full py-2 px-4 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer ${
-                  isSimulating 
-                    ? 'bg-slate-900 hover:bg-slate-800 text-white' 
+                className={`w-full py-2 px-4 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer ${isSimulating
+                    ? 'bg-slate-900 hover:bg-slate-800 text-white'
                     : 'bg-[#bc0100] hover:bg-[#a00100] text-white shadow-sm'
-                }`}
+                  }`}
               >
                 {isSimulating ? (
                   <>
@@ -925,7 +948,7 @@ export const LiveTrackingTab: React.FC = () => {
         )}
 
       </div>
-      
+
     </div>
   );
 };
