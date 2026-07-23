@@ -830,35 +830,36 @@ export const LiveTrackingTab: React.FC = () => {
                   </MapMarker>
                 ))}
 
-                {/* Live Driver Marker */}
-                {selectedRoute?.currentGpsLocation && (
+                {/* Live Driver Markers (Nổi bật vị trí xe tài xế đang phát GPS thời gian thực) */}
+                {routes.filter(r => r.currentGpsLocation).map(r => (
                   <MapMarker
-                    longitude={selectedRoute.currentGpsLocation.longitude}
-                    latitude={selectedRoute.currentGpsLocation.latitude}
+                    key={`driver-${r.id}`}
+                    longitude={r.currentGpsLocation!.longitude}
+                    latitude={r.currentGpsLocation!.latitude}
                   >
                     <MarkerContent>
-                      <div className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-green-500 bg-slate-900 shadow-lg animate-bounce">
+                      <div className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-green-500 bg-slate-900 shadow-lg animate-bounce cursor-pointer">
                         <Truck className="h-5 w-5 text-white" />
                         <span className="absolute -inset-1 animate-ping rounded-full border-2 border-green-400/40 opacity-75"></span>
                       </div>
                     </MarkerContent>
                     <MarkerPopup closeButton={false}>
                       <div className="p-2 text-xs font-sans max-w-[200px]">
-                        <h4 className="font-bold text-slate-800">{selectedRoute.driverVehicleAssignment.driver.fullName}</h4>
-                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">{selectedRoute.routeCode}</p>
+                        <h4 className="font-bold text-slate-800">{r.driverVehicleAssignment.driver.fullName}</h4>
+                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">{r.routeCode}</p>
                         <div className="mt-2 space-y-1 text-slate-600">
                           <p>Vận tốc: <span className="font-bold text-slate-800">
-                            {selectedRoute.currentGpsLocation.speedMps
-                              ? `${Math.round(selectedRoute.currentGpsLocation.speedMps * 3.6)} km/h`
+                            {r.currentGpsLocation!.speedMps
+                              ? `${Math.round(r.currentGpsLocation!.speedMps * 3.6)} km/h`
                               : 'Đang dừng'}
                           </span></p>
-                          <p>Tọa độ: <span className="font-mono">{selectedRoute.currentGpsLocation.latitude.toFixed(5)}, {selectedRoute.currentGpsLocation.longitude.toFixed(5)}</span></p>
-                          <p className="text-[9px] text-gray-400 italic">Cập nhật: {selectedRoute.currentGpsLocation.recordedAt ? new Date(selectedRoute.currentGpsLocation.recordedAt).toLocaleTimeString('vi-VN') : 'Vừa xong'}</p>
+                          <p>Tọa độ: <span className="font-mono">{r.currentGpsLocation!.latitude.toFixed(5)}, {r.currentGpsLocation!.longitude.toFixed(5)}</span></p>
+                          <p className="text-[9px] text-gray-400 italic">Cập nhật: {r.currentGpsLocation!.recordedAt ? new Date(r.currentGpsLocation!.recordedAt).toLocaleTimeString('vi-VN') : 'Vừa xong'}</p>
                         </div>
                       </div>
                     </MarkerPopup>
                   </MapMarker>
-                )}
+                ))}
 
                 <MapControls showZoom showCompass showFullscreen className="bottom-4 right-4" />
               </Map>

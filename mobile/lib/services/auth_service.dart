@@ -73,16 +73,23 @@ class AuthService {
         final data = responseData['data'];
         final token = data['accessToken'] ?? data['token'];
         final user = data['user'];
-        final List<dynamic> roles = user['roles'];
-        
-        // Pick primary role from roles list
+        // Extract primary role code safely from either user.role object or user.roles list
         String role = 'CUSTOMER';
-        if (roles.contains('ADMIN')) {
-          role = 'ADMIN';
-        } else if (roles.contains('STAFF')) {
-          role = 'STAFF';
-        } else if (roles.contains('SHIPPER')) {
-          role = 'SHIPPER';
+        if (user != null) {
+          if (user['role'] is Map && user['role']['roleCode'] != null) {
+            role = user['role']['roleCode'].toString();
+          } else if (user['role'] is String) {
+            role = user['role'].toString();
+          } else if (user['roles'] is List && (user['roles'] as List).isNotEmpty) {
+            final List<dynamic> roles = user['roles'];
+            if (roles.contains('ADMIN')) {
+              role = 'ADMIN';
+            } else if (roles.contains('STAFF')) {
+              role = 'STAFF';
+            } else if (roles.contains('SHIPPER')) {
+              role = 'SHIPPER';
+            }
+          }
         }
 
         if (token == null) {
@@ -179,15 +186,22 @@ class AuthService {
         final data = responseData['data'];
         final token = data['accessToken'] ?? data['token'];
         final user = data['user'];
-        final List<dynamic> roles = user['roles'];
-
         String role = 'CUSTOMER';
-        if (roles.contains('ADMIN')) {
-          role = 'ADMIN';
-        } else if (roles.contains('STAFF')) {
-          role = 'STAFF';
-        } else if (roles.contains('SHIPPER')) {
-          role = 'SHIPPER';
+        if (user != null) {
+          if (user['role'] is Map && user['role']['roleCode'] != null) {
+            role = user['role']['roleCode'].toString();
+          } else if (user['role'] is String) {
+            role = user['role'].toString();
+          } else if (user['roles'] is List && (user['roles'] as List).isNotEmpty) {
+            final List<dynamic> roles = user['roles'];
+            if (roles.contains('ADMIN')) {
+              role = 'ADMIN';
+            } else if (roles.contains('STAFF')) {
+              role = 'STAFF';
+            } else if (roles.contains('SHIPPER')) {
+              role = 'SHIPPER';
+            }
+          }
         }
 
         if (token == null) {

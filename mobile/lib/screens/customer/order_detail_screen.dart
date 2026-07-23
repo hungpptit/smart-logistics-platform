@@ -391,9 +391,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildCostBreakdownCard() {
-    final totalAmount = _order!['totalAmount'] != null ? double.parse(_order!['totalAmount'].toString()) : 0.0;
-    final shippingFee = _order!['shippingFee'] != null ? double.parse(_order!['shippingFee'].toString()) : 0.0;
-    final insuranceFee = _order!['insuranceFee'] != null ? double.parse(_order!['insuranceFee'].toString()) : 0.0;
+    final rawTotal = _order!['estimatedTotalAmount'] ?? _order!['totalAmount'];
+    final rawShipping = _order!['estimatedShippingFee'] ?? _order!['shippingFee'];
+    final rawInsurance = _order!['estimatedInsuranceFee'] ?? _order!['insuranceFee'];
+
+    final totalAmount = rawTotal != null ? double.tryParse(rawTotal.toString()) ?? 0.0 : 0.0;
+    final shippingFee = rawShipping != null ? double.tryParse(rawShipping.toString()) ?? 0.0 : 0.0;
+    final insuranceFee = rawInsurance != null ? double.tryParse(rawInsurance.toString()) ?? 0.0 : 0.0;
+
     final paymentMethod = _order!['payment'] != null ? _order!['payment']['paymentMethod'] ?? 'CASH' : 'CASH';
     final paymentStatus = _order!['payment'] != null ? _order!['payment']['status'] ?? 'UNPAID' : 'UNPAID';
 

@@ -364,6 +364,11 @@ export class RoutingService {
             },
           },
         },
+        stops: {
+          orderBy: {
+            sequence: 'asc',
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',

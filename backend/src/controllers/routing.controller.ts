@@ -46,10 +46,22 @@ export class RoutingController {
   public getRoutes = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { status, facilityId, driverId } = req.query;
+      const user = (req as any).user;
+
+      let filterDriverId = driverId as string;
+      if (!filterDriverId && user?.id) {
+        const driverProfile = await prisma.driver.findFirst({
+          where: { userId: user.id },
+        });
+        if (driverProfile) {
+          filterDriverId = driverProfile.id;
+        }
+      }
+
       const routes = await this.routingService.getAllRoutes({
         status: status as string,
         facilityId: facilityId as string,
-        driverId: driverId as string,
+        driverId: filterDriverId,
       });
 
       return res.status(200).json({

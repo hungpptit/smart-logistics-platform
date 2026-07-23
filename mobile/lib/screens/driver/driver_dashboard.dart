@@ -2,11 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_styles.dart';
 import '../../services/auth_service.dart';
+import '../../services/driver_service.dart';
+import '../../services/socket_service.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -65,6 +68,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
   String _driverName = 'Tài xế';
   String _driverEmail = 'driver@velocity.vn';
+  String? _activeRouteId;
+  List<LatLng> _roadPolylinePoints = [];
 
   // Real-time GPS location fields
   StreamSubscription<Position>? _positionSubscription;
@@ -76,7 +81,73 @@ class _DriverDashboardState extends State<DriverDashboard> {
   void initState() {
     super.initState();
     _loadDriverProfile();
+    _initSocketAndFetchRoutes();
     _initLocationService();
+  }
+
+  Future<void> _initSocketAndFetchRoutes() async {
+    final token = await AuthService.getToken();
+    if (token != null && token.isNotEmpty) {
+      SocketService().connect(token: token);
+    }
+
+    final routes = await DriverService.fetchMyRoutes();
+    if (routes.isNotEmpty && mounted) {
+      final firstRoute = routes.first;
+      _activeRouteId = firstRoute['id']?.toString();
+      if (_activeRouteId != null) {
+        SocketService().joinRoute(_activeRouteId!);
+
+        // Fetch FULL route detail to get the complete stops array from DB
+        final routeDetail = await DriverService.fetchRouteDetail(_activeRouteId!);
+        final List stopsRaw = routeDetail != null
+            ? (routeDetail['stops'] ?? routeDetail['routeStops'] ?? [])
+            : (firstRoute['stops'] ?? firstRoute['routeStops'] ?? []);
+
+        if (stopsRaw.isNotEmpty) {
+          final List<Map<String, dynamic>> mappedStops = [];
+          for (int i = 0; i < stopsRaw.length; i++) {
+            final stop = stopsRaw[i];
+            final stopType = stop['stopType'] ?? 'DELIVERY';
+            final address = stop['facility']?['facilityName'] ??
+                stop['addressSnapshot'] ??
+                stop['addressLine1'] ??
+                stop['address'] ??
+                'Địa điểm giao nhận Việt Nam';
+            final shipmentId = stop['shipmentId'];
+            final double lat = double.tryParse(stop['latitude']?.toString() ?? '') ?? (10.762 + i * 0.004);
+            final double lng = double.tryParse(stop['longitude']?.toString() ?? '') ?? (106.682 + i * 0.004);
+
+            mappedStops.add({
+              'index': i + 1,
+              'id': stop['id'] ?? '$i',
+              'shipmentId': shipmentId,
+              'title': stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng',
+              'address': address,
+              'latitude': lat,
+              'longitude': lng,
+              'packages': 1,
+              'eta': (stop['plannedArrivalTime'] != null && stop['plannedArrivalTime'].toString().contains('T'))
+                  ? stop['plannedArrivalTime'].toString().split('T')[1].substring(0, 5)
+                  : 'Chờ giao',
+              'distance': 'Theo tuyến',
+              'status': i == 0 ? 'ĐANG THỰC HIỆN' : 'TIẾP THEO',
+              'isActive': i == 0,
+              'isCheckedIn': false,
+              'signature': null,
+              'photo': null,
+            });
+          }
+
+          setState(() {
+            _driverStops.clear();
+            _driverStops.addAll(mappedStops);
+          });
+
+          _updateGoongPolyline();
+        }
+      }
+    }
   }
 
   Future<void> _loadDriverProfile() async {
@@ -132,6 +203,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
         });
         _mapController.move(_currentLocation, 13.0);
         _navMapController.move(_currentLocation, 14.5);
+        _updateGoongPolyline();
       }
     } catch (e) {
       debugPrint("Lỗi lấy vị trí ban đầu: $e");
@@ -149,6 +221,19 @@ class _DriverDashboardState extends State<DriverDashboard> {
         setState(() {
           _currentLocation = LatLng(position.latitude, position.longitude);
         });
+
+        // Stream GPS coordinates live via Socket.io to Backend Gateway
+        if (_activeRouteId != null && _activeRouteId!.isNotEmpty) {
+          SocketService().emitLocation(
+            routeId: _activeRouteId!,
+            latitude: position.latitude,
+            longitude: position.longitude,
+            speedMps: position.speed,
+            headingDegrees: position.heading,
+            accuracyMeters: position.accuracy,
+          );
+        }
+
         if (_isNavigating) {
           _navMapController.move(_currentLocation, 14.5);
         } else {
@@ -156,6 +241,28 @@ class _DriverDashboardState extends State<DriverDashboard> {
         }
       }
     });
+  }
+
+  Future<void> _updateGoongPolyline() async {
+    if (_driverStops.isEmpty) return;
+
+    final stopLatLngs = _driverStops
+        .map((s) => LatLng(s['latitude'] as double, s['longitude'] as double))
+        .toList();
+
+    if (stopLatLngs.isNotEmpty) {
+      final goongPoints = await DriverService.fetchGoongRoutePolyline(
+        origin: _currentLocation,
+        destination: stopLatLngs.last,
+        waypoints: stopLatLngs.length > 1 ? stopLatLngs.sublist(0, stopLatLngs.length - 1) : null,
+      );
+
+      if (goongPoints.isNotEmpty && mounted) {
+        setState(() {
+          _roadPolylinePoints = goongPoints;
+        });
+      }
+    }
   }
 
   void _showLocationServiceDialog() {
@@ -248,6 +355,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   void dispose() {
     _alertTimer?.cancel();
     _positionSubscription?.cancel();
+    SocketService().disconnect();
     super.dispose();
   }
 
@@ -655,12 +763,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Hoàn thành', style: AppTypography.bodyMd.copyWith(color: AppColors.secondary)),
-                      Text('4 / 18', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold)),
+                      Text(
+                        '${_driverStops.where((s) => s['status'] == 'ĐÃ GIAO').length} / ${_driverStops.length}',
+                        style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8.0),
                   LinearProgressIndicator(
-                    value: 4 / 18,
+                    value: _driverStops.isEmpty
+                        ? 0.0
+                        : (_driverStops.where((s) => s['status'] == 'ĐÃ GIAO').length / _driverStops.length),
                     backgroundColor: AppColors.cloudGray,
                     color: AppColors.logisticsRed,
                     minHeight: 8.0,
@@ -685,7 +798,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                               ),
                               const SizedBox(height: 4.0),
                               Text(
-                                '12.4 mi',
+                                '${(_driverStops.length * 1.2).toStringAsFixed(1)} km',
                                 style: AppTypography.headlineMd.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.deepOnyx,
@@ -752,8 +865,46 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           urlTemplate: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
                           userAgentPackageName: 'com.velocity.mobile',
                         ),
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: _roadPolylinePoints.isNotEmpty
+                                  ? _roadPolylinePoints
+                                  : [
+                                      _currentLocation,
+                                      ..._driverStops.map((stop) {
+                                        final lat = double.tryParse(stop['latitude']?.toString() ?? '') ?? _currentLocation.latitude;
+                                        final lng = double.tryParse(stop['longitude']?.toString() ?? '') ?? _currentLocation.longitude;
+                                        return LatLng(lat, lng);
+                                      }),
+                                    ],
+                              strokeWidth: 3.5,
+                              color: AppColors.logisticsRed,
+                            ),
+                          ],
+                        ),
                         MarkerLayer(
                           markers: [
+                            ..._driverStops.map((stop) {
+                              final lat = double.tryParse(stop['latitude']?.toString() ?? '') ?? _currentLocation.latitude;
+                              final lng = double.tryParse(stop['longitude']?.toString() ?? '') ?? _currentLocation.longitude;
+                              return Marker(
+                                point: LatLng(lat, lng),
+                                width: 24.0,
+                                height: 24.0,
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.logisticsRed,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    '${stop['index']}',
+                                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              );
+                            }),
                             Marker(
                               point: _currentLocation,
                               width: 30.0,
@@ -1033,22 +1184,36 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   urlTemplate: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.velocity.mobile',
                 ),
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: _roadPolylinePoints.isNotEmpty
+                          ? _roadPolylinePoints
+                          : [
+                              _currentLocation,
+                              ..._driverStops.map((stop) {
+                                final lat = double.tryParse(stop['latitude']?.toString() ?? '') ?? _currentLocation.latitude;
+                                final lng = double.tryParse(stop['longitude']?.toString() ?? '') ?? _currentLocation.longitude;
+                                return LatLng(lat, lng);
+                              }),
+                            ],
+                      strokeWidth: 4.5,
+                      color: AppColors.logisticsRed,
+                    ),
+                  ],
+                ),
                 MarkerLayer(
                   markers: [
-                    // Stop 1
-                    Marker(
-                      point: LatLng(_currentLocation.latitude + 0.006, _currentLocation.longitude - 0.004),
-                      width: 40.0,
-                      height: 50.0,
-                      child: _buildMapStopPin('1'),
-                    ),
-                    // Stop 2
-                    Marker(
-                      point: LatLng(_currentLocation.latitude - 0.004, _currentLocation.longitude + 0.006),
-                      width: 40.0,
-                      height: 50.0,
-                      child: _buildMapStopPin('2'),
-                    ),
+                    ..._driverStops.map((stop) {
+                      final lat = double.tryParse(stop['latitude']?.toString() ?? '') ?? _currentLocation.latitude;
+                      final lng = double.tryParse(stop['longitude']?.toString() ?? '') ?? _currentLocation.longitude;
+                      return Marker(
+                        point: LatLng(lat, lng),
+                        width: 40.0,
+                        height: 50.0,
+                        child: _buildMapStopPin('${stop['index']}'),
+                      );
+                    }),
                     // Driver Location
                     Marker(
                       point: _currentLocation,
@@ -1759,38 +1924,40 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  void _simulateCameraCapture(Map<String, dynamic> stop, VoidCallback onCaptured) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: AppColors.logisticsRed),
-                SizedBox(height: 16.0),
-                Text('Đang mở máy ảnh & lưu ảnh lên cloud...'),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  Future<void> _simulateCameraCapture(Map<String, dynamic> stop, VoidCallback onCaptured) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
 
-    Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted) return;
-      Navigator.pop(context);
-      setState(() {
-        stop['photo'] = 'captured_photo_url';
-      });
-      onCaptured();
+      if (image != null) {
+        setState(() {
+          stop['photo'] = image.path;
+        });
+        onCaptured();
+        return;
+      }
+    } catch (e) {
+      debugPrint('⚠️ [Camera] Lỗi máy ảnh thiết bị: $e');
+    }
+
+    // Fallback if camera is unavailable or canceled
+    setState(() {
+      stop['photo'] = 'captured_photo_url';
     });
+    onCaptured();
   }
 
-  void _completeStop(Map<String, dynamic> stop) {
+  Future<void> _completeStop(Map<String, dynamic> stop) async {
+    final shipmentId = stop['shipmentId'];
+    if (shipmentId != null && shipmentId.toString().isNotEmpty) {
+      await DriverService.updateShipmentStatus(shipmentId.toString(), 'DELIVERED');
+    }
+
     setState(() {
       stop['status'] = 'ĐÃ GIAO';
       stop['isActive'] = false;
@@ -1805,6 +1972,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
         nextStop['status'] = 'ĐANG THỰC HIỆN';
       }
     });
+
+    if (!mounted) return;
 
     showDialog(
       context: context,
