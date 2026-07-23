@@ -247,6 +247,35 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           ),
           const SizedBox(height: 16.0),
+          // 1D Barcode Code 128
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: AppColors.surfaceContainerHighest),
+              borderRadius: AppStyles.roundedLg,
+            ),
+            child: Column(
+              children: [
+                Image.network(
+                  'https://bwipjs-api.metafloor.com/?bcid=code128&text=$code&scale=2&height=12',
+                  height: 60.0,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 50.0,
+                    alignment: Alignment.center,
+                    child: Text(
+                      '||||||||||||||||||||||||||||\n$code',
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16.0),
+          // 2D QR Code
           Container(
             padding: const EdgeInsets.all(12.0),
             decoration: BoxDecoration(
@@ -255,18 +284,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
             child: Image.network(
               'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=$code',
-              width: 150.0,
-              height: 150.0,
+              width: 140.0,
+              height: 140.0,
               errorBuilder: (context, error, stackTrace) => const Icon(
                 Icons.qr_code,
-                size: 150.0,
+                size: 140.0,
                 color: AppColors.secondary,
               ),
             ),
           ),
           const SizedBox(height: 12.0),
           Text(
-            'In nhãn này dán lên bưu kiện để quét QR Code',
+            'In nhãn Vận đơn (Mã vạch 1D & QR Code) dán lên bưu kiện để Shipper quét khi giao nhận',
             style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
             textAlign: TextAlign.center,
           ),

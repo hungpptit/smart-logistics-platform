@@ -14,7 +14,9 @@ import {
   ChevronRight,
   AlertTriangle,
   Bot,
-  RotateCcw
+  RotateCcw,
+  Printer,
+  QrCode
 } from 'lucide-react';
 
 interface PackageItem {
@@ -151,6 +153,7 @@ export const OrderTab: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
   const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
+  const [showPrintLabel, setShowPrintLabel] = useState<boolean>(false);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [newStatus, setNewStatus] = useState<string>('');
   const [statusReason, setStatusReason] = useState<string>('');
@@ -813,12 +816,22 @@ export const OrderTab: React.FC = () => {
               <span className="text-[9px] uppercase font-bold text-gray-400">Chi tiết vận đơn</span>
               <h3 className="text-sm font-mono font-bold tracking-widest">{selectedOrder?.orderCode || '...'}</h3>
             </div>
-            <button
-              onClick={() => setSelectedOrder(null)}
-              className="text-gray-400 hover:text-white p-1"
-            >
-              Đóng
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPrintLabel(true)}
+                className="bg-[#bc0100] hover:bg-red-700 text-white text-[10px] font-bold px-2.5 py-1.5 rounded flex items-center gap-1 cursor-pointer transition-colors"
+                title="In nhãn Vận đơn (Barcode 1D Code 128 + 2D QR Code)"
+              >
+                <Printer size={12} />
+                <span>In nhãn</span>
+              </button>
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="text-gray-400 hover:text-white p-1"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
 
           {detailLoading ? (
@@ -1051,6 +1064,82 @@ export const OrderTab: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Waybill Print Label Modal (Barcode 1D Code 128 + 2D QR Code) */}
+      {showPrintLabel && selectedOrder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-200 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                  <Printer size={16} className="text-[#bc0100]" />
+                  <span>NHÃN IN VẬN ĐƠN (WAYBILL LABEL)</span>
+                </h3>
+                <p className="text-[10px] text-slate-400">Dán lên bưu kiện để Shipper quét Barcode / QR Code</p>
+              </div>
+              <button
+                onClick={() => setShowPrintLabel(false)}
+                className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+              >
+                ✕ Đóng
+              </button>
+            </div>
+
+            {/* Label Content Printable Box */}
+            <div className="border-2 border-dashed border-slate-300 p-5 rounded-lg bg-slate-50 space-y-4 text-center">
+              <div className="flex justify-between items-center border-b border-slate-200 pb-2 text-left">
+                <div>
+                  <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">SMART LOGISTICS PLATFORM</span>
+                  <span className="font-mono font-bold text-slate-900 text-base">{selectedOrder.orderCode}</span>
+                </div>
+                <span className="bg-red-100 text-[#bc0100] text-[9px] font-extrabold px-2 py-0.5 rounded uppercase">
+                  {selectedOrder.service?.serviceName || 'STANDARD'}
+                </span>
+              </div>
+
+              {/* 1D Barcode Code 128 */}
+              <div className="bg-white p-2 border border-slate-200 rounded flex flex-col items-center">
+                <img
+                  src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${selectedOrder.orderCode}&scale=2&height=12`}
+                  alt="1D Barcode Code 128"
+                  className="h-14 object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+                <span className="font-mono text-[10px] font-bold text-slate-600 mt-1">{selectedOrder.orderCode}</span>
+              </div>
+
+              {/* 2D QR Code */}
+              <div className="flex items-center justify-center gap-4 bg-white p-3 border border-slate-200 rounded">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${selectedOrder.orderCode}`}
+                  alt="2D QR Code"
+                  className="w-28 h-28 object-contain"
+                />
+                <div className="text-left text-[10px] space-y-1 text-slate-600">
+                  <p><strong className="text-slate-800">Từ:</strong> {selectedOrder.senderName}</p>
+                  <p><strong className="text-slate-800">Đến:</strong> {selectedOrder.receiverName}</p>
+                  <p><strong className="text-slate-800">Kho nhận:</strong> {selectedOrder.destinationFacility?.facilityCode || 'N/A'}</p>
+                  <p><strong className="text-slate-800">Số kiện:</strong> {selectedOrder.packages?.length || 1} kiện</p>
+                  <p className="text-red-600 font-bold">COD: {formatPrice(selectedOrder.codAmount ?? (selectedOrder as any).estimatedCodAmount)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                onClick={() => window.print()}
+                className="bg-[#bc0100] hover:bg-red-700 text-white px-4 py-2 rounded text-xs font-bold flex items-center gap-1.5 shadow transition-colors cursor-pointer"
+              >
+                <Printer size={14} />
+                <span>In nhãn Vận đơn</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
