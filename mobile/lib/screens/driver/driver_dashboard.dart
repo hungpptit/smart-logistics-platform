@@ -118,10 +118,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
             final double lat = double.tryParse(stop['latitude']?.toString() ?? '') ?? (10.762 + i * 0.004);
             final double lng = double.tryParse(stop['longitude']?.toString() ?? '') ?? (106.682 + i * 0.004);
 
+            final orderCode = stop['shipment']?['order']?['orderCode'] ??
+                stop['shipment']?['trackingNumber'] ??
+                (shipmentId != null ? 'ORD-${shipmentId.toString().substring(0, 8).toUpperCase()}' : 'ORD-66266482-0${i + 1}');
+
             mappedStops.add({
               'index': i + 1,
               'id': stop['id'] ?? '$i',
               'shipmentId': shipmentId,
+              'orderCode': orderCode,
+              'receiverName': stop['shipment']?['receiverName'] ?? 'Anh Minh (0987.654.321)',
+              'codAmount': stop['shipment']?['codAmount'] ?? 150000,
               'title': stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng',
               'address': address,
               'latitude': lat,
@@ -1084,19 +1091,37 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                              Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
                                 decoration: BoxDecoration(
-                                  color: isActive ? Colors.red.shade50 : AppColors.surfaceContainerLow,
+                                  color: AppColors.logisticsRed.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4.0),
+                                ),
+                                child: Text(
+                                  stop['orderCode'] ?? 'ORD-66266482',
+                                  style: const TextStyle(
+                                    color: AppColors.logisticsRed,
+                                    fontSize: 11.0,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                                decoration: BoxDecoration(
+                                  color: status == 'ĐANG THỰC HIỆN'
+                                      ? AppColors.logisticsRed.withValues(alpha: 0.1)
+                                      : AppColors.surfaceContainer,
                                   borderRadius: BorderRadius.circular(4.0),
                                 ),
                                 child: Text(
                                   status,
-                                  style: AppTypography.labelMd.copyWith(
-                                    color: isActive ? AppColors.logisticsRed : AppColors.secondary,
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: status == 'ĐANG THỰC HIỆN' ? AppColors.logisticsRed : AppColors.secondary,
                                     fontSize: 9.0,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -1740,7 +1765,69 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       stop['address'] as String,
                       style: AppTypography.bodyMd.copyWith(color: AppColors.secondary),
                     ),
-                    const SizedBox(height: 20.0),
+                    const SizedBox(height: 12.0),
+
+                    // Package Identification Card with 1D Barcode
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12.0),
+                      decoration: BoxDecoration(
+                        color: AppColors.cloudGray,
+                        borderRadius: BorderRadius.circular(10.0),
+                        border: Border.all(color: AppColors.surfaceContainerHighest),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                '📦 MÃ BƯU KIỆN CẦN QUÉT:',
+                                style: TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                              ),
+                              Text(
+                                stop['orderCode'] ?? 'ORD-66266482',
+                                style: const TextStyle(
+                                  fontSize: 13.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.logisticsRed,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8.0),
+                          Center(
+                            child: Image.network(
+                              'https://bwipjs-api.metafloor.com/?bcid=code128&text=${stop['orderCode'] ?? 'ORD-66266482'}&scale=2&height=10',
+                              height: 40.0,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) => Text(
+                                '||||||||||||||||||||||||\n${stop['orderCode'] ?? 'ORD-66266482'}',
+                                style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 11),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8.0),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '👤 ${stop['receiverName'] ?? 'Anh Minh (0987.654.321)'}',
+                                style: const TextStyle(fontSize: 11.0, fontWeight: FontWeight.w600, color: AppColors.deepOnyx),
+                              ),
+                              const Text(
+                                '💵 COD: 150.000đ',
+                                style: TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold, color: Colors.green),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16.0),
 
                     Row(
                       children: [
