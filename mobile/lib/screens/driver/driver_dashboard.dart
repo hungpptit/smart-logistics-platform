@@ -1120,7 +1120,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                 ),
                                 child: Text(
                                   status,
-                                  style: AppTypography.labelSm.copyWith(
+                                  style: TextStyle(
                                     color: status == 'ĐANG THỰC HIỆN' ? AppColors.logisticsRed : AppColors.secondary,
                                     fontSize: 9.0,
                                     fontWeight: FontWeight.bold,
