@@ -25,6 +25,7 @@ class DriverService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
         },
       ).timeout(const Duration(seconds: 8));
 
@@ -32,10 +33,15 @@ class DriverService {
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        if (body['success'] == true && body['data'] is List) {
-          final list = List<Map<String, dynamic>>.from(body['data']);
-          debugPrint('✅ [DriverService] Nhận được ${list.length} lộ trình từ backend');
-          return list;
+        if (body['success'] == true && body['data'] != null) {
+          if (body['data'] is List) {
+            final list = List<Map<String, dynamic>>.from(body['data']);
+            debugPrint('✅ [DriverService] Nhận được ${list.length} lộ trình từ backend');
+            return list;
+          } else if (body['data'] is Map) {
+            debugPrint('✅ [DriverService] Nhận được 1 lộ trình (Map) từ backend');
+            return [Map<String, dynamic>.from(body['data'])];
+          }
         }
       }
     } catch (e) {
@@ -56,6 +62,7 @@ class DriverService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
         },
       ).timeout(const Duration(seconds: 8));
 

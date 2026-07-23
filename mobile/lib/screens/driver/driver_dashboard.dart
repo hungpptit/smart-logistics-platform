@@ -110,7 +110,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
               final String receiverName = firstOrder?['receiverName']?.toString() ?? 'Anh Minh';
               final String receiverPhone = firstOrder?['receiverPhone']?.toString() ?? '0987.654.321';
-              final num codAmount = firstOrder?['codAmount'] ?? firstOrder?['estimatedCodAmount'] ?? 150000;
+              final num codAmount = num.tryParse(firstOrder?['codAmount']?.toString() ?? firstOrder?['estimatedCodAmount']?.toString() ?? '150000') ?? 150000;
 
               mappedStops.add({
                 'index': i + 1,

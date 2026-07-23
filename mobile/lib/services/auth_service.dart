@@ -60,7 +60,10 @@ class AuthService {
     try {
       final response = await http.post(
         Uri.parse('${AppConfig.baseUrl}/auth/login'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
         body: jsonEncode({
           'email': email,
           'password': password,
