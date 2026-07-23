@@ -1094,22 +1094,26 @@ class _DriverDashboardState extends State<DriverDashboard> {
                               Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
-                                decoration: BoxDecoration(
-                                  color: AppColors.logisticsRed.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4.0),
-                                ),
-                                child: Text(
-                                  stop['orderCode'] ?? 'ORD-66266482',
-                                  style: const TextStyle(
-                                    color: AppColors.logisticsRed,
-                                    fontSize: 11.0,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: 'monospace',
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.logisticsRed.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(4.0),
+                                  ),
+                                  child: Text(
+                                    stop['orderCode'] ?? 'ORD-66266482',
+                                    style: const TextStyle(
+                                      color: AppColors.logisticsRed,
+                                      fontSize: 10.0,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 4.0),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
                                 decoration: BoxDecoration(
@@ -1126,10 +1130,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ),
-                              Text(
-                                'cách $distance',
-                                style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
                               ),
                             ],
                           ),
@@ -1891,16 +1891,20 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text(
-                                '📦 MÃ BƯU KIỆN CẦN QUÉT:',
+                                '📦 MÃ BƯU KIỆN:',
                                 style: TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold, color: AppColors.secondary),
                               ),
-                              Text(
-                                stop['orderCode'] ?? 'ORD-66266482',
-                                style: const TextStyle(
-                                  fontSize: 13.0,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.logisticsRed,
-                                  fontFamily: 'monospace',
+                              const SizedBox(width: 4.0),
+                              Flexible(
+                                child: Text(
+                                  stop['orderCode'] ?? 'ORD-66266482',
+                                  style: const TextStyle(
+                                    fontSize: 12.0,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.logisticsRed,
+                                    fontFamily: 'monospace',
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -1922,10 +1926,14 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                '👤 ${stop['receiverName'] ?? 'Anh Minh (0987.654.321)'}',
-                                style: const TextStyle(fontSize: 11.0, fontWeight: FontWeight.w600, color: AppColors.deepOnyx),
+                              Expanded(
+                                child: Text(
+                                  '👤 ${stop['receiverName'] ?? 'Anh Minh (0987.654.321)'}',
+                                  style: const TextStyle(fontSize: 11.0, fontWeight: FontWeight.w600, color: AppColors.deepOnyx),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
+                              const SizedBox(width: 8.0),
                               const Text(
                                 '💵 COD: 150.000đ',
                                 style: TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold, color: Colors.green),
