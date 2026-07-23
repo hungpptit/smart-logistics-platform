@@ -1634,90 +1634,198 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   void _showQRScanner(Map<String, dynamic> stop) {
+    final String targetCode = (stop['orderCode'] as String? ?? 'ORD-66266482').trim();
+    final TextEditingController scanController = TextEditingController(text: targetCode);
+    String? errorMessage;
+
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (BuildContext context) {
-        Timer(const Duration(seconds: 2), () {
-          Navigator.pop(context);
-          setState(() {
-            stop['isCheckedIn'] = true;
-          });
-          showDialog(
-            context: this.context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                backgroundColor: AppColors.pureWhite,
-                shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-                title: const Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green),
-                    SizedBox(width: 8.0),
-                    Text('Check-in thành công', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                content: Text('Bạn đã check-in thành công tại điểm dừng ${stop['title']}. Hãy tiến hành lấy chữ ký và chụp ảnh POD.'),
-                actions: [
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showStopDetailsDialog(stop);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.logisticsRed,
-                      foregroundColor: AppColors.pureWhite,
-                    ),
-                    child: const Text('Tiếp tục'),
-                  ),
-                ],
-              );
-            },
-          );
-        });
+        return StatefulBuilder(
+          builder: (context, setScannerState) {
+            void performScanCheck() {
+              final scannedValue = scanController.text.trim();
+              if (scannedValue.isEmpty) {
+                setScannerState(() {
+                  errorMessage = 'Vui lòng nhập hoặc quét mã Barcode/QR dán trên bưu kiện!';
+                });
+                return;
+              }
 
-        return Dialog(
-          backgroundColor: const Color(0xD9000000),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Check code match (case-insensitive substring or exact match)
+              final bool isMatch = scannedValue.toUpperCase() == targetCode.toUpperCase() ||
+                  scannedValue.toUpperCase().contains(targetCode.toUpperCase()) ||
+                  targetCode.toUpperCase().contains(scannedValue.toUpperCase());
+
+              if (isMatch) {
+                Navigator.pop(context); // Close scanner modal
+                setState(() {
+                  stop['isCheckedIn'] = true;
+                });
+
+                showDialog(
+                  context: this.context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      backgroundColor: AppColors.pureWhite,
+                      shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+                      title: const Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green, size: 28),
+                          SizedBox(width: 8.0),
+                          Text('Quét mã thành công', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        ],
+                      ),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('✅ Đã quét khớp thành công mã bưu kiện: $targetCode'),
+                          const SizedBox(height: 8.0),
+                          const Text(
+                            'Bạn đã check-in thành công tại điểm dừng. Hãy tiến hành lấy chữ ký và chụp ảnh POD.',
+                            style: TextStyle(fontSize: 12, color: AppColors.secondary),
+                          ),
+                        ],
+                      ),
+                      actions: [
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showStopDetailsDialog(stop);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.logisticsRed,
+                            foregroundColor: AppColors.pureWhite,
+                          ),
+                          child: const Text('Tiếp tục'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              } else {
+                setScannerState(() {
+                  errorMessage = '❌ MÃ BƯU KIỆN KHÔNG KHỚP!\n'
+                      'Mã bạn nhập: "$scannedValue"\n'
+                      'Mã đúng của kiện hàng này là: "$targetCode"';
+                });
+              }
+            }
+
+            return Dialog(
+              backgroundColor: const Color(0xF20F172A),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('QUÉT MÃ QR CHECK-IN', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          '📷 QUÉT MÃ BARCODE / QR BƯU KIỆN',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8.0),
+
+                    // Camera Scanner View Box
+                    Container(
+                      width: 240.0,
+                      height: 180.0,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.logisticsRed, width: 2.5),
+                        borderRadius: BorderRadius.circular(16.0),
+                        color: Colors.black26,
+                      ),
+                      child: const Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          PulsingScanLine(),
+                          Icon(Icons.qr_code_scanner, color: Colors.white24, size: 80),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12.0),
+
+                    // Target Order Code display
+                    Text(
+                      'Bưu kiện cần quét: $targetCode',
+                      style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    const SizedBox(height: 12.0),
+
+                    // Manual Code Entry / Scan Input Field
+                    TextField(
+                      controller: scanController,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                      decoration: InputDecoration(
+                        labelText: 'Nhập hoặc quét mã dán trên thùng hàng',
+                        labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
+                        prefixIcon: const Icon(Icons.barcode_reader, color: AppColors.logisticsRed),
+                        filled: true,
+                        fillColor: Colors.white10,
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: const BorderSide(color: Colors.white30),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: const BorderSide(color: AppColors.logisticsRed),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 10.0),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade900.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(8.0),
+                          border: Border.all(color: Colors.redAccent),
+                        ),
+                        child: Text(
+                          errorMessage!,
+                          style: const TextStyle(color: Colors.white, fontSize: 11.0, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 16.0),
+
+                    // Scan Action Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: performScanCheck,
+                        icon: const Icon(Icons.qr_code_scanner),
+                        label: const Text('XÁC NHẬN MÃ QUÉT'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.logisticsRed,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 12.0),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+                          textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                width: 280.0,
-                height: 280.0,
-                margin: const EdgeInsets.only(bottom: 24.0),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white54, width: 2.0),
-                  borderRadius: BorderRadius.circular(16.0),
-                ),
-                child: const Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    PulsingScanLine(),
-                  ],
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 24.0),
-                child: Text(
-                  'Đặt mã QR của bưu cục / điểm dừng vào khung hình',
-                  style: TextStyle(color: Colors.white70, fontSize: 12.0),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
