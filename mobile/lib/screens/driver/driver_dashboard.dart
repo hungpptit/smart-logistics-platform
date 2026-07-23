@@ -118,17 +118,33 @@ class _DriverDashboardState extends State<DriverDashboard> {
             final double lat = double.tryParse(stop['latitude']?.toString() ?? '') ?? (10.762 + i * 0.004);
             final double lng = double.tryParse(stop['longitude']?.toString() ?? '') ?? (106.682 + i * 0.004);
 
-            final orderCode = stop['shipment']?['order']?['orderCode'] ??
-                stop['shipment']?['trackingNumber'] ??
+            Map<String, dynamic>? firstOrder;
+            if (stop['shipment'] != null && stop['shipment']['shipmentPackages'] is List && (stop['shipment']['shipmentPackages'] as List).isNotEmpty) {
+              final firstPkg = (stop['shipment']['shipmentPackages'] as List).first;
+              if (firstPkg != null && firstPkg['package'] != null && firstPkg['package']['order'] != null) {
+                firstOrder = Map<String, dynamic>.from(firstPkg['package']['order']);
+              }
+            }
+            if (firstOrder == null && stop['shipment'] != null && stop['shipment']['order'] != null) {
+              firstOrder = Map<String, dynamic>.from(stop['shipment']['order']);
+            }
+
+            final String orderCode = firstOrder?['orderCode']?.toString() ??
+                stop['shipment']?['trackingNumber']?.toString() ??
+                stop['shipment']?['shipmentCode']?.toString() ??
                 (shipmentId != null ? 'ORD-${shipmentId.toString().substring(0, 8).toUpperCase()}' : 'ORD-66266482-0${i + 1}');
+
+            final String receiverName = firstOrder?['receiverName']?.toString() ?? 'Anh Minh';
+            final String receiverPhone = firstOrder?['receiverPhone']?.toString() ?? '0987.654.321';
+            final num codAmount = firstOrder?['codAmount'] ?? firstOrder?['estimatedCodAmount'] ?? 150000;
 
             mappedStops.add({
               'index': i + 1,
               'id': stop['id'] ?? '$i',
               'shipmentId': shipmentId,
               'orderCode': orderCode,
-              'receiverName': stop['shipment']?['receiverName'] ?? 'Anh Minh (0987.654.321)',
-              'codAmount': stop['shipment']?['codAmount'] ?? 150000,
+              'receiverName': '$receiverName ($receiverPhone)',
+              'codAmount': codAmount,
               'title': stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng',
               'address': address,
               'latitude': lat,
@@ -1030,7 +1046,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
     final String address = stop['address'] as String;
     final int packages = stop['packages'] as int;
     final String eta = stop['eta'] as String;
-    final String distance = stop['distance'] as String;
     final String status = stop['status'] as String;
     final bool isActive = stop['isActive'] as bool;
 

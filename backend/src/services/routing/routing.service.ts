@@ -365,6 +365,29 @@ export class RoutingService {
           },
         },
         stops: {
+          include: {
+            shipment: {
+              include: {
+                shipmentPackages: {
+                  include: {
+                    package: {
+                      include: {
+                        order: {
+                          select: {
+                            id: true,
+                            orderCode: true,
+                            receiverName: true,
+                            receiverPhone: true,
+                            estimatedCodAmount: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
           orderBy: {
             sequence: 'asc',
           },
@@ -422,6 +445,29 @@ export class RoutingService {
           },
         },
         stops: {
+          include: {
+            shipment: {
+              include: {
+                shipmentPackages: {
+                  include: {
+                    package: {
+                      include: {
+                        order: {
+                          select: {
+                            id: true,
+                            orderCode: true,
+                            receiverName: true,
+                            receiverPhone: true,
+                            estimatedCodAmount: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
           orderBy: {
             sequence: 'asc',
           },
