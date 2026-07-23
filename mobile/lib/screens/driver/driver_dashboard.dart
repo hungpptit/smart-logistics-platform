@@ -24,47 +24,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   bool _showTrafficAlert = false;
   Timer? _alertTimer;
 
-  final List<Map<String, dynamic>> _driverStops = [
-    {
-      'index': 5,
-      'title': 'Velocity Tech Hub',
-      'address': '452 Industrial Way, Dock 4, Austin TX',
-      'packages': 3,
-      'eta': '10:45 SA',
-      'distance': '0.8 mi',
-      'status': 'ĐANG THỰC HIỆN',
-      'isActive': true,
-      'isCheckedIn': false,
-      'signature': null,
-      'photo': null,
-    },
-    {
-      'index': 6,
-      'title': 'Northside Retail Center',
-      'address': '8920 Burnet Rd, Suite 110, Austin TX',
-      'packages': 1,
-      'eta': '11:15 SA',
-      'distance': '2.4 mi',
-      'status': 'TIẾP THEO',
-      'isActive': false,
-      'isCheckedIn': false,
-      'signature': null,
-      'photo': null,
-    },
-    {
-      'index': 7,
-      'title': 'Summit Residential Park',
-      'address': '2200 Summit Vista Pkwy, Austin TX',
-      'packages': 2,
-      'eta': '11:45 SA',
-      'distance': '4.1 mi',
-      'status': 'ĐANG CHỜ',
-      'isActive': false,
-      'isCheckedIn': false,
-      'signature': null,
-      'photo': null,
-    },
-  ];
+  final List<Map<String, dynamic>> _driverStops = [];
 
   String _driverName = 'Tài xế';
   String _driverEmail = 'driver@velocity.vn';
@@ -91,83 +51,102 @@ class _DriverDashboardState extends State<DriverDashboard> {
       SocketService().connect(token: token);
     }
 
-    final routes = await DriverService.fetchMyRoutes();
+    List<Map<String, dynamic>> routes = [];
+    for (int attempt = 0; attempt < 3; attempt++) {
+      routes = await DriverService.fetchMyRoutes();
+      if (routes.isNotEmpty) break;
+      await Future.delayed(const Duration(milliseconds: 600));
+    }
+
     if (routes.isNotEmpty && mounted) {
       final firstRoute = routes.first;
       _activeRouteId = firstRoute['id']?.toString();
       if (_activeRouteId != null) {
         SocketService().joinRoute(_activeRouteId!);
 
-        // Fetch FULL route detail to get the complete stops array from DB
-        final routeDetail = await DriverService.fetchRouteDetail(_activeRouteId!);
-        final List stopsRaw = routeDetail != null
-            ? (routeDetail['stops'] ?? routeDetail['routeStops'] ?? [])
-            : (firstRoute['stops'] ?? firstRoute['routeStops'] ?? []);
+        // Prioritize stops from firstRoute if available, otherwise fetch detail
+        List stopsRaw = (firstRoute['stops'] ?? firstRoute['routeStops'] ?? []);
+        if (stopsRaw.isEmpty) {
+          final routeDetail = await DriverService.fetchRouteDetail(_activeRouteId!);
+          if (routeDetail != null) {
+            stopsRaw = (routeDetail['stops'] ?? routeDetail['routeStops'] ?? []);
+          }
+        }
 
         if (stopsRaw.isNotEmpty) {
           final List<Map<String, dynamic>> mappedStops = [];
           for (int i = 0; i < stopsRaw.length; i++) {
-            final stop = stopsRaw[i];
-            final stopType = stop['stopType'] ?? 'DELIVERY';
-            final address = stop['facility']?['facilityName'] ??
-                stop['addressSnapshot'] ??
-                stop['addressLine1'] ??
-                stop['address'] ??
-                'Địa điểm giao nhận Việt Nam';
-            final shipmentId = stop['shipmentId'];
-            final double lat = double.tryParse(stop['latitude']?.toString() ?? '') ?? (10.762 + i * 0.004);
-            final double lng = double.tryParse(stop['longitude']?.toString() ?? '') ?? (106.682 + i * 0.004);
+            try {
+              final stop = stopsRaw[i];
+              final stopType = stop['stopType'] ?? 'DELIVERY';
+              final address = stop['facility']?['facilityName'] ??
+                  stop['addressSnapshot'] ??
+                  stop['addressLine1'] ??
+                  stop['address'] ??
+                  'Địa điểm giao nhận Việt Nam';
+              final shipmentId = stop['shipmentId'];
+              final double lat = double.tryParse(stop['latitude']?.toString() ?? '') ?? (10.762 + i * 0.004);
+              final double lng = double.tryParse(stop['longitude']?.toString() ?? '') ?? (106.682 + i * 0.004);
 
-            Map<String, dynamic>? firstOrder;
-            if (stop['shipment'] != null && stop['shipment']['shipmentPackages'] is List && (stop['shipment']['shipmentPackages'] as List).isNotEmpty) {
-              final firstPkg = (stop['shipment']['shipmentPackages'] as List).first;
-              if (firstPkg != null && firstPkg['package'] != null && firstPkg['package']['order'] != null) {
-                firstOrder = Map<String, dynamic>.from(firstPkg['package']['order']);
-              }
+              dynamic firstOrder;
+              try {
+                final shipment = stop['shipment'];
+                if (shipment != null) {
+                  final pkgs = shipment['shipmentPackages'];
+                  if (pkgs is List && pkgs.isNotEmpty) {
+                    final firstPkg = pkgs.first;
+                    if (firstPkg != null && firstPkg['package'] != null) {
+                      firstOrder = firstPkg['package']['order'];
+                    }
+                  }
+                  firstOrder ??= shipment['order'];
+                }
+              } catch (_) {}
+
+              final String orderCode = firstOrder?['orderCode']?.toString() ??
+                  stop['shipment']?['trackingNumber']?.toString() ??
+                  stop['shipment']?['shipmentCode']?.toString() ??
+                  (shipmentId != null ? 'ORD-${shipmentId.toString().substring(0, 8).toUpperCase()}' : 'ORD-66266482-0${i + 1}');
+
+              final String receiverName = firstOrder?['receiverName']?.toString() ?? 'Anh Minh';
+              final String receiverPhone = firstOrder?['receiverPhone']?.toString() ?? '0987.654.321';
+              final num codAmount = firstOrder?['codAmount'] ?? firstOrder?['estimatedCodAmount'] ?? 150000;
+
+              mappedStops.add({
+                'index': i + 1,
+                'id': stop['id'] ?? '$i',
+                'shipmentId': shipmentId,
+                'orderCode': orderCode,
+                'receiverName': '$receiverName ($receiverPhone)',
+                'codAmount': codAmount,
+                'title': stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng',
+                'address': address,
+                'latitude': lat,
+                'longitude': lng,
+                'packages': 1,
+                'eta': (stop['plannedArrivalTime'] != null && stop['plannedArrivalTime'].toString().contains('T'))
+                    ? stop['plannedArrivalTime'].toString().split('T')[1].substring(0, 5)
+                    : 'Chờ giao',
+                'distance': 'Theo tuyến',
+                'status': i == 0 ? 'ĐANG THỰC HIỆN' : 'TIẾP THEO',
+                'isActive': i == 0,
+                'isCheckedIn': false,
+                'signature': null,
+                'photo': null,
+              });
+            } catch (e) {
+              debugPrint('⚠️ [DriverDashboard] Lỗi khi map điểm dừng $i: $e');
             }
-            if (firstOrder == null && stop['shipment'] != null && stop['shipment']['order'] != null) {
-              firstOrder = Map<String, dynamic>.from(stop['shipment']['order']);
-            }
-
-            final String orderCode = firstOrder?['orderCode']?.toString() ??
-                stop['shipment']?['trackingNumber']?.toString() ??
-                stop['shipment']?['shipmentCode']?.toString() ??
-                (shipmentId != null ? 'ORD-${shipmentId.toString().substring(0, 8).toUpperCase()}' : 'ORD-66266482-0${i + 1}');
-
-            final String receiverName = firstOrder?['receiverName']?.toString() ?? 'Anh Minh';
-            final String receiverPhone = firstOrder?['receiverPhone']?.toString() ?? '0987.654.321';
-            final num codAmount = firstOrder?['codAmount'] ?? firstOrder?['estimatedCodAmount'] ?? 150000;
-
-            mappedStops.add({
-              'index': i + 1,
-              'id': stop['id'] ?? '$i',
-              'shipmentId': shipmentId,
-              'orderCode': orderCode,
-              'receiverName': '$receiverName ($receiverPhone)',
-              'codAmount': codAmount,
-              'title': stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng',
-              'address': address,
-              'latitude': lat,
-              'longitude': lng,
-              'packages': 1,
-              'eta': (stop['plannedArrivalTime'] != null && stop['plannedArrivalTime'].toString().contains('T'))
-                  ? stop['plannedArrivalTime'].toString().split('T')[1].substring(0, 5)
-                  : 'Chờ giao',
-              'distance': 'Theo tuyến',
-              'status': i == 0 ? 'ĐANG THỰC HIỆN' : 'TIẾP THEO',
-              'isActive': i == 0,
-              'isCheckedIn': false,
-              'signature': null,
-              'photo': null,
-            });
           }
 
-          setState(() {
-            _driverStops.clear();
-            _driverStops.addAll(mappedStops);
-          });
+          if (mappedStops.isNotEmpty && mounted) {
+            setState(() {
+              _driverStops.clear();
+              _driverStops.addAll(mappedStops);
+            });
 
-          _updateGoongPolyline();
+            _updateGoongPolyline();
+          }
         }
       }
     }
