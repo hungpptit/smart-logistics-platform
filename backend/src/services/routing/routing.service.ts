@@ -279,7 +279,7 @@ export class RoutingService {
           status: nextStatus,
           changedByUserId: creatorId || null,
           changeSource: 'SYSTEM',
-          reason: `Đơn hàng được AI phân bổ vào lộ trình tối ưu ${routeCode} cho tài xế ${driver.fullName} (${isPickup ? 'Tuyến lấy hàng' : 'Tuyến giao hàng'})`,
+          reason: `Đơn hàng được AI phân bổ vào lộ trình tối ưu ${routeCode} cho tài xế ${driver.employeeCode} (${isPickup ? 'Tuyến lấy hàng' : 'Tuyến giao hàng'})`,
         });
       }
 
@@ -351,8 +351,12 @@ export class RoutingService {
               select: {
                 id: true,
                 employeeCode: true,
-                fullName: true,
-                phone: true,
+                user: {
+                  select: {
+                    fullName: true,
+                    phone: true,
+                  },
+                },
               },
             },
             vehicle: {
@@ -379,6 +383,7 @@ export class RoutingService {
                             receiverName: true,
                             receiverPhone: true,
                             estimatedCodAmount: true,
+                            estimatedTotalAmount: true,
                           },
                         },
                       },
@@ -431,8 +436,12 @@ export class RoutingService {
               select: {
                 id: true,
                 employeeCode: true,
-                fullName: true,
-                phone: true,
+                user: {
+                  select: {
+                    fullName: true,
+                    phone: true,
+                  },
+                },
               },
             },
             vehicle: {
@@ -459,6 +468,7 @@ export class RoutingService {
                             receiverName: true,
                             receiverPhone: true,
                             estimatedCodAmount: true,
+                            estimatedTotalAmount: true,
                           },
                         },
                       },

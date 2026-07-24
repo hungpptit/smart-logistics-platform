@@ -37,6 +37,14 @@ class _DriverDashboardState extends State<DriverDashboard> {
   final MapController _mapController = MapController();
   final MapController _navMapController = MapController();
 
+  String _formatCurrency(num amount) {
+    final int value = amount.round();
+    final String str = value.toString();
+    final RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    final String result = str.replaceAllMapped(reg, (Match m) => '${m[1]}.');
+    return '$resultđ';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -110,7 +118,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
               final String receiverName = firstOrder?['receiverName']?.toString() ?? 'Anh Minh';
               final String receiverPhone = firstOrder?['receiverPhone']?.toString() ?? '0987.654.321';
-              final num codAmount = num.tryParse(firstOrder?['codAmount']?.toString() ?? firstOrder?['estimatedCodAmount']?.toString() ?? '150000') ?? 150000;
+              final num codAmount = num.tryParse(firstOrder?['estimatedTotalAmount']?.toString() ?? firstOrder?['codAmount']?.toString() ?? firstOrder?['estimatedCodAmount']?.toString() ?? '35500') ?? 35500;
 
               mappedStops.add({
                 'index': i + 1,
@@ -1628,8 +1636,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   void _showQRScanner(Map<String, dynamic> stop) {
-    final String targetCode = (stop['orderCode'] as String? ?? 'ORD-66266482').trim();
-    final TextEditingController scanController = TextEditingController(text: targetCode);
+    final String targetCode = (stop['orderCode'] as String? ?? 'ORD_V3_HUB_133').trim();
+    final TextEditingController scanController = TextEditingController();
     String? errorMessage;
 
     showDialog(
@@ -1642,7 +1650,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
               final scannedValue = scanController.text.trim();
               if (scannedValue.isEmpty) {
                 setScannerState(() {
-                  errorMessage = 'Vui lòng nhập hoặc quét mã Barcode/QR dán trên bưu kiện!';
+                  errorMessage = '⚠️ Vui lòng bật camera quét tem dán trên thùng hàng hoặc chọn mã quét!';
                 });
                 return;
               }
@@ -1733,20 +1741,38 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     const SizedBox(height: 8.0),
 
                     // Camera Scanner View Box
-                    Container(
-                      width: 240.0,
-                      height: 180.0,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.logisticsRed, width: 2.5),
-                        borderRadius: BorderRadius.circular(16.0),
-                        color: Colors.black26,
-                      ),
-                      child: const Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          PulsingScanLine(),
-                          Icon(Icons.qr_code_scanner, color: Colors.white24, size: 80),
-                        ],
+                    GestureDetector(
+                      onTap: () {
+                        setScannerState(() {
+                          scanController.text = targetCode;
+                          errorMessage = null;
+                        });
+                      },
+                      child: Container(
+                        width: 240.0,
+                        height: 170.0,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.logisticsRed, width: 2.5),
+                          borderRadius: BorderRadius.circular(16.0),
+                          color: Colors.black26,
+                        ),
+                        child: const Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            PulsingScanLine(),
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.qr_code_scanner, color: Colors.white70, size: 56),
+                                SizedBox(height: 4),
+                                Text(
+                                  '[ CHẠM VÀO ĐỂ QUÉT MÃ MẪU ]',
+                                  style: TextStyle(color: Colors.amberAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12.0),
@@ -1928,9 +1954,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                 ),
                               ),
                               const SizedBox(width: 8.0),
-                              const Text(
-                                '💵 COD: 150.000đ',
-                                style: TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold, color: Colors.green),
+                              Text(
+                                '💵 COD: ${_formatCurrency((stop['codAmount'] as num? ?? 0))}',
+                                style: const TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold, color: Colors.green),
                               ),
                             ],
                           ),

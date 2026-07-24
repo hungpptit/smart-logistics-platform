@@ -9,9 +9,9 @@ export class DriverService {
    * Create a new driver profile
    */
   public async createDriver(dto: CreateDriverDto) {
-    // Check if phone already exists in drivers table
-    const phoneExists = await prisma.driver.findUnique({
-      where: { phone: dto.phone },
+    // Check if phone already exists in users table
+    const phoneExists = await prisma.user.findFirst({
+      where: { phone: dto.phone, deletedAt: null },
     });
     if (phoneExists) {
       throw new BadRequestException('Số điện thoại tài xế đã tồn tại trên hệ thống');
@@ -92,6 +92,7 @@ export class DriverService {
           username,
           email: dto.email,
           passwordHash,
+          fullName: dto.fullName,
           phone: dto.phone,
           status: 'ACTIVE',
           roleId: role.id,
@@ -101,8 +102,6 @@ export class DriverService {
       return await tx.driver.create({
         data: {
           employeeCode,
-          fullName: dto.fullName,
-          phone: dto.phone,
           citizenId: dto.citizenId || null,
           driverLicenseNumber: dto.driverLicenseNumber,
           driverLicenseClass: dto.driverLicenseClass,
@@ -250,12 +249,15 @@ export class DriverService {
     }
 
     // Check unique phone if it changed
-    if (dto.phone && dto.phone !== driver.phone) {
-      const phoneExists = await prisma.driver.findUnique({
-        where: { phone: dto.phone },
-      });
-      if (phoneExists) {
-        throw new BadRequestException('Số điện thoại mới đã tồn tại trên hệ thống');
+    if (dto.phone && driver.userId) {
+      const currentUser = await prisma.user.findUnique({ where: { id: driver.userId } });
+      if (currentUser && dto.phone !== currentUser.phone) {
+        const phoneExists = await prisma.user.findFirst({
+          where: { phone: dto.phone, deletedAt: null },
+        });
+        if (phoneExists) {
+          throw new BadRequestException('Số điện thoại mới đã tồn tại trên hệ thống');
+        }
       }
     }
 
@@ -296,11 +298,19 @@ export class DriverService {
       }
     }
 
+    if (driver.userId && (dto.fullName || dto.phone)) {
+      await prisma.user.update({
+        where: { id: driver.userId },
+        data: {
+          fullName: dto.fullName !== undefined ? dto.fullName : undefined,
+          phone: dto.phone !== undefined ? dto.phone : undefined,
+        },
+      });
+    }
+
     return await prisma.driver.update({
       where: { id },
       data: {
-        fullName: dto.fullName ?? driver.fullName,
-        phone: dto.phone ?? driver.phone,
         citizenId: dto.citizenId !== undefined ? dto.citizenId : driver.citizenId,
         driverLicenseNumber: dto.driverLicenseNumber ?? driver.driverLicenseNumber,
         driverLicenseClass: dto.driverLicenseClass ?? driver.driverLicenseClass,
@@ -354,18 +364,18 @@ export class DriverService {
     }
 
     const timestamp = Date.now();
-    const deletedPhone = `del_${driver.phone.substring(0, 10)}_${timestamp.toString().slice(-4)}`;
+    const phoneVal = driver.user?.phone || '0000000000';
+    const deletedPhone = `del_${phoneVal.substring(0, 10)}_${timestamp.toString().slice(-4)}`;
     const deletedCitizenId = driver.citizenId
       ? `del_${timestamp.toString().slice(-4)}_${driver.citizenId.substring(0, 11)}`
       : null;
 
     await prisma.$transaction(async (tx) => {
-      // 1. Soft delete the driver, release the unique phone number and citizen_id
+      // 1. Soft delete the driver, release unique citizen_id
       await tx.driver.update({
         where: { id },
         data: { 
           deletedAt: new Date(),
-          phone: deletedPhone,
           citizenId: deletedCitizenId,
         },
       });
@@ -554,8 +564,12 @@ export class DriverService {
           select: {
             id: true,
             employeeCode: true,
-            fullName: true,
-            phone: true,
+            user: {
+              select: {
+                fullName: true,
+                phone: true,
+              },
+            },
             driverLicenseClass: true,
           },
         },

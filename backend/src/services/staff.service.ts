@@ -220,12 +220,25 @@ export class StaffService {
       throw new BadRequestException('Hệ thống chưa cấu hình vai trò Nhân viên (STAFF)');
     }
 
+    const latestStaff = await prisma.staffProfile.findFirst({
+      orderBy: { employeeCode: 'desc' },
+    });
+    let nextStaffNum = 1;
+    if (latestStaff && latestStaff.employeeCode) {
+      const match = latestStaff.employeeCode.match(/STF-(\d+)/);
+      if (match) {
+        nextStaffNum = parseInt(match[1], 10) + 1;
+      }
+    }
+    const employeeCode = `STF-${String(nextStaffNum).padStart(6, '0')}`;
+
     const newStaff = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           username,
           email: dto.email,
           passwordHash,
+          fullName: dto.fullName,
           phone: dto.phone || null,
           status: 'ACTIVE',
           roleId: staffRole.id,
@@ -235,6 +248,7 @@ export class StaffService {
       const profile = await tx.staffProfile.create({
         data: {
           userId: user.id,
+          employeeCode,
           citizenId: dto.citizenId || null,
           assignedFacilityId: dto.assignedFacilityId || null,
         },
@@ -364,6 +378,7 @@ export class StaffService {
         },
         create: {
           userId: id,
+          employeeCode: `STF-${Date.now().toString().slice(-6)}`,
           citizenId: dto.citizenId || null,
           assignedFacilityId: dto.assignedFacilityId || null,
         },

@@ -68,6 +68,8 @@ export class FacilityService {
           managerUserId: dto.managerUserId || null,
           operatingStatus: dto.operatingStatus || 'ACTIVE',
           openedAt: new Date(dto.openedAt),
+          latitude: dto.address.latitude,
+          longitude: dto.address.longitude,
         },
       });
 

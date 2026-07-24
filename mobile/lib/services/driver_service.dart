@@ -93,6 +93,7 @@ class DriverService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
         },
         body: jsonEncode(payload),
       );
