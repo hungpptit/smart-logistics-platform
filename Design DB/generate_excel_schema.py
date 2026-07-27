@@ -569,10 +569,15 @@ def build_excel():
                     max_len = len(val_str)
         ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
 
-    # Save to workspace root
-    out_path = "../Database_Schema.xlsx"
-    wb.save(out_path)
-    print(f"Successfully generated updated Database_Schema.xlsx at {out_path} with 5+ rows per table!")
+    # Save to workspace root and Design DB
+    import os
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    out_path_root = os.path.abspath(os.path.join(base_dir, "..", "Database_Schema.xlsx"))
+    out_path_local = os.path.abspath(os.path.join(base_dir, "Database_Schema.xlsx"))
+    
+    wb.save(out_path_root)
+    wb.save(out_path_local)
+    print(f"Successfully generated Database_Schema.xlsx at:\n  - {out_path_root}\n  - {out_path_local}")
 
 if __name__ == "__main__":
     build_excel()
