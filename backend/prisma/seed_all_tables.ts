@@ -278,6 +278,8 @@ async function main() {
         facilityName: `Kho/Bưu cục Velocity ${i + 1}`,
         facilityTypeId: fType.id,
         managerUserId: staff.id,
+        latitude: 10.7725 + i * 0.01,
+        longitude: 106.6580 + i * 0.01,
         operatingStatus: 'ACTIVE',
         openedAt: new Date('2025-01-01'),
       },
@@ -299,7 +301,7 @@ async function main() {
       { zoneCode: 'REC', zoneName: 'Khu vực nhập hàng', zoneType: 'RECEIVING', capacity: 100 },
       { zoneCode: 'STOR', zoneName: 'Khu vực lưu trữ', zoneType: 'STORAGE', capacity: 500 },
       { zoneCode: 'SORT', zoneName: 'Khu vực phân loại', zoneType: 'SORTING', capacity: 200 },
-      { zoneCode: 'DISP', zoneName: 'Khu vực xuất hàng', zoneType: 'DISPATCH', capacity: 150 },
+      { zoneCode: 'SHIP', zoneName: 'Khu vực xuất hàng', zoneType: 'SHIPPING', capacity: 150 },
       { zoneCode: 'QUAR', zoneName: 'Khu vực cách ly / Kiểm định', zoneType: 'QUARANTINE', capacity: 50 },
     ];
     for (const z of zonesData) {
@@ -333,6 +335,7 @@ async function main() {
       const sp = await prisma.staffProfile.create({
         data: {
           userId: sUser.id,
+          employeeCode: `STF_${100 + i}`,
           citizenId: `12345678901${i}`,
           assignedFacilityId: fac.id,
         },
@@ -368,12 +371,14 @@ async function main() {
     baseLat: number,
     baseLng: number
   ) => {
+    await prisma.user.update({
+      where: { id: sUser.id },
+      data: { fullName, phone }
+    });
     const driver = await prisma.driver.create({
       data: {
         userId: sUser.id,
         employeeCode: `DRV_${codeSuffix}`,
-        fullName,
-        phone,
         citizenId: `03120000${codeSuffix}`,
         driverLicenseNumber: `GPLX_${codeSuffix}`,
         driverLicenseClass: 'A1',
@@ -461,12 +466,17 @@ async function main() {
     const fac = dbFacilities[i % dbFacilities.length];
     const sUser = shipperUsers[i % shipperUsers.length];
     const vType = dbVehicleTypes[i % dbVehicleTypes.length];
+    await prisma.user.update({
+      where: { id: sUser.id },
+      data: {
+        fullName: `Tài xế tổng hợp ${String.fromCharCode(65 + i)}`,
+        phone: `090500000${i}`
+      }
+    });
     const driver = await prisma.driver.create({
       data: {
         userId: sUser.id,
         employeeCode: `DRV_${100 + i}`,
-        fullName: `Tài xế tổng hợp ${String.fromCharCode(65 + i)}`,
-        phone: `090500000${i}`,
         citizenId: `03120000045${i}`,
         driverLicenseNumber: `GPLX_${2000 + i}`,
         driverLicenseClass: 'B2',
