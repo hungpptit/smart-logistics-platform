@@ -1,8 +1,8 @@
 # 📖 TỰ ĐIỂN CƠ SỞ DỮ LIỆU CHUẨN HÓA (DATABASE DICTIONARY) - SMART LOGISTICS PLATFORM
 
-Tài liệu này tổng hợp toàn bộ các bảng cơ sở dữ liệu được thiết kế theo chuẩn **Clean Architecture & Domain Driven Design**, phân chia theo 10 Phân hệ (Module) phục vụ hệ thống Smart Logistics Platform (SLP). 
+Tài liệu này tổng hợp toàn bộ 41 bảng cơ sở dữ liệu được thiết kế theo chuẩn **Clean Architecture & Domain Driven Design**, phân chia theo 10 Phân hệ (Module) phục vụ hệ thống Smart Logistics Platform (SLP). 
 
-Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của bảng** giải thích chi tiết mục đích nghiệp vụ và đóng vai trò gì trong hệ thống, cùng các ghi chú rõ ràng về **Khóa chính (PK)**, **Khóa ngoại (FK)**, **Cặp khóa chính phức hợp (Composite PK)**, **Khóa duy nhất (Unique)** và **Ví dụ thực tế chuẩn hóa** giúp bạn dễ dàng thuyết trình, bảo vệ đồ án trước Giảng viên và Hội đồng phản biện.
+Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của bảng** giải thích chi tiết mục đích nghiệp vụ và đóng vai trò gì trong hệ thống, cùng các ghi chú rõ ràng về **Khóa chính (PK)**, **Khóa ngoại (FK)**, **Cặp khóa chính phức hợp (Composite PK)**, **Khóa ngoại 1-1 (Unique FK)**, **Khóa duy nhất (Unique)** và **Ý nghĩa & Ví dụ thực tế chuẩn hóa** giúp bạn dễ dàng thuyết trình, bảo vệ đồ án trước Giảng viên và Hội đồng phản biện.
 
 ---
 
@@ -12,7 +12,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 * **`Khóa ngoại (FK ➔ bảng X)`**: Foreign Key - Khóa ngoại tham chiếu đến bảng X.
 * **`Khóa ngoại 1-1 (FK, Unique ➔ bảng X)`**: Foreign Key Unique - Khóa ngoại liên kết bắt buộc 1-1 với bảng X (Chuẩn Clean Architecture).
 * **`Cặp khóa chính (Composite PK)`**: Khóa chính phức hợp kết hợp từ 2 cột trở lên (Ví dụ: Bảng trung gian N:N).
-* **`Khóa duy nhất (Unique)`**: Ràng buộc không được trùng lặp dữ liệu.
+* **`Khóa duy nhất (Unique)`**: Ràng buộc không được trùng lặp dữ liệu trong hệ thống.
 * **`Bắt buộc (Not Null)`**: Trường dữ liệu bắt buộc phải nhập.
 * **`Tùy chọn (Nullable)`**: Trường dữ liệu có thể để trống.
 
@@ -21,47 +21,47 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 ## 🔐 MODULE 1: AUTHENTICATION & AUTHORIZATION (Xác thực & Phân quyền)
 
 ### 1. Bảng `users` (Tài khoản người dùng - Single Source of Truth)
-📌 **Chức năng của bảng:** Lưu trữ tài khoản định danh trung tâm (Single Source of Truth) cho tất cả 4 nhóm Actor trong hệ thống (Admin, Staff, Customer, Shipper). Bảng này quản lý thông tin đăng nhập (`username`, `password_hash`), định danh liên lạc (`email`, `phone`, `full_name`), ảnh đại diện, trạng thái khóa/mở tài khoản và liên kết phân quyền vai trò duy nhất.
+📌 **Chức năng của bảng:** Lưu trữ tài khoản định danh trung tâm (Single Source of Truth) cho tất cả 4 nhóm Actor trong hệ thống (Admin, Staff, Customer, Shipper). Bảng này quản lý thông tin đăng nhập (`username`, `password_hash`), định danh liên lạc (`email`, `phone`, `full_name`), ảnh đại diện, trạng thái khóa/mở tài khoản và liên kết vai trò hệ thống (`role_id`).
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã định danh duy nhất của người dùng. VD: `c0a80101-8b43-4f9e-a892-111111111111` |
+| `id` | Uuid | **Khóa chính (PK)** | Mã định danh duy nhất của người dùng. VD: `usr-01`, `usr-02` |
 | `username` | VarChar(50) | Khóa duy nhất (Unique), Bắt buộc | Tên đăng nhập tài khoản. VD: `hung_admin`, `staff_kho_tbd`, `shipper_nam`, `kh_vinamilk` |
 | `email` | VarChar(255) | Khóa duy nhất (Unique), Bắt buộc | Email tài khoản nhận thông báo/reset mật khẩu. VD: `hung.pham@smartlog.com` |
-| `password_hash`| Text | Bắt buộc | Mật khẩu băm bỏi bcrypt bảo mật. VD: `$2b$10$e8N0Y9z.K2qL.uX1vW9Z8e...` |
-| `full_name` | VarChar(150) | Tùy chọn | Họ và tên hiển thị chuẩn (Single Source of Truth). VD: `Phạm Tuấn Hưng`, `Nguyễn Văn Bình` |
-| `phone` | VarChar(20) | Tùy chọn | Số điện thoại liên lạc chính thức. VD: `0987654321` |
-| `avatar_url` | Text | Tùy chọn | Đường dẫn ảnh đại diện. VD: `https://storage.smartlog.com/avatars/user_101.jpg` |
+| `password_hash`| Text | Bắt buộc | Chuỗi mật khẩu băm bảo mật Bcrypt. VD: `$2b$10$e8N0Y9z.K2qL.uX1vW9Z8e...` |
+| `full_name` | VarChar(150) | Tùy chọn | Họ và tên hiển thị chuẩn người dùng. VD: `Phạm Tuấn Hưng`, `Nguyễn Văn Minh` |
+| `phone` | VarChar(20) | Tùy chọn | Số điện thoại liên lạc chính thức. VD: `0987654321`, `0912345678` |
+| `avatar_url` | Text | Tùy chọn | Đường dẫn ảnh đại diện trên Cloud Storage. VD: `https://storage.smartlog.com/avatars/user_101.jpg` |
 | `status` | Enum | Bắt buộc (Default Active) | Trạng thái tài khoản: `ACTIVE` (Hoạt động), `LOCKED` (Bị khóa), `DISABLED` (Vô hiệu hóa) |
-| `role_id` | Uuid | **Khóa ngoại (FK ➔ bảng roles)** | Khóa ngoại trỏ sang bảng `roles` quy định vai trò duy nhất của User |
+| `role_id` | Uuid | **Khóa ngoại (FK ➔ bảng roles)** | Mã vai trò hệ thống gán cho người dùng (Trỏ `roles.id`). VD: `rol-01` |
 | `last_login_at`| Timestamptz | Tùy chọn | Thời điểm đăng nhập gần nhất. VD: `2026-07-24 08:30:00+07` |
-| `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm khởi tạo tài khoản. VD: `2026-07-01 10:00:00+07` |
-| `updated_at` | Timestamptz | UpdatedAt | Thời điểm cập nhật thông tin gần nhất |
-| `deleted_at` | Timestamptz | Tùy chọn | Mốc thời gian xóa mềm (Soft Delete) |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian tạo tài khoản. VD: `2026-07-01 10:00:00+07` |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin tài khoản gần nhất |
+| `deleted_at` | Timestamptz | Tùy chọn | Mốc thời gian xóa mềm (Soft Delete) tài khoản |
 
 ---
 
 ### 2. Bảng `roles` (Vai trò người dùng - RBAC)
-📌 **Chức năng của bảng:** Định nghĩa danh mục các vai trò người dùng trong hệ thống theo mô hình phân quyền RBAC (`ADMIN` - Quản trị, `STAFF` - Nhân viên điều vận/bưu cục, `CUSTOMER` - Khách hàng, `SHIPPER` - Tài xế giao hàng). Mỗi tài khoản `User` được gán chính xác một `role_id`.
+📌 **Chức năng của bảng:** Định nghĩa danh mục các vai trò người dùng trong hệ thống theo mô hình phân quyền RBAC (`ADMIN` - Quản trị, `STAFF` - Nhân viên bưu cục/điều vận, `CUSTOMER` - Khách hàng, `SHIPPER` - Tài xế). Mỗi tài khoản `User` được gán chính xác một `role_id`.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã vai trò hệ thống. VD: `r1111111-2222-3333-4444-555555555555` |
-| `role_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã vai trò cố định: `ADMIN` (Quản trị), `STAFF` (Nhân viên), `CUSTOMER` (Khách hàng), `SHIPPER` (Tài xế) |
-| `role_name` | VarChar(100) | Bắt buộc | Tên hiển thị của vai trò. VD: `Quản trị viên hệ thống`, `Nhân viên điều vận bưu cục` |
-| `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tạo vai trò |
+| `id` | Uuid | **Khóa chính (PK)** | Mã định danh vai trò. VD: `rol-01`, `rol-02` |
+| `role_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã vai trò cố định hệ thống: `ADMIN` (Quản trị), `STAFF` (Nhân viên), `CUSTOMER` (Khách hàng), `SHIPPER` (Tài xế) |
+| `role_name` | VarChar(100) | Bắt buộc | Tên hiển thị chi tiết vai trò. VD: `Quản trị viên hệ thống`, `Nhân viên điều vận bưu cục` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tạo vai trò. VD: `2026-07-01 10:00:00+07` |
 
 ---
 
 ### 3. Bảng `permissions` (Danh mục Quyền hạn chi tiết)
-📌 **Chức năng của bảng:** Lưu trữ danh mục tất cả các quyền hạn thao tác chức năng chi tiết trong hệ thống (như quyền tạo đơn hàng `ORDER_CREATE`, quyền duyệt vận đơn `SHIPMENT_APPROVE`, quyền kích hoạt thuật toán AI routing `AI_ROUTE_OPTIMIZE`...).
+📌 **Chức năng của bảng:** Lưu trữ danh mục tất cả các quyền hạn thao tác chức năng chi tiết trong hệ thống (như quyền tạo đơn `ORDER_CREATE`, quyền duyệt vận đơn `SHIPMENT_APPROVE`, quyền kích hoạt AI routing `AI_ROUTE_OPTIMIZE`...).
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã quyền hạn. VD: `p1111111-2222-3333-4444-555555555555` |
-| `permission_code`| VarChar(50)| Khóa duy nhất (Unique), Bắt buộc | Mã quyền hệ thống. VD: `ORDER_CREATE`, `SHIPMENT_APPROVE`, `AI_ROUTE_OPTIMIZE` |
+| `id` | Uuid | **Khóa chính (PK)** | Mã định danh quyền hạn. VD: `per-01`, `per-02` |
+| `permission_code`| VarChar(50)| Khóa duy nhất (Unique), Bắt buộc | Mã quyền thao tác hệ thống. VD: `ORDER_CREATE`, `SHIPMENT_APPROVE`, `AI_ROUTE_OPTIMIZE` |
 | `permission_name`| VarChar(100)| Bắt buộc | Tên quyền chi tiết. VD: `Kích hoạt thuật toán AI tối ưu tuyến đường` |
-| `description` | Text | Tùy chọn | Mô tả phạm vi tác động của quyền |
+| `description` | Text | Tùy chọn | Mô tả phạm vi tác động của quyền trong hệ thống |
 
 ---
 
@@ -70,26 +70,26 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `role_id` | Uuid | **Cặp khóa chính (Composite PK [role_id, permission_id])**, **FK ➔ bảng roles** | Mã vai trò được gán quyền |
-| `permission_id` | Uuid | **Cặp khóa chính (Composite PK [role_id, permission_id])**, **FK ➔ bảng permissions** | Mã quyền hạn được gán cho vai trò |
+| `role_id` | Uuid | **Cặp khóa chính (Composite PK [role_id, permission_id])**, **FK ➔ bảng roles** | Mã vai trò được gán quyền. VD: `rol-01` (Gán cho vai trò Admin) |
+| `permission_id` | Uuid | **Cặp khóa chính (Composite PK [role_id, permission_id])**, **FK ➔ bảng permissions** | Mã quyền hạn được gán cho vai trò. VD: `per-01` (Gán quyền ORDER_CREATE) |
 
 ---
 
 ## 🏬 MODULE 2: CUSTOMERS & ADDRESSES (Khách hàng & Địa chỉ)
 
 ### 5. Bảng `customers` (Hồ sơ Khách hàng - Clean Architecture 1-1 với `users`)
-📌 **Chức năng của bảng:** Lưu trữ thông tin hồ sơ nghiệp vụ của Khách hàng (khách hàng cá nhân gửi lẻ hoặc doanh nghiệp/shop thương mại điện tử). Bảng này lưu mã khách hàng, loại khách hàng, tên công ty, mã số thuế và trạng thái tài khoản. Liên kết bắt buộc 1-1 với tài khoản `users` qua `user_id UNIQUE`.
+📌 **Chức năng của bảng:** Lưu trữ thông tin hồ sơ nghiệp vụ của Khách hàng (khách cá nhân gửi lẻ hoặc doanh nghiệp/shop thương mại điện tử). Bảng này lưu mã khách hàng, loại khách hàng, tên công ty, mã số thuế và trạng thái tài khoản. Liên kết bắt buộc 1-1 với tài khoản `users` qua `user_id UNIQUE`.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã hồ sơ khách hàng. VD: `c2222222-3333-4444-5555-666666666666` |
-| `user_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng users)** | Khóa ngoại BẮT BUỘC 1-1 trỏ bảng `users` (Tài khoản đăng nhập trên App/Web) |
-| `customer_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã quản lý khách hàng. VD: `KH-IND-0089`, `KH-BIZ-012` |
+| `id` | Uuid | **Khóa chính (PK)** | Mã hồ sơ khách hàng. VD: `cust-01`, `cust-02` |
+| `user_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng users)** | Khóa ngoại BẮT BUỘC 1-1 trỏ bảng `users` (Tài khoản đăng nhập App/Web). VD: `usr-04` |
+| `customer_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã quản lý khách hàng. VD: `KH-IND-0089`, `KH-BIZ-0012` |
 | `customer_type` | Enum | Bắt buộc | Loại khách hàng: `INDIVIDUAL` (Cá nhân gửi lẻ), `BUSINESS` (Doanh nghiệp/Shop lớn) |
 | `company_name` | VarChar(255) | Tùy chọn | Tên công ty/Thương hiệu shop (nếu là BIZ). VD: `Công ty TNHH Vinamilk Việt Nam` |
 | `tax_code` | VarChar(30) | Tùy chọn | Mã số thuế doanh nghiệp. VD: `0300588569` |
 | `status` | Enum | Bắt buộc (Default Active) | Trạng thái hồ sơ: `ACTIVE` (Đang giao dịch), `INACTIVE`, `BLOCKED` (Chặn tạo đơn) |
-| `created_at` | Timestamptz | Bắt buộc (Default Now) | Ngày khách hàng đăng ký hệ thống |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Ngày khách hàng đăng ký hệ thống. VD: `2026-07-01 10:00:00+07` |
 
 ---
 
@@ -98,16 +98,16 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã địa chỉ duy nhất. VD: `a3333333-4444-5555-6666-777777777777` |
+| `id` | Uuid | **Khóa chính (PK)** | Mã địa chỉ duy nhất. VD: `addr-01`, `addr-02` |
 | `address_line_1`| VarChar(255)| Bắt buộc | Số nhà, tên đường chi tiết. VD: `Số 268 Lý Thường Kiệt` |
 | `ward` | VarChar(100) | Bắt buộc | Phường / Xã. VD: `Phường 14` |
-| `ward_code` | VarChar(20) | **Khóa ngoại (FK ➔ bảng wards)** | Mã định danh Phường/Xã (Trỏ bảng `wards`) |
+| `ward_code` | VarChar(20) | **Khóa ngoại (FK ➔ bảng wards)** | Mã định danh Phường/Xã (Trỏ bảng `wards`). VD: `26830` |
 | `province` | VarChar(100) | Bắt buộc | Tỉnh / Thành phố trực thuộc TW. VD: `Thành phố Hồ Chí Minh` |
-| `country` | VarChar(100) | Default 'Vietnam' | Quốc gia |
+| `country` | VarChar(100) | Default 'Vietnam' | Quốc gia. VD: `Vietnam` |
 | `place_id` | VarChar(255)| Tùy chọn | Mã định vị địa điểm từ Goong Map / Google Maps API. VD: `ChIJaX7y8Z4vdTER...` |
 | `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS. VD: `10.7721` |
 | `longitude` | Double | Bắt buộc | Kinh độ định vị GPS. VD: `106.6578` |
-| `formatted_address`| Text | Bắt buộc | Địa chỉ hoàn chỉnh dạng chuỗi. VD: `268 Lý Thường Kiệt, Phường 14, Quận 10, TP.HCM` |
+| `formatted_address`| Text | Bắt buộc | Địa chỉ hoàn chỉnh dạng chuỗi đầy đủ. VD: `268 Lý Thường Kiệt, Phường 14, Quận 10, TP.HCM` |
 
 ---
 
@@ -116,11 +116,11 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi sổ địa chỉ |
-| `customer_id` | Uuid | **Cặp khóa duy nhất [customer_id, address_id]**, **FK ➔ bảng customers** | Mã khách hàng sở hữu địa chỉ |
-| `address_id` | Uuid | **Cặp khóa duy nhất [customer_id, address_id]**, **FK ➔ bảng addresses** | Mã địa chỉ được liên kết |
-| `address_type` | Enum | Bắt buộc | Loại địa chỉ: `HOME` (Nhà riêng), `OFFICE` (Văn phòng), `WAREHOUSE` (Kho hàng), `RETURN` |
-| `is_default` | Boolean | Default False | Đánh dấu làm địa chỉ lấy/giao mặc định |
+| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi sổ địa chỉ. VD: `cadr-01` |
+| `customer_id` | Uuid | **Cặp khóa duy nhất [customer_id, address_id]**, **FK ➔ bảng customers** | Mã khách hàng sở hữu địa chỉ. VD: `cust-01` |
+| `address_id` | Uuid | **Cặp khóa duy nhất [customer_id, address_id]**, **FK ➔ bảng addresses** | Mã địa chỉ được liên kết. VD: `addr-01` |
+| `address_type` | Enum | Bắt buộc | Loại địa chỉ: `HOME` (Nhà riêng), `OFFICE` (Văn phòng), `WAREHOUSE` (Kho hàng), `RETURN` (Trả hàng) |
+| `is_default` | Boolean | Default False | Đánh dấu địa chỉ lấy/giao mặc định (`true` / `false`) |
 
 ---
 
@@ -129,12 +129,12 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã người liên hệ |
-| `customer_id` | Uuid | **Khóa ngoại (FK ➔ bảng customers)** | Thuộc về khách hàng nào |
+| `id` | Uuid | **Khóa chính (PK)** | Mã người liên hệ. VD: `cct-01` |
+| `customer_id` | Uuid | **Khóa ngoại (FK ➔ bảng customers)** | Thuộc về khách hàng nào (Trỏ `customers.id`). VD: `cust-02` |
 | `full_name` | VarChar(150) | Bắt buộc | Họ tên người liên hệ tại kho/văn phòng. VD: `Chị Mai - Trưởng Kho Hàng` |
 | `phone` | VarChar(20) | Bắt buộc | Số điện thoại liên hệ trực tiếp. VD: `0912345678` |
-| `email` | VarChar(255) | Tùy chọn | Email người nhận thông báo giao nhận |
-| `is_primary` | Boolean | Default False | Đánh dấu người liên hệ đại diện chính |
+| `email` | VarChar(255) | Tùy chọn | Email người nhận thông báo giao nhận. VD: `mai@vinamilk.com` |
+| `is_primary` | Boolean | Default False | Đánh dấu người liên hệ đại diện chính (`true` / `false`) |
 
 ---
 
@@ -145,7 +145,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã loại kho bãi |
+| `id` | Uuid | **Khóa chính (PK)** | Mã loại kho bãi. VD: `ftype-01` |
 | `type_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã phân loại: `SORTING_CENTER` (Trung tâm chia chọn), `LAST_MILE_HUB` (Bưu cục phát chặng cuối) |
 | `type_name` | VarChar(100) | Bắt buộc | Tên hiển thị loại kho. VD: `Bưu cục Giao nhận Chặng cuối (Last-mile Hub)` |
 
@@ -156,15 +156,16 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã định danh bưu cục. VD: `f4444444-5555-6666-7777-888888888888` |
+| `id` | Uuid | **Khóa chính (PK)** | Mã định danh bưu cục. VD: `fac-01`, `fac-02` |
 | `facility_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã bưu cục/kho. VD: `HUB-Q10-HCM`, `HUB-CWD-HN` |
 | `facility_name` | VarChar(255) | Bắt buộc | Tên đầy đủ của bưu cục. VD: `Bưu cục Giao nhận Quận 10 - TP.HCM` |
-| `facility_type_id`| Uuid | **Khóa ngoại (FK ➔ bảng facility_types)** | Loại hình kho bãi |
-| `parent_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Kho cấp trên trong cây phân cấp mạng lưới |
-| `manager_user_id`| Uuid | **Khóa ngoại (FK ➔ bảng users)** | Quản lý bưu cục (Trỏ User có Role Staff/Admin) |
-| `latitude` | Double | Bắt buộc | Vĩ độ Hub (Truy vấn trực tiếp siêu tốc cho thuật toán AI Routing) |
-| `longitude` | Double | Bắt buộc | Kinh độ Hub (Truy vấn trực tiếp siêu tốc cho thuật toán AI Routing) |
+| `facility_type_id`| Uuid | **Khóa ngoại (FK ➔ bảng facility_types)** | Mã loại hình kho bãi (Trỏ `facility_types.id`). VD: `ftype-02` |
+| `parent_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Mã bưu cục cấp trên trong cây phân cấp mạng lưới (Ví dụ Hub mẹ). VD: `fac-05` |
+| `manager_user_id`| Uuid | **Khóa ngoại (FK ➔ bảng users)** | Quản lý bưu cục (Trỏ User có Role Staff/Admin). VD: `usr-02` |
+| `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS Hub (Truy vấn siêu tốc cho AI Routing). VD: `10.7725` |
+| `longitude` | Double | Bắt buộc | Kinh độ định vị GPS Hub (Truy vấn siêu tốc cho AI Routing). VD: `106.6580` |
 | `operating_status`| Enum | Bắt buộc (Default Active) | Trạng thái: `ACTIVE` (Đang mở cửa), `MAINTENANCE` (Bảo trì), `CLOSED` |
+| `opened_at` | Date | Bắt buộc | Ngày chính thức mở cửa hoạt động bưu cục. VD: `2025-01-01` |
 
 ---
 
@@ -173,9 +174,9 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi địa chỉ kho |
-| `facility_id` | Uuid | **Cặp khóa duy nhất [facility_id, address_id]**, **FK ➔ bảng facilities** | Mã bưu cục sở hữu địa chỉ |
-| `address_id` | Uuid | **Cặp khóa duy nhất [facility_id, address_id]**, **FK ➔ bảng addresses** | Mã địa chỉ được liên kết |
+| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi địa chỉ kho. VD: `fadr-01` |
+| `facility_id` | Uuid | **Cặp khóa duy nhất [facility_id, address_id]**, **FK ➔ bảng facilities** | Mã bưu cục sở hữu địa chỉ. VD: `fac-01` |
+| `address_id` | Uuid | **Cặp khóa duy nhất [facility_id, address_id]**, **FK ➔ bảng addresses** | Mã địa chỉ được liên kết. VD: `addr-01` |
 | `address_type` | Enum | Bắt buộc | Loại địa chỉ kho: `MAIN` (Trụ sở chính), `BILLING`, `RETURN`, `PICKUP` |
 
 ---
@@ -185,12 +186,12 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã phân khu kho |
-| `facility_id` | Uuid | **Cặp khóa duy nhất [facility_id, zone_code]**, **FK ➔ bảng facilities** | Thuộc bưu cục nào |
-| `zone_code` | VarChar(30) | **Cặp khóa duy nhất [facility_id, zone_code]**, Bắt buộc | Mã phân khu. VD: `ZONE-REC-01`, `ZONE-SORT-A`, `ZONE-SHIP-SOUTH` |
-| `zone_name` | VarChar(100) | Bắt buộc | Tên phân khu kho. VD: `Khu vực Nhập kho`, `Khu phân loại tự động`, `Khu chờ giao` |
-| `zone_type` | Enum | Bắt buộc | Enum phân khu: `RECEIVING` (Khu nhận), `SORTING` (Khu phân loại), `SHIPPING` (Khu chờ giao) |
-| `capacity` | Int | Tùy chọn | Sức chứa tối đa (Số kiện hàng). VD: `5000` |
+| `id` | Uuid | **Khóa chính (PK)** | Mã phân khu kho. VD: `fzone-01` |
+| `facility_id` | Uuid | **Cặp khóa duy nhất [facility_id, zone_code]**, **FK ➔ bảng facilities** | Thuộc bưu cục nào (Trỏ `facilities.id`). VD: `fac-01` |
+| `zone_code` | VarChar(30) | **Cặp khóa duy nhất [facility_id, zone_code]**, Bắt buộc | Mã phân khu kho. VD: `ZONE-REC-01`, `ZONE-SORT-A`, `ZONE-SHIP-SOUTH` |
+| `zone_name` | VarChar(100) | Bắt buộc | Tên phân khu kho. VD: `Khu vực Nhập kho`, `Khu phân loại tự động`, `Khu chờ xuất giao` |
+| `zone_type` | Enum | Bắt buộc | Phân loại khu vực: `RECEIVING` (Khu nhận), `SORTING` (Khu phân loại), `SHIPPING` (Khu chờ xuất giao) |
+| `capacity` | Int | Tùy chọn | Sức chứa tối đa của phân khu (đơn vị: Số kiện hàng). VD: `5000` |
 
 ---
 
@@ -201,67 +202,73 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã dịch vụ |
+| `id` | Uuid | **Khóa chính (PK)** | Mã dịch vụ. VD: `srv-01`, `srv-02` |
 | `service_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã dịch vụ: `EXPRESS` (Hỏa tốc 2H), `STANDARD` (Tiêu chuẩn 24H), `SAVING` (Tiết kiệm) |
-| `base_price` | Decimal(12,2)| Default 0 | Cước phí nền cơ bản. VD: `15000.00` VNĐ |
-| `free_distance_km`| Float | Default 2.0 | Khoảng cách miễn phí tối thiểu (Km). VD: `2.0` |
-| `price_per_km` | Decimal(12,2)| Default 0 | Cước vượt mốc theo Km. VD: `5000.00` VNĐ/Km |
-| `free_weight_kg` | Float | Default 1.0 | Khối lượng miễn phí tối thiểu (Kg). VD: `1.0` |
-| `price_per_kg` | Decimal(12,2)| Default 0 | Cước phụ trội theo Kg. VD: `2500.00` VNĐ/Kg |
+| `base_price` | Decimal(12,2)| Default 0 | Cước phí nền cơ bản. VD: `15000.00` VNĐ, `25000.00` VNĐ |
+| `free_distance_km`| Float | Default 2.0 | Khoảng cách miễn phí tối thiểu (Km). VD: `2.0` Km |
+| `price_per_km` | Decimal(12,2)| Default 0 | Cước phụ trội tính thêm theo Km. VD: `5000.00` VNĐ/Km |
+| `free_weight_kg` | Float | Default 1.0 | Khối lượng miễn phí tối thiểu (Kg). VD: `1.0` Kg |
+| `price_per_kg` | Decimal(12,2)| Default 0 | Cước phụ trội tính thêm theo Kg. VD: `2500.00` VNĐ/Kg |
 
 ---
 
 ### 14. Bảng `orders` (Quản lý Đơn hàng - Order Snapshot)
-📌 **Chức năng của bảng:** Bảng trung tâm quản lý Đơn hàng do khách tạo. Lưu đóng đóng băng (Snapshot) địa chỉ lấy/giao, tọa độ GPS, thông tin người gửi/nhận, lịch hẹn lấy hàng tận nhà, gói dịch vụ đã chọn và các khoản chi phí dự tính (`estimated_shipping_fee`, `estimated_cod_amount`).
+📌 **Chức năng của bảng:** Bảng trung tâm quản lý Đơn hàng do khách tạo. Lưu đóng đóng băng (Snapshot) địa chỉ lấy/giao, tọa độ GPS, thông tin người gửi/nhận, lịch hẹn lấy hàng tận nhà, hình thức gửi hàng (`pickup_type`), gói dịch vụ đã chọn và các khoản chi phí dự tính (`estimated_shipping_fee`, `estimated_cod_amount`).
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã đơn hàng duy nhất. VD: `o5555555-6666-7777-8888-999999999999` |
+| `id` | Uuid | **Khóa chính (PK)** | Mã đơn hàng duy nhất. VD: `ord-01`, `ord-02` |
 | `order_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã tra cứu đơn hàng công khai. VD: `ORD-20260724-8891` |
-| `customer_id` | Uuid | **Khóa ngoại (FK ➔ bảng customers)** | Khách hàng người tạo đơn |
-| `service_id` | Uuid | **Khóa ngoại (FK ➔ bảng services)** | Dịch vụ vận chuyển đã chọn |
-| `pickup_address_id`| Uuid | **Khóa ngoại (FK ➔ bảng addresses)** | Địa chỉ lấy hàng chính |
-| `delivery_address_id`| Uuid | **Khóa ngoại (FK ➔ bảng addresses)** | Địa chỉ giao hàng chính |
-| `sender_contact_id`| Uuid | **Khóa ngoại (FK ➔ bảng customer_contacts)**| Danh bạ người gửi |
-| `receiver_contact_id`| Uuid| **Khóa ngoại (FK ➔ bảng customer_contacts)**| Danh bạ người nhận |
-| `origin_facility_id`| Uuid| **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục nhận hàng đầu tiên |
-| `destination_facility_id`| Uuid| **Khóa ngoại (FK ➔ bảng facilities)**| Bưu cục phát hàng cuối cùng |
-| `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người khởi tạo đơn hàng |
+| `customer_id` | Uuid | **Khóa ngoại (FK ➔ bảng customers)** | Khách hàng người tạo đơn (Trỏ `customers.id`). VD: `cust-01` |
+| `service_id` | Uuid | **Khóa ngoại (FK ➔ bảng services)** | Dịch vụ vận chuyển đã chọn (Trỏ `services.id`). VD: `srv-01` |
+| `pickup_address_id`| Uuid | **Khóa ngoại (FK ➔ bảng addresses)** | Mã địa chỉ lấy hàng gốc |
+| `delivery_address_id`| Uuid | **Khóa ngoại (FK ➔ bảng addresses)** | Mã địa chỉ giao hàng gốc |
+| `sender_contact_id`| Uuid | **Khóa ngoại (FK ➔ bảng customer_contacts)**| Danh bạ người gửi đại diện |
+| `receiver_contact_id`| Uuid| **Khóa ngoại (FK ➔ bảng customer_contacts)**| Danh bạ người nhận đại diện |
+| `origin_facility_id`| Uuid| **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục nhận hàng đầu tiên. VD: `fac-01` |
+| `destination_facility_id`| Uuid| **Khóa ngoại (FK ➔ bảng facilities)**| Bưu cục phát hàng cuối cùng. VD: `fac-01` |
+| `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người khởi tạo đơn hàng. VD: `usr-01` |
 | `updated_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người cập nhật đơn gần nhất |
 | `status` | Enum | Bắt buộc | Trạng thái đơn hàng (`CREATED`, `READY_FOR_PICKUP`, `OUT_FOR_DELIVERY`, `DELIVERED`...) |
 | `scheduled_pickup_at`| Timestamptz| Tùy chọn | Lịch hẹn khách đặt Shipper đến lấy hàng. VD: `2026-07-24 14:00:00+07` |
-| `sender_name` | VarChar(150) | Bắt buộc | Họ tên người gửi đóng băng snapshot |
-| `sender_phone` | VarChar(20) | Bắt buộc | Số điện thoại người gửi snapshot |
-| `pickup_address_text`| Text | Bắt buộc | Địa chỉ lấy hàng chi tiết đóng băng snapshot |
-| `pickup_latitude` | Double | Bắt buộc | Vĩ độ tọa độ lấy hàng |
-| `pickup_longitude`| Double | Bắt buộc | Kinh độ tọa độ lấy hàng |
-| `receiver_name` | VarChar(150) | Bắt buộc | Họ tên người nhận đóng băng snapshot |
-| `receiver_phone` | VarChar(20) | Bắt buộc | Số điện thoại người nhận snapshot |
-| `delivery_address_text`| Text | Bắt buộc | Địa chỉ giao hàng chi tiết đóng băng snapshot |
-| `delivery_latitude`| Double | Bắt buộc | Vĩ độ tọa độ giao hàng |
-| `delivery_longitude`| Double | Bắt buộc | Kinh độ tọa độ giao hàng |
-| `estimated_shipping_fee`| Decimal(12,2)| Default 0 | Cước phí vận chuyển tạm tính |
-| `estimated_cod_amount` | Decimal(12,2)| Default 0 | Tiền thu hộ COD dự kiến |
-| `estimated_total_amount`| Decimal(12,2)| Default 0 | Tổng chi phí tạm tính |
+| `sender_name` | VarChar(150) | Bắt buộc | Họ tên người gửi đóng băng snapshot. VD: `Phạm Tuấn Hưng` |
+| `sender_phone` | VarChar(20) | Bắt buộc | Số điện thoại người gửi snapshot. VD: `0987654321` |
+| `pickup_address_text`| Text | Bắt buộc | Địa chỉ lấy hàng chi tiết đóng băng snapshot. VD: `268 Lý Thường Kiệt, P.14, Q.10` |
+| `pickup_latitude` | Double | Bắt buộc | Vĩ độ tọa độ lấy hàng. VD: `10.7721` |
+| `pickup_longitude`| Double | Bắt buộc | Kinh độ tọa độ lấy hàng. VD: `106.6578` |
+| `receiver_name` | VarChar(150) | Bắt buộc | Họ tên người nhận đóng băng snapshot. VD: `Trần Thị B` |
+| `receiver_phone` | VarChar(20) | Bắt buộc | Số điện thoại người nhận snapshot. VD: `0918888999` |
+| `delivery_address_text`| Text | Bắt buộc | Địa chỉ giao hàng chi tiết đóng băng snapshot. VD: `123 Nguyễn Huệ, P.Bến Nghé, Q.1` |
+| `delivery_latitude`| Double | Bắt buộc | Vĩ độ tọa độ giao hàng. VD: `10.7740` |
+| `delivery_longitude`| Double | Bắt buộc | Kinh độ tọa độ giao hàng. VD: `106.7030` |
+| `estimated_shipping_fee`| Decimal(12,2)| Default 0 | Cước phí vận chuyển tạm tính. VD: `25000.00` VNĐ |
+| `estimated_cod_amount` | Decimal(12,2)| Default 0 | Tiền thu hộ COD dự kiến. VD: `500000.00` VNĐ |
+| `estimated_total_amount`| Decimal(12,2)| Default 0 | Tổng chi phí tạm tính. VD: `525000.00` VNĐ |
+| `pickup_type` | Enum | Bắt buộc (Default PICKUP) | Hình thức gửi hàng: `PICKUP` (Shipper đến lấy tận nơi), `DROP_OFF` (Khách tự mang ra bưu cục gửi) |
+| `estimated_delivery_date`| Timestamptz| Tùy chọn | Ngày & giờ dự kiến giao hàng thành công. VD: `2026-07-28 17:00:00+07` |
 
 ---
 
 ### 15. Bảng `packages` (Chi tiết Kiện hàng vật lý & Vị trí Phân khu Kho)
-📌 **Chức năng của bảng:** Quản lý chi tiết từng kiện hàng vật lý nằm trong đơn hàng (mã barcode kiện hàng, khối lượng, thể tích, hàng dễ vỡ, mô tả tên hàng, giá trị khai giá để tính Phí bảo hiểm). Đồng thời lưu vết **Bưu cục hiện tại (`current_facility_id`)** và **Phân khu kho hiện tại (`current_zone_id`)** mà kiện hàng đang được lưu giữ.
+📌 **Chức năng của bảng:** Quản lý chi tiết từng kiện hàng vật lý nằm trong đơn hàng (mã barcode kiện hàng, khối lượng, thể tích, kích thước Dài x Rộng x Cao cm, yêu cầu bảo quản nhiệt độ, hàng dễ vỡ, mô tả tên hàng, giá trị khai giá để tính Phí bảo hiểm). Đồng thời lưu vết **Bưu cục hiện tại (`current_facility_id`)** và **Phân khu kho hiện tại (`current_zone_id`)** mà kiện hàng đang được lưu giữ.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã kiện hàng. VD: `pkg-8888-9999-0000` |
-| `order_id` | Uuid | **Khóa ngoại (FK ➔ bảng orders)** | Thuộc Đơn hàng nào |
-| `package_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã vạch/Barcode kiện hàng. VD: `PKG-8891-01` |
-| `required_vehicle_type_id`| Uuid| **Khóa ngoại (FK ➔ bảng vehicle_types)**| Yêu cầu loại xe chở kiện hàng |
-| `current_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Vị trí Bưu cục hiện tại kiện hàng đang nằm |
-| `current_zone_id` | Uuid | **Khóa ngoại (FK ➔ bảng facility_zones)**| Vị trí Phân khu kho hiện tại (Khu nhận, Khu phân loại, Khu xuất) |
-| `description` | Text | Tùy chọn | Mô tả mặt hàng bên trong. VD: `Quần áo thời trang, Hộp quà lưu niệm` |
-| `declared_value` | Decimal(12,2)| Tùy chọn | Giá trị khai giá hàng hóa (Làm căn cứ tính Phí bảo hiểm). VD: `2000000.00` VNĐ |
-| `weight` | Decimal(8,2) | Bắt buộc | Khối lượng kiện hàng (Kg). VD: `1.25` Kg |
-| `volume` | Decimal(10,4)| Bắt buộc | Thể tích quy đổi (m³). VD: `0.0045` m³ |
-| `is_fragile` | Boolean | Default False | Cảnh báo hàng dễ vỡ |
+| `id` | Uuid | **Khóa chính (PK)** | Mã kiện hàng. VD: `pkg-01`, `pkg-02` |
+| `order_id` | Uuid | **Khóa ngoại (FK ➔ bảng orders)** | Thuộc Đơn hàng nào (Trỏ `orders.id`). VD: `ord-01` |
+| `package_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã vạch/Barcode kiện hàng in tem. VD: `PKG-8891-01` |
+| `required_vehicle_type_id`| Uuid| **Khóa ngoại (FK ➔ bảng vehicle_types)**| Yêu cầu loại xe chở kiện hàng (VD: Xe đông lạnh, Xe tải lớn) |
+| `current_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Vị trí Bưu cục hiện tại kiện hàng đang nằm. VD: `fac-01` |
+| `current_zone_id` | Uuid | **Khóa ngoại (FK ➔ bảng facility_zones)**| Vị trí Phân khu kho hiện tại (Khu nhận, Khu phân loại, Khu chờ giao). VD: `fzone-01` |
+| `description` | Text | Tùy chọn | Mô tả tên mặt hàng bên trong. VD: `Hộp quà thời trang cao cấp` |
+| `declared_value` | Decimal(12,2)| Tùy chọn | Giá trị khai giá hàng hóa (Căn cứ tính Phí bảo hiểm). VD: `2000000.00` VNĐ |
+| `weight` | Decimal(8,2) | Bắt buộc | Khối lượng kiện hàng thực tế (Kg). VD: `1.25` Kg |
+| `length` | Decimal(6,2) | Bắt buộc | Chiều dài kiện hàng (cm). VD: `20.00` cm |
+| `width` | Decimal(6,2) | Bắt buộc | Chiều rộng kiện hàng (cm). VD: `15.00` cm |
+| `height` | Decimal(6,2) | Bắt buộc | Chiều cao kiện hàng (cm). VD: `10.00` cm |
+| `volume` | Decimal(10,4)| Bắt buộc | Thể tích quy đổi (m³). VD: `0.0030` m³ |
+| `is_fragile` | Boolean | Default False | Cảnh báo hàng dễ vỡ (`true` / `false`) |
+| `temperature_requirement`| VarChar(50)| Tùy chọn | Yêu cầu nhiệt độ bảo quản. VD: `2-8 °C`, `Đông lạnh (-18°C)` |
 
 ---
 
@@ -270,13 +277,13 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã giao dịch thanh toán |
-| `order_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng orders)** | Gắn duy nhất 1-1 với `orders` |
-| `final_shipping_fee`| Decimal(12,2)| Bắt buộc | Cước vận chuyển cuối cùng thực tế |
-| `final_cod_amount` | Decimal(12,2)| Bắt buộc | Tiền thu hộ COD chốt thực tế |
+| `id` | Uuid | **Khóa chính (PK)** | Mã giao dịch thanh toán. VD: `op-01` |
+| `order_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng orders)** | Gắn duy nhất 1-1 với đơn hàng (Trỏ `orders.id`). VD: `ord-01` |
+| `final_shipping_fee`| Decimal(12,2)| Bắt buộc | Cước vận chuyển cuối cùng thực tế. VD: `25000.00` VNĐ |
+| `final_cod_amount` | Decimal(12,2)| Bắt buộc | Số tiền thu hộ COD chốt thực tế. VD: `500000.00` VNĐ |
 | `fee_payer` | Enum | Bắt buộc | Người trả cước: `SENDER` (Người gửi trả), `RECEIVER` (Người nhận trả) |
 | `payment_method` | Enum | Bắt buộc | Hình thức: `CASH` (Tiền mặt), `BANK_TRANSFER`, `E_WALLET`, `COD` |
-| `payment_status` | Enum | Default Unpaid | Trạng thái: `UNPAID` (Chưa thanh toán), `PAID` (Đã thanh toán), `REFUNDED` |
+| `payment_status` | Enum | Default Unpaid | Trạng thái thanh toán: `UNPAID` (Chưa thanh toán), `PAID` (Đã thanh toán), `REFUNDED` |
 
 ---
 
@@ -285,12 +292,12 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi lịch sử |
-| `order_id` | Uuid | **Khóa ngoại (FK ➔ bảng orders)** | Thuộc đơn hàng nào |
-| `changed_by_user_id`| Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người thực hiện chuyển trạng thái (User ID) |
-| `status` | Enum | Bắt buộc | Trạng thái chuyển đến. VD: `OUT_FOR_DELIVERY` |
+| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi lịch sử. VD: `osh-01` |
+| `order_id` | Uuid | **Khóa ngoại (FK ➔ bảng orders)** | Thuộc đơn hàng nào (Trỏ `orders.id`). VD: `ord-01` |
+| `changed_by_user_id`| Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người thực hiện chuyển trạng thái (User ID). VD: `usr-01` |
+| `status` | Enum | Bắt buộc | Trạng thái chuyển đến. VD: `READY_FOR_PICKUP`, `OUT_FOR_DELIVERY` |
 | `change_source` | Enum | Bắt buộc | Nguồn tác động: `SYSTEM`, `CUSTOMER`, `DRIVER`, `ADMIN`, `API` |
-| `reason` | Text | Tùy chọn | Lý do chuyển trạng thái |
+| `reason` | Text | Tùy chọn | Lý do chuyển trạng thái. VD: `Khách hàng khởi tạo đơn hàng mới` |
 
 ---
 
@@ -301,14 +308,14 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã vận đơn duy nhất |
-| `shipment_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã tracking vận đơn công khai. VD: `SPM-20260724-9900` |
-| `route_id` | Uuid | **Khóa ngoại (FK ➔ bảng routes)** | Thuộc Lộ trình giao hàng nào |
-| `origin_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục xuất phát của vận đơn |
-| `destination_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục đích đến của vận đơn |
-| `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Nhân viên khởi tạo vận đơn |
+| `id` | Uuid | **Khóa chính (PK)** | Mã vận đơn duy nhất. VD: `spm-01`, `spm-02` |
+| `shipment_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã tracking vận đơn công khai. VD: `SPM-20260724-9901` |
+| `route_id` | Uuid | **Khóa ngoại (FK ➔ bảng routes)** | Thuộc Lộ trình giao hàng nào (Trỏ `routes.id`). VD: `rt-01` |
+| `origin_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Kho/Bưu cục xuất phát của vận đơn. VD: `fac-01` |
+| `destination_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Kho/Bưu cục đích đến của vận đơn. VD: `fac-01` |
+| `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Nhân viên khởi tạo vận đơn. VD: `usr-02` |
 | `updated_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người cập nhật vận đơn gần nhất |
-| `status` | Enum | Bắt buộc | Trạng thái vận đơn (`CREATED`, `IN_TRANSIT`, `OUT_FOR_DELIVERY`, `DELIVERED`...) |
+| `status` | Enum | Bắt buộc | Trạng thái vận đơn: `CREATED`, `IN_TRANSIT`, `OUT_FOR_DELIVERY`, `DELIVERED` |
 
 ---
 
@@ -317,9 +324,9 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi gom hàng |
-| `shipment_id` | Uuid | **Cặp khóa duy nhất [shipment_id, package_id]**, **FK ➔ bảng shipments** | Mã Vận đơn gom hàng |
-| `package_id` | Uuid | **Khóa ngoại duy nhất (FK, Unique ➔ bảng packages)** | Kiện hàng duy nhất (Ràng buộc Unique đảm bảo 1 Kiện không nằm 2 Vận đơn cùng lúc) |
+| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi gom hàng. VD: `spkg-01` |
+| `shipment_id` | Uuid | **Cặp khóa duy nhất [shipment_id, package_id]**, **FK ➔ bảng shipments** | Mã Vận đơn gom hàng (Trỏ `shipments.id`). VD: `spm-01` |
+| `package_id` | Uuid | **Khóa ngoại duy nhất (FK, Unique ➔ bảng packages)** | Kiện hàng duy nhất (Ràng buộc Unique đảm bảo 1 Kiện không nằm 2 Vận đơn cùng lúc). VD: `pkg-01` |
 
 ---
 
@@ -328,26 +335,28 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã sự kiện vận đơn |
-| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Thuộc vận đơn nào |
-| `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục phát sinh sự kiện |
-| `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người ghi nhận sự kiện |
+| `id` | Uuid | **Khóa chính (PK)** | Mã sự kiện vận đơn. VD: `se-01` |
+| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Thuộc vận đơn nào (Trỏ `shipments.id`). VD: `spm-01` |
+| `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục phát sinh sự kiện. VD: `fac-01` |
+| `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người ghi nhận sự kiện (User ID). VD: `usr-03` |
 | `event_type` | Enum | Bắt buộc | Loại sự kiện: `DRIVER_ASSIGNED`, `DEPARTED_FACILITY`, `ARRIVED_FACILITY`, `DELIVERY_SUCCESS` |
-| `event_time` | Timestamptz | Not Null | Thời điểm xảy ra sự kiện |
+| `event_time` | Timestamptz | Not Null | Thời điểm xảy ra sự kiện. VD: `2026-07-24 09:35:00+07` |
 
 ---
 
 ### 21. Bảng `shipment_transfers` (Luân chuyển Hàng giữa các Bưu cục)
-📌 **Chức năng của bảng:** Quản lý quy trình giao nhận luân chuyển vận đơn giữa bưu cục gửi (`from_facility_id`) và bưu cục nhận (`to_facility_id`). Theo dõi thời điểm xuất xe, thời điểm xe cập bến kho và nhân viên kho bấm Xác nhận nhập kho.
+📌 **Chức năng của bảng:** Quản lý quy trình giao nhận luân chuyển vận đơn giữa bưu cục gửi (`from_facility_id`) và bưu cục nhận (`to_facility_id`). Theo dõi thời điểm xuất xe (`dispatched_at`), thời điểm xe cập bến kho (`arrived_at`) và nhân viên kho bấm Xác nhận nhập kho (`received_by`).
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | PK | Mã giao dịch chuyển giao hàng |
-| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Vận đơn luân chuyển |
-| `from_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục gửi hàng đi |
-| `to_facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục tiếp nhận hàng |
-| `received_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Nhân viên nhận bàn giao hàng |
-| `status` | Enum | Bắt buộc | Trạng thái: `PENDING`, `IN_TRANSIT`, `ARRIVED` (Đã nhận kho), `REJECTED` |
+| `id` | Uuid | PK | Mã giao dịch chuyển giao hàng. VD: `st-01` |
+| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Vận đơn luân chuyển (Trỏ `shipments.id`). VD: `spm-01` |
+| `from_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục gửi hàng đi. VD: `fac-01` |
+| `to_facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục tiếp nhận hàng. VD: `fac-03` |
+| `received_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Nhân viên nhận bàn giao hàng tại kho đích. VD: `usr-02` |
+| `status` | Enum | Bắt buộc | Trạng thái luân chuyển: `PENDING`, `IN_TRANSIT`, `ARRIVED` (Đã nhận kho), `REJECTED` |
+| `dispatched_at` | Timestamptz | Tùy chọn | Thời điểm xe xuất phát rời bưu cục gửi. VD: `2026-07-24 09:35:00+07` |
+| `arrived_at` | Timestamptz | Tùy chọn | Thời điểm xe cập bến bưu cục nhận. VD: `2026-07-24 11:20:00+07` |
 
 ---
 
@@ -358,15 +367,15 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã hồ sơ tài xế. VD: `drv-7777-8888-9999` |
-| `user_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng users)** | Khóa ngoại BẮT BUỘC 1-1 trỏ bảng `users` (Tài khoản App mobile Shipper) |
+| `id` | Uuid | **Khóa chính (PK)** | Mã hồ sơ tài xế. VD: `drv-01`, `drv-02` |
+| `user_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng users)** | Khóa ngoại BẮT BUỘC 1-1 trỏ bảng `users` (Tài khoản App Mobile Shipper). VD: `usr-03` |
 | `employee_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã nhân viên giao hàng. VD: `SHIPPER-Q10-09` |
 | `citizen_id` | VarChar(20) | Khóa duy nhất (Unique), Tùy chọn| Số Căn cước công dân (CCCD). VD: `079098001234` |
-| `driver_license_number`| VarChar(50)| Bắt buộc | Số bằng lái xe. VD: `59012938102` |
-| `driver_license_class` | VarChar(10)| Bắt buộc | Hạng bằng lái. VD: `A1`, `B2`, `C` |
+| `driver_license_number`| VarChar(50)| Bắt buộc | Số bằng lái xe (GPLX). VD: `59012938102` |
+| `driver_license_class` | VarChar(10)| Bắt buộc | Hạng bằng lái xe. VD: `A1`, `B2`, `C` |
 | `hire_date` | Date | Bắt buộc | Ngày chính thức ký hợp đồng tuyển dụng. VD: `2025-01-15` |
 | `employment_status` | Enum | Bắt buộc | Trạng thái ca làm việc: `ACTIVE` (Đang làm), `OFFLINE` (Nghỉ ca), `SUSPENDED` |
-| `home_facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục trực thuộc quản lý chính |
+| `home_facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục trực thuộc quản lý chính. VD: `fac-01` |
 | `driver_type` | Enum | Default HubDelivery | Loại tài xế: `HUB_DELIVERY` (Giao chặng cuối bưu cục), `ON_DEMAND` (Giao tức thì) |
 
 ---
@@ -376,27 +385,30 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã hồ sơ nhân viên |
-| `user_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng users)** | Khóa ngoại BẮT BUỘC 1-1 trỏ bảng `users` (Tài khoản Web Admin/Staff) |
+| `id` | Uuid | **Khóa chính (PK)** | Mã hồ sơ nhân viên. VD: `stf-01` |
+| `user_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng users)** | Khóa ngoại BẮT BUỘC 1-1 trỏ bảng `users` (Tài khoản Web Admin/Staff). VD: `usr-02` |
 | `employee_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã nhân viên. VD: `STAFF-LOG-05` |
-| `citizen_id` | VarChar(20) | Khóa duy nhất (Unique), Tùy chọn| Căn cước công dân |
-| `position` | VarChar(100)| Tùy chọn | Chức vụ. VD: `Trưởng Bưu Cục`, `Nhân viên Phân loại Hàng`, `Nhân viên Điều vận AI` |
-| `assigned_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục công tác chính |
+| `citizen_id` | VarChar(20) | Khóa duy nhất (Unique), Tùy chọn| Số Căn cước công dân. VD: `079098005555` |
+| `position` | VarChar(100)| Tùy chọn | Chức vụ công tác. VD: `Trưởng Bưu Cục`, `Nhân viên Phân loại Hàng`, `Nhân viên Điều vận AI` |
+| `assigned_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục công tác chính (Trỏ `facilities.id`). VD: `fac-01` |
 
 ---
 
 ### 24. Bảng `vehicles` (Danh mục Phương tiện Giao hàng)
-📌 **Chức năng của bảng:** Quản lý danh sách các phương tiện di chuyển trong đội xe (Xe máy, Xe tải nhẹ, Xe Van). Quản lý biển số xe, tải trọng tối đa (Kg), thể tích thùng xe (m³), bưu cục đậu xe và trạng thái vận hành (`ACTIVE`, `MAINTENANCE`, `RETIRED`).
+📌 **Chức năng của bảng:** Quản lý danh sách các phương tiện di chuyển trong đội xe (Xe máy, Xe tải nhẹ, Xe Van). Quản lý biển số xe, tải trọng tối đa (Kg), thể tích thùng xe (m³), chiều dài thùng xe (`max_length`), cờ hỗ trợ xe lạnh (`refrigeration_supported`), mã định danh thiết bị GPS (`gps_device_id`), bưu cục đậu xe và trạng thái vận hành.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã phương tiện |
-| `vehicle_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã xe. VD: `XE-TRUCK-01`, `XE-BIKE-09` |
-| `license_plate` | VarChar(20) | Khóa duy nhất (Unique), Bắt buộc | Biển số xe. VD: `59-P1 999.88` |
-| `vehicle_type_id` | Uuid | **Khóa ngoại (FK ➔ bảng vehicle_types)**| Loại xe (Xe tải, Xe máy...) |
-| `home_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục đậu/quản lý xe |
+| `id` | Uuid | **Khóa chính (PK)** | Mã phương tiện. VD: `veh-01`, `veh-02` |
+| `vehicle_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã xe quản lý. VD: `XE-TRUCK-01`, `XE-BIKE-02` |
+| `license_plate` | VarChar(20) | Khóa duy nhất (Unique), Bắt buộc | Biển số xe đăng ký. VD: `59-P1 999.88` |
+| `vehicle_type_id` | Uuid | **Khóa ngoại (FK ➔ bảng vehicle_types)**| Loại xe (Xe tải, Xe máy... Trỏ `vehicle_types.id`). VD: `vtype-01` |
+| `home_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục đậu/quản lý xe. VD: `fac-01` |
 | `max_weight` | Decimal(10,2)| Bắt buộc | Tải trọng tối đa (Kg). VD: `1500.00` Kg |
 | `max_volume` | Decimal(10,4)| Bắt buộc | Thể tích thùng xe tối đa (m³). VD: `12.5000` m³ |
+| `max_length` | Decimal(6,2) | Tùy chọn | Chiều dài lòng thùng xe (m). VD: `3.50` m |
+| `refrigeration_supported` | Boolean | Default False | Cờ hỗ trợ vận chuyển thùng hàng đông lạnh (`true` / `false`) |
+| `gps_device_id` | VarChar(100) | Tùy chọn | Mã định danh thiết bị GPS phần cứng gắn trên xe. VD: `GPS-DEV-88` |
 | `operating_status`| Enum | Bắt buộc | Trạng thái: `ACTIVE` (Sẵn sàng), `MAINTENANCE` (Đang sửa), `RETIRED` |
 
 ---
@@ -406,9 +418,9 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã loại phương tiện |
+| `id` | Uuid | **Khóa chính (PK)** | Mã loại phương tiện. VD: `vtype-01` |
 | `type_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã loại xe: `MOTORBIKE`, `VAN_500KG`, `TRUCK_1.5TON` |
-| `type_name` | VarChar(100) | Bắt buộc | Tên hiển thị. VD: `Xe tải nhẹ 1.5 Tấn` |
+| `type_name` | VarChar(100) | Bắt buộc | Tên hiển thị loại xe. VD: `Xe tải nhẹ 1.5 Tấn` |
 
 ---
 
@@ -417,24 +429,27 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã lượt phân công xe |
-| `driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Tài xế được gán xe |
-| `vehicle_id` | Uuid | **Khóa ngoại (FK ➔ bảng vehicles)**| Phương tiện được gán |
-| `assigned_from` | Timestamptz | Bắt buộc | Thời điểm bắt đầu giao xe |
+| `id` | Uuid | **Khóa chính (PK)** | Mã lượt phân công xe. VD: `dva-01` |
+| `driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Tài xế được gán xe (Trỏ `drivers.id`). VD: `drv-01` |
+| `vehicle_id` | Uuid | **Khóa ngoại (FK ➔ bảng vehicles)**| Phương tiện được gán (Trỏ `vehicles.id`). VD: `veh-01` |
+| `assigned_from` | Timestamptz | Bắt buộc | Thời điểm bắt đầu giao xe. VD: `2026-07-24 06:00:00+07` |
 | `assigned_to` | Timestamptz | Tùy chọn | Thời điểm trả xe |
-| `is_active` | Boolean | Default True | Đánh dấu phân công đang có hiệu lực |
+| `is_active` | Boolean | Default True | Đánh dấu phân công đang có hiệu lực (`true` / `false`) |
 
 ---
 
 ### 27. Bảng `driver_locations` (Tọa độ GPS Thời gian thực hiện tại của Shipper)
-📌 **Chức năng của bảng:** Lưu trữ vị trí tọa độ GPS mới nhất (`latitude`, `longitude`), góc hướng di chuyển và vận tốc thực tế của từng tài xế. Bảng này được ứng dụng Mobile Shipper cập nhật liên tục ngầm (3-5 giây/lượt) để hiển thị vị trí Shipper thời gian thực trên bản đồ Web Admin.
+📌 **Chức năng của bảng:** Lưu trữ vị trí tọa độ GPS mới nhất (`latitude`, `longitude`), góc hướng di chuyển (`heading`) và vận tốc thực tế (`speed`) của từng tài xế. Bảng này được ứng dụng Mobile Shipper cập nhật liên tục ngầm (3-5 giây/lượt) để hiển thị vị trí Shipper thời gian thực trên bản đồ Web Admin.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `driver_id` | Uuid | **Khóa chính (PK)**, **FK ➔ bảng drivers** | Mã tài xế (Mỗi tài xế giữ 1 bản ghi vị trí hiện tại) |
+| `driver_id` | Uuid | **Khóa chính (PK)**, **FK ➔ bảng drivers** | Mã tài xế (Mỗi tài xế giữ 1 bản ghi vị trí hiện tại). VD: `drv-01` |
 | `latitude` | Double | Bắt buộc | Vĩ độ phát ngầm thời gian thực qua WebSocket. VD: `10.7735` |
 | `longitude` | Double | Bắt buộc | Kinh độ phát ngầm thời gian thực qua WebSocket. VD: `106.6590` |
-| `recorded_at` | Timestamptz | Bắt buộc | Mốc thời gian thiết bị phát tọa độ gần nhất |
+| `heading` | Float | Tùy chọn | Góc hướng di chuyển của xe (độ). VD: `180.0`° |
+| `speed` | Float | Tùy chọn | Vận tốc di chuyển thực tế (m/s). VD: `25.5` m/s |
+| `accuracy` | Float | Tùy chọn | Độ chính xác bán kính định vị GPS (m). VD: `3.0` m |
+| `recorded_at` | Timestamptz | Bắt buộc | Mốc thời gian thiết bị phát tọa độ gần nhất. VD: `2026-07-24 09:40:00+07` |
 
 ---
 
@@ -445,14 +460,14 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã lộ trình tối ưu |
+| `id` | Uuid | **Khóa chính (PK)** | Mã lộ trình tối ưu. VD: `rt-01`, `rt-02` |
 | `route_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã tuyến đường. VD: `RT-20260724-001` |
-| `driver_vehicle_assignment_id`| Uuid | **Khóa ngoại (FK ➔ bảng driver_vehicle_assignments)**| Phân công Shipper+Xe (Nullable cho phép AI sinh Route trước) |
-| `driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Tài xế được gán chính |
-| `vehicle_id` | Uuid | **Khóa ngoại (FK ➔ bảng vehicles)** | Phương tiện xe được gán chính |
-| `start_facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục điểm xuất phát tuyến |
-| `end_facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục điểm kết thúc tuyến |
-| `optimization_id` | Uuid | **Khóa ngoại (FK ➔ bảng route_optimizations)** | Kết nối lượt chạy tối ưu AI |
+| `driver_vehicle_assignment_id`| Uuid | **Khóa ngoại (FK ➔ bảng driver_vehicle_assignments)**| Phân công Shipper+Xe (Nullable cho phép AI sinh Route trước). VD: `dva-01` |
+| `driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Tài xế được gán chính. VD: `drv-01` |
+| `vehicle_id` | Uuid | **Khóa ngoại (FK ➔ bảng vehicles)** | Phương tiện xe được gán chính. VD: `veh-01` |
+| `start_facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục điểm xuất phát tuyến. VD: `fac-01` |
+| `end_facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục điểm kết thúc tuyến. VD: `fac-01` |
+| `optimization_id` | Uuid | **Khóa ngoại (FK ➔ bảng route_optimizations)** | Kết nối lượt chạy tối ưu AI. VD: `ro-01` |
 | `planned_distance_km` | Decimal(10,2)| Default 0 | Tổng quãng đường AI tính toán tối ưu (Km). VD: `14.85` Km |
 | `planned_duration_min`| Int | Default 0 | Tổng thời gian AI ước tính hoàn thành (Phút). VD: `125` Phút |
 | `status` | Enum | Default Planned | Trạng thái tuyến: `PLANNED` (AI vừa tính xong), `ASSIGNED`, `IN_PROGRESS`, `COMPLETED` |
@@ -464,14 +479,14 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã điểm dừng |
-| `route_id` | Uuid | **Cặp khóa duy nhất [route_id, sequence]**, **FK ➔ bảng routes** | Thuộc Lộ trình nào |
-| `sequence` | Int | **Cặp khóa duy nhất [route_id, sequence]**, Bắt buộc | Thứ tự thứ tự ghé thăm tối ưu (1, 2, 3...) |
-| `order_id` | Uuid | **Khóa ngoại (FK ➔ bảng orders)** | Đơn hàng cần lấy (Dùng cho điểm dừng Pickup Lấy hàng tại nhà) |
-| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Vận đơn cần giao (Dùng cho điểm dừng Delivery Giao hàng) |
+| `id` | Uuid | **Khóa chính (PK)** | Mã điểm dừng. VD: `rs-01`, `rs-02` |
+| `route_id` | Uuid | **Cặp khóa duy nhất [route_id, sequence]**, **FK ➔ bảng routes** | Thuộc Lộ trình nào (Trỏ `routes.id`). VD: `rt-01` |
+| `sequence` | Int | **Cặp khóa duy nhất [route_id, sequence]**, Bắt buộc | Thứ tự ghé thăm tối ưu (1, 2, 3...) |
+| `order_id` | Uuid | **Khóa ngoại (FK ➔ bảng orders)** | Đơn hàng cần lấy (Dùng cho điểm dừng Pickup Lấy hàng tại nhà). VD: `ord-01` |
+| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Vận đơn cần giao (Dùng cho điểm dừng Delivery Giao hàng). VD: `spm-01` |
 | `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục ghé trung chuyển (Dùng cho điểm dừng Hub) |
 | `stop_type` | Enum | Bắt buộc | Loại điểm dừng: `PICKUP` (Lấy hàng), `HUB` (Bưu cục), `DELIVERY` (Giao hàng) |
-| `latitude` / `longitude`| Double | Bắt buộc | Tọa độ GPS của điểm dừng |
+| `latitude` / `longitude`| Double | Bắt buộc | Tọa độ GPS của điểm dừng. VD: `10.7721` / `106.6578` |
 | `status` | Enum | Default Pending | Trạng thái dừng: `PENDING` (Chờ ghé), `ARRIVED` (Đã đến), `DEPARTED`, `SKIPPED`, `FAILED` |
 
 ---
@@ -481,13 +496,13 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã nhiệm vụ điều vận |
+| `id` | Uuid | **Khóa chính (PK)** | Mã nhiệm vụ điều vận. VD: `dt-01` |
 | `task_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã task điều vận. VD: `TSK-20260724-88` |
-| `route_id` | Uuid | **Khóa ngoại (FK ➔ bảng routes)** | Lộ trình được gán |
-| `assigned_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Staff/Admin thực hiện giao ca |
-| `assigned_to` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Shipper được giao nhận ca |
+| `route_id` | Uuid | **Khóa ngoại (FK ➔ bảng routes)** | Lộ trình được gán (Trỏ `routes.id`). VD: `rt-01` |
+| `assigned_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Staff/Admin thực hiện giao ca. VD: `usr-02` |
+| `assigned_to` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Shipper được giao nhận ca. VD: `drv-01` |
 | `status` | Enum | Default Pending | Trạng thái ca: `PENDING` (Chờ nhận), `ACCEPTED` (Đã nhận ca), `REJECTED` (Từ chối) |
-| `rejection_reason` | Text | Tùy chọn | Lý do Shipper từ chối nhận ca (Ốm, hỏng xe...) |
+| `rejection_reason` | Text | Tùy chọn | Lý do Shipper từ chối nhận ca. VD: `Xe bị thủng lốp trên đường đi ca` |
 
 ---
 
@@ -496,10 +511,12 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi GPS vệt đường |
-| `route_id` | Uuid | **Khóa ngoại (FK ➔ bảng routes)** | Thuộc Lộ trình đang chạy |
-| `latitude` / `longitude`| Double | Bắt buộc | Tọa độ GPS ghi nhận thực tế trên đường |
-| `recorded_at` | Timestamptz | Default Now | Thời điểm thiết bị lưu vết tọa độ |
+| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi GPS vệt đường. VD: `rll-01` |
+| `route_id` | Uuid | **Khóa ngoại (FK ➔ bảng routes)** | Thuộc Lộ trình đang chạy. VD: `rt-01` |
+| `latitude` / `longitude`| Double | Bắt buộc | Tọa độ GPS ghi nhận thực tế trên đường. VD: `10.7728` / `106.6582` |
+| `speed_mps` | Decimal(5,2) | Tùy chọn | Vận tốc di chuyển tính bằng m/s. VD: `8.50` m/s |
+| `heading_degrees` | Decimal(5,2) | Tùy chọn | Góc hướng di chuyển độ. VD: `90.00`° |
+| `recorded_at` | Timestamptz | Default Now | Thời điểm thiết bị lưu vết tọa độ. VD: `2026-07-24 08:15:00+07` |
 
 ---
 
@@ -508,13 +525,13 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã lượt chạy tối ưu AI |
+| `id` | Uuid | **Khóa chính (PK)** | Mã lượt chạy tối ưu AI. VD: `ro-01` |
 | `algorithm_name` | VarChar(50) | Bắt buộc | Thuật toán áp dụng: `K-Means + Genetic Algorithm (GA)` |
 | `parameters_json` | Json | Tùy chọn | **Snapshot cấu hình AI đã dùng**: `{"kmeans_radius_km": 5, "ga_pop_size": 100, "max_gen": 500, "mutation_rate": 0.05}` |
-| `input_shipment_count`| Int | Bắt buộc | Số lượng đơn/vận đơn đầu vào cần phân tuyến |
-| `output_route_count` | Int | Bắt buộc | Số lượng Tuyến đường tối ưu sinh ra |
+| `input_shipment_count`| Int | Bắt buộc | Số lượng đơn/vận đơn đầu vào cần phân tuyến. VD: `45` đơn |
+| `output_route_count` | Int | Bắt buộc | Số lượng Tuyến đường tối ưu sinh ra. VD: `3` tuyến |
 | `execution_time_ms` | Int | Bắt buộc | Thời gian thuật toán chạy xong (Milisecond). VD: `850` ms |
-| `fitness_score` | Decimal(8,4) | Tùy chọn | Điểm số thích nghi tối ưu (Fitness score GA) |
+| `fitness_score` | Decimal(8,4) | Tùy chọn | Điểm số thích nghi tối ưu (Fitness score GA). VD: `0.9850` |
 
 ---
 
@@ -523,11 +540,11 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã lượt xử lý sự cố |
-| `route_id` | Uuid | **Khóa ngoại (FK ➔ bảng routes)** | Lộ trình bị can thiệp |
-| `adjusted_by_user_id`| Uuid | **Khóa ngoại (FK ➔ bảng users)** | Staff/Admin thực hiện can thiệp thủ công |
-| `old_driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Tài xế cũ bị hủy ca/thay thế |
-| `new_driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Tài xế mới được điều động thay thế |
+| `id` | Uuid | **Khóa chính (PK)** | Mã lượt xử lý sự cố. VD: `ral-01` |
+| `route_id` | Uuid | **Khóa ngoại (FK ➔ bảng routes)** | Lộ trình bị can thiệp (Trỏ `routes.id`). VD: `rt-01` |
+| `adjusted_by_user_id`| Uuid | **Khóa ngoại (FK ➔ bảng users)** | Staff/Admin thực hiện can thiệp thủ công. VD: `usr-02` |
+| `old_driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Tài xế cũ bị hủy ca/thay thế. VD: `drv-01` |
+| `new_driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Tài xế mới được điều động thay thế. VD: `drv-02` |
 | `adjustment_type` | VarChar(50) | Bắt buộc | Loại can thiệp: `REASSIGN_DRIVER` (Đổi tài xế), `MODIFY_STOPS`, `CANCEL_ROUTE` |
 | `reason` | Text | Bắt buộc | Lý do sự cố: `Tài xế hỏng xe giữa đường tại ngã tư Hàng Xanh` |
 
@@ -540,12 +557,12 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã chứng từ giao hàng |
-| `route_stop_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng route_stops)**| Điểm dừng duy nhất phát sinh chứng từ này |
-| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Vận đơn được giao (Không Unique để hỗ trợ lưu nhiều chứng từ giao lại khi thất bại) |
+| `id` | Uuid | **Khóa chính (PK)** | Mã chứng từ giao hàng. VD: `dp-01` |
+| `route_stop_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng route_stops)**| Điểm dừng duy nhất phát sinh chứng từ này (Trỏ `route_stops.id`). VD: `rs-01` |
+| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Vận đơn được giao (Không Unique để hỗ trợ lưu nhiều chứng từ giao lại khi thất bại). VD: `spm-01` |
 | `proof_type` | Enum | Bắt buộc | Dạng bằng chứng: `PHOTO` (Chụp ảnh), `SIGNATURE` (Ký tên), `OTP` |
 | `delivery_result` | Enum | Bắt buộc | Kết quả: `SUCCESS` (Thành công), `FAILED` (Thất bại), `PARTIAL` |
-| `actual_cod_collected`| Decimal(12,2)| Tùy chọn | **Số tiền mặt COD thực tế Shipper đã thu tại chỗ** đối soát tài chính |
+| `actual_cod_collected`| Decimal(12,2)| Tùy chọn | **Số tiền mặt COD thực tế Shipper đã thu tại chỗ** đối soát tài chính. VD: `500000.00` VNĐ |
 | `failure_reason` | Enum | Tùy chọn | Lý do thất bại: `RECIPIENT_UNAVAILABLE` (Khách không bắt máy), `INCORRECT_ADDRESS` |
 
 ---
@@ -555,12 +572,12 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã lượt quét barcode |
-| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Vận đơn được quét mã |
-| `package_id` | Uuid | **Khóa ngoại (FK ➔ bảng packages)** | Kiện hàng được quét mã |
-| `route_stop_id` | Uuid | **Khóa ngoại (FK ➔ bảng route_stops)** | Điểm dừng phát sinh quét mã |
-| `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Kho/Bưu cục phát sinh quét mã |
-| `scanned_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người thực hiện quét mã |
+| `id` | Uuid | **Khóa chính (PK)** | Mã lượt quét barcode. VD: `bs-01` |
+| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Vận đơn được quét mã. VD: `spm-01` |
+| `package_id` | Uuid | **Khóa ngoại (FK ➔ bảng packages)** | Kiện hàng được quét mã. VD: `pkg-01` |
+| `route_stop_id` | Uuid | **Khóa ngoại (FK ➔ bảng route_stops)** | Điểm dừng phát sinh quét mã. VD: `rs-01` |
+| `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Kho/Bưu cục phát sinh quét mã. VD: `fac-01` |
+| `scanned_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người thực hiện quét mã (User ID). VD: `usr-03` |
 | `barcode_value` | VarChar(100) | Bắt buộc | Giá trị chuỗi mã vạch vừa quét. VD: `PKG-8891-01` |
 | `scan_type` | Enum | Bắt buộc | Tác vụ quét: `INBOUND` (Nhập kho), `OUTBOUND` (Xuất kho), `SORTING`, `DELIVERY` |
 
@@ -571,11 +588,13 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi check-in |
-| `route_stop_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng route_stops)**| Gắn duy nhất với điểm dừng |
-| `driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Shipper thực hiện check-in |
-| `check_in_at` | Timestamptz | Default Now | Mốc thời gian bấm Check-in trên App |
-| `check_out_at` | Timestamptz | Tùy chọn | Mốc thời gian bấm Check-out xong điểm dừng |
+| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi check-in. VD: `dci-01` |
+| `route_stop_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng route_stops)**| Gắn duy nhất với điểm dừng. VD: `rs-01` |
+| `driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Shipper thực hiện check-in (Trỏ `drivers.id`). VD: `drv-01` |
+| `check_in_at` | Timestamptz | Default Now | Mốc thời gian bấm Check-in trên App. VD: `2026-07-24 09:40:00+07` |
+| `check_out_at` | Timestamptz | Tùy chọn | Mốc thời gian bấm Check-out xong điểm dừng. VD: `2026-07-24 09:45:00+07` |
+| `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS thiết bị tại thời điểm Check-in. VD: `10.7735` |
+| `longitude` | Double | Bắt buộc | Kinh độ định vị GPS thiết bị tại thời điểm Check-in. VD: `106.6590` |
 
 ---
 
@@ -584,55 +603,73 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã file đính kèm |
-| `delivery_proof_id`| Uuid | **Khóa ngoại (FK ➔ bảng delivery_proofs)**| Thuộc bằng chứng giao hàng nào |
+| `id` | Uuid | **Khóa chính (PK)** | Mã file đính kèm. VD: `ta-01` |
+| `delivery_proof_id`| Uuid | **Khóa ngoại (FK ➔ bảng delivery_proofs)**| Thuộc bằng chứng giao hàng nào (Trỏ `delivery_proofs.id`). VD: `dp-01` |
 | `file_type` | Enum | Bắt buộc | Loại file: `PHOTO` (Ảnh chụp), `SIGNATURE` (Chữ ký điện tử) |
-| `object_key` | VarChar(500)| Bắt buộc | Đường dẫn lưu trữ Cloud/S3. VD: `pod/2026/07/proof_99.jpg` |
+| `object_key` | VarChar(500)| Bắt buộc | Đường dẫn lưu trữ Cloud/S3. VD: `pod/2026/07/proof_dp01.jpg` |
+
+---
+
+### 38. Bảng `tracking_events` (Nhật ký Sự kiện Tracking Vận đơn Công khai)
+📌 **Chức năng của bảng:** Lưu trữ dòng thời gian (Timeline) các sự kiện tracking vận đơn công khai cho Khách hàng & Người dùng tra cứu hành trình trực quan trên Web/Mobile (`PICKED_UP` - Đã lấy hàng, `ARRIVED_HUB` - Đến bưu cục, `DEPARTED_HUB` - Rời bưu cục, `OUT_FOR_DELIVERY` - Đang giao, `DELIVERED` - Giao thành công, `FAILED` - Giao thất bại, `RETURNED` - Hoàn hàng, `CANCELLED` - Đã hủy).
+
+| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
+| :--- | :--- | :--- | :--- |
+| `id` | Uuid | **Khóa chính (PK)** | Mã định danh sự kiện tracking. VD: `te-01` |
+| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Thuộc Vận đơn nào (Trỏ `shipments.id`). VD: `spm-01` |
+| `route_stop_id` | Uuid | **Khóa ngoại (FK ➔ bảng route_stops)** | Phát sinh từ điểm dừng nào (nếu có). VD: `rs-01` |
+| `event_type` | Enum | Bắt buộc | Loại sự kiện: `PICKED_UP`, `ARRIVED_HUB`, `DEPARTED_HUB`, `OUT_FOR_DELIVERY`, `DELIVERED`, `FAILED`, `RETURNED`, `CANCELLED` |
+| `event_source` | Enum | Default 'SYSTEM' | Nguồn tạo sự kiện: `SYSTEM`, `DRIVER_APP`, `WAREHOUSE_APP`, `API` |
+| `description` | Text | Bắt buộc | Mô tả chi tiết hành trình. VD: `Đơn hàng đã được giao thành công cho người nhận` |
+| `latitude` / `longitude` | Double | Tùy chọn | Tọa độ GPS phát sinh sự kiện. VD: `10.7740` / `106.7030` |
+| `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người dùng/Nhân viên ghi nhận sự kiện. VD: `usr-03` |
+| `occurred_at` | Timestamptz | Bắt buộc | Thời điểm thực tế xảy ra sự kiện. VD: `2026-07-24 09:45:00+07` |
+| `created_at` | Timestamptz | Default Now | Thời điểm ghi nhận vào CSDL |
 
 ---
 
 ## ⚙️ MODULE 9: SYSTEM CONFIGURATION (Cấu hình Tham số AI & Hệ thống)
 
-### 38. Bảng `system_settings` (Tham số Siêu cấu hình AI / GPS)
+### 39. Bảng `system_settings` (Tham số Siêu cấu hình AI / GPS)
 📌 **Chức năng của bảng:** Lưu trữ tất cả các tham số siêu cấu hình vận hành hệ thống và thuật toán AI (bán kính phân cụm K-Means `kmeans_cluster_radius_km`, kích thước quần thể `ga_population_size`, số thế hệ tối đa `ga_max_generations`, tỷ lệ đột biến `ga_mutation_rate`, chu kỳ phát GPS `gps_sync_interval_sec`). Cho phép Admin điều chỉnh tham số AI linh hoạt trên giao diện Web mà không cần khởi động lại Server.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã tham số |
+| `id` | Uuid | **Khóa chính (PK)** | Mã tham số cấu hình. VD: `ss-01` |
 | `setting_key` | VarChar(100) | Khóa duy nhất (Unique), Bắt buộc | Khóa cấu hình: `kmeans_cluster_radius_km`, `ga_population_size`, `ga_max_generations`, `ga_mutation_rate`, `gps_sync_interval_sec` |
 | `setting_value` | Text | Bắt buộc | Giá trị cấu hình: `"5.0"`, `"100"`, `"500"`, `"0.05"`, `"3"` |
 | `value_type` | Enum | Bắt buộc | Kiểu dữ liệu: `INTEGER`, `DECIMAL`, `STRING`, `BOOLEAN`, `JSON` |
-| `category` | Enum | Bắt buộc | Phân nhóm: `AI`, `ROUTING`, `GPS`, `SYSTEM` |
-| `updated_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Admin thực hiện chỉnh sửa cấu hình gần nhất |
+| `category` | Enum | Bắt buộc | Phân nhóm cấu hình: `AI`, `ROUTING`, `GPS`, `SYSTEM` |
+| `updated_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Admin thực hiện chỉnh sửa cấu hình gần nhất (Trỏ `users.id`). VD: `usr-01` |
 
 ---
 
 ## 🗺️ MODULE 10: VIETNAMESE ADMINISTRATIVE UNITS (Đơn vị Hành chính Việt Nam)
 
-### 39. Bảng `provinces` (Tỉnh / Thành phố)
+### 40. Bảng `provinces` (Tỉnh / Thành phố)
 📌 **Chức năng của bảng:** Quản lý danh mục mã và tên các Tỉnh / Thành phố trực thuộc Trung ương của Việt Nam (dùng để seed dữ liệu chuẩn địa chính quốc gia).
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `code` | VarChar(20) | **Khóa chính (PK)** | Mã tỉnh/thành. VD: `79` (TP.HCM), `01` (Hà Nội) |
+| `code` | VarChar(20) | **Khóa chính (PK)** | Mã tỉnh/thành địa chính. VD: `79` (TP.HCM), `01` (Hà Nội) |
 | `name` | VarChar(255) | Bắt buộc | Tên tỉnh thành. VD: `Thành phố Hồ Chí Minh` |
 | `full_name` | VarChar(255) | Bắt buộc | Tên đầy đủ địa chính. VD: `Thành phố Hồ Chí Minh` |
 
 ---
 
-### 40. Bảng `wards` (Phường / Xã - Trực thuộc Tỉnh/TP)
+### 41. Bảng `wards` (Phường / Xã - Trực thuộc Tỉnh/TP)
 📌 **Chức năng của bảng:** Quản lý danh mục các Phường / Xã liên kết trực tiếp với Tỉnh / Thành phố theo mô hình địa chính 2 cấp (Tỉnh/TP ➔ Phường/Xã) phục vụ việc chọn địa chỉ chuyển phát nhanh chóng trên Web và Mobile App.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `code` | VarChar(20) | **Khóa chính (PK)** | Mã phường xã. VD: `26830` |
+| `code` | VarChar(20) | **Khóa chính (PK)** | Mã phường xã địa chính. VD: `26830` |
 | `name` | VarChar(255) | Bắt buộc | Tên phường xã. VD: `Phường 14` |
-| `province_code` | VarChar(20) | **Khóa ngoại (FK ➔ bảng provinces)** | Thuộc Tỉnh/TP nào (Mô hình địa chính 2 cấp Tỉnh ➔ Phường/Xã) |
+| `province_code` | VarChar(20) | **Khóa ngoại (FK ➔ bảng provinces)** | Thuộc Tỉnh/TP nào (Trỏ `provinces.code`). VD: `79` |
 
 ---
 
 ## 💡 KẾT LUẬN
 
-Tài liệu Tự điển CSDL này hiện tại đã có đầy đủ mục **📌 Chức năng của bảng** trên tất cả 40 bảng dữ liệu, được bổ sung chi tiết về **Khóa chính (PK)**, **Khóa ngoại (FK)**, **Cặp khóa chính (Composite PK)**, **Khóa ngoại 1-1** và đồng bộ 100% với mã nguồn Prisma Schema (`schema.prisma`) và Báo cáo Thẩm định Kiến trúc. 
+Tài liệu Tự điển CSDL này hiện tại đã có đầy đủ mục **📌 Chức năng của bảng** trên tất cả 41 bảng dữ liệu, được bổ sung chi tiết về **Khóa chính (PK)**, **Khóa ngoại (FK)**, **Cặp khóa chính (Composite PK)**, **Khóa ngoại 1-1** và đồng bộ 100% với mã nguồn Prisma Schema (`schema.prisma`) và Báo cáo Thẩm định Kiến trúc. 
 
 Bạn có thể sử dụng file tài liệu này để giải trình mượt mà mục đích của từng bảng trước Giảng viên và Hội đồng phản biện!

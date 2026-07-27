@@ -49,6 +49,8 @@ Bảng trung tâm đại diện cho "Một lần vận chuyển hàng hóa". M�
 | `shipment_code` | VARCHAR(30) | ❌ | Mã phiếu vận chuyển duy nhất (Ví dụ: `SHP000001`). |
 | `status` | `shipment_status_enum` | ❌ | Trạng thái của Shipment. |
 | `route_id` | UUID | ✅ | FK → `Routes(id)` (nullable). Tuyến đường do AI chỉ định (Module 7). |
+| `origin_facility_id`| UUID | ✅ | FK → `Facilities(id)`. Kho/Bưu cục xuất phát của vận đơn. |
+| `destination_facility_id`| UUID | ✅ | FK → `Facilities(id)`. Kho/Bưu cục đích đến của vận đơn. |
 | `created_by` | UUID | ✅ | FK → `Users(id)` (ON DELETE SET NULL). Người tạo phiếu vận chuyển. |
 | `updated_by` | UUID | ✅ | FK → `Users(id)` (ON DELETE SET NULL). Người cập nhật cuối cùng. |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo phiếu. |

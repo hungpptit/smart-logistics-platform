@@ -82,6 +82,7 @@ Bảng trung tâm lưu trữ thông tin nghiệp vụ chính của đơn hàng.
 | `shipping_fee` | NUMERIC(12,2) | ❌ | Tiền cước vận chuyển (Mặc định `0.00`). |
 | `insurance_fee` | NUMERIC(12,2) | ❌ | Phí bảo hiểm hàng hóa (nếu có). |
 | `cod_amount` | NUMERIC(12,2) | ❌ | Số tiền thu hộ COD. |
+| `pickup_type` | `pickup_type_enum` | ❌ | Hình thức gửi hàng (`PICKUP` Shipper lấy tận nơi, `DROP_OFF` Khách gửi tại bưu cục). |
 | `estimated_delivery_date`| TIMESTAMPTZ | ✅ | Ngày dự kiến giao hàng thành công. |
 | **--- AUDIT FIELDS ---** | | | |
 | `created_by` | UUID | ✅ | FK → `Users(id)` (ON DELETE SET NULL). Người tạo đơn. |
@@ -133,6 +134,8 @@ Mô tả chi tiết các kiện hàng. Một đơn hàng có thể có nhiều k
 | `is_fragile` | BOOLEAN | ❌ | Kiện hàng dễ vỡ hay không (Mặc định `false`). |
 | `temperature_requirement`| VARCHAR(50) | ✅ | Yêu cầu nhiệt độ bảo quản (Ví dụ: `COLD`, `FROZEN`, `NORMAL`). |
 | `required_vehicle_type_id`| UUID | ✅ | FK → `VehicleTypes(id)` (nullable). Chỉ định loại xe bắt buộc (Ví dụ: xe đông lạnh). |
+| `current_facility_id`| UUID | ✅ | FK → `Facilities(id)`. Vị trí bưu cục hiện tại kiện hàng đang nằm. |
+| `current_zone_id` | UUID | ✅ | FK → `FacilityZones(id)`. Vị trí phân khu kho hiện tại. |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo kiện hàng. |
 | `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật. |
 

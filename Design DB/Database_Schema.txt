@@ -85,7 +85,7 @@ id	user_id	customer_code	customer_type	company_name	tax_code	status	created_at	d
 																																		
 																																		
 facilities																																		
-id	facility_code	facility_name	facility_type_id	parent_facility_id	manager_user_id	operating_status	opened_at	closed_at	created_at	updated_at	deleted_at																							
+id	facility_code	facility_name	facility_type_id	parent_facility_id	manager_user_id	latitude	longitude	operating_status	opened_at	created_at	updated_at	deleted_at																							
 																																		
 																																		
 																																		

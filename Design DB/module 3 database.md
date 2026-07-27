@@ -55,9 +55,10 @@ Bảng dữ liệu trung tâm của mạng lưới logistics, tổ chức cấu 
 | `facility_type_id` | UUID | ❌ | FK → `FacilityTypes(id)` (ON DELETE RESTRICT). |
 | `parent_facility_id`| UUID | ✅ | FK → `Facilities(id)`. Nếu bằng `NULL` thì đây là Tổng kho (Main Depot). |
 | `manager_user_id` | UUID | ✅ | FK → `Users(id)` (nullable). Người chịu trách nhiệm quản lý cơ sở. |
+| `latitude` | DOUBLE PRECISION | ❌ | Vĩ độ định vị GPS của Hub/Bưu cục. |
+| `longitude` | DOUBLE PRECISION | ❌ | Kinh độ định vị GPS của Hub/Bưu cục. |
 | `operating_status` | `facility_status_enum` | ❌ | Trạng thái hoạt động (`ACTIVE`, `INACTIVE`, `MAINTENANCE`, `CLOSED`). |
 | `opened_at` | DATE | ❌ | Ngày bắt đầu hoạt động. |
-| `closed_at` | DATE | ✅ | Ngày chính thức ngừng hoạt động (nếu có). |
 | `note` | TEXT | ✅ | Ghi chú thêm. |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo. |
 | `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật. |
@@ -144,7 +145,7 @@ Quản lý các phân khu chức năng bên trong một cơ sở logistics (Ví 
 | `facility_id` | UUID | ❌ | FK → `Facilities(id)` (ON DELETE CASCADE). |
 | `zone_code` | VARCHAR(30) | ❌ | Mã phân khu (Ví dụ: `RECV`, `SORT`, `STOR_A`). |
 | `zone_name` | VARCHAR(100) | ❌ | Tên phân khu (Ví dụ: `Khu vực phân loại`). |
-| `zone_type` | `facility_zone_type_enum` | ❌ | Phân loại phân khu (`RECEIVING`, `SORTING`, `STORAGE`, `DISPATCH`, `RETURN`, `QUARANTINE`). |
+| `zone_type` | `facility_zone_type_enum` | ❌ | Phân loại phân khu (`RECEIVING`, `SORTING`, `STORAGE`, `SHIPPING`, `RETURN`, `QUARANTINE`). |
 | `capacity` | INTEGER | ✅ | Sức chứa tối đa của phân khu (đơn vị: Kiện hàng, m3 hoặc pallets). |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo. |
 | `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật. |
