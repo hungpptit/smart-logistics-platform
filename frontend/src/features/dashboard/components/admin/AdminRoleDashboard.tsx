@@ -1,11 +1,12 @@
 import React from 'react';
-import { Users, Building2, User, Settings, Package, Truck, UserCheck, Earth } from 'lucide-react';
+import { Users, Building2, User, Settings, Package, Truck, UserCheck, Earth, BarChart3 } from 'lucide-react';
 import { DashboardShell } from '../layouts/DashboardShell';
 import type { MenuItem } from '../layouts/Sidebar';
 import { OrderTab } from '../OrderTab';
 import { CustomerTab } from '../CustomerTab';
 import { FacilityTab } from '../FacilityTab';
 import { SystemConfigTab } from './SystemConfigTab';
+import { AnalyticsTab } from './AnalyticsTab';
 import { DriverTab } from '../DriverTab';
 import { VehicleTab } from '../VehicleTab';
 import { StaffTab } from '../StaffTab';
@@ -18,6 +19,13 @@ interface AdminRoleDashboardProps {
 
 export const AdminRoleDashboard: React.FC<AdminRoleDashboardProps> = ({ onBackToHome }) => {
   const menuItems: MenuItem[] = [
+    {
+      id: 'analytics',
+      label: 'Thống kê Báo cáo',
+      icon: BarChart3,
+      component: AnalyticsTab,
+      allowed: true,
+    },
     {
       id: 'orders',
       label: 'Quản lý Đơn hàng',

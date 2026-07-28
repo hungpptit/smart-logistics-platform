@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_styles.dart';
@@ -256,20 +257,23 @@ class _DriverDashboardState extends State<DriverDashboard> {
   Future<void> _updateGoongPolyline() async {
     if (_driverStops.isEmpty) return;
 
-    final stopLatLngs = _driverStops
-        .map((s) => LatLng(s['latitude'] as double, s['longitude'] as double))
+    final List<LatLng> stopLatLngs = _driverStops
+        .map((s) {
+          final double lat = double.tryParse(s['latitude']?.toString() ?? '') ?? _currentLocation.latitude;
+          final double lng = double.tryParse(s['longitude']?.toString() ?? '') ?? _currentLocation.longitude;
+          return LatLng(lat, lng);
+        })
         .toList();
 
     if (stopLatLngs.isNotEmpty) {
-      final goongPoints = await DriverService.fetchGoongRoutePolyline(
-        origin: _currentLocation,
-        destination: stopLatLngs.last,
-        waypoints: stopLatLngs.length > 1 ? stopLatLngs.sublist(0, stopLatLngs.length - 1) : null,
+      final fullRoute = await DriverService.fetchFullSequentialRoute(
+        driverLocation: _currentLocation,
+        stopLatLngs: stopLatLngs,
       );
 
-      if (goongPoints.isNotEmpty && mounted) {
+      if (mounted && fullRoute.isNotEmpty) {
         setState(() {
-          _roadPolylinePoints = goongPoints;
+          _roadPolylinePoints = fullRoute;
         });
       }
     }
@@ -1740,38 +1744,60 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     ),
                     const SizedBox(height: 8.0),
 
-                    // Camera Scanner View Box
-                    GestureDetector(
-                      onTap: () {
-                        setScannerState(() {
-                          scanController.text = targetCode;
-                          errorMessage = null;
-                        });
-                      },
-                      child: Container(
-                        width: 240.0,
-                        height: 170.0,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.logisticsRed, width: 2.5),
-                          borderRadius: BorderRadius.circular(16.0),
-                          color: Colors.black26,
-                        ),
-                        child: const Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            PulsingScanLine(),
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.qr_code_scanner, color: Colors.white70, size: 56),
-                                SizedBox(height: 4),
-                                Text(
-                                  '[ CHẠM VÀO ĐỂ QUÉT MÃ MẪU ]',
-                                  style: TextStyle(color: Colors.amberAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                    // Camera Scanner View Box with live camera & demo tap
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16.0),
+                      child: GestureDetector(
+                        onTap: () {
+                          setScannerState(() {
+                            scanController.text = targetCode;
+                            errorMessage = null;
+                          });
+                        },
+                        child: Container(
+                          width: 250.0,
+                          height: 180.0,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.logisticsRed, width: 2.5),
+                            borderRadius: BorderRadius.circular(16.0),
+                            color: Colors.black,
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              MobileScanner(
+                                fit: BoxFit.cover,
+                                onDetect: (barcodeCapture) {
+                                  final List<Barcode> barcodes = barcodeCapture.barcodes;
+                                  for (final barcode in barcodes) {
+                                    final String? rawValue = barcode.rawValue;
+                                    if (rawValue != null && rawValue.isNotEmpty) {
+                                      setScannerState(() {
+                                        scanController.text = rawValue;
+                                        errorMessage = null;
+                                      });
+                                      break;
+                                    }
+                                  }
+                                },
+                              ),
+                              const PulsingScanLine(),
+                              Positioned(
+                                bottom: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Camera đang quét • Chạm để điền mã thử',
+                                    style: TextStyle(color: Colors.amberAccent, fontSize: 9, fontWeight: FontWeight.bold),
+                                  ),
                                 ),
-                              ],
-                            ),
-                          ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

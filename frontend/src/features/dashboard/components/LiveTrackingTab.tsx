@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Map, MapControls, MapMarker, MarkerContent, MapRoute, MarkerPopup } from '../../../components/ui/map';
 import MapLibreGL from 'maplibre-gl';
+import { RouteOptimizationModal } from './RouteOptimizationModal';
 
 interface Facility {
   id: string;
@@ -44,16 +45,20 @@ interface RouteData {
       };
     }>;
   };
-  driverVehicleAssignment: {
-    driver: {
+  driverVehicleAssignment?: {
+    driver?: {
       id: string;
-      employeeCode: string;
-      fullName: string;
-      phone: string;
+      employeeCode?: string;
+      fullName?: string;
+      phone?: string;
+      user?: {
+        fullName: string;
+        phone?: string;
+      };
     };
-    vehicle: {
-      vehicleCode: string;
-      licensePlate: string;
+    vehicle?: {
+      vehicleCode?: string;
+      licensePlate?: string;
     };
   };
   stops?: RouteStop[];
@@ -75,6 +80,7 @@ export const LiveTrackingTab: React.FC = () => {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<RouteData | null>(null);
+  const [isOptimizationModalOpen, setIsOptimizationModalOpen] = useState(false);
   const [routeGeometry, setRouteGeometry] = useState<[number, number][]>([]);
 
   // Filters
@@ -84,7 +90,6 @@ export const LiveTrackingTab: React.FC = () => {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [optimizing, setOptimizing] = useState<boolean>(false);
 
   const isAdmin = user?.roles.includes('ADMIN');
   const isStaffOnly = user?.roles.includes('STAFF') && !user?.roles.includes('ADMIN');
@@ -93,46 +98,12 @@ export const LiveTrackingTab: React.FC = () => {
   const canOperateOnCurrentFacility = isAdmin || (isStaffOnly && facilityFilter === userAssignedFacilityId);
 
   const handleRunAiOptimization = async () => {
-    const targetFacilityId = facilityFilter || userAssignedFacilityId;
-    if (!targetFacilityId) {
-      alert('Vui lòng chọn Kho/Bưu cục cần chạy AI gom cụm đơn hàng!');
-      return;
-    }
-
-    if (!canOperateOnCurrentFacility) {
+    if (isStaffOnly && facilityFilter && facilityFilter !== userAssignedFacilityId) {
       alert('❌ Quyền hạn không đủ! Bạn chỉ được phép thực hiện gom cụm đơn hàng tại Bưu cục mình quản lý.');
       return;
     }
 
-    const targetFacName = facilities.find(f => f.id === targetFacilityId)?.facilityName || 'Kho đang chọn';
-    if (!window.confirm(`🤖 Bạn có chắc chắn muốn kích hoạt AI Gom Cụm K-Means & VRP cho ${targetFacName}?`)) {
-      return;
-    }
-
-    setOptimizing(true);
-    try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}/routes/optimize`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ facilityId: targetFacilityId })
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
-        alert(`🎉 ${data.message || 'Tối ưu định tuyến AI thành công!'}`);
-        fetchRoutes();
-      } else {
-        alert(`❌ Lỗi AI: ${data.message || 'Không thể chạy AI phân cụm.'}`);
-      }
-    } catch (err) {
-      console.error('Lỗi khi gọi API AI optimize:', err);
-      alert('❌ Đã xảy ra lỗi kết nối khi kích hoạt AI.');
-    } finally {
-      setOptimizing(false);
-    }
+    setIsOptimizationModalOpen(true);
   };
 
   const [resetting, setResetting] = useState<boolean>(false);
@@ -569,15 +540,23 @@ export const LiveTrackingTab: React.FC = () => {
     }, 3000); // Emits update every 3 seconds to keep it active
   };
 
+  // Helper to extract driver name safely from either direct property or nested user property
+  const getDriverName = (driverObj?: any) => {
+    if (!driverObj) return '';
+    return driverObj.user?.fullName || driverObj.fullName || '';
+  };
+
   // Filters routes locally based on search query
   const filteredRoutes = routes.filter(route => {
     const term = searchTerm.toLowerCase().trim();
     if (!term) return true;
 
+    const driverName = getDriverName(route.driverVehicleAssignment?.driver);
+
     return (
       route.routeCode.toLowerCase().includes(term) ||
-      route.driverVehicleAssignment.driver.fullName.toLowerCase().includes(term) ||
-      route.driverVehicleAssignment.vehicle.licensePlate.toLowerCase().includes(term) ||
+      driverName.toLowerCase().includes(term) ||
+      (route.driverVehicleAssignment?.vehicle?.licensePlate || '').toLowerCase().includes(term) ||
       route.startFacility.facilityName.toLowerCase().includes(term)
     );
   });
@@ -606,17 +585,17 @@ export const LiveTrackingTab: React.FC = () => {
                 <>
                   <button
                     onClick={handleRunAiOptimization}
-                    disabled={optimizing || resetting}
+                    disabled={resetting}
                     className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
                     title="Kích hoạt thuật toán AI K-Means & VRP gom cụm phân đơn cho tài xế"
                   >
-                    <Bot size={12} className={optimizing ? 'animate-bounce' : ''} />
-                    <span>{optimizing ? 'Đang gom...' : '🤖 AI Gom Cụm'}</span>
+                    <Bot size={12} />
+                    <span>🤖 AI Gom Cụm</span>
                   </button>
 
                   <button
                     onClick={handleDevResetAi}
-                    disabled={optimizing || resetting}
+                    disabled={resetting}
                     className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
                     title="[DEV TOOL] Hoàn tác toàn bộ lộ trình AI và khôi phục 80 đơn hàng về trạng thái ban đầu để test AI tiếp"
                   >
@@ -716,7 +695,7 @@ export const LiveTrackingTab: React.FC = () => {
                         )}
                       </div>
                       <p className="text-[10px] text-gray-500 font-medium mt-0.5">
-                        Tài xế: <span className="font-semibold text-gray-700">{route.driverVehicleAssignment.driver.fullName}</span>
+                        Tài xế: <span className="font-semibold text-gray-700">{getDriverName(route.driverVehicleAssignment?.driver) || 'Chưa gán'}</span>
                       </p>
                     </div>
 
@@ -732,7 +711,7 @@ export const LiveTrackingTab: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-1 mt-3 text-[10px] text-gray-400 font-mono">
                     <span className="flex items-center gap-1">
-                      <Truck size={10} /> {route.driverVehicleAssignment.vehicle.licensePlate}
+                      <Truck size={10} /> {route.driverVehicleAssignment?.vehicle?.licensePlate || 'N/A'}
                     </span>
                     <span className="flex items-center gap-1 justify-end">
                       <Clock size={10} /> {route.plannedDurationMin} phút
@@ -845,7 +824,7 @@ export const LiveTrackingTab: React.FC = () => {
                     </MarkerContent>
                     <MarkerPopup closeButton={false}>
                       <div className="p-2 text-xs font-sans max-w-[200px]">
-                        <h4 className="font-bold text-slate-800">{r.driverVehicleAssignment.driver.fullName}</h4>
+                        <h4 className="font-bold text-slate-800">{getDriverName(r.driverVehicleAssignment?.driver) || 'Tài xế'}</h4>
                         <p className="text-[10px] text-slate-400 font-mono mt-0.5">{r.routeCode}</p>
                         <div className="mt-2 space-y-1 text-slate-600">
                           <p>Vận tốc: <span className="font-bold text-slate-800">
@@ -917,11 +896,11 @@ export const LiveTrackingTab: React.FC = () => {
             <div className="flex items-center gap-4 flex-wrap">
               <div>
                 <span className="text-[9px] font-bold text-gray-400 uppercase">Tài xế giao vận</span>
-                <p className="font-bold text-gray-800">{selectedRoute.driverVehicleAssignment.driver.fullName}</p>
+                <p className="font-bold text-gray-800">{getDriverName(selectedRoute.driverVehicleAssignment?.driver) || 'Chưa gán'}</p>
               </div>
               <div className="border-l border-gray-200 pl-4">
                 <span className="text-[9px] font-bold text-gray-400 uppercase">Phương tiện gán</span>
-                <p className="font-semibold text-gray-700">{selectedRoute.driverVehicleAssignment.vehicle.licensePlate}</p>
+                <p className="font-semibold text-gray-700">{selectedRoute.driverVehicleAssignment?.vehicle?.licensePlate || 'N/A'}</p>
               </div>
               <div className="border-l border-gray-200 pl-4">
                 <span className="text-[9px] font-bold text-gray-400 uppercase">Điểm xuất phát</span>
@@ -950,6 +929,17 @@ export const LiveTrackingTab: React.FC = () => {
 
       </div>
 
+      <RouteOptimizationModal
+        isOpen={isOptimizationModalOpen}
+        onClose={() => setIsOptimizationModalOpen(false)}
+        onSuccess={() => {
+          fetchRoutes();
+        }}
+        token={token}
+        facilityId={facilityFilter || userAssignedFacilityId}
+        facilities={facilities}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 };

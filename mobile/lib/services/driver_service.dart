@@ -108,6 +108,109 @@ class DriverService {
     return false;
   }
 
+  /// Fetch actual road navigation geometry from OSRM connecting all route stops sequentially (matching Web App)
+  static Future<List<LatLng>> fetchRouteOSRM({
+    required List<LatLng> stops,
+  }) async {
+    if (stops.length < 2) return stops;
+    try {
+      final coordsString = stops.map((p) => '${p.longitude},${p.latitude}').join(';');
+      final urlStr = 'https://router.project-osrm.org/route/v1/driving/$coordsString?overview=full&geometries=geojson';
+
+      debugPrint('🗺️ [OSRM API Mobile] Requesting direction: $urlStr');
+      final response = await http.get(Uri.parse(urlStr)).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['code'] == 'Ok' && body['routes'] != null && (body['routes'] as List).isNotEmpty) {
+          final List rawCoords = body['routes'][0]['geometry']['coordinates'];
+          final List<LatLng> decoded = rawCoords
+              .map<LatLng>((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
+              .toList();
+          debugPrint('🗺️ [OSRM API Mobile] Decoded ${decoded.length} road polyline points');
+          return decoded;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [OSRM API Mobile] Exception: $e');
+    }
+    return [];
+  }
+
+  /// Fetch complete road polyline starting from driver current location to Stop 1, Stop 2, ... Stop N
+  /// Uses Goong Maps API as primary road navigation engine, with OSRM / straight lines fallback.
+  static Future<List<LatLng>> fetchFullSequentialRoute({
+    required LatLng driverLocation,
+    required List<LatLng> stopLatLngs,
+  }) async {
+    if (stopLatLngs.isEmpty) return [driverLocation];
+
+    final List<LatLng> allWaypoints = [driverLocation, ...stopLatLngs];
+
+    // Attempt 1: Goong Maps Direction API (PRIMARY ENGINE)
+    try {
+      final List<Future<List<LatLng>>> segmentFutures = [];
+      for (int i = 0; i < allWaypoints.length - 1; i++) {
+        segmentFutures.add(_fetchGoongSegment(allWaypoints[i], allWaypoints[i + 1]));
+      }
+
+      final List<List<LatLng>> segments = await Future.wait(segmentFutures);
+      final List<LatLng> fullPolyline = [];
+      for (final seg in segments) {
+        if (seg.isNotEmpty) {
+          if (fullPolyline.isNotEmpty) {
+            fullPolyline.addAll(seg.skip(1));
+          } else {
+            fullPolyline.addAll(seg);
+          }
+        }
+      }
+
+      if (fullPolyline.length >= 2) {
+        debugPrint('🗺️ [Goong API Primary] Successfully fetched ${fullPolyline.length} road polyline points across ${segments.length} segments!');
+        return fullPolyline;
+      }
+    } catch (e) {
+      debugPrint('⚠️ [Goong API Primary] Exception: $e');
+    }
+
+    // Attempt 2: OSRM fallback if Goong API failed
+    try {
+      final osrmPoints = await fetchRouteOSRM(stops: allWaypoints);
+      if (osrmPoints.length >= 2) {
+        debugPrint('🗺️ [OSRM Fallback] Successfully fetched full route with ${osrmPoints.length} points!');
+        return osrmPoints;
+      }
+    } catch (e) {
+      debugPrint('⚠️ [OSRM Fallback] Error: $e');
+    }
+
+    // Attempt 3: Straight lines fallback through all points (Driver -> Stop 1 -> Stop 2 -> ... -> Stop N)
+    return allWaypoints;
+  }
+
+  /// Helper to fetch Goong Direction API between 2 coordinates (origin -> destination)
+  static Future<List<LatLng>> _fetchGoongSegment(LatLng origin, LatLng destination) async {
+    try {
+      final String originStr = '${origin.latitude},${origin.longitude}';
+      final String destStr = '${destination.latitude},${destination.longitude}';
+      final String urlStr = 'https://rsapi.goong.io/Direction?origin=$originStr&destination=$destStr&vehicle=bike&api_key=$goongApiKey';
+
+      final response = await http.get(Uri.parse(urlStr)).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['routes'] != null && (body['routes'] as List).isNotEmpty) {
+          final String polylineStr = body['routes'][0]['overview_polyline']['points'];
+          final decoded = decodePolyline(polylineStr);
+          if (decoded.isNotEmpty) return decoded;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [Goong Segment API] Error: $e');
+    }
+    return [origin, destination];
+  }
+
   /// Fetch actual road navigation geometry from Goong Maps Direction API
   static Future<List<LatLng>> fetchGoongRoutePolyline({
     required LatLng origin,

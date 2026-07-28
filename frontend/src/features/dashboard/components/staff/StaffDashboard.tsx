@@ -1,11 +1,12 @@
 import React from 'react';
-import { Package, Users, Building2, User, Earth, Truck } from 'lucide-react';
+import { Package, Users, Building2, User, Earth, Truck, BarChart3 } from 'lucide-react';
 import { DashboardShell } from '../layouts/DashboardShell';
 import type { MenuItem } from '../layouts/Sidebar';
 import { OrderTab } from '../OrderTab';
 import { CustomerTab } from '../CustomerTab';
 import { FacilityTab } from '../FacilityTab';
 import { LiveTrackingTab } from '../LiveTrackingTab';
+import { AnalyticsTab } from '../admin/AnalyticsTab';
 import { DriverTab } from '../DriverTab';
 import { VehicleTab } from '../VehicleTab';
 import { useAuth } from '../../../../context/AuthContext';
@@ -18,6 +19,13 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onBackToHome }) 
   const { user } = useAuth();
 
   const menuItems: MenuItem[] = [
+    {
+      id: 'analytics',
+      label: 'Thống kê Báo cáo',
+      icon: BarChart3,
+      component: AnalyticsTab,
+      allowed: true,
+    },
     {
       id: 'orders',
       label: 'Quản lý Đơn hàng',
