@@ -28,8 +28,8 @@ export class FacilityService {
 
     // Check manager user if provided
     if (dto.managerUserId) {
-      const managerExists = await prisma.user.findUnique({
-        where: { id: dto.managerUserId, deletedAt: null },
+      const managerExists = await prisma.user.findFirst({
+        where: { id: dto.managerUserId, isHidden: false },
       });
       if (!managerExists) {
         throw new BadRequestException('Tài khoản người quản lý không tồn tại');
@@ -132,8 +132,13 @@ export class FacilityService {
           manager: {
             select: {
               username: true,
-              email: true,
-              phone: true,
+              staff: {
+                select: {
+                  fullName: true,
+                  phone: true,
+                  email: true,
+                },
+              },
             },
           },
         },
@@ -173,8 +178,13 @@ export class FacilityService {
           select: {
             id: true,
             username: true,
-            email: true,
-            phone: true,
+            staff: {
+              select: {
+                fullName: true,
+                phone: true,
+                email: true,
+              },
+            },
           },
         },
       },

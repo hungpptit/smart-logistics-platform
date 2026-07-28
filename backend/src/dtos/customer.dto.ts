@@ -93,6 +93,14 @@ export class CreateAddressDto {
   @IsString({ message: 'Mã Phường/Xã phải là một chuỗi ký tự' })
   @IsOptional()
   wardCode?: string;
+
+  @IsString({ message: 'Tên người liên hệ kho phải là chuỗi' })
+  @IsOptional()
+  contactName?: string;
+
+  @IsString({ message: 'Số điện thoại người liên hệ kho phải là chuỗi' })
+  @IsOptional()
+  contactPhone?: string;
 }
 
 export class UpdateAddressDto {
@@ -139,4 +147,12 @@ export class UpdateAddressDto {
   @IsString({ message: 'Mã Phường/Xã phải là một chuỗi ký tự' })
   @IsOptional()
   wardCode?: string;
+
+  @IsString({ message: 'Tên người liên hệ kho phải là chuỗi' })
+  @IsOptional()
+  contactName?: string;
+
+  @IsString({ message: 'Số điện thoại người liên hệ kho phải là chuỗi' })
+  @IsOptional()
+  contactPhone?: string;
 }

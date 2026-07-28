@@ -17,6 +17,10 @@ export class RegisterDto {
   @IsOptional()
   phone?: string;
 
+  @IsString({ message: 'Họ và tên phải là một chuỗi ký tự' })
+  @IsOptional()
+  fullName?: string;
+
   @IsString({ message: 'Đường dẫn ảnh đại diện phải là một chuỗi ký tự' })
   @IsOptional()
   avatarUrl?: string;
@@ -28,7 +32,12 @@ export class RegisterDto {
 
 export class LoginDto {
   @IsString({ message: 'Tài khoản đăng nhập phải là một chuỗi ký tự' })
-  email!: string;
+  @IsOptional()
+  username?: string;
+
+  @IsString({ message: 'Email/Tài khoản đăng nhập phải là một chuỗi ký tự' })
+  @IsOptional()
+  email?: string;
 
   @IsString({ message: 'Mật khẩu phải là một chuỗi ký tự' })
   password!: string;

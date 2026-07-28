@@ -5,58 +5,35 @@ erDiagram
     Users {
         uuid id PK
         varchar username UK
-        varchar email UK
         text password_hash
-        varchar phone
-        text avatar_url
         user_status_enum status
+        boolean is_hidden
+        uuid role_id FK
         timestamptz last_login_at
         timestamptz created_at
         timestamptz updated_at
-        timestamptz deleted_at
     }
     Roles {
         uuid id PK
         varchar role_code UK
         varchar role_name
-        text description
         timestamptz created_at
     }
     Permissions {
         uuid id PK
         varchar permission_code UK
         varchar permission_name
-        varchar module
         text description
         timestamptz created_at
-    }
-    UserRoles {
-        uuid user_id PK, FK
-        uuid role_id PK, FK
-        timestamptz assigned_at
-        uuid assigned_by FK
     }
     RolePermissions {
         uuid role_id PK, FK
         uuid permission_id PK, FK
     }
-    StaffProfiles {
-        uuid id PK
-        uuid user_id FK, UK
-        varchar citizen_id UK
-        uuid assigned_facility_id FK
-        timestamptz created_at
-        timestamptz updated_at
-        timestamptz deleted_at
-    }
 
-    Users ||--o{ UserRoles : "has"
-    Roles ||--o{ UserRoles : "linked"
+    Roles ||--o{ Users : "has_role"
     Roles ||--o{ RolePermissions : "contains"
     Permissions ||--o{ RolePermissions : "linked"
-    Users ||--o{ UserRoles : "assigned_by"
-    Users ||--o| StaffProfiles : "has_profile"
-    Facilities ||--o{ StaffProfiles : "assigned_facility"
 
     %% ==========================================
     %% MODULE 2: CUSTOMERS & ADDRESSES
@@ -65,14 +42,16 @@ erDiagram
         uuid id PK
         uuid user_id FK, UK
         varchar customer_code UK
+        varchar full_name
+        varchar phone
+        varchar email
         customer_type_enum customer_type
         varchar company_name
         varchar tax_code
         customer_status_enum status
-        text note
+        boolean is_hidden
         timestamptz created_at
         timestamptz updated_at
-        timestamptz deleted_at
     }
     Addresses {
         uuid id PK
@@ -294,25 +273,27 @@ erDiagram
     %% ==========================================
     %% MODULE 6: FLEET & DRIVER MANAGEMENT
     %% ==========================================
-    Drivers {
+    Staff {
         uuid id PK
         uuid user_id FK, UK
         varchar employee_code UK
         varchar full_name
-        varchar phone UK
+        varchar phone
+        varchar email
         varchar citizen_id UK
+        varchar position
+        uuid assigned_facility_id FK
         varchar driver_license_number
         varchar driver_license_class
-        date hire_date
+        driver_type_enum driver_type
         driver_employment_status_enum employment_status
+        date hire_date
         double_precision preferred_latitude
         double_precision preferred_longitude
-        driver_type_enum driver_type
-        uuid home_facility_id FK
         text note
+        boolean is_hidden
         timestamptz created_at
         timestamptz updated_at
-        timestamptz deleted_at
     }
     Vehicles {
         uuid id PK
@@ -355,13 +336,13 @@ erDiagram
         timestamptz recorded_at
     }
 
-    Users ||--o| Drivers : "linked_to_account"
-    Facilities ||--o{ Drivers : "home_depot"
+    Users ||--o| Staff : "has_profile"
+    Facilities ||--o{ Staff : "assigned_facility"
     VehicleTypes ||--o{ Vehicles : "defines"
     Facilities ||--o{ Vehicles : "home_garage"
-    Drivers ||--o{ DriverVehicleAssignments : "assigned_to"
+    Staff ||--o{ DriverVehicleAssignments : "assigned_to"
     Vehicles ||--o{ DriverVehicleAssignments : "used_by"
-    Drivers ||--|| DriverLocations : "realtime_location"
+    Staff ||--|| DriverLocations : "realtime_location"
     VehicleTypes ||--o{ Packages : "required_capacity"
 
     %% ==========================================

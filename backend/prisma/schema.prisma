@@ -282,23 +282,18 @@ enum DriverType {
 model User {
   id               String       @id @default(uuid()) @db.Uuid
   username         String       @unique @db.VarChar(50)
-  email            String       @unique @db.VarChar(255)
   passwordHash     String       @map("password_hash") @db.Text
-  
-  // FIX LỖI 12: Thêm fullName (Single Source of Truth cho Tên người dùng)
-  fullName         String?      @map("full_name") @db.VarChar(150)
-  phone            String?      @db.VarChar(20)
-  avatarUrl        String?      @map("avatar_url") @db.Text
   status           UserStatus   @default(ACTIVE)
+  isHidden         Boolean      @default(false) @map("is_hidden")
   lastLoginAt      DateTime?    @map("last_login_at") @db.Timestamptz
   createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz
   roleId           String       @map("role_id") @db.Uuid
 
   // Quan hệ
   role                  Role                 @relation(fields: [roleId], references: [id], onDelete: Restrict)
   customer              Customer?
+  staff                 Staff?
   managedFacilities     Facility[]           @relation("FacilityManager")
   createdOrders         Order[]              @relation("OrderCreator")
   updatedOrders         Order[]              @relation("OrderUpdater")
@@ -306,13 +301,11 @@ model User {
   createdShipments      Shipment[]           @relation("ShipmentCreator")
   updatedShipments      Shipment[]           @relation("ShipmentUpdater")
   receivedTransfers     ShipmentTransfer[]
-  driver                Driver?
   assignedDispatchTasks DispatchTask[]
   trackingEvents        TrackingEvent[]
   barcodeScans          BarcodeScan[]
   systemSettings        SystemSetting[]
   shipmentEvents        ShipmentEvent[]
-  staffProfile          StaffProfile?
 
   @@map("users")
 }
@@ -358,20 +351,21 @@ model RolePermission {
 
 model Customer {
   id           String         @id @default(uuid()) @db.Uuid
-  
-  // FIX LỖI 11: userId bắt buộc @unique (Clean Architecture 1-1)
   userId       String         @unique @map("user_id") @db.Uuid
   customerCode String         @unique @map("customer_code") @db.VarChar(30)
+  fullName     String         @map("full_name") @db.VarChar(150)
+  phone        String         @db.VarChar(20)
+  email        String?        @db.VarChar(255)
   customerType CustomerType   @map("customer_type")
   companyName  String?        @map("company_name") @db.VarChar(255)
   taxCode      String?        @map("tax_code") @db.VarChar(30)
   status       CustomerStatus @default(ACTIVE)
+  isHidden     Boolean        @default(false) @map("is_hidden")
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  deletedAt    DateTime?      @map("deleted_at") @db.Timestamptz
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   addresses    CustomerAddress[]
-  contacts     CustomerContact[]
   orders       Order[]
 
   @@map("customers")
@@ -404,37 +398,21 @@ model Address {
 }
 
 model CustomerAddress {
-  id          String              @id @default(uuid()) @db.Uuid
-  customerId  String              @map("customer_id") @db.Uuid
-  addressId   String              @map("address_id") @db.Uuid
-  addressType CustomerAddressType @map("address_type")
-  isDefault   Boolean             @default(false) @map("is_default")
-  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  id           String              @id @default(uuid()) @db.Uuid
+  customerId   String              @map("customer_id") @db.Uuid
+  addressId    String              @map("address_id") @db.Uuid
+  addressType  CustomerAddressType @map("address_type")
+  isDefault    Boolean             @default(false) @map("is_default")
+  contactName  String?             @map("contact_name") @db.VarChar(150)
+  contactPhone String?             @map("contact_phone") @db.VarChar(20)
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz
 
-  customer    Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  address     Address             @relation(fields: [addressId], references: [id], onDelete: Restrict)
+  customer     Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  address      Address             @relation(fields: [addressId], references: [id], onDelete: Restrict)
 
   @@unique([customerId, addressId])
   @@index([customerId], name: "idx_cust_addr_customer")
   @@map("customer_addresses")
-}
-
-model CustomerContact {
-  id         String   @id @default(uuid()) @db.Uuid
-  customerId String   @map("customer_id") @db.Uuid
-  fullName   String   @map("full_name") @db.VarChar(150)
-  phone      String   @db.VarChar(20)
-  email      String?  @db.VarChar(255)
-  position   String?  @db.VarChar(100)
-  isPrimary  Boolean  @default(false) @map("is_primary")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
-
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  senderOrders Order[] @relation("OrderSenderContact")
-  receiverOrders Order[] @relation("OrderReceiverContact")
-
-  @@index([customerId], name: "idx_cust_contacts_customer")
-  @@map("customer_contacts")
 }
 
 // ==========================================
@@ -479,14 +457,13 @@ model Facility {
   facilityZones     FacilityZone[]
   transfersFrom     ShipmentTransfer[] @relation("TransferFromFacility")
   transfersTo       ShipmentTransfer[] @relation("TransferToFacility")
-  drivers           Driver[]
+  staffMembers      Staff[]
   vehicles          Vehicle[]
   startRoutes       Route[]           @relation("RouteStartFacility")
   endRoutes         Route[]           @relation("RouteEndFacility")
   routeStops        RouteStop[]
   shipmentEvents    ShipmentEvent[]
   barcodeScans      BarcodeScan[]
-  staffProfiles     StaffProfile[]
   originOrders      Order[]           @relation("OrderOriginFacility")
   destinationOrders Order[]           @relation("OrderDestinationFacility")
   packages          Package[]         @relation("PackageCurrentFacility")
@@ -565,7 +542,6 @@ model Order {
   scheduledPickupAt     DateTime?     @map("scheduled_pickup_at") @db.Timestamptz
   
   pickupAddressId       String?       @map("pickup_address_id") @db.Uuid
-  senderContactId       String?       @map("sender_contact_id") @db.Uuid
   senderName            String        @map("sender_name") @db.VarChar(150)
   senderPhone           String        @map("sender_phone") @db.VarChar(20)
   pickupAddressText     String        @map("pickup_address_text") @db.Text
@@ -573,7 +549,6 @@ model Order {
   pickupLongitude       Float         @map("pickup_longitude") @db.DoublePrecision
 
   deliveryAddressId     String?       @map("delivery_address_id") @db.Uuid
-  receiverContactId     String?       @map("receiver_contact_id") @db.Uuid
   receiverName          String        @map("receiver_name") @db.VarChar(150)
   receiverPhone         String        @map("receiver_phone") @db.VarChar(20)
   deliveryAddressText   String        @map("delivery_address_text") @db.Text
@@ -602,8 +577,6 @@ model Order {
   service               Service       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   pickupAddress         Address?      @relation("OrderPickupAddress", fields: [pickupAddressId], references: [id], onDelete: SetNull)
   deliveryAddress       Address?      @relation("OrderDeliveryAddress", fields: [deliveryAddressId], references: [id], onDelete: SetNull)
-  senderContact         CustomerContact? @relation("OrderSenderContact", fields: [senderContactId], references: [id], onDelete: SetNull)
-  receiverContact       CustomerContact? @relation("OrderReceiverContact", fields: [receiverContactId], references: [id], onDelete: SetNull)
   creator               User?         @relation("OrderCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   updater               User?         @relation("OrderUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
   originFacility        Facility?     @relation("OrderOriginFacility", fields: [originFacilityId], references: [id], onDelete: SetNull)
@@ -781,52 +754,41 @@ model ShipmentTransfer {
 // MODULE 6: FLEET & DRIVER MANAGEMENT
 // ==========================================
 
-model Driver {
-  id                   String                 @id @default(uuid()) @db.Uuid
-  
-  // FIX LỖI 11: userId bắt buộc @unique (Clean Architecture 1-1)
-  userId               String                 @unique @map("user_id") @db.Uuid
-  employeeCode         String                 @unique @map("employee_code") @db.VarChar(30)
-  citizenId            String?                @unique @map("citizen_id") @db.VarChar(20)
-  driverLicenseNumber  String                 @map("driver_license_number") @db.VarChar(50)
-  driverLicenseClass   String                 @map("driver_license_class") @db.VarChar(10)
-  hireDate             DateTime               @map("hire_date") @db.Date
-  employmentStatus     DriverEmploymentStatus @map("employment_status")
-  homeFacilityId       String?                @map("home_facility_id") @db.Uuid
-  driverType           DriverType             @default(HUB_DELIVERY) @map("driver_type")
-  preferredLatitude    Float?                 @map("preferred_latitude")
-  preferredLongitude   Float?                 @map("preferred_longitude")
-  note                 String?                @db.Text
-  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt            DateTime?              @map("deleted_at") @db.Timestamptz
+model Staff {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  userId               String                  @unique @map("user_id") @db.Uuid
+  employeeCode         String                  @unique @map("employee_code") @db.VarChar(30)
+  fullName             String                  @map("full_name") @db.VarChar(150)
+  phone                String                  @db.VarChar(20)
+  email                String?                 @db.VarChar(255)
+  citizenId            String?                 @unique @map("citizen_id") @db.VarChar(20)
+  position             String                  @db.VarChar(100)
+  assignedFacilityId   String?                 @map("assigned_facility_id") @db.Uuid
 
-  user                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  homeFacility         Facility?              @relation(fields: [homeFacilityId], references: [id], onDelete: SetNull)
+  // Thông tin mở rộng cho Tài xế (NULL nếu là Staff văn phòng/kho)
+  driverLicenseNumber  String?                 @unique @map("driver_license_number") @db.VarChar(50)
+  driverLicenseClass   String?                 @map("driver_license_class") @db.VarChar(10)
+  driverType           DriverType?             @map("driver_type")
+  employmentStatus     DriverEmploymentStatus? @default(ACTIVE) @map("employment_status")
+  hireDate             DateTime?               @map("hire_date") @db.Date
+  preferredLatitude    Float?                  @map("preferred_latitude")
+  preferredLongitude   Float?                  @map("preferred_longitude")
+  note                 String?                 @db.Text
+
+  isHidden             Boolean                 @default(false) @map("is_hidden")
+  createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime                @updatedAt @map("updated_at") @db.Timestamptz
+
+  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedFacility     Facility?               @relation(fields: [assignedFacilityId], references: [id], onDelete: SetNull)
   assignments          DriverVehicleAssignment[]
   location             DriverLocation?
   dispatchTasks        DispatchTask[]
   checkIns             DriverCheckIn[]
 
-  @@index([employmentStatus], name: "idx_drivers_status")
-  @@index([homeFacilityId], name: "idx_drivers_home")
-  @@map("drivers")
-}
-
-model StaffProfile {
-  id                 String    @id @default(uuid()) @db.Uuid
-  userId             String    @unique @map("user_id") @db.Uuid
-  employeeCode       String    @unique @map("employee_code") @db.VarChar(30)
-  citizenId          String?   @unique @map("citizen_id") @db.VarChar(20)
-  position           String?   @db.VarChar(100)
-  assignedFacilityId String?   @map("assigned_facility_id") @db.Uuid
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
-
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignedFacility   Facility? @relation(fields: [assignedFacilityId], references: [id], onDelete: SetNull)
-
-  @@map("staff_profiles")
+  @@index([employmentStatus], name: "idx_staff_status")
+  @@index([assignedFacilityId], name: "idx_staff_facility")
+  @@map("staff")
 }
 
 model Vehicle {
@@ -874,7 +836,7 @@ model DriverVehicleAssignment {
   assignedTo   DateTime? @map("assigned_to") @db.Timestamptz
   isActive     Boolean   @default(true) @map("is_active")
 
-  driver       Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driver       Staff     @relation(fields: [driverId], references: [id], onDelete: Cascade)
   vehicle      Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   routes       Route[]
 
@@ -892,7 +854,7 @@ model DriverLocation {
   accuracy   Float?   @db.Real
   recordedAt DateTime @map("recorded_at") @db.Timestamptz
 
-  driver     Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driver     Staff    @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
   @@index([latitude, longitude], name: "idx_drv_loc_coords")
   @@map("driver_locations")
@@ -991,7 +953,7 @@ model DispatchTask {
 
   route        Route              @relation(fields: [routeId], references: [id], onDelete: Restrict)
   assigner     User               @relation(fields: [assignedBy], references: [id], onDelete: Restrict)
-  driver       Driver             @relation(fields: [assignedTo], references: [id], onDelete: Restrict)
+  driver       Staff              @relation(fields: [assignedTo], references: [id], onDelete: Restrict)
 
   @@index([assignedTo], name: "idx_disp_tasks_driver")
   @@index([status], name: "idx_disp_tasks_status")
@@ -1139,7 +1101,7 @@ model DriverCheckIn {
   note       String?   @db.Text
 
   routeStop  RouteStop @relation(fields: [routeStopId], references: [id], onDelete: Cascade)
-  driver     Driver    @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  driver     Staff     @relation(fields: [driverId], references: [id], onDelete: Restrict)
 
   @@map("driver_check_ins")
 }

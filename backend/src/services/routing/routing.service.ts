@@ -58,11 +58,12 @@ export class RoutingService {
     }
 
     // 3. Fetch all active drivers assigned to this facility
-    const drivers = await prisma.driver.findMany({
+    const drivers = await prisma.staff.findMany({
       where: {
-        homeFacilityId: facilityId,
+        assignedFacilityId: facilityId,
+        position: 'DRIVER',
         employmentStatus: 'ACTIVE',
-        deletedAt: null,
+        isHidden: false,
       },
       include: {
         location: true,
@@ -77,7 +78,7 @@ export class RoutingService {
 
     // Filter drivers that have active vehicle assignments
     const availableDrivers = drivers.filter(
-      (driver) => driver.assignments.some((a) => a.isActive)
+      (driver: any) => driver.assignments.some((a: any) => a.isActive)
     );
 
     if (availableDrivers.length === 0) {
@@ -351,12 +352,8 @@ export class RoutingService {
               select: {
                 id: true,
                 employeeCode: true,
-                user: {
-                  select: {
-                    fullName: true,
-                    phone: true,
-                  },
-                },
+                fullName: true,
+                phone: true,
               },
             },
             vehicle: {
@@ -436,12 +433,8 @@ export class RoutingService {
               select: {
                 id: true,
                 employeeCode: true,
-                user: {
-                  select: {
-                    fullName: true,
-                    phone: true,
-                  },
-                },
+                fullName: true,
+                phone: true,
               },
             },
             vehicle: {

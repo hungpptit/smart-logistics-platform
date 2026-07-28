@@ -10,22 +10,24 @@ export class CustomerService {
    * Create a new customer profile
    */
   public async createCustomer(dto: CreateCustomerDto) {
-    // Check if email already exists
-    const emailExists = await prisma.user.findFirst({
-      where: {
-        email: dto.email,
-        deletedAt: null,
-      },
-    });
-    if (emailExists) {
-      throw new BadRequestException('Địa chỉ email tài khoản đã được đăng ký');
+    // Check if email already exists in customers
+    if (dto.email) {
+      const emailExists = await prisma.customer.findFirst({
+        where: {
+          email: dto.email,
+          isHidden: false,
+        },
+      });
+      if (emailExists) {
+        throw new BadRequestException('Địa chỉ email tài khoản đã được đăng ký');
+      }
     }
 
-    // Check if phone already exists
-    const phoneExists = await prisma.user.findFirst({
+    // Check if phone already exists in customers
+    const phoneExists = await prisma.customer.findFirst({
       where: {
         phone: dto.phone,
-        deletedAt: null,
+        isHidden: false,
       },
     });
     if (phoneExists) {
@@ -36,7 +38,7 @@ export class CustomerService {
     const count = await prisma.customer.count();
     const customerCode = `CUST-${String(count + 1).padStart(6, '0')}`;
 
-    // Generate unique username from Full Name (lower case, remove accents/diacritics/spaces, append random number)
+    // Generate unique username from Full Name
     let slug = dto.fullName.toLowerCase();
     slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     slug = slug.replace(/[đĐ]/g, "d");
@@ -62,9 +64,7 @@ export class CustomerService {
       const user = await tx.user.create({
         data: {
           username,
-          email: dto.email,
           passwordHash,
-          phone: dto.phone,
           status: 'ACTIVE',
           roleId: role.id,
         },
@@ -74,6 +74,9 @@ export class CustomerService {
         data: {
           userId: user.id,
           customerCode,
+          fullName: dto.fullName,
+          phone: dto.phone,
+          email: dto.email || null,
           customerType: dto.customerType,
           companyName: dto.companyName || null,
           taxCode: dto.taxCode || null,
@@ -83,8 +86,7 @@ export class CustomerService {
           user: {
             select: {
               username: true,
-              email: true,
-              phone: true,
+              status: true,
             },
           },
         },
@@ -113,11 +115,14 @@ export class CustomerService {
     const limit = parseInt(query.limit || '10', 10);
     const skip = (page - 1) * limit;
 
-    const where: any = { deletedAt: null };
+    const where: any = { isHidden: false };
 
     if (query.search) {
       where.OR = [
         { customerCode: { contains: query.search, mode: 'insensitive' } },
+        { fullName: { contains: query.search, mode: 'insensitive' } },
+        { phone: { contains: query.search, mode: 'insensitive' } },
+        { email: { contains: query.search, mode: 'insensitive' } },
         { companyName: { contains: query.search, mode: 'insensitive' } },
         { taxCode: { contains: query.search, mode: 'insensitive' } },
       ];
@@ -142,8 +147,7 @@ export class CustomerService {
           user: {
             select: {
               username: true,
-              email: true,
-              phone: true,
+              status: true,
             },
           },
         },
@@ -171,9 +175,7 @@ export class CustomerService {
         user: {
           select: {
             username: true,
-            email: true,
-            phone: true,
-            avatarUrl: true,
+            status: true,
           },
         },
         addresses: {
@@ -184,7 +186,7 @@ export class CustomerService {
       },
     });
 
-    if (!customer || customer.deletedAt) {
+    if (!customer || customer.isHidden) {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng');
     }
 
@@ -199,7 +201,7 @@ export class CustomerService {
       where: { id },
     });
 
-    if (!customer || customer.deletedAt) {
+    if (!customer || customer.isHidden) {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng để cập nhật');
     }
 
@@ -215,7 +217,7 @@ export class CustomerService {
   }
 
   /**
-   * Soft delete customer (checking active orders)
+   * Soft hide customer (checking active orders)
    */
   public async deleteCustomer(id: string) {
     const customer = await prisma.customer.findUnique({
@@ -223,16 +225,13 @@ export class CustomerService {
       include: { user: true },
     });
 
-    if (!customer || customer.deletedAt) {
+    if (!customer || customer.isHidden) {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng để xóa');
     }
 
-    // Check if customer has any active orders (non-completed orders)
-    // Active orders are defined as orders still in the processing cycle
     const activeOrder = await prisma.order.findFirst({
       where: {
         customerId: id,
-        deletedAt: null,
       },
     });
 
@@ -240,27 +239,20 @@ export class CustomerService {
       throw new BadRequestException('Không thể xóa khách hàng đang có đơn hàng trong hệ thống');
     }
 
-    const timestamp = Date.now();
-
     await prisma.$transaction(async (tx) => {
-      // 1. Soft delete the customer
+      // 1. Soft hide the customer
       await tx.customer.update({
         where: { id },
-        data: { deletedAt: new Date() },
+        data: { isHidden: true },
       });
 
-      // 2. Soft delete the associated User and release username/email
-      if (customer.userId && customer.user) {
-        const deletedEmail = `del_${timestamp}_${customer.user.email.slice(0, 50)}@deleted.com`;
-        const deletedUsername = `del_${timestamp.toString().slice(-6)}_${customer.user.username.slice(0, 30)}`;
-
+      // 2. Soft hide the associated User
+      if (customer.userId) {
         await tx.user.update({
           where: { id: customer.userId },
           data: {
-            deletedAt: new Date(),
-            status: 'LOCKED',
-            email: deletedEmail.slice(0, 255),
-            username: deletedUsername.slice(0, 50),
+            isHidden: true,
+            status: 'DISABLED',
           },
         });
       }
@@ -277,7 +269,7 @@ export class CustomerService {
       where: { id: customerId },
     });
 
-    if (!customer || customer.deletedAt) {
+    if (!customer || customer.isHidden) {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng');
     }
 
@@ -285,7 +277,6 @@ export class CustomerService {
     const formattedAddress = `${dto.addressLine1}, ${resolved.ward}, ${resolved.province}, ${dto.country || 'Vietnam'}`;
 
     return await prisma.$transaction(async (tx) => {
-      // 1. Create Address record
       const address = await tx.address.create({
         data: {
           addressLine1: dto.addressLine1,
@@ -299,7 +290,6 @@ export class CustomerService {
         },
       });
 
-      // 2. If this is default address, set others to not default
       if (dto.isDefault) {
         await tx.customerAddress.updateMany({
           where: { customerId },
@@ -307,46 +297,46 @@ export class CustomerService {
         });
       }
 
-      // 3. Create link record
-      const customerAddress = await tx.customerAddress.create({
+      return await tx.customerAddress.create({
         data: {
           customerId,
           addressId: address.id,
           addressType: dto.addressType,
           isDefault: dto.isDefault || false,
+          contactName: dto.contactName || null,
+          contactPhone: dto.contactPhone || null,
         },
         include: {
           address: true,
         },
       });
-
-      return customerAddress;
     });
   }
 
   /**
-   * Get address book of a customer
+   * Get all addresses for a customer
    */
   public async getAddresses(customerId: string) {
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
+      include: {
+        addresses: {
+          include: {
+            address: true,
+          },
+        },
+      },
     });
 
-    if (!customer || customer.deletedAt) {
+    if (!customer || customer.isHidden) {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng');
     }
 
-    return await prisma.customerAddress.findMany({
-      where: { customerId },
-      include: {
-        address: true,
-      },
-      orderBy: { isDefault: 'desc' },
-    });
+    return customer.addresses;
   }
 
   /**
-   * Update address book entry
+   * Update customer address
    */
   public async updateAddress(customerId: string, addressId: string, dto: UpdateAddressDto) {
     const customerAddress = await prisma.customerAddress.findUnique({
@@ -356,44 +346,35 @@ export class CustomerService {
           addressId,
         },
       },
-      include: {
-        address: true,
-      },
     });
 
     if (!customerAddress) {
-      throw new NotFoundException('Không tìm thấy địa chỉ trong sổ địa chỉ của khách hàng');
+      throw new NotFoundException('Không tìm thấy địa chỉ của khách hàng');
     }
 
+    const resolved = await resolveAddressDetails({
+      addressLine1: dto.addressLine1 || '',
+      ward: dto.ward || '',
+      province: dto.province || '',
+      country: dto.country,
+    });
+    const formattedAddress = `${dto.addressLine1 || ''}, ${resolved.ward}, ${resolved.province}, ${dto.country || 'Vietnam'}`;
+
     return await prisma.$transaction(async (tx) => {
-      const updatedAddressLine1 = dto.addressLine1 ?? customerAddress.address.addressLine1;
-      const updatedCountry = dto.country ?? customerAddress.address.country;
-
-      // Resolve address details if wardCode is provided, or fallback to input/existing values
-      const resolved = await resolveAddressDetails({
-        addressLine1: updatedAddressLine1,
-        ward: dto.ward ?? customerAddress.address.ward,
-        province: dto.province ?? customerAddress.address.province,
-        wardCode: dto.wardCode ?? (customerAddress.address.wardCode || undefined),
-      });
-
-      const formattedAddress = `${updatedAddressLine1}, ${resolved.ward}, ${resolved.province}, ${updatedCountry}`;
-
-      await tx.address.update({
+      const address = await tx.address.update({
         where: { id: addressId },
         data: {
-          addressLine1: updatedAddressLine1,
+          addressLine1: dto.addressLine1 !== undefined ? dto.addressLine1 : undefined,
           ward: resolved.ward,
           province: resolved.province,
-          country: updatedCountry,
-          latitude: dto.latitude ?? customerAddress.address.latitude,
-          longitude: dto.longitude ?? customerAddress.address.longitude,
+          country: dto.country !== undefined ? dto.country : undefined,
+          latitude: dto.latitude !== undefined ? dto.latitude : undefined,
+          longitude: dto.longitude !== undefined ? dto.longitude : undefined,
           formattedAddress,
           wardCode: resolved.wardCode,
         },
       });
 
-      // 2. If isDefault is changing to true, update all other customer addresses to false
       if (dto.isDefault) {
         await tx.customerAddress.updateMany({
           where: { customerId },
@@ -401,7 +382,6 @@ export class CustomerService {
         });
       }
 
-      // 3. Update customer link
       const updatedCustomerAddress = await tx.customerAddress.update({
         where: {
           customerId_addressId: {
@@ -410,8 +390,10 @@ export class CustomerService {
           },
         },
         data: {
-          addressType: dto.addressType ?? customerAddress.addressType,
-          isDefault: dto.isDefault !== undefined ? dto.isDefault : customerAddress.isDefault,
+          addressType: dto.addressType !== undefined ? dto.addressType : undefined,
+          isDefault: dto.isDefault !== undefined ? dto.isDefault : undefined,
+          contactName: dto.contactName !== undefined ? dto.contactName : undefined,
+          contactPhone: dto.contactPhone !== undefined ? dto.contactPhone : undefined,
         },
         include: {
           address: true,
@@ -423,7 +405,7 @@ export class CustomerService {
   }
 
   /**
-   * Delete address book entry
+   * Delete customer address
    */
   public async deleteAddress(customerId: string, addressId: string) {
     const customerAddress = await prisma.customerAddress.findUnique({
@@ -436,24 +418,16 @@ export class CustomerService {
     });
 
     if (!customerAddress) {
-      throw new NotFoundException('Không tìm thấy địa chỉ trong sổ địa chỉ của khách hàng');
+      throw new NotFoundException('Không tìm thấy địa chỉ của khách hàng');
     }
 
-    await prisma.$transaction(async (tx) => {
-      // 1. Delete link
-      await tx.customerAddress.delete({
-        where: {
-          customerId_addressId: {
-            customerId,
-            addressId,
-          },
+    await prisma.customerAddress.delete({
+      where: {
+        customerId_addressId: {
+          customerId,
+          addressId,
         },
-      });
-
-      // 2. Delete actual address
-      await tx.address.delete({
-        where: { id: addressId },
-      });
+      },
     });
 
     return { success: true };

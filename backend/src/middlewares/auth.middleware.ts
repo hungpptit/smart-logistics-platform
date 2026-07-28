@@ -37,9 +37,11 @@ export const authMiddleware = async (
     }
 
     // Fetch user details with roles and permissions to ensure they are active and valid
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id, deletedAt: null },
+    const user = await prisma.user.findFirst({
+      where: { id: decoded.id, isHidden: false },
       include: {
+        staff: true,
+        customer: true,
         role: {
           include: {
             rolePermissions: {
@@ -61,17 +63,21 @@ export const authMiddleware = async (
     }
 
     // Extract roles and flat map permissions
-    const roles = [user.role.roleCode];
-    const permissions = Array.from(
-      new Set(
-        user.role.rolePermissions.map((rp) => rp.permission.permissionCode)
-      )
-    );
+    const roles = user.role ? [user.role.roleCode] : [];
+    const permissions: string[] = user.role?.rolePermissions
+      ? Array.from(
+          new Set(
+            user.role.rolePermissions.map((rp: any) => rp.permission.permissionCode)
+          )
+        )
+      : [];
+
+    const profileEmail = user.staff?.email || user.customer?.email || '';
 
     req.user = {
       id: user.id,
       username: user.username,
-      email: user.email,
+      email: profileEmail,
       roles,
       permissions,
     };

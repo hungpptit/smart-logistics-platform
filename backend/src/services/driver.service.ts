@@ -9,17 +9,17 @@ export class DriverService {
    * Create a new driver profile
    */
   public async createDriver(dto: CreateDriverDto) {
-    // Check if phone already exists in users table
-    const phoneExists = await prisma.user.findFirst({
-      where: { phone: dto.phone, deletedAt: null },
+    // Check if phone already exists in staff table
+    const phoneExists = await prisma.staff.findFirst({
+      where: { phone: dto.phone, isHidden: false },
     });
     if (phoneExists) {
       throw new BadRequestException('Số điện thoại tài xế đã tồn tại trên hệ thống');
     }
 
-    // Check if citizenId already exists in drivers table if provided
+    // Check if citizenId already exists in staff table if provided
     if (dto.citizenId) {
-      const citizenExists = await prisma.driver.findUnique({
+      const citizenExists = await prisma.staff.findUnique({
         where: { citizenId: dto.citizenId },
       });
       if (citizenExists) {
@@ -30,7 +30,7 @@ export class DriverService {
     // Check home facility if provided
     if (dto.homeFacilityId) {
       const facilityExists = await prisma.facility.findUnique({
-        where: { id: dto.homeFacilityId, deletedAt: null },
+        where: { id: dto.homeFacilityId },
       });
       if (!facilityExists) {
         throw new BadRequestException('Kho bãi hoạt động không tồn tại hoặc đã bị xóa');
@@ -38,7 +38,7 @@ export class DriverService {
     }
 
     // Generate unique employee code by finding the highest current code
-    const latestDriver = await prisma.driver.findFirst({
+    const latestDriver = await prisma.staff.findFirst({
       orderBy: { employeeCode: 'desc' },
     });
 
@@ -51,11 +51,11 @@ export class DriverService {
     }
     const employeeCode = `DRV-${String(nextNumber).padStart(6, '0')}`;
 
-    // Always check if email already exists
-    const emailExists = await prisma.user.findFirst({
+    // Always check if email already exists in staff
+    const emailExists = await prisma.staff.findFirst({
       where: {
         email: dto.email,
-        deletedAt: null,
+        isHidden: false,
       },
     });
 
@@ -63,7 +63,7 @@ export class DriverService {
       throw new BadRequestException('Địa chỉ email tài khoản đã được đăng ký');
     }
 
-    // Generate unique username from Full Name (lower case, remove accents/diacritics/spaces, append random number)
+    // Generate unique username from Full Name
     let slug = dto.fullName.toLowerCase();
     slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     slug = slug.replace(/[đĐ]/g, "d");
@@ -85,41 +85,41 @@ export class DriverService {
     const rawPassword = `Drv@${Math.floor(100000 + Math.random() * 900000)}`;
     const passwordHash = await bcrypt.hash(rawPassword, 10);
 
-    // Create User and Driver in a transaction
+    // Create User and Staff (Driver profile) in a transaction
     const driver = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           username,
-          email: dto.email,
           passwordHash,
-          fullName: dto.fullName,
-          phone: dto.phone,
           status: 'ACTIVE',
           roleId: role.id,
         },
       });
 
-      return await tx.driver.create({
+      return await tx.staff.create({
         data: {
           employeeCode,
+          fullName: dto.fullName,
+          phone: dto.phone,
+          email: dto.email,
+          position: 'DRIVER',
           citizenId: dto.citizenId || null,
           driverLicenseNumber: dto.driverLicenseNumber,
           driverLicenseClass: dto.driverLicenseClass,
           hireDate: new Date(dto.hireDate),
           employmentStatus: dto.employmentStatus || 'ACTIVE',
           userId: user.id,
-          homeFacilityId: dto.homeFacilityId || null,
+          assignedFacilityId: dto.homeFacilityId || null,
           note: dto.note || null,
           preferredLatitude: dto.preferredLatitude !== undefined ? dto.preferredLatitude : null,
           preferredLongitude: dto.preferredLongitude !== undefined ? dto.preferredLongitude : null,
           driverType: dto.driverType || 'HUB_DELIVERY',
         },
         include: {
-          homeFacility: true,
+          assignedFacility: true,
           user: {
             select: {
               username: true,
-              email: true,
               status: true,
             },
           },
@@ -142,14 +142,14 @@ export class DriverService {
   }
 
   /**
-   * Get list of drivers with pagination, search, and filters (including home facility classification)
+   * Get list of drivers with pagination, search, and filters
    */
   public async getDrivers(query: { page?: string; limit?: string; search?: string; facilityId?: string; status?: string }) {
     const page = parseInt(query.page || '1', 10);
     const limit = parseInt(query.limit || '10', 10);
     const skip = (page - 1) * limit;
 
-    const where: any = { deletedAt: null };
+    const where: any = { isHidden: false, position: 'DRIVER' };
 
     if (query.search) {
       where.OR = [
@@ -160,7 +160,7 @@ export class DriverService {
     }
 
     if (query.facilityId) {
-      where.homeFacilityId = query.facilityId;
+      where.assignedFacilityId = query.facilityId;
     }
 
     if (query.status) {
@@ -168,14 +168,14 @@ export class DriverService {
     }
 
     const [total, drivers] = await prisma.$transaction([
-      prisma.driver.count({ where }),
-      prisma.driver.findMany({
+      prisma.staff.count({ where }),
+      prisma.staff.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          homeFacility: {
+          assignedFacility: {
             select: {
               id: true,
               facilityCode: true,
@@ -186,7 +186,6 @@ export class DriverService {
             select: {
               id: true,
               username: true,
-              email: true,
               status: true,
             },
           },
@@ -209,15 +208,14 @@ export class DriverService {
    * Get driver details by ID
    */
   public async getDriverById(id: string) {
-    const driver = await prisma.driver.findUnique({
+    const driver = await prisma.staff.findUnique({
       where: { id },
       include: {
-        homeFacility: true,
+        assignedFacility: true,
         user: {
           select: {
             id: true,
             username: true,
-            email: true,
             status: true,
           },
         },
@@ -229,7 +227,7 @@ export class DriverService {
       },
     });
 
-    if (!driver || driver.deletedAt) {
+    if (!driver || driver.isHidden) {
       throw new NotFoundException('Không tìm thấy thông tin tài xế');
     }
 
@@ -240,30 +238,27 @@ export class DriverService {
    * Update driver details
    */
   public async updateDriver(id: string, dto: UpdateDriverDto) {
-    const driver = await prisma.driver.findUnique({
-      where: { id, deletedAt: null },
+    const driver = await prisma.staff.findUnique({
+      where: { id },
     });
 
-    if (!driver) {
+    if (!driver || driver.isHidden) {
       throw new NotFoundException('Không tìm thấy thông tin tài xế để cập nhật');
     }
 
     // Check unique phone if it changed
-    if (dto.phone && driver.userId) {
-      const currentUser = await prisma.user.findUnique({ where: { id: driver.userId } });
-      if (currentUser && dto.phone !== currentUser.phone) {
-        const phoneExists = await prisma.user.findFirst({
-          where: { phone: dto.phone, deletedAt: null },
-        });
-        if (phoneExists) {
-          throw new BadRequestException('Số điện thoại mới đã tồn tại trên hệ thống');
-        }
+    if (dto.phone && dto.phone !== driver.phone) {
+      const phoneExists = await prisma.staff.findFirst({
+        where: { phone: dto.phone, isHidden: false, NOT: { id } },
+      });
+      if (phoneExists) {
+        throw new BadRequestException('Số điện thoại mới đã tồn tại trên hệ thống');
       }
     }
 
     // Check unique citizenId if it changed
     if (dto.citizenId && dto.citizenId !== driver.citizenId) {
-      const citizenExists = await prisma.driver.findUnique({
+      const citizenExists = await prisma.staff.findUnique({
         where: { citizenId: dto.citizenId },
       });
       if (citizenExists) {
@@ -271,64 +266,38 @@ export class DriverService {
       }
     }
 
-    // Check user linkage if it changed
-    if (dto.userId && dto.userId !== driver.userId) {
-      const userExists = await prisma.user.findUnique({
-        where: { id: dto.userId, deletedAt: null },
-      });
-      if (!userExists) {
-        throw new BadRequestException('Tài khoản người dùng liên kết mới không tồn tại');
-      }
-
-      const driverUserLinked = await prisma.driver.findUnique({
-        where: { userId: dto.userId },
-      });
-      if (driverUserLinked) {
-        throw new BadRequestException('Tài khoản người dùng này đã liên kết với tài xế khác');
-      }
-    }
-
     // Check home facility if it changed
-    if (dto.homeFacilityId && dto.homeFacilityId !== driver.homeFacilityId) {
+    if (dto.homeFacilityId && dto.homeFacilityId !== driver.assignedFacilityId) {
       const facilityExists = await prisma.facility.findUnique({
-        where: { id: dto.homeFacilityId, deletedAt: null },
+        where: { id: dto.homeFacilityId },
       });
       if (!facilityExists) {
         throw new BadRequestException('Kho bãi hoạt động mới không tồn tại hoặc đã bị xóa');
       }
     }
 
-    if (driver.userId && (dto.fullName || dto.phone)) {
-      await prisma.user.update({
-        where: { id: driver.userId },
-        data: {
-          fullName: dto.fullName !== undefined ? dto.fullName : undefined,
-          phone: dto.phone !== undefined ? dto.phone : undefined,
-        },
-      });
-    }
-
-    return await prisma.driver.update({
+    return await prisma.staff.update({
       where: { id },
       data: {
+        fullName: dto.fullName !== undefined ? dto.fullName : driver.fullName,
+        phone: dto.phone !== undefined ? dto.phone : driver.phone,
         citizenId: dto.citizenId !== undefined ? dto.citizenId : driver.citizenId,
         driverLicenseNumber: dto.driverLicenseNumber ?? driver.driverLicenseNumber,
         driverLicenseClass: dto.driverLicenseClass ?? driver.driverLicenseClass,
         hireDate: dto.hireDate ? new Date(dto.hireDate) : driver.hireDate,
-        employmentStatus: dto.employmentStatus ?? driver.employmentStatus,
+        employmentStatus: (dto.employmentStatus as any) ?? driver.employmentStatus,
         userId: dto.userId !== undefined ? dto.userId : driver.userId,
-        homeFacilityId: dto.homeFacilityId !== undefined ? dto.homeFacilityId : driver.homeFacilityId,
+        assignedFacilityId: dto.homeFacilityId !== undefined ? dto.homeFacilityId : driver.assignedFacilityId,
         note: dto.note !== undefined ? dto.note : driver.note,
         preferredLatitude: dto.preferredLatitude !== undefined ? dto.preferredLatitude : driver.preferredLatitude,
         preferredLongitude: dto.preferredLongitude !== undefined ? dto.preferredLongitude : driver.preferredLongitude,
-        driverType: dto.driverType ?? driver.driverType,
+        driverType: (dto.driverType as any) ?? driver.driverType,
       },
       include: {
-        homeFacility: true,
+        assignedFacility: true,
         user: {
           select: {
             username: true,
-            email: true,
             status: true,
           },
         },
@@ -337,19 +306,19 @@ export class DriverService {
   }
 
   /**
-   * Soft delete driver profile
+   * Soft hide driver profile
    */
   public async deleteDriver(id: string) {
-    const driver = await prisma.driver.findUnique({
-      where: { id, deletedAt: null },
+    const driver = await prisma.staff.findUnique({
+      where: { id },
       include: { user: true },
     });
 
-    if (!driver) {
+    if (!driver || driver.isHidden) {
       throw new NotFoundException('Không tìm thấy tài xế để xóa');
     }
 
-    // Optional business rules: Can check if they have active dispatch tasks or in-progress routes
+    // Check active route assignments
     const activeRoute = await prisma.route.findFirst({
       where: {
         driverVehicleAssignment: {
@@ -363,20 +332,12 @@ export class DriverService {
       throw new BadRequestException('Không thể xóa tài xế đang thực hiện lộ trình giao hàng');
     }
 
-    const timestamp = Date.now();
-    const phoneVal = driver.user?.phone || '0000000000';
-    const deletedPhone = `del_${phoneVal.substring(0, 10)}_${timestamp.toString().slice(-4)}`;
-    const deletedCitizenId = driver.citizenId
-      ? `del_${timestamp.toString().slice(-4)}_${driver.citizenId.substring(0, 11)}`
-      : null;
-
     await prisma.$transaction(async (tx) => {
-      // 1. Soft delete the driver, release unique citizen_id
-      await tx.driver.update({
+      // 1. Soft hide the driver
+      await tx.staff.update({
         where: { id },
-        data: { 
-          deletedAt: new Date(),
-          citizenId: deletedCitizenId,
+        data: {
+          isHidden: true,
         },
       });
 
@@ -392,22 +353,13 @@ export class DriverService {
         },
       });
 
-      // 3. Soft delete the associated User and release username/email/phone
-      if (driver.userId && driver.user) {
-        const deletedEmail = `del_${timestamp}_${driver.user.email.slice(0, 50)}@deleted.com`;
-        const deletedUsername = `del_${timestamp.toString().slice(-6)}_${driver.user.username.slice(0, 30)}`;
-        const deletedUserPhone = driver.user.phone
-          ? `del_${driver.user.phone.substring(0, 10)}_${timestamp.toString().slice(-4)}`
-          : null;
-
+      // 3. Soft hide the associated User
+      if (driver.userId) {
         await tx.user.update({
           where: { id: driver.userId },
           data: {
-            deletedAt: new Date(),
-            status: 'LOCKED',
-            email: deletedEmail.slice(0, 255),
-            username: deletedUsername.slice(0, 50),
-            phone: deletedUserPhone,
+            isHidden: true,
+            status: 'DISABLED',
           },
         });
       }
@@ -422,8 +374,8 @@ export class DriverService {
   public async getUnlinkedUsers() {
     return await prisma.user.findMany({
       where: {
-        deletedAt: null,
-        driver: null,
+        isHidden: false,
+        staff: null,
         role: {
           roleCode: 'SHIPPER',
         },
@@ -431,8 +383,6 @@ export class DriverService {
       select: {
         id: true,
         username: true,
-        email: true,
-        phone: true,
       },
     });
   }
@@ -441,11 +391,10 @@ export class DriverService {
    * Assign a vehicle to a driver
    */
   public async assignVehicle(dto: { driverId: string; vehicleId: string }) {
-    // 1. Fetch driver and vehicle
-    const driver = await prisma.driver.findUnique({
-      where: { id: dto.driverId, deletedAt: null },
+    const driver = await prisma.staff.findUnique({
+      where: { id: dto.driverId },
     });
-    if (!driver) {
+    if (!driver || driver.isHidden) {
       throw new NotFoundException('Không tìm thấy tài xế hoạt động');
     }
 
@@ -465,7 +414,7 @@ export class DriverService {
       throw new BadRequestException('Phương tiện đang không ở trạng thái hoạt động tốt (ACTIVE)');
     }
 
-    // 2. Validate License compatibility
+    // Validate License compatibility
     const licenseHierarchy: Record<string, number> = {
       'A1': 1,
       'A2': 2,
@@ -478,7 +427,8 @@ export class DriverService {
       'FE': 9
     };
 
-    const driverRank = licenseHierarchy[driver.driverLicenseClass.toUpperCase()] || 0;
+    const driverLicenseClass = driver.driverLicenseClass || 'B2';
+    const driverRank = licenseHierarchy[driverLicenseClass.toUpperCase()] || 0;
     const vehicleTypeCode = vehicle.vehicleType.typeCode.toUpperCase();
 
     let isCompatible = true;
@@ -492,27 +442,21 @@ export class DriverService {
 
     if (!isCompatible) {
       throw new BadRequestException(
-        `Tài xế có bằng hạng ${driver.driverLicenseClass} không đủ điều kiện điều khiển phương tiện loại ${vehicle.vehicleType.typeName} (Yêu cầu tối thiểu ${
-          vehicleTypeCode === 'CONTAINER' ? 'FC' : (vehicleTypeCode === 'REFRIGERATED_TRUCK' ? 'C' : 'B2')
-        })`
+        `Tài xế có bằng hạng ${driverLicenseClass} không đủ điều kiện điều khiển phương tiện loại ${vehicle.vehicleType.typeName}`
       );
     }
 
-    // 3. Perform 1:1 assignment inside a Transaction
     return await prisma.$transaction(async (tx) => {
-      // A. Deactivate any active assignments of this driver
       await tx.driverVehicleAssignment.updateMany({
         where: { driverId: dto.driverId, isActive: true },
         data: { isActive: false, assignedTo: new Date() },
       });
 
-      // B. Deactivate any active assignments of this vehicle
       await tx.driverVehicleAssignment.updateMany({
         where: { vehicleId: dto.vehicleId, isActive: true },
         data: { isActive: false, assignedTo: new Date() },
       });
 
-      // C. Create new assignment
       return await tx.driverVehicleAssignment.create({
         data: {
           driverId: dto.driverId,
@@ -564,12 +508,8 @@ export class DriverService {
           select: {
             id: true,
             employeeCode: true,
-            user: {
-              select: {
-                fullName: true,
-                phone: true,
-              },
-            },
+            fullName: true,
+            phone: true,
             driverLicenseClass: true,
           },
         },

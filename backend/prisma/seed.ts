@@ -214,47 +214,56 @@ async function main() {
     });
   }
 
-  // 7. Seed Test Users
-  console.log('👤 Seeding Test Users...');
+  // 7. Seed Test Users & Profiles
+  console.log('👤 Seeding Test Users & Profiles (Clean 3NF Architecture)...');
   const testUsers = [
     {
       username: 'admin',
-      email: 'admin@velocity.vn',
       password: 'AdminPassword123',
-      phone: '0900000001',
       roleCode: 'ADMIN',
+      fullName: 'Quản trị viên Hệ thống',
+      phone: '0900000001',
+      email: 'admin@velocity.vn',
+      employeeCode: 'EMP-ADMIN-01',
+      position: 'ADMIN',
     },
     {
-      username: 'dispatcher',
-      email: 'staff@velocity.vn',
+      username: 'staff',
       password: 'StaffPassword123',
-      phone: '0900000002',
       roleCode: 'STAFF',
+      fullName: 'Nhân viên Điều phối Bưu cục',
+      phone: '0900000002',
+      email: 'staff@velocity.vn',
+      employeeCode: 'EMP-STAFF-01',
+      position: 'STAFF',
     },
     {
-      username: 'Tài xế giao hàng (Shipper)',
-      email: 'driver@velocity.vn',
+      username: 'shipper',
       password: 'DriverPassword123',
-      phone: '0900000003',
       roleCode: 'SHIPPER',
+      fullName: 'Tài xế Nguyễn Văn Giao',
+      phone: '0900000003',
+      email: 'driver@velocity.vn',
+      employeeCode: 'EMP-DRIVER-01',
+      position: 'DRIVER',
+      driverLicenseNumber: 'DRV-998877',
+      driverLicenseClass: 'B2',
+      driverType: 'HUB_DELIVERY',
     },
     {
       username: 'customer',
-      email: 'customer@velocity.vn',
       password: 'CustomerPassword123',
-      phone: '0900000004',
       roleCode: 'CUSTOMER',
+      fullName: 'Khách hàng Nguyễn Văn A',
+      phone: '0900000004',
+      email: 'customer@velocity.vn',
+      customerCode: 'CUST-001',
     },
   ];
 
   for (const tu of testUsers) {
-    const existing = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { username: tu.username },
-          { email: tu.email }
-        ]
-      }
+    const existing = await prisma.user.findUnique({
+      where: { username: tu.username }
     });
 
     if (!existing) {
@@ -271,15 +280,41 @@ async function main() {
       const user = await prisma.user.create({
         data: {
           username: tu.username,
-          email: tu.email,
           passwordHash: passwordHash,
-          phone: tu.phone,
           status: 'ACTIVE',
           roleId: role.id,
         }
       });
 
-      console.log(`✅ Created test user: ${tu.username} (${tu.roleCode})`);
+      if (tu.roleCode === 'CUSTOMER') {
+        await prisma.customer.create({
+          data: {
+            userId: user.id,
+            customerCode: tu.customerCode!,
+            fullName: tu.fullName,
+            phone: tu.phone,
+            email: tu.email,
+            customerType: 'INDIVIDUAL',
+            status: 'ACTIVE',
+          }
+        });
+      } else {
+        await prisma.staff.create({
+          data: {
+            userId: user.id,
+            employeeCode: tu.employeeCode!,
+            fullName: tu.fullName,
+            phone: tu.phone,
+            email: tu.email,
+            position: tu.position!,
+            driverLicenseNumber: tu.driverLicenseNumber,
+            driverLicenseClass: tu.driverLicenseClass,
+            driverType: tu.driverType as any,
+          }
+        });
+      }
+
+      console.log(`✅ Created test user: ${tu.username} (${tu.roleCode}) with profile`);
     } else {
       console.log(`ℹ️ Test user already exists: ${tu.username}`);
     }

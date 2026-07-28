@@ -20,7 +20,7 @@ export class RoutingController {
       // Enforce strict facility permission boundary for STAFF users
       const user = (req as any).user;
       if (user?.roles.includes('STAFF') && !user?.roles.includes('ADMIN')) {
-        const staffProfile = await prisma.staffProfile.findUnique({
+        const staffProfile = await prisma.staff.findUnique({
           where: { userId: user.id },
         });
         if (staffProfile && staffProfile.assignedFacilityId !== facilityId) {
@@ -50,8 +50,8 @@ export class RoutingController {
 
       let filterDriverId = driverId as string;
       if (!filterDriverId && user?.id) {
-        const driverProfile = await prisma.driver.findFirst({
-          where: { userId: user.id },
+        const driverProfile = await prisma.staff.findFirst({
+          where: { userId: user.id, isHidden: false },
         });
         if (driverProfile) {
           filterDriverId = driverProfile.id;
@@ -94,7 +94,7 @@ export class RoutingController {
       // Enforce strict facility permission boundary for STAFF users
       const user = (req as any).user;
       if (user?.roles.includes('STAFF') && !user?.roles.includes('ADMIN')) {
-        const staffProfile = await prisma.staffProfile.findUnique({
+        const staffProfile = await prisma.staff.findUnique({
           where: { userId: user.id },
         });
         if (staffProfile && staffProfile.assignedFacilityId !== facilityId) {

@@ -20,24 +20,20 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ## 🔐 MODULE 1: AUTHENTICATION & AUTHORIZATION (Xác thực & Phân quyền)
 
-### 1. Bảng `users` (Tài khoản người dùng - Single Source of Truth)
-📌 **Chức năng của bảng:** Lưu trữ tài khoản định danh trung tâm (Single Source of Truth) cho tất cả 4 nhóm Actor trong hệ thống (Admin, Staff, Customer, Shipper). Bảng này quản lý thông tin đăng nhập (`username`, `password_hash`), định danh liên lạc (`email`, `phone`, `full_name`), ảnh đại diện, trạng thái khóa/mở tài khoản và liên kết vai trò hệ thống (`role_id`).
+### 1. Bảng `users` (Danh tính đăng nhập Pure Credentials - Separation of PII)
+📌 **Chức năng của bảng:** Lưu trữ danh tính xác thực thuần túy (`username`, `password_hash`) cho tất cả các tài khoản trong hệ thống. Theo chuẩn bảo mật PII Separation & 3NF, bảng này **KHÔNG LƯU TRỮ** thông tin định danh cá nhân/liên lạc (`email`, `phone`, `full_name`). Khi hacker chiếm được bảng `users`, chúng chỉ thu được password hash và username mà không thể biết thông tin liên lạc hay cá nhân của người dùng.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã định danh duy nhất của người dùng. VD: `usr-01`, `usr-02` |
-| `username` | VarChar(50) | Khóa duy nhất (Unique), Bắt buộc | Tên đăng nhập tài khoản. VD: `hung_admin`, `staff_kho_tbd`, `shipper_nam`, `kh_vinamilk` |
-| `email` | VarChar(255) | Khóa duy nhất (Unique), Bắt buộc | Email tài khoản nhận thông báo/reset mật khẩu. VD: `hung.pham@smartlog.com` |
+| `id` | Uuid | **Khóa chính (PK)** | Mã định danh duy nhất của tài khoản. VD: `usr-01`, `usr-02` |
+| `username` | VarChar(50) | Khóa duy nhất (Unique), Bắt buộc | Tên đăng nhập duy nhất. VD: `hung_admin`, `staff_kho_tbd`, `shipper_nam`, `kh_vinamilk` |
 | `password_hash`| Text | Bắt buộc | Chuỗi mật khẩu băm bảo mật Bcrypt. VD: `$2b$10$e8N0Y9z.K2qL.uX1vW9Z8e...` |
-| `full_name` | VarChar(150) | Tùy chọn | Họ và tên hiển thị chuẩn người dùng. VD: `Phạm Tuấn Hưng`, `Nguyễn Văn Minh` |
-| `phone` | VarChar(20) | Tùy chọn | Số điện thoại liên lạc chính thức. VD: `0987654321`, `0912345678` |
-| `avatar_url` | Text | Tùy chọn | Đường dẫn ảnh đại diện trên Cloud Storage. VD: `https://storage.smartlog.com/avatars/user_101.jpg` |
-| `status` | Enum | Bắt buộc (Default Active) | Trạng thái tài khoản: `ACTIVE` (Hoạt động), `LOCKED` (Bị khóa), `DISABLED` (Vô hiệu hóa) |
+| `status` | Enum | Bắt buộc (Default Active) | Trạng thái tài khoản: `ACTIVE` (Hoạt động), `LOCKED` (Khóa), `DISABLED` (Vô hiệu hóa), `PENDING_VERIFICATION` |
+| `is_hidden` | Boolean | Bắt buộc (Default False) | Flag ẩn tài khoản (`true` / `false`). Thay thế hoàn toàn `deleted_at` |
 | `role_id` | Uuid | **Khóa ngoại (FK ➔ bảng roles)** | Mã vai trò hệ thống gán cho người dùng (Trỏ `roles.id`). VD: `rol-01` |
 | `last_login_at`| Timestamptz | Tùy chọn | Thời điểm đăng nhập gần nhất. VD: `2026-07-24 08:30:00+07` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian tạo tài khoản. VD: `2026-07-01 10:00:00+07` |
 | `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin tài khoản gần nhất |
-| `deleted_at` | Timestamptz | Tùy chọn | Mốc thời gian xóa mềm (Soft Delete) tài khoản |
 
 ---
 
@@ -62,6 +58,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `permission_code`| VarChar(50)| Khóa duy nhất (Unique), Bắt buộc | Mã quyền thao tác hệ thống. VD: `ORDER_CREATE`, `SHIPMENT_APPROVE`, `AI_ROUTE_OPTIMIZE` |
 | `permission_name`| VarChar(100)| Bắt buộc | Tên quyền chi tiết. VD: `Kích hoạt thuật toán AI tối ưu tuyến đường` |
 | `description` | Text | Tùy chọn | Mô tả phạm vi tác động của quyền trong hệ thống |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tạo quyền hạn |
 
 ---
 
@@ -77,19 +74,24 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ## 🏬 MODULE 2: CUSTOMERS & ADDRESSES (Khách hàng & Địa chỉ)
 
-### 5. Bảng `customers` (Hồ sơ Khách hàng - Clean Architecture 1-1 với `users`)
-📌 **Chức năng của bảng:** Lưu trữ thông tin hồ sơ nghiệp vụ của Khách hàng (khách cá nhân gửi lẻ hoặc doanh nghiệp/shop thương mại điện tử). Bảng này lưu mã khách hàng, loại khách hàng, tên công ty, mã số thuế và trạng thái tài khoản. Liên kết bắt buộc 1-1 với tài khoản `users` qua `user_id UNIQUE`.
+### 5. Bảng `customers` (Hồ sơ Khách hàng - Clean Architecture PII Profile)
+📌 **Chức năng của bảng:** Lưu trữ thông tin hồ sơ cá nhân/doanh nghiệp của Khách hàng. Bảng lưu trữ trực tiếp `full_name`, `phone`, `email` giúp các tác vụ gửi thông báo/mail diễn ra cực nhanh mà không cần JOIN bảng `users`. Liên kết 1-1 với `users` qua `user_id UNIQUE`.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
 | `id` | Uuid | **Khóa chính (PK)** | Mã hồ sơ khách hàng. VD: `cust-01`, `cust-02` |
-| `user_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng users)** | Khóa ngoại BẮT BUỘC 1-1 trỏ bảng `users` (Tài khoản đăng nhập App/Web). VD: `usr-04` |
-| `customer_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã quản lý khách hàng. VD: `KH-IND-0089`, `KH-BIZ-0012` |
-| `customer_type` | Enum | Bắt buộc | Loại khách hàng: `INDIVIDUAL` (Cá nhân gửi lẻ), `BUSINESS` (Doanh nghiệp/Shop lớn) |
-| `company_name` | VarChar(255) | Tùy chọn | Tên công ty/Thương hiệu shop (nếu là BIZ). VD: `Công ty TNHH Vinamilk Việt Nam` |
+| `user_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng users)** | Khóa ngoại 1-1 trỏ bảng `users` (Tài khoản đăng nhập). VD: `usr-04` |
+| `customer_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã quản lý khách hàng. VD: `CUST-000001`, `KH-BIZ-0012` |
+| `full_name` | VarChar(150) | Bắt buộc | Họ và tên khách hàng/đại diện. VD: `Nguyễn Văn A` |
+| `phone` | VarChar(20) | Bắt buộc | Số điện thoại liên lạc chính. VD: `0900000004` |
+| `email` | VarChar(255) | Tùy chọn | Địa chỉ email nhận thông báo/hóa đơn. VD: `customer@velocity.vn` |
+| `customer_type` | Enum | Bắt buộc | Loại khách hàng: `INDIVIDUAL` (Cá nhân gửi lẻ), `BUSINESS` (Doanh nghiệp/Shop) |
+| `company_name` | VarChar(255) | Tùy chọn | Tên công ty/Thương hiệu shop (nếu BIZ). VD: `Công ty TNHH Vinamilk` |
 | `tax_code` | VarChar(30) | Tùy chọn | Mã số thuế doanh nghiệp. VD: `0300588569` |
-| `status` | Enum | Bắt buộc (Default Active) | Trạng thái hồ sơ: `ACTIVE` (Đang giao dịch), `INACTIVE`, `BLOCKED` (Chặn tạo đơn) |
-| `created_at` | Timestamptz | Bắt buộc (Default Now) | Ngày khách hàng đăng ký hệ thống. VD: `2026-07-01 10:00:00+07` |
+| `status` | Enum | Bắt buộc (Default Active) | Trạng thái hồ sơ: `ACTIVE` (Hoạt động), `INACTIVE`, `BLOCKED` (Chặn tạo đơn) |
+| `is_hidden` | Boolean | Bắt buộc (Default False) | Flag ẩn hồ sơ (`true` / `false`). Thay thế `deleted_at` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Ngày khách hàng đăng ký hệ thống |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật gần nhất |
 
 ---
 
@@ -111,8 +113,8 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ---
 
-### 7. Bảng `customer_addresses` (Sổ địa chỉ Khách hàng - Bảng trung gian N:N)
-📌 **Chức năng của bảng:** Bảng sổ địa chỉ lưu danh mục các địa chỉ thường dùng của từng khách hàng (Địa chỉ nhà riêng, văn phòng, kho hàng, địa chỉ nhận hàng hoàn). Quản lý cờ `is_default` để tự động điền địa chỉ mặc định khi tạo đơn mới.
+### 7. Bảng `customer_addresses` (Sổ địa chỉ Khách hàng & Người liên hệ kho)
+📌 **Chức năng của bảng:** Bảng sổ địa chỉ lưu danh mục các địa chỉ thường dùng của từng khách hàng (Nhà riêng, văn phòng, kho bãi). Nhằm tối ưu dung lượng CSDL & tốc độ truy vấn 1-query không cần SQL JOIN, bảng **tích hợp luôn thông tin người đại diện liên hệ tại kho** (`contact_name`, `contact_phone`) như Trưởng kho, Kế toán kho.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
@@ -121,20 +123,9 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `address_id` | Uuid | **Cặp khóa duy nhất [customer_id, address_id]**, **FK ➔ bảng addresses** | Mã địa chỉ được liên kết. VD: `addr-01` |
 | `address_type` | Enum | Bắt buộc | Loại địa chỉ: `HOME` (Nhà riêng), `OFFICE` (Văn phòng), `WAREHOUSE` (Kho hàng), `RETURN` (Trả hàng) |
 | `is_default` | Boolean | Default False | Đánh dấu địa chỉ lấy/giao mặc định (`true` / `false`) |
-
----
-
-### 8. Bảng `customer_contacts` (Danh bạ Người liên hệ của Khách hàng)
-📌 **Chức năng của bảng:** Lưu trữ danh bạ đại diện những người liên hệ thực tế tại kho bãi hoặc văn phòng của Khách hàng (như Trưởng kho, Kế toán giao nhận). Dùng để ghi nhận thông tin người gửi/người liên hệ trực tiếp khi Shipper đến lấy hàng.
-
-| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
-| :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã người liên hệ. VD: `cct-01` |
-| `customer_id` | Uuid | **Khóa ngoại (FK ➔ bảng customers)** | Thuộc về khách hàng nào (Trỏ `customers.id`). VD: `cust-02` |
-| `full_name` | VarChar(150) | Bắt buộc | Họ tên người liên hệ tại kho/văn phòng. VD: `Chị Mai - Trưởng Kho Hàng` |
-| `phone` | VarChar(20) | Bắt buộc | Số điện thoại liên hệ trực tiếp. VD: `0912345678` |
-| `email` | VarChar(255) | Tùy chọn | Email người nhận thông báo giao nhận. VD: `mai@vinamilk.com` |
-| `is_primary` | Boolean | Default False | Đánh dấu người liên hệ đại diện chính (`true` / `false`) |
+| `contact_name` | VarChar(150) | Tùy chọn | Họ tên người phụ trách liên hệ tại kho. VD: `Chị Mai - Trưởng Kho Q7` |
+| `contact_phone`| VarChar(20) | Tùy chọn | Số điện thoại liên hệ kho trực tiếp khi Shipper đến lấy. VD: `0912345678` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tạo bản ghi sổ địa chỉ |
 
 ---
 
@@ -360,41 +351,37 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ---
 
-## 🏎️ MODULE 6: FLEET & DRIVER MANAGEMENT (Đội xe & Tài xế)
+## 🏎️ MODULE 6: FLEET & DRIVER MANAGEMENT (Đội xe & Nhân sự Vận hành)
 
-### 22. Bảng `drivers` (Hồ sơ Tài xế / Shipper - Clean Architecture 1-1 với `users`)
-📌 **Chức năng của bảng:** Lưu trữ hồ sơ nghiệp vụ của Tài xế / Shipper (Mã tài xế, CCCD, số bằng lái, hạng bằng lái, bưu cục quản lý trực thuộc, loại tài xế giao chặng cuối `HUB_DELIVERY` hay giao tức thì `ON_DEMAND`). Liên kết bắt buộc 1-1 với tài khoản `users` qua `user_id UNIQUE`.
-
-| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
-| :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã hồ sơ tài xế. VD: `drv-01`, `drv-02` |
-| `user_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng users)** | Khóa ngoại BẮT BUỘC 1-1 trỏ bảng `users` (Tài khoản App Mobile Shipper). VD: `usr-03` |
-| `employee_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã nhân viên giao hàng. VD: `SHIPPER-Q10-09` |
-| `citizen_id` | VarChar(20) | Khóa duy nhất (Unique), Tùy chọn| Số Căn cước công dân (CCCD). VD: `079098001234` |
-| `driver_license_number`| VarChar(50)| Bắt buộc | Số bằng lái xe (GPLX). VD: `59012938102` |
-| `driver_license_class` | VarChar(10)| Bắt buộc | Hạng bằng lái xe. VD: `A1`, `B2`, `C` |
-| `hire_date` | Date | Bắt buộc | Ngày chính thức ký hợp đồng tuyển dụng. VD: `2025-01-15` |
-| `employment_status` | Enum | Bắt buộc | Trạng thái ca làm việc: `ACTIVE` (Đang làm), `OFFLINE` (Nghỉ ca), `SUSPENDED` |
-| `home_facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục trực thuộc quản lý chính. VD: `fac-01` |
-| `driver_type` | Enum | Default HubDelivery | Loại tài xế: `HUB_DELIVERY` (Giao chặng cuối bưu cục), `ON_DEMAND` (Giao tức thì) |
-
----
-
-### 23. Bảng `staff_profiles` (Hồ sơ Nhân viên Bưu cục / Điều vận - Clean Architecture 1-1 với `users`)
-📌 **Chức năng của bảng:** Lưu trữ hồ sơ nghiệp vụ của Nhân viên Bưu cục / Nhân viên Điều vận kho (Mã nhân viên `employee_code`, CCCD, chức vụ `position`, bưu cục công tác `assigned_facility_id`). Liên kết bắt buộc 1-1 với tài khoản `users` qua `user_id UNIQUE`.
+### 22. Bảng `staff` (Hồ sơ Hợp nhất Nhân viên & Tài xế - Clean Architecture PII Profile)
+📌 **Chức năng của bảng:** Bảng hợp nhất lưu trữ toàn bộ hồ sơ nhân sự vận hành trong công ty (Quản trị viên, Nhân viên điều phối, Thủ kho, Tài xế giao hàng). Bảng lưu trữ trực tiếp thông tin PII liên lạc (`full_name`, `phone`, `email`, `citizen_id`) và bưu cục công tác (`assigned_facility_id`). Đối với tài xế giao hàng (`position == 'DRIVER'`), bảng bổ sung các trường thông tin bằng lái, hạng xe, loại tài xế và trạng thái ca làm việc. Liên kết 1-1 với tài khoản `users` qua `user_id UNIQUE`.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã hồ sơ nhân viên. VD: `stf-01` |
-| `user_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng users)** | Khóa ngoại BẮT BUỘC 1-1 trỏ bảng `users` (Tài khoản Web Admin/Staff). VD: `usr-02` |
-| `employee_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã nhân viên. VD: `STAFF-LOG-05` |
-| `citizen_id` | VarChar(20) | Khóa duy nhất (Unique), Tùy chọn| Số Căn cước công dân. VD: `079098005555` |
-| `position` | VarChar(100)| Tùy chọn | Chức vụ công tác. VD: `Trưởng Bưu Cục`, `Nhân viên Phân loại Hàng`, `Nhân viên Điều vận AI` |
-| `assigned_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục công tác chính (Trỏ `facilities.id`). VD: `fac-01` |
+| `id` | Uuid | **Khóa chính (PK)** | Mã hồ sơ nhân sự duy nhất. VD: `stf-01`, `stf-02` |
+| `user_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng users)** | Khóa ngoại 1-1 trỏ bảng `users` (Tài khoản đăng nhập). VD: `usr-02`, `usr-03` |
+| `employee_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã nhân viên/tài xế duy nhất. VD: `STF-000001`, `DRV-000001` |
+| `full_name` | VarChar(150) | Bắt buộc | Họ và tên nhân sự/tài xế. VD: `Nguyễn Văn Giao`, `Trần Văn Kho` |
+| `phone` | VarChar(20) | Bắt buộc | Số điện thoại liên lạc công việc. VD: `0900000003` |
+| `email` | VarChar(255) | Tùy chọn | Email nội bộ/liên hệ công việc. VD: `driver@velocity.vn` |
+| `citizen_id` | VarChar(20) | Khóa duy nhất (Unique), Tùy chọn| Số Căn cước công dân. VD: `079098001234` |
+| `position` | VarChar(100)| Bắt buộc | Chức vụ: `ADMIN`, `DISPATCHER`, `WAREHOUSE_STAFF`, `DRIVER` |
+| `assigned_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục công tác/trực thuộc quản lý. VD: `fac-01` |
+| `driver_license_number`| VarChar(50)| Khóa duy nhất (Unique), Tùy chọn| Số bằng lái xe GPLX (Chỉ dùng cho Driver). VD: `59012938102` |
+| `driver_license_class` | VarChar(10)| Tùy chọn | Hạng bằng lái xe GPLX (Chỉ dùng cho Driver). VD: `A1`, `B2`, `C`, `FC` |
+| `driver_type` | Enum | Tùy chọn | Loại tài xế: `HUB_DELIVERY` (Giao bưu cục), `ON_DEMAND` (Giao tức thì) |
+| `employment_status` | Enum | Tùy chọn (Default Active) | Trạng thái công tác: `ACTIVE` (Đang làm), `ON_LEAVE` (Nghỉ phép), `TERMINATED` |
+| `hire_date` | Date | Tùy chọn | Ngày chính thức tuyển dụng. VD: `2025-01-15` |
+| `preferred_latitude` | Double | Tùy chọn | Vĩ độ khu vực ưu tiên nhận đơn giao |
+| `preferred_longitude`| Double | Tùy chọn | Kinh độ khu vực ưu tiên nhận đơn giao |
+| `note` | Text | Tùy chọn | Ghi chú quản lý nhân sự / tài xế |
+| `is_hidden` | Boolean | Bắt buộc (Default False) | Flag ẩn hồ sơ nhân sự (`true` / `false`). Thay thế `deleted_at` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian tạo hồ sơ |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 
 ---
 
-### 24. Bảng `vehicles` (Danh mục Phương tiện Giao hàng)
+### 23. Bảng `vehicles` (Danh mục Phương tiện Giao hàng)
 📌 **Chức năng của bảng:** Quản lý danh sách các phương tiện di chuyển trong đội xe (Xe máy, Xe tải nhẹ, Xe Van). Quản lý biển số xe, tải trọng tối đa (Kg), thể tích thùng xe (m³), chiều dài thùng xe (`max_length`), cờ hỗ trợ xe lạnh (`refrigeration_supported`), mã định danh thiết bị GPS (`gps_device_id`), bưu cục đậu xe và trạng thái vận hành.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
@@ -413,7 +400,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ---
 
-### 25. Bảng `vehicle_types` (Loại Phương tiện)
+### 24. Bảng `vehicle_types` (Loại Phương tiện)
 📌 **Chức năng của bảng:** Định nghĩa chủng loại phương tiện (Xe máy `MOTORBIKE`, Xe tải Van 500Kg `VAN_500KG`, Xe tải 1.5 Tấn `TRUCK_1.5TON`) làm căn cứ để thuật toán AI Routing phân bổ tuyến đường phù hợp với kích thước kiện hàng.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
@@ -424,13 +411,13 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ---
 
-### 26. Bảng `driver_vehicle_assignments` (Phân công Xe cho Tài xế)
+### 25. Bảng `driver_vehicle_assignments` (Phân công Xe cho Tài xế)
 📌 **Chức năng của bảng:** Quản lý lịch sử và trạng thái phân công xe cho tài xế sử dụng theo từng ca làm việc. Đảm bảo tại một thời điểm biết chính xác tài xế nào đang điều khiển phương tiện nào.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
 | `id` | Uuid | **Khóa chính (PK)** | Mã lượt phân công xe. VD: `dva-01` |
-| `driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Tài xế được gán xe (Trỏ `drivers.id`). VD: `drv-01` |
+| `driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng staff)** | Tài xế được gán xe (Trỏ `staff.id`). VD: `stf-01` |
 | `vehicle_id` | Uuid | **Khóa ngoại (FK ➔ bảng vehicles)**| Phương tiện được gán (Trỏ `vehicles.id`). VD: `veh-01` |
 | `assigned_from` | Timestamptz | Bắt buộc | Thời điểm bắt đầu giao xe. VD: `2026-07-24 06:00:00+07` |
 | `assigned_to` | Timestamptz | Tùy chọn | Thời điểm trả xe |
@@ -438,12 +425,12 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ---
 
-### 27. Bảng `driver_locations` (Tọa độ GPS Thời gian thực hiện tại của Shipper)
+### 26. Bảng `driver_locations` (Tọa độ GPS Thời gian thực hiện tại của Shipper)
 📌 **Chức năng của bảng:** Lưu trữ vị trí tọa độ GPS mới nhất (`latitude`, `longitude`), góc hướng di chuyển (`heading`) và vận tốc thực tế (`speed`) của từng tài xế. Bảng này được ứng dụng Mobile Shipper cập nhật liên tục ngầm (3-5 giây/lượt) để hiển thị vị trí Shipper thời gian thực trên bản đồ Web Admin.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `driver_id` | Uuid | **Khóa chính (PK)**, **FK ➔ bảng drivers** | Mã tài xế (Mỗi tài xế giữ 1 bản ghi vị trí hiện tại). VD: `drv-01` |
+| `driver_id` | Uuid | **Khóa chính (PK)**, **FK ➔ bảng staff** | Mã tài xế (Mỗi tài xế giữ 1 bản ghi vị trí hiện tại). VD: `stf-01` |
 | `latitude` | Double | Bắt buộc | Vĩ độ phát ngầm thời gian thực qua WebSocket. VD: `10.7735` |
 | `longitude` | Double | Bắt buộc | Kinh độ phát ngầm thời gian thực qua WebSocket. VD: `106.6590` |
 | `heading` | Float | Tùy chọn | Góc hướng di chuyển của xe (độ). VD: `180.0`° |

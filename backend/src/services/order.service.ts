@@ -17,7 +17,7 @@ export class OrderService {
     const customer = await prisma.customer.findUnique({
       where: { userId },
     });
-    if (!customer || customer.deletedAt) {
+    if (!customer || customer.isHidden) {
       throw new BadRequestException('Không tìm thấy thông tin hồ sơ khách hàng liên kết với tài khoản này');
     }
     if (customer.status === 'BLOCKED') {
@@ -46,9 +46,8 @@ export class OrderService {
     }
 
     // Check if customer exists
-    const customerWithUser = await prisma.customer.findUnique({
-      where: { id: customerId, deletedAt: null },
-      include: { user: true },
+    const customerWithUser = await prisma.customer.findFirst({
+      where: { id: customerId, isHidden: false },
     });
     if (!customerWithUser) {
       throw new NotFoundException('Không tìm thấy khách hàng');
@@ -155,69 +154,23 @@ export class OrderService {
     // Giả định tốc độ trung bình 30km/h để tính thời gian di chuyển dự kiến (phút)
     const durationMin = Math.ceil((distanceKm / 30) * 60) + 15; // + 15 phút thời gian chuẩn bị/xử lý
 
-    // 4. Resolve Contacts
-    let resolvedSenderContactId: string | null = dto.senderContactId || null;
-    let resolvedReceiverContactId: string | null = dto.receiverContactId || null;
-
-    if (dto.senderContact && !resolvedSenderContactId) {
-      const contact = await prisma.customerContact.create({
-        data: {
-          customerId,
-          fullName: dto.senderContact.fullName,
-          phone: dto.senderContact.phone,
-          email: dto.senderContact.email || null,
-          isPrimary: false,
-        },
-      });
-      resolvedSenderContactId = contact.id;
-    }
-
-    if (dto.receiverContact && !resolvedReceiverContactId) {
-      const contact = await prisma.customerContact.create({
-        data: {
-          customerId,
-          fullName: dto.receiverContact.fullName,
-          phone: dto.receiverContact.phone,
-          email: dto.receiverContact.email || null,
-          isPrimary: false,
-        },
-      });
-      resolvedReceiverContactId = contact.id;
-    }
-
-    // 5. Snapshot contact names and phones
+    // 4. Snapshot sender and receiver contact names and phones
     let resolvedSenderName = '';
     let resolvedSenderPhone = '';
-    if (resolvedSenderContactId) {
-      const contact = await prisma.customerContact.findUnique({
-        where: { id: resolvedSenderContactId },
-      });
-      if (contact) {
-        resolvedSenderName = contact.fullName;
-        resolvedSenderPhone = contact.phone;
-      }
-    } else if (dto.senderContact) {
+    if (dto.senderContact) {
       resolvedSenderName = dto.senderContact.fullName;
       resolvedSenderPhone = dto.senderContact.phone;
     }
 
     // Fallback default sender to user profile if still empty
     if (!resolvedSenderName) {
-      resolvedSenderName = customerWithUser.user?.username || 'Khách hàng';
-      resolvedSenderPhone = customerWithUser.user?.phone || '0000000000';
+      resolvedSenderName = customerWithUser.fullName || 'Khách hàng';
+      resolvedSenderPhone = customerWithUser.phone || '0000000000';
     }
 
     let resolvedReceiverName = '';
     let resolvedReceiverPhone = '';
-    if (resolvedReceiverContactId) {
-      const contact = await prisma.customerContact.findUnique({
-        where: { id: resolvedReceiverContactId },
-      });
-      if (contact) {
-        resolvedReceiverName = contact.fullName;
-        resolvedReceiverPhone = contact.phone;
-      }
-    } else if (dto.receiverContact) {
+    if (dto.receiverContact) {
       resolvedReceiverName = dto.receiverContact.fullName;
       resolvedReceiverPhone = dto.receiverContact.phone;
     }
@@ -226,7 +179,7 @@ export class OrderService {
       throw new BadRequestException('Vui lòng cung cấp thông tin liên hệ của người nhận (tên và số điện thoại)');
     }
 
-    // 6. Calculate total chargeable weight (max of actual weight and volumetric weight = L*W*H/5000)
+    // 5. Calculate total chargeable weight (max of actual weight and volumetric weight = L*W*H/5000)
     let totalChargeableWeight = 0;
     let totalVolume = 0;
     let isFragile = false;
@@ -242,7 +195,7 @@ export class OrderService {
       if (pkg.isFragile) isFragile = true;
     });
 
-    // 7. Calculate Pricing
+    // 6. Calculate Pricing
     const pricing = await this.pricingService.calculatePrice(
       dto.serviceCode,
       distanceKm,
@@ -251,7 +204,7 @@ export class OrderService {
       dto.codAmount || 0
     );
 
-    // 8. Generate order code
+    // 7. Generate order code
     const count = await prisma.order.count();
     const orderCode = `ORD-${Date.now().toString().slice(-4)}${String(count + 1).padStart(6, '0')}`;
 
@@ -264,7 +217,7 @@ export class OrderService {
     const originFacilityId = await this.findNearestFacility(pickupLat, pickupLon);
     const destinationFacilityId = await this.findNearestFacility(deliveryLat, deliveryLon);
 
-    // 9. Create Order in Transaction
+    // 8. Create Order in Transaction
     return await prisma.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
@@ -272,8 +225,6 @@ export class OrderService {
           serviceId: pricing.serviceId,
           pickupAddressId: resolvedPickupAddressId,
           deliveryAddressId: resolvedDeliveryAddressId,
-          senderContactId: resolvedSenderContactId,
-          receiverContactId: resolvedReceiverContactId,
           orderCode,
           status: 'CREATED',
           pickupType: dto.pickupType || 'PICKUP',
@@ -390,7 +341,7 @@ export class OrderService {
         targetFacilityId = query.facilityId;
       }
     } else if (userRoles.includes('STAFF')) {
-      const staffProfile = await prisma.staffProfile.findUnique({
+      const staffProfile = await prisma.staff.findUnique({
         where: { userId },
         select: { assignedFacilityId: true },
       });
@@ -534,7 +485,7 @@ export class OrderService {
 
     if (userRoles.includes('STAFF') && !userRoles.includes('ADMIN')) {
       if (order.createdBy !== userId) {
-        const staffProfile = await prisma.staffProfile.findUnique({
+        const staffProfile = await prisma.staff.findUnique({
           where: { userId },
           select: { assignedFacilityId: true },
         });
@@ -594,7 +545,7 @@ export class OrderService {
     let staffFacilityId: string | null = null;
 
     if (userRoles.includes('STAFF') && !userRoles.includes('ADMIN')) {
-      const staffProfile = await prisma.staffProfile.findUnique({
+      const staffProfile = await prisma.staff.findUnique({
         where: { userId },
         select: { assignedFacilityId: true },
       });
@@ -686,7 +637,7 @@ export class OrderService {
 
     if (userRoles.includes('STAFF') && !userRoles.includes('ADMIN')) {
       if (order.createdBy !== userId) {
-        const staffProfile = await prisma.staffProfile.findUnique({
+        const staffProfile = await prisma.staff.findUnique({
           where: { userId },
           select: { assignedFacilityId: true },
         });

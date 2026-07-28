@@ -1,4 +1,4 @@
-import { Driver, DriverLocation, DriverVehicleAssignment, Vehicle, Order } from '@prisma/client';
+import { Staff, DriverLocation, DriverVehicleAssignment, Vehicle, Order } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { Cluster } from './kmeans.service';
 
@@ -101,7 +101,7 @@ export class AssignmentService {
    * Matches drivers to clusters using the Hungarian algorithm based on a composite cost matrix.
    */
   public async assignDriversToClusters(
-    drivers: (Driver & {
+    drivers: (Staff & {
       location?: DriverLocation | null;
       assignments?: (DriverVehicleAssignment & { vehicle: Vehicle })[];
     })[],
@@ -178,7 +178,7 @@ export class AssignmentService {
           if (isNaN(dist)) dist = 0;
 
           // Find active vehicle and capacity constraints
-          const activeAssignment = driver.assignments?.find((a) => a.isActive);
+          const activeAssignment = driver.assignments?.find((a: any) => a.isActive);
           let capacityPenalty = 0;
           let vehiclePenalty = 0;
 

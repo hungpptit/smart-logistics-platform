@@ -8,6 +8,7 @@ export interface CreateStaffDto {
   email: string;
   phone?: string;
   citizenId?: string;
+  position?: string;
   assignedFacilityId?: string | null;
 }
 
@@ -16,6 +17,7 @@ export interface UpdateStaffDto {
   password?: string;
   phone?: string;
   citizenId?: string;
+  position?: string;
   status?: 'ACTIVE' | 'LOCKED' | 'DISABLED';
   assignedFacilityId?: string | null;
 }
@@ -27,7 +29,7 @@ export class StaffService {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      deletedAt: null,
+      isHidden: false,
       role: {
         roleCode: 'STAFF',
       },
@@ -36,8 +38,9 @@ export class StaffService {
     if (query.search) {
       where.OR = [
         { username: { contains: query.search, mode: 'insensitive' } },
-        { email: { contains: query.search, mode: 'insensitive' } },
-        { phone: { contains: query.search, mode: 'insensitive' } },
+        { staff: { fullName: { contains: query.search, mode: 'insensitive' } } },
+        { staff: { email: { contains: query.search, mode: 'insensitive' } } },
+        { staff: { phone: { contains: query.search, mode: 'insensitive' } } },
       ];
     }
 
@@ -47,17 +50,17 @@ export class StaffService {
 
     if (query.facilityId) {
       if (query.facilityId === 'none') {
-        where.staffProfile = {
+        where.staff = {
           assignedFacilityId: null,
         };
       } else {
-        where.staffProfile = {
+        where.staff = {
           assignedFacilityId: query.facilityId,
         };
       }
     }
 
-    const [total, staffs] = await Promise.all([
+    const [total, users] = await Promise.all([
       prisma.user.count({ where }),
       prisma.user.findMany({
         where,
@@ -66,13 +69,15 @@ export class StaffService {
         select: {
           id: true,
           username: true,
-          email: true,
-          phone: true,
           status: true,
           createdAt: true,
-          staffProfile: {
+          staff: {
             select: {
+              fullName: true,
+              email: true,
+              phone: true,
               citizenId: true,
+              position: true,
               assignedFacilityId: true,
               assignedFacility: {
                 select: {
@@ -90,16 +95,18 @@ export class StaffService {
       }),
     ]);
 
-    const mappedStaffs = staffs.map((s) => ({
+    const mappedStaffs = users.map((s) => ({
       id: s.id,
       username: s.username,
-      email: s.email,
-      phone: s.phone,
+      fullName: s.staff?.fullName || s.username,
+      email: s.staff?.email || null,
+      phone: s.staff?.phone || null,
       status: s.status,
+      position: s.staff?.position || 'STAFF',
       createdAt: s.createdAt,
-      citizenId: s.staffProfile?.citizenId || null,
-      assignedFacilityId: s.staffProfile?.assignedFacilityId || null,
-      assignedFacility: s.staffProfile?.assignedFacility || null,
+      citizenId: s.staff?.citizenId || null,
+      assignedFacilityId: s.staff?.assignedFacilityId || null,
+      assignedFacility: s.staff?.assignedFacility || null,
     }));
 
     return {
@@ -114,10 +121,10 @@ export class StaffService {
   }
 
   public async getStaffById(id: string) {
-    const staff = await prisma.user.findFirst({
+    const user = await prisma.user.findFirst({
       where: {
         id,
-        deletedAt: null,
+        isHidden: false,
         role: {
           roleCode: 'STAFF',
         },
@@ -125,13 +132,15 @@ export class StaffService {
       select: {
         id: true,
         username: true,
-        email: true,
-        phone: true,
         status: true,
         createdAt: true,
-        staffProfile: {
+        staff: {
           select: {
+            fullName: true,
+            email: true,
+            phone: true,
             citizenId: true,
+            position: true,
             assignedFacilityId: true,
             assignedFacility: {
               select: {
@@ -145,29 +154,31 @@ export class StaffService {
       },
     });
 
-    if (!staff) {
+    if (!user) {
       throw new NotFoundException('Không tìm thấy nhân viên');
     }
 
     return {
-      id: staff.id,
-      username: staff.username,
-      email: staff.email,
-      phone: staff.phone,
-      status: staff.status,
-      createdAt: staff.createdAt,
-      citizenId: staff.staffProfile?.citizenId || null,
-      assignedFacilityId: staff.staffProfile?.assignedFacilityId || null,
-      assignedFacility: staff.staffProfile?.assignedFacility || null,
+      id: user.id,
+      username: user.username,
+      fullName: user.staff?.fullName || user.username,
+      email: user.staff?.email || null,
+      phone: user.staff?.phone || null,
+      status: user.status,
+      position: user.staff?.position || 'STAFF',
+      createdAt: user.createdAt,
+      citizenId: user.staff?.citizenId || null,
+      assignedFacilityId: user.staff?.assignedFacilityId || null,
+      assignedFacility: user.staff?.assignedFacility || null,
     };
   }
 
   public async createStaff(dto: CreateStaffDto) {
-    // Check if email already exists
-    const existing = await prisma.user.findFirst({
+    // Check if email already exists in staff
+    const existing = await prisma.staff.findFirst({
       where: {
-        deletedAt: null,
         email: dto.email,
+        isHidden: false,
       },
     });
 
@@ -177,10 +188,10 @@ export class StaffService {
 
     // Check if citizenId already exists if provided
     if (dto.citizenId) {
-      const existingCitizen = await prisma.staffProfile.findFirst({
+      const existingCitizen = await prisma.staff.findFirst({
         where: {
           citizenId: dto.citizenId,
-          deletedAt: null,
+          isHidden: false,
         },
       });
       if (existingCitizen) {
@@ -191,14 +202,14 @@ export class StaffService {
     // Verify facility exists if provided
     if (dto.assignedFacilityId) {
       const facility = await prisma.facility.findFirst({
-        where: { id: dto.assignedFacilityId, deletedAt: null },
+        where: { id: dto.assignedFacilityId },
       });
       if (!facility) {
         throw new NotFoundException('Không tìm thấy kho hàng được chỉ định');
       }
     }
 
-    // Generate unique username from Full Name (lower case, remove accents/diacritics/spaces, append random number)
+    // Generate unique username from Full Name
     let slug = dto.fullName.toLowerCase();
     slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     slug = slug.replace(/[đĐ]/g, "d");
@@ -208,7 +219,6 @@ export class StaffService {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const username = `${usernamePrefix}_${randomSuffix}`;
 
-    // Generate secure random password: Staff@ + 6 random digits
     const rawPassword = `Staff@${Math.floor(100000 + Math.random() * 900000)}`;
     const passwordHash = await bcrypt.hash(rawPassword, 10);
 
@@ -220,7 +230,7 @@ export class StaffService {
       throw new BadRequestException('Hệ thống chưa cấu hình vai trò Nhân viên (STAFF)');
     }
 
-    const latestStaff = await prisma.staffProfile.findFirst({
+    const latestStaff = await prisma.staff.findFirst({
       orderBy: { employeeCode: 'desc' },
     });
     let nextStaffNum = 1;
@@ -236,19 +246,20 @@ export class StaffService {
       const user = await tx.user.create({
         data: {
           username,
-          email: dto.email,
           passwordHash,
-          fullName: dto.fullName,
-          phone: dto.phone || null,
           status: 'ACTIVE',
           roleId: staffRole.id,
         },
       });
 
-      const profile = await tx.staffProfile.create({
+      const profile = await tx.staff.create({
         data: {
           userId: user.id,
           employeeCode,
+          fullName: dto.fullName,
+          phone: dto.phone || '',
+          email: dto.email,
+          position: dto.position || 'STAFF',
           citizenId: dto.citizenId || null,
           assignedFacilityId: dto.assignedFacilityId || null,
         },
@@ -266,7 +277,6 @@ export class StaffService {
       return { user, profile };
     });
 
-    // Fetch facility info if assigned to send in the email
     let facilityCode = '';
     let facilityName = '';
     if (newStaff.profile.assignedFacility) {
@@ -289,9 +299,11 @@ export class StaffService {
     return {
       id: newStaff.user.id,
       username: newStaff.user.username,
-      email: newStaff.user.email,
-      phone: newStaff.user.phone,
+      fullName: newStaff.profile.fullName,
+      email: newStaff.profile.email,
+      phone: newStaff.profile.phone,
       status: newStaff.user.status,
+      position: newStaff.profile.position,
       citizenId: newStaff.profile.citizenId,
       assignedFacilityId: newStaff.profile.assignedFacilityId,
       assignedFacility: newStaff.profile.assignedFacility,
@@ -299,27 +311,30 @@ export class StaffService {
   }
 
   public async updateStaff(id: string, dto: UpdateStaffDto) {
-    const staff = await prisma.user.findFirst({
+    const user = await prisma.user.findFirst({
       where: {
         id,
-        deletedAt: null,
+        isHidden: false,
         role: {
           roleCode: 'STAFF',
         },
       },
+      include: {
+        staff: true,
+      },
     });
 
-    if (!staff) {
+    if (!user) {
       throw new NotFoundException('Không tìm thấy nhân viên');
     }
 
     // Check unique email if updating email
-    if (dto.email && dto.email !== staff.email) {
-      const existingEmail = await prisma.user.findFirst({
+    if (dto.email && dto.email !== user.staff?.email) {
+      const existingEmail = await prisma.staff.findFirst({
         where: {
           email: dto.email,
-          deletedAt: null,
-          NOT: { id },
+          isHidden: false,
+          NOT: { userId: id },
         },
       });
       if (existingEmail) {
@@ -329,10 +344,10 @@ export class StaffService {
 
     // Check unique citizenId if provided
     if (dto.citizenId) {
-      const existingCitizen = await prisma.staffProfile.findFirst({
+      const existingCitizen = await prisma.staff.findFirst({
         where: {
           citizenId: dto.citizenId,
-          deletedAt: null,
+          isHidden: false,
           NOT: { userId: id },
         },
       });
@@ -344,42 +359,40 @@ export class StaffService {
     // Verify facility exists if provided
     if (dto.assignedFacilityId) {
       const facility = await prisma.facility.findFirst({
-        where: { id: dto.assignedFacilityId, deletedAt: null },
+        where: { id: dto.assignedFacilityId },
       });
       if (!facility) {
         throw new NotFoundException('Không tìm thấy kho hàng được chỉ định');
       }
     }
 
-    const data: any = {
-      phone: dto.phone !== undefined ? dto.phone : undefined,
-      status: dto.status !== undefined ? dto.status : undefined,
-    };
+    const userData: any = {};
+    if (dto.status) userData.status = dto.status;
+    if (dto.password) userData.passwordHash = await bcrypt.hash(dto.password, 10);
 
-    if (dto.email) {
-      data.email = dto.email;
-    }
-
-    if (dto.password) {
-      data.passwordHash = await bcrypt.hash(dto.password, 10);
-    }
+    const staffData: any = {};
+    if (dto.phone !== undefined) staffData.phone = dto.phone;
+    if (dto.email !== undefined) staffData.email = dto.email;
+    if (dto.citizenId !== undefined) staffData.citizenId = dto.citizenId;
+    if (dto.position !== undefined) staffData.position = dto.position;
+    if (dto.assignedFacilityId !== undefined) staffData.assignedFacilityId = dto.assignedFacilityId;
 
     const updated = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.update({
-        where: { id },
-        data,
-      });
+      const updatedUser = Object.keys(userData).length > 0
+        ? await tx.user.update({ where: { id }, data: userData })
+        : user;
 
-      const profile = await tx.staffProfile.upsert({
+      const updatedProfile = await tx.staff.upsert({
         where: { userId: id },
-        update: {
-          citizenId: dto.citizenId !== undefined ? dto.citizenId : undefined,
-          assignedFacilityId: dto.assignedFacilityId !== undefined ? dto.assignedFacilityId : undefined,
-        },
+        update: staffData,
         create: {
           userId: id,
           employeeCode: `STF-${Date.now().toString().slice(-6)}`,
+          fullName: user.username,
+          phone: dto.phone || '',
+          email: dto.email || null,
           citizenId: dto.citizenId || null,
+          position: dto.position || 'STAFF',
           assignedFacilityId: dto.assignedFacilityId || null,
         },
         include: {
@@ -393,15 +406,17 @@ export class StaffService {
         },
       });
 
-      return { user, profile };
+      return { user: updatedUser, profile: updatedProfile };
     });
 
     return {
       id: updated.user.id,
       username: updated.user.username,
-      email: updated.user.email,
-      phone: updated.user.phone,
+      fullName: updated.profile.fullName,
+      email: updated.profile.email,
+      phone: updated.profile.phone,
       status: updated.user.status,
+      position: updated.profile.position,
       citizenId: updated.profile.citizenId,
       assignedFacilityId: updated.profile.assignedFacilityId,
       assignedFacility: updated.profile.assignedFacility,
@@ -409,53 +424,38 @@ export class StaffService {
   }
 
   public async deleteStaff(id: string) {
-    const staff = await prisma.user.findFirst({
+    const user = await prisma.user.findFirst({
       where: {
         id,
-        deletedAt: null,
+        isHidden: false,
         role: {
           roleCode: 'STAFF',
         },
       },
       include: {
-        staffProfile: true,
+        staff: true,
       },
     });
 
-    if (!staff) {
+    if (!user) {
       throw new NotFoundException('Không tìm thấy nhân viên');
     }
 
-    const timestamp = Date.now();
-    const deletedEmail = `del_${timestamp}_${staff.email.slice(0, 50)}@deleted.com`;
-    const deletedUsername = `del_${timestamp.toString().slice(-6)}_${staff.username.slice(0, 30)}`;
-    const deletedPhone = staff.phone
-      ? `del_${staff.phone.substring(0, 10)}_${timestamp.toString().slice(-4)}`
-      : null;
-
-    // Soft delete by updating deletedAt in transaction
+    // Soft hide using isHidden = true
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id },
         data: {
-          deletedAt: new Date(),
+          isHidden: true,
           status: 'DISABLED',
-          email: deletedEmail.slice(0, 255),
-          username: deletedUsername.slice(0, 50),
-          phone: deletedPhone,
         },
       });
 
-      if (staff.staffProfile) {
-        const deletedCitizenId = staff.staffProfile.citizenId
-          ? `del_${timestamp.toString().slice(-4)}_${staff.staffProfile.citizenId.substring(0, 11)}`
-          : null;
-
-        await tx.staffProfile.update({
+      if (user.staff) {
+        await tx.staff.update({
           where: { userId: id },
           data: {
-            deletedAt: new Date(),
-            citizenId: deletedCitizenId,
+            isHidden: true,
           },
         });
       }
