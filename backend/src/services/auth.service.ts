@@ -242,11 +242,6 @@ export class AuthService {
       throw new UnauthorizedException('Tài khoản hoặc mật khẩu không chính xác');
     }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
-
     const jwtSecret = process.env.JWT_SECRET || 'super_secret_key_slp_2026';
     const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'super_refresh_secret_key_slp_2026';
 

@@ -84,9 +84,7 @@ Chỉ lưu thông tin xác thực danh tính. Không chứa PII (`email`, `phone
 | `password_hash` | TEXT | ❌ | Chuỗi mật khẩu băm mã hóa Bcrypt. |
 | `status` | `UserStatus` | ❌ | ENUM: `ACTIVE`, `LOCKED`, `DISABLED`, `PENDING_VERIFICATION` (Mặc định `ACTIVE`). |
 | `role_id` | UUID | ❌ | Khóa ngoại tham chiếu $\rightarrow$ `roles(id)`. |
-| `last_login_at` | TIMESTAMPTZ | ✅ | Thời điểm đăng nhập gần nhất. |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo tài khoản (`NOW()`). |
-| `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật tài khoản gần nhất (`NOW()`). |
 
 * **Constraints & Indexes:**
   ```sql

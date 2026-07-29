@@ -30,9 +30,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `password_hash`| Text | Bắt buộc | Chuỗi mật khẩu băm bảo mật Bcrypt. VD: `$2b$10$e8N0Y9z.K2qL.uX1vW9Z8e...` |
 | `status` | Enum | Bắt buộc (Default Active) | Trạng thái tài khoản: `ACTIVE` (Hoạt động), `LOCKED` (Khóa), `DISABLED` (Vô hiệu hóa), `PENDING_VERIFICATION` |
 | `role_id` | Uuid | **Khóa ngoại (FK ➔ bảng roles)** | Mã vai trò hệ thống gán cho người dùng (Trỏ `roles.id`). VD: `rol-01` |
-| `last_login_at`| Timestamptz | Tùy chọn | Thời điểm đăng nhập gần nhất. VD: `2026-07-24 08:30:00+07` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian tạo tài khoản. VD: `2026-07-01 10:00:00+07` |
-| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin tài khoản gần nhất |
 
 ---
 
