@@ -28,7 +28,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `id` | Uuid | **Khóa chính (PK)** | Mã định danh duy nhất của tài khoản. VD: `usr-01`, `usr-02` |
 | `username` | VarChar(50) | Khóa duy nhất (Unique), Bắt buộc | Tên đăng nhập duy nhất. VD: `hung_admin`, `staff_kho_tbd`, `shipper_nam`, `kh_vinamilk` |
 | `password_hash`| Text | Bắt buộc | Chuỗi mật khẩu băm bảo mật Bcrypt. VD: `$2b$10$e8N0Y9z.K2qL.uX1vW9Z8e...` |
-| `status` | Enum | Bắt buộc (Default Active) | Trạng thái tài khoản: `ACTIVE` (Hoạt động), `LOCKED` (Khóa), `DISABLED` (Vô hiệu hóa), `PENDING_VERIFICATION` |
+| `status` | Enum | Bắt buộc (Default Active) | Trạng thái tài khoản: `ACTIVE` (Hoạt động), `DISABLED` (Vô hiệu hóa) |
 | `role_id` | Uuid | **Khóa ngoại (FK ➔ bảng roles)** | Mã vai trò hệ thống gán cho người dùng (Trỏ `roles.id`). VD: `rol-01` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian tạo tài khoản. VD: `2026-07-01 10:00:00+07` |
 
@@ -85,7 +85,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `customer_type` | Enum | Bắt buộc | Loại khách hàng: `INDIVIDUAL` (Cá nhân gửi lẻ), `BUSINESS` (Doanh nghiệp/Shop) |
 | `company_name` | VarChar(255) | Tùy chọn | Tên công ty/Thương hiệu shop (nếu BIZ). VD: `Công ty TNHH Vinamilk` |
 | `tax_code` | VarChar(30) | Tùy chọn | Mã số thuế doanh nghiệp. VD: `0300588569` |
-| `status` | Enum | Bắt buộc (Default Active) | Trạng thái hồ sơ: `ACTIVE` (Hoạt động), `INACTIVE`, `BLOCKED` (Chặn tạo đơn), `DISABLED` (Vô hiệu hóa/Ẩn) |
+| `status` | Enum | Bắt buộc (Default Active) | Trạng thái hồ sơ: `ACTIVE` (Hoạt động), `DISABLED` (Vô hiệu hóa) |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Ngày khách hàng đăng ký hệ thống |
 
 ---
@@ -117,7 +117,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi sổ địa chỉ. VD: `cadr-01` |
 | `customer_id` | Uuid | **Cặp khóa duy nhất [customer_id, address_id]**, **FK ➔ bảng customers** | Mã khách hàng sở hữu địa chỉ. VD: `cust-01` |
 | `address_id` | Uuid | **Cặp khóa duy nhất [customer_id, address_id]**, **FK ➔ bảng addresses** | Mã địa chỉ được liên kết. VD: `addr-01` |
-| `address_type` | Enum | Bắt buộc | Loại địa chỉ: `HOME`, `WAREHOUSE` |
+| `address_type` | Enum | Bắt buộc | Loại địa chỉ: `HOME` (Nhà riêng), `OFFICE` (Văn phòng), `WAREHOUSE` (Kho hàng), `RETURN` (Trả hàng) |
 | `is_default` | Boolean | Default False | Đánh dấu địa chỉ lấy/giao mặc định (`true` / `false`) |
 | `contact_name` | VarChar(150) | Tùy chọn | Họ tên người phụ trách liên hệ tại kho. VD: `Chị Mai - Trưởng Kho Q7` |
 | `contact_phone`| VarChar(20) | Tùy chọn | Số điện thoại liên hệ kho trực tiếp khi Shipper đến lấy. VD: `0912345678` |
@@ -153,7 +153,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `address_id` | Uuid | **Khóa ngoại (FK ➔ bảng addresses)** | Mã địa chỉ của bưu cục/kho bãi (Trỏ `addresses.id`). VD: `addr-05` |
 | `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS Hub (Truy vấn siêu tốc cho AI Routing). VD: `10.7725` |
 | `longitude` | Double | Bắt buộc | Kinh độ định vị GPS Hub (Truy vấn siêu tốc cho AI Routing). VD: `106.6580` |
-| `operating_status`| Enum | Bắt buộc (Default Active) | Trạng thái: `ACTIVE`, `INACTIVE` |
+| `operating_status`| Enum | Bắt buộc (Default Active) | Trạng thái: `ACTIVE` (Đang mở cửa), `MAINTENANCE` (Bảo trì), `CLOSED` |
 | `opened_at` | Date | Bắt buộc | Ngày chính thức mở cửa hoạt động bưu cục. VD: `2025-01-01` |
 | `closed_at` | Date | Tùy chọn | Ngày đóng cửa bưu cục (nếu status = CLOSED). VD: `2026-07-29` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
@@ -169,7 +169,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `facility_id` | Uuid | **Cặp khóa duy nhất [facility_id, zone_code]**, **FK ➔ bảng facilities** | Thuộc bưu cục nào (Trỏ `facilities.id`). VD: `fac-01` |
 | `zone_code` | VarChar(30) | **Cặp khóa duy nhất [facility_id, zone_code]**, Bắt buộc | Mã phân khu kho. VD: `ZONE-REC-01`, `ZONE-SORT-A`, `ZONE-SHIP-SOUTH` |
 | `zone_name` | VarChar(100) | Bắt buộc | Tên phân khu kho. VD: `Khu vực Nhập kho`, `Khu phân loại tự động`, `Khu chờ xuất giao` |
-| `zone_type` | Enum | Bắt buộc | Phân loại khu vực: `SORTING`, `STORAGE` |
+| `zone_type` | Enum | Bắt buộc | Phân loại khu vực: `RECEIVING` (Khu nhận), `SORTING` (Khu phân loại), `SHIPPING` (Khu chờ xuất giao) |
 | `capacity` | Int | Tùy chọn | Sức chứa tối đa của phân khu (đơn vị: Số kiện hàng). VD: `5000` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
@@ -183,7 +183,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
 | `id` | Uuid | **Khóa chính (PK)** | Mã dịch vụ. VD: `srv-01`, `srv-02` |
-| `service_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã dịch vụ: `EXPRESS`, `STANDARD` |
+| `service_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã dịch vụ: `EXPRESS` (Hỏa tốc 2H), `STANDARD` (Tiêu chuẩn 24H), `SAVING` (Tiết kiệm) |
 | `base_price` | Decimal(12,2)| Default 0 | Cước phí nền cơ bản. VD: `15000.00` VNĐ, `25000.00` VNĐ |
 | `free_distance_km`| Float | Default 2.0 | Khoảng cách miễn phí tối thiểu (Km). VD: `2.0` Km |
 | `price_per_km` | Decimal(12,2)| Default 0 | Cước phụ trội tính thêm theo Km. VD: `5000.00` VNĐ/Km |
@@ -373,11 +373,11 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `phone` | VarChar(20) | Bắt buộc | Số điện thoại liên lạc công việc. VD: `0900000003` |
 | `email` | VarChar(255) | Tùy chọn | Email nội bộ/liên hệ công việc. VD: `driver@velocity.vn` |
 | `citizen_id` | VarChar(20) | Khóa duy nhất (Unique), Tùy chọn| Số Căn cước công dân. VD: `079098001234` |
-| `position` | VarChar(100)| Bắt buộc | Chức vụ: `ADMIN`, `DRIVER`... |
+| `position` | VarChar(100)| Bắt buộc | Chức vụ: `ADMIN`, `DISPATCHER`, `WAREHOUSE_STAFF`, `DRIVER` |
 | `assigned_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục công tác/trực thuộc quản lý. VD: `fac-01` |
 | `driver_license_number`| VarChar(50)| Khóa duy nhất (Unique), Tùy chọn| Số bằng lái xe GPLX (Chỉ dùng cho Driver). VD: `59012938102` |
 | `driver_license_class` | VarChar(10)| Tùy chọn | Hạng bằng lái xe GPLX (Chỉ dùng cho Driver). VD: `A1`, `B2`, `C`, `FC` |
-| `driver_type` | Enum | Tùy chọn | Loại tài xế: `HUB_DELIVERY`, `ON_DEMAND` |
+| `driver_type` | Enum | Tùy chọn | Loại tài xế: `HUB_DELIVERY` (Giao bưu cục), `ON_DEMAND` (Giao tức thì) |
 | `employment_status` | Enum | Tùy chọn (Default Active) | Trạng thái công tác: `ACTIVE` (Đang làm), `ON_LEAVE` (Nghỉ phép), `TERMINATED`, `DISABLED` (Vô hiệu hóa/Ẩn) |
 | `hire_date` | Date | Tùy chọn | Ngày chính thức tuyển dụng. VD: `2025-01-15` |
 | `preferred_latitude` | Double | Tùy chọn | Vĩ độ khu vực ưu tiên nhận đơn giao |
@@ -401,7 +401,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `max_length` | Decimal(6,2) | Tùy chọn | Chiều dài lòng thùng xe (m). VD: `3.50` m |
 | `refrigeration_supported` | Boolean | Default False | Cờ hỗ trợ vận chuyển thùng hàng đông lạnh (`true` / `false`) |
 | `gps_device_id` | VarChar(100) | Tùy chọn | Mã định danh thiết bị GPS phần cứng gắn trên xe. VD: `GPS-DEV-88` |
-| `operating_status`| Enum | Bắt buộc | Trạng thái: `ACTIVE`, `MAINTENANCE` |
+| `operating_status`| Enum | Bắt buộc | Trạng thái: `ACTIVE` (Sẵn sàng), `MAINTENANCE` (Đang sửa), `RETIRED` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
@@ -639,7 +639,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | :--- | :--- | :--- | :--- |
 | `id` | Uuid | **Khóa chính (PK)** | Mã file đính kèm. VD: `ta-01` |
 | `delivery_proof_id`| Uuid | **Khóa ngoại (FK ➔ bảng delivery_proofs)**| Thuộc bằng chứng giao hàng nào (Trỏ `delivery_proofs.id`). VD: `dp-01` |
-| `file_type` | Enum | Bắt buộc | Loại file: `PHOTO`, `SIGNATURE` |
+| `file_type` | Enum | Bắt buộc | Loại file: `PHOTO` (Ảnh chụp), `SIGNATURE` (Chữ ký điện tử) |
 | `object_key` | VarChar(500)| Bắt buộc | Đường dẫn lưu trữ Cloud/S3. VD: `pod/2026/07/proof_dp01.jpg` |
 | `storage_provider` | VarChar(30) | Bắt buộc (Default S3) | Nhà cung cấp Cloud Storage (`S3`/`MinIO`) |
 | `mime_type` | VarChar(100) | Bắt buộc | Kiểu định dạng tệp (`image/jpeg`) |
@@ -656,8 +656,8 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `id` | Uuid | **Khóa chính (PK)** | Mã định danh sự kiện tracking. VD: `te-01` |
 | `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Thuộc Vận đơn nào (Trỏ `shipments.id`). VD: `spm-01` |
 | `route_stop_id` | Uuid | **Khóa ngoại (FK ➔ bảng route_stops)** | Phát sinh từ điểm dừng nào (nếu có). VD: `rs-01` |
-| `event_type` | Enum | Bắt buộc | Loại sự kiện: `DELIVERED`, `CANCELLED`... |
-| `event_source` | Enum | Default 'SYSTEM' | Nguồn tạo: `SYSTEM`, `DRIVER_APP` |
+| `event_type` | Enum | Bắt buộc | Loại sự kiện: `PICKED_UP`, `ARRIVED_HUB`, `DEPARTED_HUB`, `OUT_FOR_DELIVERY`, `DELIVERED`, `FAILED`, `RETURNED`, `CANCELLED` |
+| `event_source` | Enum | Default 'SYSTEM' | Nguồn tạo sự kiện: `SYSTEM`, `DRIVER_APP`, `WAREHOUSE_APP`, `API` |
 | `description` | Text | Bắt buộc | Mô tả chi tiết hành trình. VD: `Đơn hàng đã được giao thành công cho người nhận` |
 | `latitude` / `longitude` | Double | Tùy chọn | Tọa độ GPS phát sinh sự kiện. VD: `10.7740` / `106.7030` |
 | `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người dùng/Nhân viên ghi nhận sự kiện. VD: `usr-03` |
@@ -676,10 +676,10 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
 | `id` | Uuid | **Khóa chính (PK)** | Mã tham số cấu hình. VD: `ss-01` |
-| `setting_key` | VarChar(100) | Khóa duy nhất (Unique), Bắt buộc | Cụm từ khóa cấu hình. VD: `ga_population_size` |
-| `setting_value` | Text | Bắt buộc | Giá trị cấu hình lưu giữ. VD: `"100"` |
-| `value_type` | Enum | Bắt buộc | Kiểu dữ liệu: `STRING`, `INTEGER` |
-| `category` | Enum | Bắt buộc | Phân nhóm: `AI`, `ROUTING` |
+| `setting_key` | VarChar(100) | Khóa duy nhất (Unique), Bắt buộc | Khóa cấu hình: `kmeans_cluster_radius_km`, `ga_population_size`, `ga_max_generations`, `ga_mutation_rate`, `gps_sync_interval_sec` |
+| `setting_value` | Text | Bắt buộc | Giá trị cấu hình: `"5.0"`, `"100"`, `"500"`, `"0.05"`, `"3"` |
+| `value_type` | Enum | Bắt buộc | Kiểu dữ liệu: `INTEGER`, `DECIMAL`, `STRING`, `BOOLEAN`, `JSON` |
+| `category` | Enum | Bắt buộc | Phân nhóm cấu hình: `AI`, `ROUTING`, `GPS`, `SYSTEM` |
 | `updated_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Admin thực hiện chỉnh sửa cấu hình gần nhất (Trỏ `users.id`). VD: `usr-01` |
 | `description` | Text | Tùy chọn | Mô tả chi tiết |
 | `is_editable` | Boolean | Bắt buộc (Default True) | Cờ cho phép chỉnh sửa (`true`/`false`) |
