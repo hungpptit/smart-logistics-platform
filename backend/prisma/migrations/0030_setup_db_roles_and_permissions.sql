@@ -26,7 +26,7 @@ $$;
 
 GRANT CONNECT ON DATABASE smart_logistics_db TO app_customer_user;
 GRANT USAGE ON SCHEMA public TO app_customer_user;
-GRANT SELECT, INSERT, UPDATE ON TABLE customers, customer_addresses, customer_contacts, orders TO app_customer_user;
+GRANT SELECT, INSERT, UPDATE ON TABLE customers, customer_addresses, orders TO app_customer_user;
 REVOKE ALL ON TABLE staff, users, system_settings FROM app_customer_user;
 
 -- 3. Create DB Role for Staff / Hub Warehouse Operations API
