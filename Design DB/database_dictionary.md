@@ -157,7 +157,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `opened_at` | Date | Bắt buộc | Ngày chính thức mở cửa hoạt động bưu cục. VD: `2025-01-01` |
 | `closed_at` | Date | Tùy chọn | Ngày đóng cửa bưu cục (nếu status = CLOSED). VD: `2026-07-29` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
-| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 
 ---
 
@@ -173,7 +172,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `zone_type` | Enum | Bắt buộc | Phân loại khu vực: `RECEIVING` (Khu nhận), `SORTING` (Khu phân loại), `SHIPPING` (Khu chờ xuất giao) |
 | `capacity` | Int | Tùy chọn | Sức chứa tối đa của phân khu (đơn vị: Số kiện hàng). VD: `5000` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
-| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 
 ---
 
@@ -405,7 +403,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `gps_device_id` | VarChar(100) | Tùy chọn | Mã định danh thiết bị GPS phần cứng gắn trên xe. VD: `GPS-DEV-88` |
 | `operating_status`| Enum | Bắt buộc | Trạng thái: `ACTIVE` (Sẵn sàng), `MAINTENANCE` (Đang sửa), `RETIRED` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
-| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 
 ---
 

@@ -438,7 +438,6 @@ model Facility {
   openedAt         DateTime       @map("opened_at") @db.Date
   closedAt         DateTime?      @map("closed_at") @db.Date
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
   facilityType      FacilityType      @relation(fields: [facilityTypeId], references: [id], onDelete: Restrict)
   parentFacility    Facility?         @relation("FacilityHierarchy", fields: [parentFacilityId], references: [id], onDelete: SetNull)
@@ -474,7 +473,6 @@ model FacilityZone {
   zoneType   FacilityZoneType @map("zone_type")
   capacity   Int?
   createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt  DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   facility   Facility         @relation(fields: [facilityId], references: [id], onDelete: Cascade)
   packages   Package[]
@@ -774,7 +772,6 @@ model Vehicle {
   gpsDeviceId            String?                @map("gps_device_id") @db.VarChar(100)
   operatingStatus        VehicleOperatingStatus @map("operating_status")
   createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt              DateTime               @updatedAt @map("updated_at") @db.Timestamptz
 
   vehicleType            VehicleType            @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict)
   homeFacility           Facility?              @relation(fields: [homeFacilityId], references: [id], onDelete: SetNull)
