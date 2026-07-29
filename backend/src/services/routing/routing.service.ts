@@ -13,6 +13,9 @@ export class RoutingService {
    * Triggers the AI routing optimization pipeline for a facility.
    */
   public async optimizeRoutesForFacility(facilityId: string, creatorId: string) {
+    // 0. Automatically reset previous PLANNED routes for this facility to ensure all 50 orders are restored to AT_HUB / READY_FOR_PICKUP
+    await this.resetFacilityAi(facilityId);
+
     // 1. Fetch the facility and its primary address
     const facility = await prisma.facility.findUnique({
       where: { id: facilityId, operatingStatus: { not: 'CLOSED' } },
@@ -44,6 +47,8 @@ export class RoutingService {
       throw new BadRequestException('Không có đơn hàng nào ở trạng thái "Chờ lấy hàng" (READY_FOR_PICKUP) hoặc "Đã đến kho nhận" (AT_HUB) tại bưu cục này');
     }
 
+    console.log(`🔍 [AI DEBUG] 1. Total Orders fetched for facility ${facilityId}: ${orders.length}`);
+
     // 3. Fetch all active drivers assigned to this facility
     const drivers = await prisma.staff.findMany({
       where: {
@@ -63,13 +68,12 @@ export class RoutingService {
       },
     });
 
-    // Filter drivers that have active vehicle assignments
-    const availableDrivers = drivers.filter(
-      (driver: any) => driver.assignments.some((a: any) => a.isActive)
-    );
+    // All active drivers at this facility are available (including motorcycle shippers)
+    const availableDrivers = drivers;
+    console.log(`🔍 [AI DEBUG] 2. Available Drivers fetched: ${availableDrivers.length} (${availableDrivers.map(d => d.fullName).join(', ')})`);
 
     if (availableDrivers.length === 0) {
-      throw new BadRequestException('Không có tài xế nào đang hoạt động và có gán phương tiện tại kho này');
+      throw new BadRequestException('Không có tài xế nào đang hoạt động tại bưu cục này');
     }
 
     // 4. Delegate AI K-Means & VRP Genetic Algorithm to Standalone AI Microservice (Port 5001)
@@ -111,12 +115,16 @@ export class RoutingService {
       );
     }
 
+    console.log(`🔍 [AI DEBUG] 3. Clusters produced: ${clusters.length} (Counts: ${clusters.map((c: any) => c.orders.length).join(', ')})`);
+
     // 5. Assign drivers to clusters using Hungarian Algorithm
     const assignments = await this.assignmentService.assignDriversToClusters(
       availableDrivers,
       clusters,
       facilityLocation
     );
+
+    console.log(`🔍 [AI DEBUG] 4. Assignments produced: ${assignments.length}`, assignments);
 
     if (assignments.length === 0) {
       throw new BadRequestException('Không thể phân bổ tài xế cho các cụm đơn hàng');
@@ -127,12 +135,11 @@ export class RoutingService {
     // 6. Run the routing logic for each assigned driver and cluster
     for (const assignment of assignments) {
       const driver = availableDrivers.find((d) => d.id === assignment.driverId);
-      const cluster = clusters.find((c) => c.id === assignment.clusterId);
+      const cluster = clusters[assignment.clusterId] || clusters.find((c: any) => c.id === assignment.clusterId);
 
-      if (!driver || !cluster || cluster.orders.length === 0) continue;
+      if (!driver || !cluster || !cluster.orders || cluster.orders.length === 0) continue;
 
-      const activeAssignment = driver.assignments.find((a) => a.isActive);
-      if (!activeAssignment) continue;
+      const activeAssignment = driver.assignments?.find((a) => a.isActive);
 
       const sortedOrders = cluster.orders;
 
@@ -185,7 +192,9 @@ export class RoutingService {
       const route = await prisma.route.create({
         data: {
           routeCode,
-          driverVehicleAssignmentId: activeAssignment.id,
+          driverVehicleAssignmentId: activeAssignment?.id || null,
+          driverId: driver.id,
+          vehicleId: activeAssignment?.vehicleId || null,
           startFacilityId: facilityId,
           endFacilityId: facilityId,
           optimizationId: optimization.id,
@@ -197,11 +206,18 @@ export class RoutingService {
         },
       });
 
-      // 3. Pre-fetch all packages for these orders in one query
+      // 3. Pre-fetch all packages and existing shipment packages for these orders in one query
       const orderIds = sortedOrders.map((o: any) => o.id);
       const allPackages = await prisma.package.findMany({
         where: { orderId: { in: orderIds } },
       });
+      
+      const existingShipmentPackages = await prisma.shipmentPackage.findMany({
+        where: { packageId: { in: allPackages.map((p) => p.id) } },
+        select: { packageId: true },
+      });
+      const assignedPkgIds = new Set(existingShipmentPackages.map((sp) => sp.packageId));
+
       const packagesByOrderId = new Map<string, typeof allPackages>();
       for (const pkg of allPackages) {
         if (!packagesByOrderId.has(pkg.orderId)) {
@@ -229,13 +245,16 @@ export class RoutingService {
           },
         });
 
-        // Collect shipment package mappings
+        // Collect shipment package mappings (only for packages not yet assigned to any shipment)
         const orderPkgs = packagesByOrderId.get(order.id) || [];
         for (const pkg of orderPkgs) {
-          shipmentPackagesData.push({
-            shipmentId: shipment.id,
-            packageId: pkg.id,
-          });
+          if (!assignedPkgIds.has(pkg.id)) {
+            shipmentPackagesData.push({
+              shipmentId: shipment.id,
+              packageId: pkg.id,
+            });
+            assignedPkgIds.add(pkg.id);
+          }
         }
 
         const isPickup = order.status === 'READY_FOR_PICKUP';
@@ -271,9 +290,12 @@ export class RoutingService {
         });
       }
 
-      // Batch insert shipment packages
+      // Batch insert shipment packages securely with skipDuplicates
       if (shipmentPackagesData.length > 0) {
-        await prisma.shipmentPackage.createMany({ data: shipmentPackagesData });
+        await prisma.shipmentPackage.createMany({
+          data: shipmentPackagesData,
+          skipDuplicates: true,
+        });
       }
 
       // Batch update order statuses
@@ -313,9 +335,10 @@ export class RoutingService {
       where.startFacilityId = filters.facilityId;
     }
     if (filters.driverId) {
-      where.driverVehicleAssignment = {
-        driverId: filters.driverId,
-      };
+      where.OR = [
+        { driverId: filters.driverId },
+        { driverVehicleAssignment: { driverId: filters.driverId } },
+      ];
     }
 
     return await prisma.route.findMany({
@@ -327,6 +350,26 @@ export class RoutingService {
             facilityCode: true,
             facilityName: true,
             address: true,
+          },
+        },
+        driver: {
+          select: {
+            id: true,
+            employeeCode: true,
+            fullName: true,
+            phone: true,
+            user: {
+              select: {
+                username: true,
+              },
+            },
+          },
+        },
+        vehicle: {
+          select: {
+            id: true,
+            vehicleCode: true,
+            licensePlate: true,
           },
         },
         driverVehicleAssignment: {
@@ -484,45 +527,41 @@ export class RoutingService {
    */
   public async resetFacilityAi(facilityId?: string) {
     // 1. Reset test orders back to original state
-    const orderWhere: any = facilityId
-      ? {
-        OR: [
-          { originFacilityId: facilityId },
-          { destinationFacilityId: facilityId },
-        ],
-      }
-      : {};
+    const validFacilityId = facilityId && typeof facilityId === 'string' && facilityId.trim().length > 0 ? facilityId.trim() : null;
 
-    // Reset Velocity 4 pickup orders back to READY_FOR_PICKUP
-    await prisma.order.updateMany({
-      where: {
-        ...orderWhere,
-        orderCode: { startsWith: 'ORD_V4_PICKUP_' },
-      },
-      data: { status: 'READY_FOR_PICKUP' },
-    });
+    // 1. Reset status of orders accurately based on whether they are Pickup or Delivery orders
+    if (validFacilityId) {
+      // Delivery orders waiting for last-mile delivery at destination facility -> Reset to AT_HUB
+      await prisma.order.updateMany({
+        where: {
+          destinationFacilityId: validFacilityId,
+          status: { in: ['PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
+        },
+        data: { status: 'AT_HUB' },
+      });
 
-    // Reset Velocity 3 delivery orders back to AT_HUB
-    await prisma.order.updateMany({
-      where: {
-        ...orderWhere,
-        orderCode: { startsWith: 'ORD_V3_HUB_' },
-      },
-      data: { status: 'AT_HUB' },
-    });
-
-    // Also reset any status changes for test orders
-    await prisma.order.updateMany({
-      where: {
-        ...orderWhere,
-        status: { in: ['PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
-      },
-      data: { status: 'READY_FOR_PICKUP' },
-    });
+      // Pickup orders waiting for pickup at origin facility -> Reset to READY_FOR_PICKUP
+      await prisma.order.updateMany({
+        where: {
+          originFacilityId: validFacilityId,
+          destinationFacilityId: { not: validFacilityId },
+          status: { in: ['PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
+        },
+        data: { status: 'READY_FOR_PICKUP' },
+      });
+    } else {
+      // Global reset fallback: reset all delivery orders in-transit back to AT_HUB
+      await prisma.order.updateMany({
+        where: {
+          status: { in: ['PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
+        },
+        data: { status: 'AT_HUB' },
+      });
+    }
 
     // 2. Find routes created for this facility (excluding base seed routes RTE_1000 to RTE_1004)
-    const routeWhere: any = facilityId
-      ? { startFacilityId: facilityId }
+    const routeWhere: any = validFacilityId
+      ? { startFacilityId: validFacilityId }
       : {};
 
     const routesToDelete = await prisma.route.findMany({
@@ -540,6 +579,7 @@ export class RoutingService {
       await prisma.driverCheckIn.deleteMany({ where: { routeStop: { routeId: { in: routeIds } } } });
       await prisma.routeLocationLog.deleteMany({ where: { routeId: { in: routeIds } } });
       await prisma.dispatchTask.deleteMany({ where: { routeId: { in: routeIds } } });
+      await prisma.routeAdjustmentLog.deleteMany({ where: { routeId: { in: routeIds } } });
       await prisma.routeStop.deleteMany({ where: { routeId: { in: routeIds } } });
 
       // Delete shipments created for these routes

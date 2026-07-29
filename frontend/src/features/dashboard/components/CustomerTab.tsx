@@ -25,15 +25,18 @@ interface AddressItem {
 interface Customer {
   id: string;
   userId?: string;
+  fullName?: string;
+  phone?: string;
+  email?: string;
   customerType: 'INDIVIDUAL' | 'BUSINESS';
   companyName?: string;
   taxCode?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+  status: string;
   note?: string;
   createdAt: string;
   user?: {
     username: string;
-    email: string;
+    email?: string;
     phone?: string;
   };
 }
@@ -66,13 +69,14 @@ export const CustomerTab: React.FC = () => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
+    username: '',
     fullName: '',
     email: '',
     phone: '',
     customerType: 'INDIVIDUAL' as 'INDIVIDUAL' | 'BUSINESS',
     companyName: '',
     taxCode: '',
-    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE' | 'BLOCKED',
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE' | 'BLOCKED' | 'DISABLED' | string,
     note: ''
   });
 
@@ -187,6 +191,7 @@ export const CustomerTab: React.FC = () => {
 
   const handleOpenCreateModal = () => {
     setFormData({
+      username: '',
       fullName: '',
       email: '',
       phone: '',
@@ -203,9 +208,10 @@ export const CustomerTab: React.FC = () => {
 
   const handleOpenEditModal = (c: Customer) => {
     setFormData({
-      fullName: c.user?.username || '',
-      email: c.user?.email || '',
-      phone: c.user?.phone || '',
+      username: c.user?.username || '',
+      fullName: c.fullName || c.user?.username || '',
+      email: c.email || '',
+      phone: c.phone || '',
       customerType: c.customerType,
       companyName: c.companyName || '',
       taxCode: c.taxCode || '',
@@ -236,6 +242,7 @@ export const CustomerTab: React.FC = () => {
             note: formData.note
           }
         : {
+            username: formData.username,
             fullName: formData.fullName,
             email: formData.email,
             phone: formData.phone,

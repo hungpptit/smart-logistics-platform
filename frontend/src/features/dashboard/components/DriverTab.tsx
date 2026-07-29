@@ -5,6 +5,7 @@ import {
   Search, RefreshCw, Plus, Edit2, Trash2, ShieldAlert, AlertTriangle, 
   Phone, ChevronLeft, ChevronRight, X, Loader2, Compass, Eye 
 } from 'lucide-react';
+import { SearchableSelect } from '../../../components/ui/SearchableSelect';
 
 interface Facility {
   id: string;
@@ -21,11 +22,18 @@ interface Driver {
   citizenId?: string | null;
   driverLicenseNumber: string;
   driverLicenseClass: string;
+  driverType?: 'HUB_DELIVERY' | 'LINEHAUL_TRANSFER' | 'ON_DEMAND';
   hireDate: string;
   employmentStatus: 'ACTIVE' | 'OFFLINE' | 'SUSPENDED';
   homeFacilityId?: string;
+  assignedFacilityId?: string;
   note?: string;
   createdAt: string;
+  assignedFacility?: {
+    id: string;
+    facilityCode: string;
+    facilityName: string;
+  };
   homeFacility?: {
     id: string;
     facilityCode: string;
@@ -83,6 +91,7 @@ export const DriverTab: React.FC = () => {
     driverLicenseNumber: '',
     driverLicenseClass: '',
     hireDate: new Date().toISOString().split('T')[0],
+    driverType: 'HUB_DELIVERY' as 'HUB_DELIVERY' | 'LINEHAUL_TRANSFER' | 'ON_DEMAND',
     employmentStatus: 'ACTIVE' as 'ACTIVE' | 'OFFLINE' | 'SUSPENDED',
     homeFacilityId: '',
     note: '',
@@ -101,10 +110,8 @@ export const DriverTab: React.FC = () => {
   }, [currentPage, facilityFilter, statusFilter]);
 
   useEffect(() => {
-    if (showModal) {
-      fetchFacilities();
-    }
-  }, [showModal]);
+    fetchFacilities();
+  }, [token]);
 
   const fetchDrivers = async (page: number = 1) => {
     if (!token) return;
@@ -181,6 +188,7 @@ export const DriverTab: React.FC = () => {
       driverLicenseNumber: '',
       driverLicenseClass: '',
       hireDate: new Date().toISOString().split('T')[0],
+      driverType: 'HUB_DELIVERY',
       employmentStatus: 'ACTIVE',
       homeFacilityId: '',
       note: '',
@@ -203,6 +211,7 @@ export const DriverTab: React.FC = () => {
       driverLicenseNumber: driver.driverLicenseNumber,
       driverLicenseClass: driver.driverLicenseClass,
       hireDate: driver.hireDate ? driver.hireDate.split('T')[0] : '',
+      driverType: driver.driverType || 'HUB_DELIVERY',
       employmentStatus: driver.employmentStatus,
       homeFacilityId: driver.homeFacilityId || '',
       note: driver.note || '',
@@ -305,30 +314,33 @@ export const DriverTab: React.FC = () => {
 
           <div className="flex items-center gap-2">
             {/* Warehouse Filter */}
-            <select
-              value={facilityFilter}
-              onChange={(e) => setFacilityFilter(e.target.value)}
-              className="px-3 py-2 border border-[#e2e8f0] rounded-md text-xs focus:border-[#bc0100] outline-none bg-white min-w-[200px]"
-            >
-              <option value="">Tất cả kho hoạt động</option>
-              {facilities.map((fac) => (
-                <option key={fac.id} value={fac.id}>
-                  {fac.facilityName} ({fac.facilityCode})
-                </option>
-              ))}
-            </select>
+            <div className="w-[220px]">
+              <SearchableSelect
+                value={facilityFilter}
+                onChange={(val) => setFacilityFilter(val)}
+                options={[
+                  { value: '', label: 'Tất cả kho hoạt động' },
+                  ...facilities.map((fac) => ({
+                    value: fac.id,
+                    label: `${fac.facilityName} (${fac.facilityCode})`
+                  }))
+                ]}
+              />
+            </div>
 
             {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-[#e2e8f0] rounded-md text-xs focus:border-[#bc0100] outline-none bg-white"
-            >
-              <option value="">Tất cả trạng thái</option>
-              <option value="ACTIVE">Đang hoạt động</option>
-              <option value="OFFLINE">Ngoại tuyến</option>
-              <option value="SUSPENDED">Bị đình chỉ</option>
-            </select>
+            <div className="w-[160px]">
+              <SearchableSelect
+                value={statusFilter}
+                onChange={(val) => setStatusFilter(val)}
+                options={[
+                  { value: '', label: 'Tất cả trạng thái' },
+                  { value: 'ACTIVE', label: 'Đang hoạt động' },
+                  { value: 'OFFLINE', label: 'Ngoại tuyến' },
+                  { value: 'SUSPENDED', label: 'Bị đình chỉ' }
+                ]}
+              />
+            </div>
           </div>
 
           <button
@@ -413,14 +425,18 @@ export const DriverTab: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-4">
-                      {drv.homeFacility ? (
-                        <div className="flex flex-col">
-                          <span className="font-bold text-gray-700">{drv.homeFacility.facilityName}</span>
-                          <span className="text-[10px] text-gray-400 font-mono">{drv.homeFacility.facilityCode}</span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 italic">Chưa phân kho</span>
-                      )}
+                      {(() => {
+                        const fac = drv.assignedFacility || drv.homeFacility;
+                        if (fac) {
+                          return (
+                            <div className="flex flex-col">
+                              <span className="font-bold text-gray-700">{fac.facilityName}</span>
+                              <span className="text-[10px] text-gray-400 font-mono">{fac.facilityCode}</span>
+                            </div>
+                          );
+                        }
+                        return <span className="text-gray-400 italic">Chưa phân kho</span>;
+                      })()}
                     </td>
                     <td className="p-4">
                       <div className="flex flex-col">
@@ -504,8 +520,8 @@ export const DriverTab: React.FC = () => {
 
       {/* Add / Edit Driver Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-[#161D25]/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-lg border border-[#e2e8f0] shadow-soft w-full max-w-lg overflow-hidden flex flex-col my-8">
+        <div className="fixed inset-0 bg-[#161D25]/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto py-8">
+          <div className="bg-white rounded-xl border border-[#e2e8f0] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-4 border-b border-[#e2e8f0] flex justify-between items-center bg-gray-50">
               <h3 className="text-sm font-bold text-[#161D25] uppercase tracking-wider">
                 {isEditing ? 'Cập nhật thông tin tài xế' : 'Thêm hồ sơ tài xế mới'}
@@ -555,9 +571,12 @@ export const DriverTab: React.FC = () => {
 
                 {/* Citizen ID (CCCD) */}
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số CCCD</label>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                    Số CCCD <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
+                    required
                     value={formData.citizenId}
                     onChange={(e) => setFormData({ ...formData, citizenId: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100]"
@@ -568,54 +587,68 @@ export const DriverTab: React.FC = () => {
                 {/* Status */}
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Trạng thái hoạt động</label>
-                  <select
+                  <SearchableSelect
                     value={formData.employmentStatus}
-                    onChange={(e) => setFormData({ ...formData, employmentStatus: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
-                  >
-                    <option value="ACTIVE">Đang hoạt động</option>
-                    <option value="OFFLINE">Ngoại tuyến</option>
-                    <option value="SUSPENDED">Bị đình chỉ</option>
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, employmentStatus: val as any })}
+                    options={[
+                      { value: 'ACTIVE', label: 'Đang hoạt động' },
+                      { value: 'OFFLINE', label: 'Ngoại tuyến' },
+                      { value: 'SUSPENDED', label: 'Bị đình chỉ' }
+                    ]}
+                  />
+                </div>
+
+                {/* Driver Type */}
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                    Loại tài xế <span className="text-[#bc0100]">*</span>
+                  </label>
+                  <SearchableSelect
+                    required
+                    value={formData.driverType}
+                    onChange={(val) => setFormData({ ...formData, driverType: val as any })}
+                    options={[
+                      { value: 'HUB_DELIVERY', label: 'Tài xế Bưu cục chặng cuối (Hub Courier)' },
+                      { value: 'LINEHAUL_TRANSFER', label: 'Tài xế Trung chuyển Liên Bưu cục / Kho tổng (Linehaul Transfer)' },
+                      { value: 'ON_DEMAND', label: 'Tài xế giao tức thì (On-Demand Express)' }
+                    ]}
+                  />
                 </div>
 
                 {/* Home Facility (Warehouse) */}
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Kho / Bưu cục trực thuộc *</label>
-                  <select
+                  <SearchableSelect
                     required
                     value={formData.homeFacilityId}
-                    onChange={(e) => setFormData({ ...formData, homeFacilityId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
-                  >
-                    <option value="">-- Chọn kho bãi hoạt động --</option>
-                    {facilities.map((fac) => (
-                      <option key={fac.id} value={fac.id}>
-                        {fac.facilityName} ({fac.facilityCode})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, homeFacilityId: val })}
+                    placeholder="-- Chọn kho bãi hoạt động --"
+                    options={facilities.map((fac) => ({
+                      value: fac.id,
+                      label: `${fac.facilityName} (${fac.facilityCode})`
+                    }))}
+                  />
                 </div>
 
                 {/* License class */}
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Hạng bằng lái *</label>
-                  <select
+                  <SearchableSelect
                     required
                     value={formData.driverLicenseClass}
-                    onChange={(e) => setFormData({ ...formData, driverLicenseClass: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
-                  >
-                    <option value="">-- Chọn hạng bằng lái --</option>
-                    <option value="A1">A1 (Xe máy dưới 175cc)</option>
-                    <option value="A2">A2 (Xe mô tô trên 175cc)</option>
-                    <option value="B1">B1 (Ô tô số tự động dưới 9 chỗ, bán tải)</option>
-                    <option value="B2">B2 (Xe tải/Van số sàn dưới 3.5 Tấn)</option>
-                    <option value="C">C (Xe tải trên 3.5 Tấn & xe đông lạnh)</option>
-                    <option value="D">D (Xe khách dưới 30 chỗ)</option>
-                    <option value="E">E (Xe khách trên 30 chỗ)</option>
-                    <option value="FC">FC (Xe đầu kéo Container)</option>
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, driverLicenseClass: val })}
+                    placeholder="-- Chọn hạng bằng lái --"
+                    options={[
+                      { value: 'A1', label: 'A1 (Xe máy dưới 175cc)' },
+                      { value: 'A2', label: 'A2 (Xe mô tô trên 175cc)' },
+                      { value: 'B1', label: 'B1 (Ô tô số tự động dưới 9 chỗ, bán tải)' },
+                      { value: 'B2', label: 'B2 (Xe tải/Van số sàn dưới 3.5 Tấn)' },
+                      { value: 'C', label: 'C (Xe tải trên 3.5 Tấn & xe đông lạnh)' },
+                      { value: 'D', label: 'D (Xe khách dưới 30 chỗ)' },
+                      { value: 'E', label: 'E (Xe khách trên 30 chỗ)' },
+                      { value: 'FC', label: 'FC (Xe đầu kéo Container)' }
+                    ]}
+                  />
                 </div>
 
                 {/* License number */}
@@ -648,9 +681,24 @@ export const DriverTab: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-3 bg-red-50/20 border border-red-100/50 rounded flex flex-col gap-2">
+                    <div className="p-3 bg-red-50/20 border border-red-100/50 rounded flex flex-col gap-3">
                       <div>
-                        <label className="block text-[9px] font-bold text-gray-500 uppercase mb-1">Email đăng ký tài khoản *</label>
+                        <label className="block text-[9px] font-bold text-gray-500 uppercase mb-1">
+                          Tên đăng nhập (Username) <span className="text-[#bc0100]">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.username}
+                          onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
+                          placeholder="VD: taixe_01"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-500 uppercase mb-1">
+                          Email đăng ký tài khoản <span className="text-[#bc0100]">*</span>
+                        </label>
                         <input
                           type="email"
                           required
@@ -661,7 +709,7 @@ export const DriverTab: React.FC = () => {
                         />
                       </div>
                       <p className="text-[9px] text-gray-500 italic">
-                        * Hệ thống sẽ tự động tạo tên đăng nhập từ họ tên tài xế, tạo mật khẩu bảo mật ngẫu nhiên và gửi thông tin qua Email này.
+                        * Hệ thống sẽ cấp tài khoản đăng nhập với Tên đăng nhập trên, tạo mật khẩu bảo mật ngẫu nhiên và gửi thông tin qua Email này.
                       </p>
                     </div>
                   )}
@@ -669,7 +717,9 @@ export const DriverTab: React.FC = () => {
 
                 {/* Hire date */}
                 <div className="col-span-2">
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Ngày ký hợp đồng *</label>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                    Ngày vào làm (Hire Date) <span className="text-[#bc0100]">*</span>
+                  </label>
                   <input
                     type="date"
                     required

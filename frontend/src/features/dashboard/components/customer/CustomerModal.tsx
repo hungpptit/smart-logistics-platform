@@ -1,28 +1,31 @@
 import React from 'react';
 import { XCircle } from 'lucide-react';
+import { SearchableSelect } from '../../../../components/ui/SearchableSelect';
 
 interface CustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
   isEditing: boolean;
   formData: {
+    username: string;
     fullName: string;
     email: string;
     phone: string;
     customerType: 'INDIVIDUAL' | 'BUSINESS';
     companyName: string;
     taxCode: string;
-    status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+    status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED' | 'DISABLED' | string;
     note: string;
   };
   setFormData: React.Dispatch<React.SetStateAction<{
+    username: string;
     fullName: string;
     email: string;
     phone: string;
     customerType: 'INDIVIDUAL' | 'BUSINESS';
     companyName: string;
     taxCode: string;
-    status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+    status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED' | 'DISABLED' | string;
     note: string;
   }>>;
   onSubmit: (e: React.FormEvent) => void;
@@ -71,7 +74,23 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
           ) : (
             <>
               <div className="flex flex-col gap-1">
-                <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Họ và tên khách hàng *</label>
+                <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">
+                  Tên đăng nhập (Username) <span className="text-[#bc0100]">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nhập tên đăng nhập (VD: khachhang01)..."
+                  value={formData.username}
+                  onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                  className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none focus:border-[#bc0100]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">
+                  Họ và tên khách hàng <span className="text-[#bc0100]">*</span>
+                </label>
                 <input
                   type="text"
                   required
@@ -84,7 +103,9 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Email đăng ký *</label>
+                  <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">
+                    Email đăng ký <span className="text-[#bc0100]">*</span>
+                  </label>
                   <input
                     type="email"
                     required
@@ -96,11 +117,12 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Số điện thoại *</label>
+                  <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">
+                    Số điện thoại (Không bắt buộc)
+                  </label>
                   <input
                     type="text"
-                    required
-                    placeholder="09XXXXXXXX"
+                    placeholder="Ví dụ: 09XXXXXXXX"
                     value={formData.phone}
                     onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                     className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none focus:border-[#bc0100]"
@@ -109,21 +131,21 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
               </div>
               
               <p className="text-[9px] text-gray-400 italic">
-                * Hệ thống sẽ tự động tạo tài khoản đăng nhập cho khách hàng, tạo mật khẩu ngẫu nhiên và gửi thông tin qua Email này.
+                * Hệ thống sẽ cấp tài khoản đăng nhập với Tên đăng nhập trên, tạo mật khẩu ngẫu nhiên an toàn và gửi thông tin kích hoạt qua Email này.
               </p>
             </>
           )}
 
           <div className="flex flex-col gap-1">
             <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Loại khách hàng</label>
-            <select
+            <SearchableSelect
               value={formData.customerType}
-              onChange={(e) => setFormData(prev => ({ ...prev, customerType: e.target.value as any }))}
-              className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none focus:border-[#bc0100]"
-            >
-              <option value="INDIVIDUAL">Cá nhân (Individual)</option>
-              <option value="BUSINESS">Doanh nghiệp (Business)</option>
-            </select>
+              onChange={(val) => setFormData(prev => ({ ...prev, customerType: val as any }))}
+              options={[
+                { value: 'INDIVIDUAL', label: 'Cá nhân (Individual)' },
+                { value: 'BUSINESS', label: 'Doanh nghiệp (Business)' }
+              ]}
+            />
           </div>
 
           {formData.customerType === 'BUSINESS' && (

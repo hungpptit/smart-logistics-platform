@@ -2,6 +2,10 @@ import { IsString, IsOptional, IsUUID, IsEnum, IsNotEmpty, IsDateString, IsBoole
 import { DriverEmploymentStatus, DriverType } from '@prisma/client';
 
 export class CreateDriverDto {
+  @IsString({ message: 'Tên đăng nhập phải là chuỗi ký tự' })
+  @IsOptional()
+  username?: string;
+
   @IsEmail({}, { message: 'Địa chỉ email tài khoản không hợp lệ' })
   @IsNotEmpty({ message: 'Địa chỉ email tài khoản không được để trống' })
   email!: string;
@@ -25,9 +29,9 @@ export class CreateDriverDto {
   @IsDateString({}, { message: 'Ngày ký hợp đồng phải đúng định dạng ngày ISO' })
   hireDate!: string;
 
-  @IsString({ message: 'Số CCCD phải là chuỗi ký tự' })
-  @IsOptional()
-  citizenId?: string;
+  @IsString({ message: 'Số CCCD không được để trống' })
+  @IsNotEmpty({ message: 'Số CCCD không được để trống' })
+  citizenId!: string;
 
   @IsEnum(DriverEmploymentStatus, { message: 'Trạng thái hoạt động không hợp lệ' })
   @IsOptional()
@@ -36,14 +40,6 @@ export class CreateDriverDto {
   @IsUUID('4', { message: 'ID kho bãi phải là UUID hợp lệ' })
   @IsOptional()
   homeFacilityId?: string;
-
-  @IsNumber({}, { message: 'Vĩ độ mong muốn phải là một số thực' })
-  @IsOptional()
-  preferredLatitude?: number;
-
-  @IsNumber({}, { message: 'Kinh độ mong muốn phải là một số thực' })
-  @IsOptional()
-  preferredLongitude?: number;
 
   @IsEnum(DriverType, { message: 'Loại tài xế không hợp lệ' })
   @IsOptional()
@@ -86,14 +82,6 @@ export class UpdateDriverDto {
   @IsUUID('4', { message: 'ID kho bãi phải là UUID hợp lệ' })
   @IsOptional()
   homeFacilityId?: string;
-
-  @IsNumber({}, { message: 'Vĩ độ mong muốn phải là một số thực' })
-  @IsOptional()
-  preferredLatitude?: number;
-
-  @IsNumber({}, { message: 'Kinh độ mong muốn phải là một số thực' })
-  @IsOptional()
-  preferredLongitude?: number;
 
   @IsEnum(DriverType, { message: 'Loại tài xế không hợp lệ' })
   @IsOptional()

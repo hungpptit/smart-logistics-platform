@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
 import { CreateOrderModal } from './CreateOrderModal';
+import { RouteOptimizationModal } from './RouteOptimizationModal';
 import {
   Search,
   Filter,
@@ -155,6 +156,7 @@ export const OrderTab: React.FC = () => {
   const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
   const [showPrintLabel, setShowPrintLabel] = useState<boolean>(false);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [isOptimizationModalOpen, setIsOptimizationModalOpen] = useState<boolean>(false);
   const [newStatus, setNewStatus] = useState<string>('');
   const [statusReason, setStatusReason] = useState<string>('');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
@@ -171,64 +173,28 @@ export const OrderTab: React.FC = () => {
   const userAssignedFacilityId = user?.staffProfile?.assignedFacilityId;
   const canOperateOnCurrentFacility = isAdmin || (isStaffOnly && facilityFilter === userAssignedFacilityId);
 
-  const handleRunAiOptimization = async () => {
-    const targetFacilityId = facilityFilter || userAssignedFacilityId;
-    if (!targetFacilityId) {
-      alert('Vui lòng chọn Kho/Bưu cục cần chạy AI gom cụm đơn hàng!');
-      return;
-    }
-
-    if (!canOperateOnCurrentFacility) {
-      alert('❌ Quyền hạn không đủ! Bạn chỉ được phép thực hiện gom cụm đơn hàng tại Bưu cục mình quản lý.');
-      return;
-    }
-
-    const targetFacName = facilities.find(f => f.id === targetFacilityId)?.facilityName || 'Kho đang chọn';
-    if (!window.confirm(`🤖 Bạn có chắc chắn muốn kích hoạt AI Gom Cụm K-Means & VRP cho ${targetFacName}?`)) {
-      return;
-    }
-
-    setOptimizing(true);
-    try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}/routes/optimize`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ facilityId: targetFacilityId })
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
-        alert(`🎉 ${data.message || 'Tối ưu định tuyến AI thành công!'}`);
-        fetchOrders(currentPage);
-      } else {
-        alert(`❌ Lỗi AI: ${data.message || 'Không thể chạy AI phân cụm.'}`);
-      }
-    } catch (err) {
-      console.error('Lỗi khi gọi API AI optimize:', err);
-      alert('❌ Đã xảy ra lỗi kết nối khi kích hoạt AI.');
-    } finally {
-      setOptimizing(false);
-    }
+  const handleRunAiOptimization = () => {
+    setIsOptimizationModalOpen(true);
   };
 
   const [resetting, setResetting] = useState<boolean>(false);
 
   const handleDevResetAi = async () => {
     const targetFacilityId = facilityFilter || userAssignedFacilityId;
-    if (!targetFacilityId) {
+
+    if (!targetFacilityId && !isAdmin) {
       alert('Vui lòng chọn Kho/Bưu cục cần hoàn tác dữ liệu AI!');
       return;
     }
 
-    if (!canOperateOnCurrentFacility) {
+    if (!canOperateOnCurrentFacility && !isAdmin) {
       alert('❌ Quyền hạn không đủ! Bạn chỉ được phép hoàn tác dữ liệu AI tại Bưu cục mình quản lý.');
       return;
     }
 
-    const targetFacName = facilities.find(f => f.id === targetFacilityId)?.facilityName || 'kho đang chọn';
+    const targetFacName = targetFacilityId
+      ? (facilities.find(f => f.id === targetFacilityId)?.facilityName || 'kho đang chọn')
+      : 'TOÀN BỘ CÁC BƯU CỤC HỆ THỐNG';
 
     if (!window.confirm(`⚠️ [DEV RESET] Bạn có chắc muốn HOÀN TÁC tất cả các tuyến AI đã gom và trả lại các đơn hàng của ${targetFacName} về trạng thái chờ ban đầu?`)) {
       return;
@@ -1154,6 +1120,19 @@ export const OrderTab: React.FC = () => {
         }}
         token={token}
         isAdminOrStaff={!!isAdminOrStaff}
+      />
+
+      {/* AI Route Optimization Modal */}
+      <RouteOptimizationModal
+        isOpen={isOptimizationModalOpen}
+        onClose={() => setIsOptimizationModalOpen(false)}
+        onSuccess={() => {
+          fetchOrders(currentPage);
+        }}
+        token={token}
+        facilityId={facilityFilter || userAssignedFacilityId}
+        facilities={facilities}
+        isAdmin={isAdmin}
       />
     </div>
   );

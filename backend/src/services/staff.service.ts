@@ -4,11 +4,13 @@ import { BadRequestException, NotFoundException } from '../middlewares/error.mid
 import { rabbitMQService } from './rabbitmq.service';
 
 export interface CreateStaffDto {
+  username?: string;
   fullName: string;
   email: string;
   phone?: string;
   citizenId?: string;
   position?: string;
+  hireDate?: string;
   assignedFacilityId?: string | null;
 }
 
@@ -173,6 +175,21 @@ export class StaffService {
   }
 
   public async createStaff(dto: CreateStaffDto) {
+    if (!dto.phone) {
+      throw new BadRequestException('Số điện thoại không được để trống');
+    }
+
+    // Check if phone already exists in staff
+    const phoneExists = await prisma.staff.findFirst({
+      where: {
+        phone: dto.phone,
+        user: { status: 'ACTIVE' },
+      },
+    });
+    if (phoneExists) {
+      throw new BadRequestException('Số điện thoại đã tồn tại trên hệ thống');
+    }
+
     // Check if email already exists in staff
     const existing = await prisma.staff.findFirst({
       where: {
@@ -208,15 +225,23 @@ export class StaffService {
       }
     }
 
-    // Generate unique username from Full Name
-    let slug = dto.fullName.toLowerCase();
-    slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    slug = slug.replace(/[đĐ]/g, "d");
-    slug = slug.replace(/\s+/g, "");
-    slug = slug.replace(/[^a-z0-9_]/g, "");
-    const usernamePrefix = slug.substring(0, 20) || 'staff';
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const username = `${usernamePrefix}_${randomSuffix}`;
+    // Generate or check unique username
+    let username = dto.username?.trim();
+    if (username) {
+      const existingUser = await prisma.user.findUnique({ where: { username } });
+      if (existingUser) {
+        throw new BadRequestException('Tên đăng nhập đã tồn tại trên hệ thống');
+      }
+    } else {
+      let slug = dto.fullName.toLowerCase();
+      slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      slug = slug.replace(/[đĐ]/g, "d");
+      slug = slug.replace(/\s+/g, "");
+      slug = slug.replace(/[^a-z0-9_]/g, "");
+      const usernamePrefix = slug.substring(0, 20) || 'staff';
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      username = `${usernamePrefix}_${randomSuffix}`;
+    }
 
     const rawPassword = `Staff@${Math.floor(100000 + Math.random() * 900000)}`;
     const passwordHash = await bcrypt.hash(rawPassword, 10);
@@ -256,20 +281,21 @@ export class StaffService {
           userId: user.id,
           employeeCode,
           fullName: dto.fullName,
-          phone: dto.phone || '',
+          phone: dto.phone || '0000000000',
           email: dto.email,
-          position: dto.position || 'STAFF',
           citizenId: dto.citizenId || null,
+          position: dto.position || 'Warehouse Staff',
+          hireDate: dto.hireDate ? new Date(dto.hireDate) : new Date(),
           assignedFacilityId: dto.assignedFacilityId || null,
         },
         include: {
-          assignedFacility: {
+          user: {
             select: {
-              id: true,
-              facilityCode: true,
-              facilityName: true,
+              username: true,
+              status: true,
             },
           },
+          assignedFacility: true,
         },
       });
 

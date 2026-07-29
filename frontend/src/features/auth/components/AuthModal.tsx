@@ -188,16 +188,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
     const trimmedUser = loginUser.trim();
     if (!trimmedUser) {
-      newErrors.username = 'Tài khoản đăng nhập không được để trống';
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const phoneRegex = /^[0-9]{9,15}$/;
-      const isEmail = emailRegex.test(trimmedUser);
-      const isPhone = phoneRegex.test(trimmedUser);
-
-      if (!isEmail && !isPhone) {
-        newErrors.username = 'Tài khoản đăng nhập phải là Email hoặc Số điện thoại hợp lệ';
-      }
+      newErrors.username = 'Tên đăng nhập không được để trống';
+    } else if (trimmedUser.length < 3) {
+      newErrors.username = 'Tên đăng nhập phải có ít nhất 3 ký tự';
     }
 
     if (!loginPass) {
@@ -215,9 +208,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
     // Username check
     if (!regUsername.trim()) {
-      newErrors.username = 'Tên tài khoản không được để trống';
+      newErrors.username = 'Tên đăng nhập không được để trống';
     } else if (regUsername.trim().length < 3) {
-      newErrors.username = 'Tên tài khoản phải có ít nhất 3 ký tự';
+      newErrors.username = 'Tên đăng nhập phải có ít nhất 3 ký tự';
     }
 
     // Email check
@@ -517,13 +510,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           {activeTab === 'login' && (
             <form onSubmit={handleLoginSubmit} className="auth-form-wrapper">
               <div className="form-group">
-                <label htmlFor="login-username">Tài khoản đăng nhập (Email / SĐT)</label>
+                <label htmlFor="login-username">Tên đăng nhập (Username)<span style={{ color: '#bc0100', marginLeft: '3px' }}>*</span></label>
                 <input 
                   type="text" 
                   id="login-username" 
                   className="form-input"
                   required 
-                  placeholder="Nhập Email hoặc Số điện thoại đăng nhập..."
+                  placeholder="Nhập Tên đăng nhập (VD: admin, staff)..."
                   value={loginUser}
                   onChange={(e) => setLoginUser(e.target.value)}
                   disabled={isLoading}
@@ -531,7 +524,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 {loginErrors.username && <div className="form-error">{loginErrors.username}</div>}
               </div>
               <div className="form-group">
-                <label htmlFor="login-password">Mật khẩu</label>
+                <label htmlFor="login-password">Mật khẩu<span style={{ color: '#bc0100', marginLeft: '3px' }}>*</span></label>
                 <div style={{ position: 'relative' }}>
                   <input 
                     type={showLoginPass ? 'text' : 'password'} 
@@ -596,7 +589,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           {activeTab === 'register' && (
             <form onSubmit={handleRegisterSubmit} className="auth-form-wrapper">
               <div className="form-group">
-                <label htmlFor="reg-username">Tên tài khoản</label>
+                <label htmlFor="reg-username">Tên đăng nhập<span style={{ color: '#bc0100', marginLeft: '3px' }}>*</span></label>
                 <input 
                   type="text" 
                   id="reg-username" 
@@ -610,7 +603,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 {errors.username && <div className="form-error">{errors.username}</div>}
               </div>
               <div className="form-group">
-                <label htmlFor="reg-email">Email</label>
+                <label htmlFor="reg-email">Email<span style={{ color: '#bc0100', marginLeft: '3px' }}>*</span></label>
                 <input 
                   type="email" 
                   id="reg-email" 
@@ -624,7 +617,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 {errors.email && <div className="form-error">{errors.email}</div>}
               </div>
               <div className="form-group">
-                <label htmlFor="reg-password">Mật khẩu</label>
+                <label htmlFor="reg-password">Mật khẩu<span style={{ color: '#bc0100', marginLeft: '3px' }}>*</span></label>
                 <div style={{ position: 'relative' }}>
                   <input 
                     type={showRegPass ? 'text' : 'password'} 
@@ -660,7 +653,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 {errors.password && <div className="form-error">{errors.password}</div>}
               </div>
               <div className="form-group">
-                <label htmlFor="reg-confirm-password">Xác nhận mật khẩu</label>
+                <label htmlFor="reg-confirm-password">Xác nhận mật khẩu<span style={{ color: '#bc0100', marginLeft: '3px' }}>*</span></label>
                 <div style={{ position: 'relative' }}>
                   <input 
                     type={showRegConfirmPass ? 'text' : 'password'} 
@@ -799,7 +792,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           {activeTab === 'forgot' && (
             <form onSubmit={handleForgotSubmit} className="auth-form-wrapper">
               <div className="form-group">
-                <label htmlFor="forgot-email">Địa chỉ Email tài khoản</label>
+                <label htmlFor="forgot-email">Địa chỉ Email tài khoản<span style={{ color: '#bc0100', marginLeft: '3px' }}>*</span></label>
                 <input 
                   type="email" 
                   id="forgot-email" 
@@ -911,7 +904,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               </div>
 
               <div className="form-group">
-                <label htmlFor="reset-new-password">Mật khẩu mới</label>
+                <label htmlFor="reset-new-password">Mật khẩu mới<span style={{ color: '#bc0100', marginLeft: '3px' }}>*</span></label>
                 <div style={{ position: 'relative' }}>
                   <input 
                     type={showResetNewPass ? 'text' : 'password'} 
@@ -948,7 +941,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               </div>
 
               <div className="form-group">
-                <label htmlFor="reset-confirm-new-password">Xác nhận mật khẩu mới</label>
+                <label htmlFor="reset-confirm-new-password">Xác nhận mật khẩu mới<span style={{ color: '#bc0100', marginLeft: '3px' }}>*</span></label>
                 <div style={{ position: 'relative' }}>
                   <input 
                     type={showResetConfirmNewPass ? 'text' : 'password'} 

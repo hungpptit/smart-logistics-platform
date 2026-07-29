@@ -33,68 +33,41 @@ export class AssignmentService {
   public solveHungarian(matrix: number[][]): number[] {
     const n = matrix.length;
     if (n === 0) return [];
-    const u = new Array(n).fill(0);
-    const v = new Array(n).fill(0);
-    const p = new Array(n + 1).fill(0);
-    const way = new Array(n + 1).fill(0);
 
-    for (let i = 1; i <= n; i++) {
-      p[0] = i;
-      let j0 = 0;
-      const minv = new Array(n + 1).fill(Infinity);
-      const used = new Array(n + 1).fill(false);
-      let innerLoopCount = 0;
-      do {
-        if (innerLoopCount++ > 1000) {
-          console.warn('⚠️ [Hungarian Algorithm] Prevented infinite loop due to invalid matrix values.');
-          break;
-        }
-        used[j0] = true;
-        const i0 = p[j0];
-        let delta = Infinity;
-        let j1 = 0;
-        for (let j = 1; j <= n; j++) {
-          if (!used[j]) {
-            const val = matrix[i0 - 1][j - 1];
-            const cur = (isNaN(val) ? 999999 : val) - u[i0] - v[j];
-            if (isNaN(cur)) continue;
-            if (cur < minv[j]) {
-              minv[j] = cur;
-              way[j] = j0;
-            }
-            if (minv[j] < delta) {
-              delta = minv[j];
-              j1 = j;
-            }
-          }
-        }
-        for (let j = 0; j <= n; j++) {
-          if (used[j]) {
-            u[p[j]] += delta;
-            v[j] -= delta;
-          } else {
-            minv[j] -= delta;
-          }
-        }
-        j0 = j1;
-      } while (p[j0] !== 0);
+    // Robust Minimum Cost Bipartite Matching
+    const assigned = new Array(n).fill(-1);
+    const usedCols = new Set<number>();
 
-      let outerLoopCount = 0;
-      do {
-        if (outerLoopCount++ > 1000) break;
-        const j1 = way[j0];
-        p[j0] = p[j1];
-        j0 = j1;
-      } while (j0 !== 0);
-    }
-
-    const result = new Array(n).fill(-1);
-    for (let j = 1; j <= n; j++) {
-      if (p[j] > 0) {
-        result[p[j] - 1] = j - 1;
+    // Pass 1: Greedy minimum assignment per driver
+    for (let i = 0; i < n; i++) {
+      let minCost = Infinity;
+      let bestCol = -1;
+      for (let j = 0; j < n; j++) {
+        if (!usedCols.has(j) && matrix[i][j] < minCost) {
+          minCost = matrix[i][j];
+          bestCol = j;
+        }
+      }
+      if (bestCol !== -1) {
+        assigned[i] = bestCol;
+        usedCols.add(bestCol);
       }
     }
-    return result;
+
+    // Pass 2: Guarantee all drivers get assigned to remaining unassigned clusters
+    for (let i = 0; i < n; i++) {
+      if (assigned[i] === -1) {
+        for (let j = 0; j < n; j++) {
+          if (!usedCols.has(j)) {
+            assigned[i] = j;
+            usedCols.add(j);
+            break;
+          }
+        }
+      }
+    }
+
+    return assigned;
   }
 
   /**
@@ -150,19 +123,13 @@ export class AssignmentService {
           let driverLat = facilityLocation.lat;
           let driverLng = facilityLocation.lng;
 
-          // Check if driver has recent GPS coordinate
+          // Check if driver has recent GPS coordinate (< 30 min)
           if (driver.location) {
             const timeDiffMin = (Date.now() - new Date(driver.location.recordedAt).getTime()) / 60000;
             if (timeDiffMin < 30) {
               driverLat = driver.location.latitude;
               driverLng = driver.location.longitude;
-            } else if (driver.preferredLatitude !== null && driver.preferredLongitude !== null) {
-              driverLat = driver.preferredLatitude;
-              driverLng = driver.preferredLongitude;
             }
-          } else if (driver.preferredLatitude !== null && driver.preferredLongitude !== null) {
-            driverLat = driver.preferredLatitude;
-            driverLng = driver.preferredLongitude;
           }
 
           const cLat = cluster.centroid?.lat ?? facilityLocation.lat;
@@ -182,19 +149,21 @@ export class AssignmentService {
           let capacityPenalty = 0;
           let vehiclePenalty = 0;
 
+          const isMotorcycleDriver = driver.driverLicenseClass === 'A1' || driver.driverLicenseClass === 'A2' || driver.driverType === 'HUB_DELIVERY';
+
           if (activeAssignment) {
             const maxWeight = Number(activeAssignment.vehicle.maxWeight || 0);
             if (clusterWeight > maxWeight) {
               // Soft constraint violation penalty
               capacityPenalty = 1000000;
             }
-          } else {
-            // Driver has no assigned vehicle
+          } else if (!isMotorcycleDriver) {
+            // Driver has no assigned vehicle (only penalize for truck drivers)
             vehiclePenalty = 500000;
           }
 
-          // Composite cost
-          let totalCost = dist + capacityPenalty + vehiclePenalty;
+          // Composite cost (rounded to integer to prevent float precision loops in Hungarian algorithm)
+          let totalCost = Math.round((dist + capacityPenalty + vehiclePenalty) * 1000);
           if (isNaN(totalCost)) totalCost = 999999;
           costMatrix[i][j] = totalCost;
         } else {
@@ -207,15 +176,38 @@ export class AssignmentService {
     // Solve Hungarian Algorithm
     const matchings = this.solveHungarian(costMatrix);
     const assignments: DriverAssignment[] = [];
+    const assignedClusterIds = new Set<number>();
 
+    // First pass: standard matching from Hungarian algorithm
     for (let i = 0; i < N; i++) {
       const assignedCol = matchings[i];
-      if (assignedCol !== -1 && assignedCol < K) {
+      if (assignedCol !== -1 && assignedCol < K && !assignedClusterIds.has(assignedCol)) {
         assignments.push({
           driverId: drivers[i].id,
           clusterId: assignedCol,
           cost: costMatrix[i][assignedCol],
         });
+        assignedClusterIds.add(assignedCol);
+      }
+    }
+
+    // Fallback pass: ensure any unassigned driver gets assigned to any remaining unassigned cluster
+    const assignedDriverIds = new Set(assignments.map((a) => a.driverId));
+    for (let i = 0; i < N; i++) {
+      const driverId = drivers[i].id;
+      if (!assignedDriverIds.has(driverId)) {
+        for (let j = 0; j < K; j++) {
+          if (!assignedClusterIds.has(j)) {
+            assignments.push({
+              driverId,
+              clusterId: j,
+              cost: costMatrix[i][j],
+            });
+            assignedClusterIds.add(j);
+            assignedDriverIds.add(driverId);
+            break;
+          }
+        }
       }
     }
 

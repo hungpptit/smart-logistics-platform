@@ -23,30 +23,40 @@ export class CustomerService {
       }
     }
 
-    // Check if phone already exists in customers
-    const phoneExists = await prisma.customer.findFirst({
-      where: {
-        phone: dto.phone,
-        status: { not: 'DISABLED' },
-      },
-    });
-    if (phoneExists) {
-      throw new BadRequestException('Số điện thoại đã được đăng ký');
+    // Check if phone already exists in customers (if provided)
+    if (dto.phone) {
+      const phoneExists = await prisma.customer.findFirst({
+        where: {
+          phone: dto.phone,
+          status: { not: 'DISABLED' },
+        },
+      });
+      if (phoneExists) {
+        throw new BadRequestException('Số điện thoại đã được đăng ký');
+      }
     }
 
     // Generate unique customer code
     const count = await prisma.customer.count();
     const customerCode = `CUST-${String(count + 1).padStart(6, '0')}`;
 
-    // Generate unique username from Full Name
-    let slug = dto.fullName.toLowerCase();
-    slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    slug = slug.replace(/[đĐ]/g, "d");
-    slug = slug.replace(/\s+/g, "");
-    slug = slug.replace(/[^a-z0-9_]/g, "");
-    const usernamePrefix = slug.substring(0, 20);
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const username = `${usernamePrefix}_${randomSuffix}`;
+    // Generate or check unique username
+    let username = dto.username?.trim();
+    if (username) {
+      const existingUser = await prisma.user.findUnique({ where: { username } });
+      if (existingUser) {
+        throw new BadRequestException('Tên đăng nhập đã được sử dụng. Vui lòng chọn tên khác.');
+      }
+    } else {
+      let slug = dto.fullName.toLowerCase();
+      slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      slug = slug.replace(/[đĐ]/g, "d");
+      slug = slug.replace(/\s+/g, "");
+      slug = slug.replace(/[^a-z0-9_]/g, "");
+      const usernamePrefix = slug.substring(0, 20) || 'cust';
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      username = `${usernamePrefix}_${randomSuffix}`;
+    }
 
     const role = await prisma.role.findUnique({
       where: { roleCode: 'CUSTOMER' },
@@ -75,7 +85,7 @@ export class CustomerService {
           userId: user.id,
           customerCode,
           fullName: dto.fullName,
-          phone: dto.phone,
+          phone: dto.phone || null,
           email: dto.email || null,
           customerType: dto.customerType,
           companyName: dto.companyName || null,

@@ -18,15 +18,18 @@ interface AddressItem {
 interface Customer {
   id: string;
   userId?: string;
+  fullName?: string;
+  phone?: string;
+  email?: string;
   customerType: 'INDIVIDUAL' | 'BUSINESS';
   companyName?: string;
   taxCode?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+  status: string;
   note?: string;
   createdAt: string;
   user?: {
     username: string;
-    email: string;
+    email?: string;
     phone?: string;
   };
 }
@@ -88,11 +91,11 @@ export const CustomerDetailPanel: React.FC<CustomerDetailPanelProps> = ({
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-gray-400 text-[10px]">Số điện thoại</span>
-              <span className="font-bold text-[#161D25]">{customer.user?.phone || 'N/A'}</span>
+              <span className="font-bold text-[#161D25]">{customer.phone || 'N/A'}</span>
             </div>
             <div className="col-span-2 flex flex-col gap-0.5">
               <span className="text-gray-400 text-[10px]">Email liên hệ</span>
-              <span className="font-bold text-[#161D25] truncate">{customer.user?.email || 'N/A'}</span>
+              <span className="font-bold text-[#161D25] truncate">{customer.email || 'N/A'}</span>
             </div>
             
             {customer.customerType === 'BUSINESS' && (

@@ -38,7 +38,7 @@ class MailWorker {
             await this.sendStaffWelcomeEmail(content);
           } else if (content.type === 'CUSTOMER_CREATED') {
             await this.sendCustomerWelcomeEmail(content);
-          } else if (content.type === 'SEND_OTP') {
+          } else if (content.type === 'SEND_OTP' || content.type === 'REGISTER_OTP') {
             await this.sendOtpEmail(content);
           } else if (content.type === 'FORGOT_PASSWORD_OTP') {
             await this.sendForgotPasswordOtpEmail(content);
@@ -85,10 +85,8 @@ class MailWorker {
             <div style="background-color: #f7fafc; border: 1px solid #edf2f7; padding: 16px; border-radius: 6px; margin: 20px 0;">
               <table style="width: 100%; font-size: 14px;">
                 <tr>
-                  <td style="width: 170px; font-weight: bold; color: #4a5568; padding-bottom: 8px;">Tài khoản đăng nhập:</td>
-                  <td style="font-weight: bold; color: #1a202c; padding-bottom: 8px;">
-                    Sử dụng <span style="color: #bc0100;">Địa chỉ Email</span> hoặc <span style="color: #bc0100;">Số điện thoại</span> dưới đây
-                  </td>
+                  <td style="width: 170px; font-weight: bold; color: #4a5568; padding-bottom: 8px;">Tên đăng nhập (Username):</td>
+                  <td style="font-family: monospace; font-weight: bold; color: #bc0100; font-size: 15px; padding-bottom: 8px;">${data.username}</td>
                 </tr>
                 <tr>
                   <td style="font-weight: bold; color: #4a5568; padding-bottom: 8px;">Địa chỉ email:</td>
@@ -134,7 +132,8 @@ class MailWorker {
 
   private async sendOtpEmail(data: {
     email: string;
-    username: string;
+    username?: string;
+    fullName?: string;
     otp: string;
   }) {
     const mailOptions = {
@@ -149,7 +148,7 @@ class MailWorker {
           </div>
           
           <div style="padding: 24px; background-color: #ffffff; color: #1a202c; line-height: 1.6;">
-            <h3 style="margin-top: 0; color: #bc0100;">Xin chào ${data.username},</h3>
+            <h3 style="margin-top: 0; color: #bc0100;">Xin chào ${data.username || data.fullName || data.email},</h3>
             <p>Cảm ơn bạn đã lựa chọn sử dụng dịch vụ của <strong>Velocity Logistics</strong>. Để hoàn tất thủ tục đăng ký tài khoản khách hàng mới, vui lòng sử dụng mã xác thực OTP dưới đây:</p>
             
             <div style="background-color: #f7fafc; border: 1px solid #edf2f7; padding: 20px; border-radius: 6px; margin: 20px 0; text-align: center;">
@@ -246,10 +245,8 @@ class MailWorker {
             <div style="background-color: #f7fafc; border: 1px solid #edf2f7; padding: 16px; border-radius: 6px; margin: 20px 0;">
               <table style="width: 100%; font-size: 14px;">
                 <tr>
-                  <td style="width: 170px; font-weight: bold; color: #4a5568; padding-bottom: 8px;">Tài khoản đăng nhập:</td>
-                  <td style="font-weight: bold; color: #1a202c; padding-bottom: 8px;">
-                    Sử dụng <span style="color: #bc0100;">Địa chỉ Email</span> hoặc <span style="color: #bc0100;">Số điện thoại</span> dưới đây
-                  </td>
+                  <td style="width: 170px; font-weight: bold; color: #4a5568; padding-bottom: 8px;">Tên đăng nhập (Username):</td>
+                  <td style="font-family: monospace; font-weight: bold; color: #bc0100; font-size: 15px; padding-bottom: 8px;">${data.username}</td>
                 </tr>
                 <tr>
                   <td style="font-weight: bold; color: #4a5568; padding-bottom: 8px;">Địa chỉ email:</td>
@@ -318,10 +315,8 @@ class MailWorker {
             <div style="background-color: #f7fafc; border: 1px solid #edf2f7; padding: 16px; border-radius: 6px; margin: 20px 0;">
               <table style="width: 100%; font-size: 14px;">
                 <tr>
-                  <td style="width: 170px; font-weight: bold; color: #4a5568; padding-bottom: 8px;">Tài khoản đăng nhập:</td>
-                  <td style="font-weight: bold; color: #1a202c; padding-bottom: 8px;">
-                    Sử dụng <span style="color: #bc0100;">Địa chỉ Email</span> hoặc <span style="color: #bc0100;">Số điện thoại</span> dưới đây
-                  </td>
+                  <td style="width: 170px; font-weight: bold; color: #4a5568; padding-bottom: 8px;">Tên đăng nhập (Username):</td>
+                  <td style="font-family: monospace; font-weight: bold; color: #bc0100; font-size: 15px; padding-bottom: 8px;">${data.username}</td>
                 </tr>
                 <tr>
                   <td style="font-weight: bold; color: #4a5568; padding-bottom: 8px;">Địa chỉ email:</td>

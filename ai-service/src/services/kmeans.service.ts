@@ -146,8 +146,73 @@ export class KMeansService {
 
     for (let i = 0; i < validOrders.length; i++) {
       const clusterIdx = assignments[i];
-      if (clusterIdx !== -1) {
+      if (clusterIdx !== -1 && clusterIdx < targetK) {
         clusters[clusterIdx].orders.push(validOrders[i]);
+      }
+    }
+
+    // Ensure no cluster is left empty
+    for (let c = 0; c < targetK; c++) {
+      if (clusters[c].orders.length === 0) {
+        let largest = clusters[0];
+        for (const cl of clusters) {
+          if (cl.orders.length > largest.orders.length) {
+            largest = cl;
+          }
+        }
+        if (largest && largest.orders.length > 1) {
+          const movedOrder = largest.orders.pop()!;
+          clusters[c].orders.push(movedOrder);
+        }
+      }
+    }
+
+    // Workload Balancing: Fairly balance orders among drivers
+    if (targetK > 1 && validOrders.length > targetK) {
+      const maxCapacity = Math.ceil(validOrders.length / targetK);
+      for (let iter = 0; iter < 10; iter++) {
+        let rebalanced = false;
+        for (let c = 0; c < targetK; c++) {
+          while (clusters[c].orders.length > maxCapacity) {
+            let maxDist = -1;
+            let furthestIdx = -1;
+            for (let i = 0; i < clusters[c].orders.length; i++) {
+              const ord = clusters[c].orders[i];
+              const coords = getOrderCoords(ord);
+              const dist = this.haversineDistance(coords.lat!, coords.lng!, clusters[c].centroid.lat, clusters[c].centroid.lng);
+              if (dist > maxDist) {
+                maxDist = dist;
+                furthestIdx = i;
+              }
+            }
+
+            if (furthestIdx === -1) break;
+
+            let bestOther = -1;
+            let minOtherDist = Infinity;
+            const ordToMove = clusters[c].orders[furthestIdx];
+            const coords = getOrderCoords(ordToMove);
+
+            for (let o = 0; o < targetK; o++) {
+              if (o !== c && clusters[o].orders.length < maxCapacity) {
+                const dist = this.haversineDistance(coords.lat!, coords.lng!, clusters[o].centroid.lat, clusters[o].centroid.lng);
+                if (dist < minOtherDist) {
+                  minOtherDist = dist;
+                  bestOther = o;
+                }
+              }
+            }
+
+            if (bestOther !== -1) {
+              const [moved] = clusters[c].orders.splice(furthestIdx, 1);
+              clusters[bestOther].orders.push(moved);
+              rebalanced = true;
+            } else {
+              break;
+            }
+          }
+        }
+        if (!rebalanced) break;
       }
     }
 

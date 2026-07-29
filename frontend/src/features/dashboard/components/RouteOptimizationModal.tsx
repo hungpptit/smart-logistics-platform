@@ -295,7 +295,7 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-h-64 overflow-y-auto pr-1">
                 {Array.isArray(previewResult) && previewResult.map((rt: any, idx: number) => (
                   <div key={rt.id || idx} className="bg-white border border-emerald-200 rounded p-3 text-xs space-y-1 shadow-sm">
                     <div className="flex justify-between items-center">
@@ -305,7 +305,7 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-600">
-                      Tài xế & Xe: <span className="font-semibold text-slate-800">{rt.driverVehicleAssignment?.driver?.user?.fullName || 'Đã phân công'}</span> ({rt.driverVehicleAssignment?.vehicle?.licensePlate || 'Xe tải'})
+                      Tài xế: <span className="font-semibold text-slate-800">{rt.driver?.fullName || rt.driverVehicleAssignment?.driver?.user?.fullName || rt.driverVehicleAssignment?.driver?.fullName || 'Đã phân công'}</span>
                     </p>
                     <div className="flex justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100 font-mono">
                       <span>Quãng đường: {Number(rt.plannedDistanceKm || 0).toFixed(1)} km</span>

@@ -110,16 +110,20 @@ export const LiveTrackingTab: React.FC = () => {
 
   const handleDevResetAi = async () => {
     const targetFacilityId = facilityFilter || userAssignedFacilityId;
-    if (!targetFacilityId) {
+
+    if (!targetFacilityId && !isAdmin) {
       alert('Vui lòng chọn Kho/Bưu cục cần hoàn tác dữ liệu AI!');
       return;
     }
 
-    if (!canOperateOnCurrentFacility) {
+    if (!canOperateOnCurrentFacility && !isAdmin) {
       alert('❌ Quyền hạn không đủ! Bạn chỉ được phép hoàn tác dữ liệu AI tại Bưu cục mình quản lý.');
       return;
     }
-    const targetFacName = facilities.find(f => f.id === targetFacilityId)?.facilityName || 'kho đang chọn';
+
+    const targetFacName = targetFacilityId
+      ? (facilities.find(f => f.id === targetFacilityId)?.facilityName || 'kho đang chọn')
+      : 'TOÀN BỘ CÁC BƯU CỤC HỆ THỐNG';
 
     if (!window.confirm(`⚠️ [DEV RESET] Bạn có chắc muốn HOÀN TÁC tất cả các tuyến AI đã gom và trả lại các đơn hàng của ${targetFacName} về trạng thái chờ ban đầu?`)) {
       return;
@@ -933,6 +937,7 @@ export const LiveTrackingTab: React.FC = () => {
         isOpen={isOptimizationModalOpen}
         onClose={() => setIsOptimizationModalOpen(false)}
         onSuccess={() => {
+          setIsOptimizationModalOpen(false);
           fetchRoutes();
         }}
         token={token}

@@ -63,15 +63,23 @@ export class DriverService {
       throw new BadRequestException('Địa chỉ email tài khoản đã được đăng ký');
     }
 
-    // Generate unique username from Full Name
-    let slug = dto.fullName.toLowerCase();
-    slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    slug = slug.replace(/[đĐ]/g, "d");
-    slug = slug.replace(/\s+/g, "");
-    slug = slug.replace(/[^a-z0-9_]/g, "");
-    const usernamePrefix = slug.substring(0, 20);
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const username = `${usernamePrefix}_${randomSuffix}`;
+    // Generate or check unique username
+    let username = dto.username?.trim();
+    if (username) {
+      const existingUser = await prisma.user.findUnique({ where: { username } });
+      if (existingUser) {
+        throw new BadRequestException('Tên đăng nhập đã tồn tại trên hệ thống. Vui lòng chọn tên khác.');
+      }
+    } else {
+      let slug = dto.fullName.toLowerCase();
+      slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      slug = slug.replace(/[đĐ]/g, "d");
+      slug = slug.replace(/\s+/g, "");
+      slug = slug.replace(/[^a-z0-9_]/g, "");
+      const usernamePrefix = slug.substring(0, 20) || 'driver';
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      username = `${usernamePrefix}_${randomSuffix}`;
+    }
 
     const role = await prisma.role.findUnique({
       where: { roleCode: 'SHIPPER' },
@@ -110,8 +118,6 @@ export class DriverService {
           employmentStatus: dto.employmentStatus || 'ACTIVE',
           userId: user.id,
           assignedFacilityId: dto.homeFacilityId || null,
-          preferredLatitude: dto.preferredLatitude !== undefined ? dto.preferredLatitude : null,
-          preferredLongitude: dto.preferredLongitude !== undefined ? dto.preferredLongitude : null,
           driverType: dto.driverType || 'HUB_DELIVERY',
         },
         include: {
@@ -287,8 +293,6 @@ export class DriverService {
         employmentStatus: (dto.employmentStatus as any) ?? driver.employmentStatus,
         userId: dto.userId !== undefined ? dto.userId : driver.userId,
         assignedFacilityId: dto.homeFacilityId !== undefined ? dto.homeFacilityId : driver.assignedFacilityId,
-        preferredLatitude: dto.preferredLatitude !== undefined ? dto.preferredLatitude : driver.preferredLatitude,
-        preferredLongitude: dto.preferredLongitude !== undefined ? dto.preferredLongitude : driver.preferredLongitude,
         driverType: (dto.driverType as any) ?? driver.driverType,
       },
       include: {

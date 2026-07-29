@@ -4,15 +4,18 @@ import { Mail, Phone, Eye, Edit2, Trash2, ChevronLeft, ChevronRight, RefreshCw, 
 interface Customer {
   id: string;
   userId?: string;
+  fullName?: string;
+  phone?: string;
+  email?: string;
   customerType: 'INDIVIDUAL' | 'BUSINESS';
   companyName?: string;
   taxCode?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+  status: string;
   note?: string;
   createdAt: string;
   user?: {
     username: string;
-    email: string;
+    email?: string;
     phone?: string;
   };
 }
@@ -100,11 +103,11 @@ export const CustomerTable: React.FC<CustomerTableProps> = ({
                   <div className="flex flex-col gap-0.5">
                     <span className="font-bold text-[#161D25]">{c.user?.username || 'Khách hàng ẩn'}</span>
                     <span className="text-[10px] text-gray-400 flex items-center gap-1">
-                      <Mail size={10} /> {c.user?.email || 'N/A'}
+                      <Mail size={10} /> {c.email || 'N/A'}
                     </span>
-                    {c.user?.phone && (
+                    {c.phone && (
                       <span className="text-[10px] text-gray-400 flex items-center gap-1">
-                        <Phone size={10} /> {c.user.phone}
+                        <Phone size={10} /> {c.phone}
                       </span>
                     )}
                   </div>

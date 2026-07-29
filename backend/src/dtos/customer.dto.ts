@@ -2,6 +2,10 @@ import { IsString, IsOptional, IsEnum, IsBoolean, IsNumber, IsUUID, IsNotEmpty, 
 import { CustomerType, CustomerStatus, CustomerAddressType } from '@prisma/client';
 
 export class CreateCustomerDto {
+  @IsString({ message: 'Tên đăng nhập phải là một chuỗi ký tự' })
+  @IsOptional()
+  username?: string;
+
   @IsString({ message: 'Họ và tên không được để trống' })
   @IsNotEmpty({ message: 'Họ và tên không được để trống' })
   fullName!: string;
@@ -10,9 +14,9 @@ export class CreateCustomerDto {
   @IsNotEmpty({ message: 'Địa chỉ email không được để trống' })
   email!: string;
 
-  @IsString({ message: 'Số điện thoại không được để trống' })
-  @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
-  phone!: string;
+  @IsString({ message: 'Số điện thoại phải là một chuỗi ký tự' })
+  @IsOptional()
+  phone?: string;
 
   @IsEnum(CustomerType, { message: 'Loại khách hàng không hợp lệ (INDIVIDUAL hoặc BUSINESS)' })
   customerType!: CustomerType;

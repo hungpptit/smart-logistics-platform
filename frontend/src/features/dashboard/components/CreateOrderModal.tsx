@@ -418,7 +418,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 <option value="">-- Chọn khách hàng --</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.companyName || c.user?.username || 'N/A'} ({c.customerCode}) - {c.user?.email}
+                    {c.fullName || c.companyName || c.user?.username || 'N/A'} ({c.customerCode}) - {c.email || 'N/A'}
                   </option>
                 ))}
               </select>

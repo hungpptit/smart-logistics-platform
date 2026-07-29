@@ -31,13 +31,8 @@ export class RegisterDto {
 }
 
 export class LoginDto {
-  @IsString({ message: 'Tài khoản đăng nhập phải là một chuỗi ký tự' })
-  @IsOptional()
-  username?: string;
-
-  @IsString({ message: 'Email/Tài khoản đăng nhập phải là một chuỗi ký tự' })
-  @IsOptional()
-  email?: string;
+  @IsString({ message: 'Tên đăng nhập (Username) phải là một chuỗi ký tự' })
+  username!: string;
 
   @IsString({ message: 'Mật khẩu phải là một chuỗi ký tự' })
   password!: string;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
 import { Search, RefreshCw, Plus, Edit2, Trash2, Shield, Mail, Phone, Calendar, Building, X, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { SearchableSelect } from '../../../components/ui/SearchableSelect';
 
 interface Facility {
   id: string;
@@ -15,6 +16,7 @@ interface Staff {
   email: string;
   phone?: string;
   citizenId?: string | null;
+  hireDate?: string | null;
   status: 'ACTIVE' | 'LOCKED' | 'DISABLED';
   createdAt: string;
   assignedFacilityId?: string | null;
@@ -58,6 +60,7 @@ export const StaffTab: React.FC = () => {
     email: '',
     phone: '',
     citizenId: '',
+    hireDate: new Date().toISOString().split('T')[0],
     password: '',
     assignedFacilityId: '',
     status: 'ACTIVE' as 'ACTIVE' | 'LOCKED' | 'DISABLED'
@@ -145,6 +148,7 @@ export const StaffTab: React.FC = () => {
       email: '',
       phone: '',
       citizenId: '',
+      hireDate: new Date().toISOString().split('T')[0],
       password: '',
       assignedFacilityId: '',
       status: 'ACTIVE'
@@ -162,6 +166,7 @@ export const StaffTab: React.FC = () => {
       email: staff.email,
       phone: staff.phone || '',
       citizenId: staff.citizenId || '',
+      hireDate: staff.hireDate ? new Date(staff.hireDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       password: '', // Leave blank for edit
       assignedFacilityId: staff.assignedFacilityId || '',
       status: staff.status
@@ -181,12 +186,26 @@ export const StaffTab: React.FC = () => {
     e.preventDefault();
     if (!token) return;
 
-    if (!isEditing && !formData.fullName) {
-      alert('Họ và tên nhân viên là bắt buộc');
-      return;
+    if (!isEditing) {
+      if (!formData.username) {
+        alert('Tên đăng nhập là bắt buộc');
+        return;
+      }
+      if (!formData.fullName) {
+        alert('Họ và tên nhân viên là bắt buộc');
+        return;
+      }
     }
     if (!formData.email) {
       alert('Email là bắt buộc');
+      return;
+    }
+    if (!formData.phone) {
+      alert('Số điện thoại là bắt buộc');
+      return;
+    }
+    if (!formData.citizenId) {
+      alert('Số CCCD là bắt buộc');
       return;
     }
 
@@ -201,11 +220,13 @@ export const StaffTab: React.FC = () => {
         email: formData.email,
         phone: formData.phone || null,
         citizenId: formData.citizenId || null,
+        hireDate: formData.hireDate || null,
         assignedFacilityId: formData.assignedFacilityId || null,
         status: formData.status
       };
 
       if (!isEditing) {
+        payload.username = formData.username;
         payload.fullName = formData.fullName;
       } else if (formData.password) {
         payload.password = formData.password;
@@ -287,29 +308,32 @@ export const StaffTab: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <select
-              value={facilityFilter}
-              onChange={(e) => { setFacilityFilter(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-2 border border-[#e2e8f0] rounded-md text-xs focus:border-[#bc0100] outline-none bg-white transition-all"
-            >
-              <option value="">Tất cả kho bãi</option>
-              <option value="none">Chưa phân kho</option>
-              {facilities.map((fac) => (
-                <option key={fac.id} value={fac.id}>
-                  {fac.facilityCode} - {fac.facilityName}
-                </option>
-              ))}
-            </select>
+            <div className="w-[220px]">
+              <SearchableSelect
+                value={facilityFilter}
+                onChange={(val) => { setFacilityFilter(val); setCurrentPage(1); }}
+                options={[
+                  { value: '', label: 'Tất cả kho bãi' },
+                  { value: 'none', label: 'Chưa phân kho' },
+                  ...facilities.map((fac) => ({
+                    value: fac.id,
+                    label: `${fac.facilityCode} - ${fac.facilityName}`
+                  }))
+                ]}
+              />
+            </div>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-2 border border-[#e2e8f0] rounded-md text-xs focus:border-[#bc0100] outline-none bg-white transition-all"
-            >
-              <option value="">Tất cả trạng thái</option>
-              <option value="ACTIVE">Hoạt động</option>
-              <option value="DISABLED">Tạm khóa</option>
-            </select>
+            <div className="w-[160px]">
+              <SearchableSelect
+                value={statusFilter}
+                onChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}
+                options={[
+                  { value: '', label: 'Tất cả trạng thái' },
+                  { value: 'ACTIVE', label: 'Hoạt động' },
+                  { value: 'DISABLED', label: 'Tạm khóa' }
+                ]}
+              />
+            </div>
           </div>
 
           <button
@@ -496,10 +520,10 @@ export const StaffTab: React.FC = () => {
 
       {/* Create / Edit Staff Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-montserrat">
-          <div className="bg-white rounded-lg shadow-xl border border-gray-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm font-montserrat py-8 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-xl max-h-[85vh] flex flex-col my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-gray-100 bg-[#fafafa] flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-gray-100 bg-[#fafafa] flex items-center justify-between shrink-0">
               <h3 className="text-xs font-extrabold uppercase tracking-wider text-gray-800 flex items-center gap-2">
                 <UserPlus size={16} className="text-[#bc0100]" />
                 <span>{isEditing ? 'Sửa thông tin nhân viên' : 'Thêm tài khoản nhân viên mới'}</span>
@@ -513,22 +537,38 @@ export const StaffTab: React.FC = () => {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSaveStaff}>
-              <div className="p-5 flex flex-col gap-4 text-xs">
+            <form onSubmit={handleSaveStaff} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-5 flex flex-col gap-4 text-xs overflow-y-auto flex-1">
                 {/* Full Name (Create mode) or Username (Edit mode) */}
                 {!isEditing ? (
-                  <div>
-                    <label className="block font-bold text-gray-700 mb-1">Họ và tên nhân viên <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.fullName}
-                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                      placeholder="VD: Nguyễn Văn A"
-                      className="w-full px-3 py-2 border border-gray-200 rounded focus:border-[#bc0100] outline-none font-medium transition-all"
-                    />
-                    <span className="text-[10px] text-gray-400 mt-1 block">Tài khoản & mật khẩu sẽ được tự động tạo và gửi đến email của nhân viên.</span>
-                  </div>
+                  <>
+                    <div>
+                      <label className="block font-bold text-gray-700 mb-1">
+                        Tên đăng nhập (Username) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.username}
+                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                        placeholder="VD: nhanvien_kho01"
+                        className="w-full px-3 py-2 border border-gray-200 rounded focus:border-[#bc0100] outline-none font-medium transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-gray-700 mb-1">Họ và tên nhân viên <span className="text-red-500">*</span></label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.fullName}
+                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                        placeholder="VD: Nguyễn Văn A"
+                        className="w-full px-3 py-2 border border-gray-200 rounded focus:border-[#bc0100] outline-none font-medium transition-all"
+                      />
+                      <span className="text-[10px] text-gray-400 mt-1 block">Tài khoản & mật khẩu sẽ được tự động tạo và gửi đến email của nhân viên.</span>
+                    </div>
+                  </>
                 ) : (
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Tên đăng nhập</label>
@@ -556,9 +596,12 @@ export const StaffTab: React.FC = () => {
 
                 {/* Phone */}
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Số điện thoại</label>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    Số điện thoại <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
+                    required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="VD: 0912345678"
@@ -568,12 +611,29 @@ export const StaffTab: React.FC = () => {
 
                 {/* Citizen ID (CCCD) */}
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Số CCCD</label>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    Số CCCD <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
+                    required
                     value={formData.citizenId}
                     onChange={(e) => setFormData({ ...formData, citizenId: e.target.value })}
                     placeholder="VD: 079123456789"
+                    className="w-full px-3 py-2 border border-gray-200 rounded focus:border-[#bc0100] outline-none font-medium transition-all"
+                  />
+                </div>
+
+                {/* Hire Date */}
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    Ngày vào làm (Hire Date) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.hireDate}
+                    onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-200 rounded focus:border-[#bc0100] outline-none font-medium transition-all"
                   />
                 </div>
@@ -606,18 +666,18 @@ export const StaffTab: React.FC = () => {
                 {/* Assigned Facility */}
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">Kho / Bưu cục phân công</label>
-                  <select
+                  <SearchableSelect
                     value={formData.assignedFacilityId}
-                    onChange={(e) => setFormData({ ...formData, assignedFacilityId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded focus:border-[#bc0100] outline-none bg-white font-medium transition-all"
-                  >
-                    <option value="">Chưa phân công kho bãi</option>
-                    {facilities.map((fac) => (
-                      <option key={fac.id} value={fac.id}>
-                        {fac.facilityCode} - {fac.facilityName}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, assignedFacilityId: val })}
+                    placeholder="Chưa phân công kho bãi"
+                    options={[
+                      { value: '', label: 'Chưa phân công kho bãi' },
+                      ...facilities.map((fac) => ({
+                        value: fac.id,
+                        label: `${fac.facilityCode} - ${fac.facilityName}`
+                      }))
+                    ]}
+                  />
                   <span className="text-[10px] text-gray-400 mt-1 block">Nhân viên sẽ được gán làm việc trực tiếp tại kho bãi này.</span>
                 </div>
 

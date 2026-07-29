@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
 import { 
-  Search, RefreshCw, Plus, Edit2, Trash2, ShieldAlert, AlertTriangle, 
-  ChevronLeft, ChevronRight, X, Loader2, Compass, CheckCircle2, UserPlus, UserMinus
+  Truck, Search, Plus, RefreshCw, ShieldAlert, Edit2, Trash2, CheckCircle2, AlertTriangle, 
+  ChevronLeft, ChevronRight, X, Loader2, Compass, UserMinus, UserPlus
 } from 'lucide-react';
+import { SearchableSelect } from '../../../components/ui/SearchableSelect';
 
 interface Facility {
   id: string;
@@ -779,8 +780,8 @@ export const VehicleTab: React.FC = () => {
 
       {/* Vehicle Add / Edit Modal */}
       {showVehicleModal && (
-        <div className="fixed inset-0 bg-[#161D25]/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-lg border border-[#e2e8f0] shadow-soft w-full max-w-lg overflow-hidden flex flex-col my-8">
+        <div className="fixed inset-0 bg-[#161D25]/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto py-8">
+          <div className="bg-white rounded-xl border border-[#e2e8f0] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-4 border-b border-[#e2e8f0] flex justify-between items-center bg-gray-50">
               <h3 className="text-sm font-bold text-[#161D25] uppercase tracking-wider">
                 {isEditing ? 'Cập nhật thông tin phương tiện' : 'Thêm phương tiện vận chuyển mới'}
@@ -832,11 +833,10 @@ export const VehicleTab: React.FC = () => {
                 {/* Vehicle Type */}
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Loại phương tiện *</label>
-                  <select
+                  <SearchableSelect
                     required
                     value={formData.vehicleTypeId}
-                    onChange={(e) => {
-                      const selectedId = e.target.value;
+                    onChange={(selectedId) => {
                       const selectedType = vehicleTypes.find((t) => t.id === selectedId);
                       setFormData({
                         ...formData,
@@ -844,51 +844,48 @@ export const VehicleTab: React.FC = () => {
                         maxWeight: selectedType?.maxDefaultWeight || formData.maxWeight
                       });
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
-                  >
-                    <option value="">-- Chọn loại phương tiện --</option>
-                    {vehicleTypes
+                    placeholder="-- Chọn loại phương tiện --"
+                    options={vehicleTypes
                       .filter((type) => {
                         const code = type.typeCode.toUpperCase();
                         return code !== 'MOTO' && code !== 'MOTORCYCLE' && code !== 'MOTORBIKE';
                       })
-                      .map((type) => (
-                        <option key={type.id} value={type.id}>
-                          {type.typeName} ({type.typeCode})
-                        </option>
-                      ))}
-                  </select>
+                      .map((type) => ({
+                        value: type.id,
+                        label: `${type.typeName} (${type.typeCode})`
+                      }))}
+                  />
                 </div>
 
                 {/* Home Facility */}
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Kho trực thuộc</label>
-                  <select
+                  <SearchableSelect
                     value={formData.homeFacilityId}
-                    onChange={(e) => setFormData({ ...formData, homeFacilityId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
-                  >
-                    <option value="">-- Không trực thuộc (Chạy liên tỉnh / Hub Pooling) --</option>
-                    {facilities.map((fac) => (
-                      <option key={fac.id} value={fac.id}>
-                        {fac.facilityName} ({fac.facilityCode})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, homeFacilityId: val })}
+                    placeholder="-- Không trực thuộc (Chạy liên tỉnh / Hub Pooling) --"
+                    options={[
+                      { value: '', label: '-- Không trực thuộc (Chạy liên tỉnh / Hub Pooling) --' },
+                      ...facilities.map((fac) => ({
+                        value: fac.id,
+                        label: `${fac.facilityName} (${fac.facilityCode})`
+                      }))
+                    ]}
+                  />
                 </div>
 
                 {/* Operating Status */}
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Trạng thái hoạt động</label>
-                  <select
+                  <SearchableSelect
                     value={formData.operatingStatus}
-                    onChange={(e) => setFormData({ ...formData, operatingStatus: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
-                  >
-                    <option value="ACTIVE">Đang hoạt động tốt (ACTIVE)</option>
-                    <option value="MAINTENANCE">Đang bảo dưỡng định kỳ (MAINTENANCE)</option>
-                    <option value="RETIRED">Đã thanh lý / Ngừng sử dụng (RETIRED)</option>
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, operatingStatus: val as any })}
+                    options={[
+                      { value: 'ACTIVE', label: 'Đang hoạt động tốt (ACTIVE)' },
+                      { value: 'MAINTENANCE', label: 'Đang bảo dưỡng định kỳ (MAINTENANCE)' },
+                      { value: 'RETIRED', label: 'Đã thanh lý / Ngừng sử dụng (RETIRED)' }
+                    ]}
+                  />
                 </div>
 
                 {/* GPS device ID */}
@@ -985,11 +982,12 @@ export const VehicleTab: React.FC = () => {
 
       {/* Driver Assignment Modal */}
       {showAssignModal && selectedVehicleForAssign && (
-        <div className="fixed inset-0 bg-[#161D25]/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-lg border border-[#e2e8f0] shadow-soft w-full max-w-md overflow-hidden flex flex-col my-8">
-            <div className="p-4 border-b border-[#e2e8f0] flex justify-between items-center bg-gray-50">
-              <h3 className="text-sm font-bold text-[#161D25] uppercase tracking-wider">
-                Phân công tài xế điều khiển xe
+        <div className="fixed inset-0 bg-[#161D25]/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto py-8">
+          <div className="bg-white rounded-xl border border-[#e2e8f0] shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-[#e2e8f0] flex justify-between items-center bg-gray-50 shrink-0">
+              <h3 className="text-sm font-bold text-[#161D25] uppercase tracking-wider flex items-center gap-2">
+                <Truck size={16} className="text-[#bc0100]" />
+                <span>Phân công tài xế điều khiển xe</span>
               </h3>
               <button
                 onClick={() => setShowAssignModal(false)}
@@ -999,84 +997,97 @@ export const VehicleTab: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleAssignDriver} className="p-6 flex-1 overflow-y-auto space-y-4">
+            <form onSubmit={handleAssignDriver} className="p-6 flex-1 overflow-y-auto space-y-4 flex flex-col">
               {actionError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded text-xs flex items-center gap-2">
+                <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs flex items-center gap-2">
                   <ShieldAlert size={16} />
                   <span className="font-semibold">{actionError}</span>
                 </div>
               )}
 
               {/* Vehicle info recap */}
-              <div className="bg-[#bc0100]/5 border border-[#bc0100]/15 rounded p-3 text-xs space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-gray-500 font-bold uppercase text-[9px]">Phương tiện:</span>
-                  <span className="font-bold text-[#161D25]">{selectedVehicleForAssign.licensePlate} ({selectedVehicleForAssign.vehicleCode})</span>
+              <div className="bg-[#bc0100]/5 border border-[#bc0100]/15 rounded-xl p-3.5 text-xs space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-bold uppercase text-[10px]">Phương tiện:</span>
+                  <span className="font-bold text-[#161D25] text-sm">{selectedVehicleForAssign.licensePlate} <span className="text-xs font-normal text-gray-500">({selectedVehicleForAssign.vehicleCode})</span></span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500 font-bold uppercase text-[9px]">Loại xe:</span>
-                  <span className="font-semibold text-gray-700">{selectedVehicleForAssign.vehicleType.typeName}</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-bold uppercase text-[10px]">Loại phương tiện:</span>
+                  <span className="font-semibold text-gray-700 bg-white px-2 py-0.5 rounded border border-gray-200">{selectedVehicleForAssign.vehicleType.typeName}</span>
                 </div>
                 {selectedVehicleForAssign.homeFacility && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 font-bold uppercase text-[9px]">Thuộc bưu cục:</span>
-                    <span className="font-semibold text-gray-700">{selectedVehicleForAssign.homeFacility.facilityName}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 font-bold uppercase text-[10px]">Trực thuộc bưu cục:</span>
+                    <span className="font-bold text-[#bc0100]">{selectedVehicleForAssign.homeFacility.facilityName}</span>
                   </div>
                 )}
               </div>
 
-              {/* Driver Select */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Chọn tài xế khả dụng *</label>
-                <select
-                  required
-                  value={selectedDriverId}
-                  onChange={(e) => setSelectedDriverId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] bg-white"
-                >
-                  <option value="">-- Chọn tài xế trong hệ thống --</option>
-                  {drivers.map((drv) => {
-                    const isCompatible = isLicenseCompatible(drv.driverLicenseClass, selectedVehicleForAssign.vehicleType.typeCode);
-                    const isAssigned = activeAssignments.some((a) => a.driverId === drv.id);
-                    
-                    let label = `${drv.fullName} (${drv.employeeCode}) - Bằng: ${drv.driverLicenseClass}`;
-                    if (isAssigned) {
-                      const prevAssign = activeAssignments.find((a) => a.driverId === drv.id);
-                      label += ` [Đang gán xe ${prevAssign?.vehicle.licensePlate}]`;
-                    }
-                    if (!isCompatible) {
-                      label += ` [Yêu cầu bằng cao hơn]`;
-                    }
+              {/* Driver Select Filtered by Facility & Compatible License */}
+              {(() => {
+                const vehicleFacilityId = selectedVehicleForAssign.homeFacilityId;
+                
+                // Only drivers belonging to the SAME facility (or unassigned), and with compatible license class
+                const availableDrivers = drivers.filter((drv) => {
+                  if (vehicleFacilityId && drv.homeFacilityId && drv.homeFacilityId !== vehicleFacilityId) {
+                    return false;
+                  }
+                  const isCompatible = isLicenseCompatible(drv.driverLicenseClass, selectedVehicleForAssign.vehicleType.typeCode);
+                  return isCompatible;
+                });
 
-                    return (
-                      <option 
-                        key={drv.id} 
-                        value={drv.id}
-                        disabled={!isCompatible}
-                        className={!isCompatible ? 'text-gray-400 bg-gray-50' : 'text-gray-800'}
-                      >
-                        {label}
-                      </option>
-                    );
-                  })}
-                </select>
-                <p className="text-[9px] text-gray-400 italic mt-1.5">
-                  * Hệ thống sẽ tự động đối chiếu giấy phép lái xe của tài xế với loại phương tiện để bảo đảm tính hợp lệ. Nếu tài xế đang gán xe khác, xe đó sẽ tự động được thu hồi.
-                </p>
-              </div>
+                const selectOptions = availableDrivers.map((drv) => {
+                  const isAssigned = activeAssignments.some((a) => a.driverId === drv.id);
+                  let label = `${drv.fullName} (${drv.employeeCode}) - Bằng ${drv.driverLicenseClass}`;
+                  if (isAssigned) {
+                    const prevAssign = activeAssignments.find((a) => a.driverId === drv.id);
+                    label += ` [Đang gán xe ${prevAssign?.vehicle.licensePlate}]`;
+                  }
+                  return {
+                    value: drv.id,
+                    label: label
+                  };
+                });
 
-              <div className="pt-4 border-t border-[#e2e8f0] flex justify-end gap-2 bg-gray-50 -mx-6 -mb-6 p-4">
+                return (
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">
+                      Chọn tài xế trực thuộc bưu cục (Bằng hợp lệ) *
+                    </label>
+
+                    {selectOptions.length > 0 ? (
+                      <SearchableSelect
+                        required
+                        value={selectedDriverId}
+                        onChange={(val) => setSelectedDriverId(val)}
+                        placeholder="-- Chọn tài xế điều khiển --"
+                        options={selectOptions}
+                      />
+                    ) : (
+                      <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs">
+                        ⚠️ Không tìm thấy tài xế nào có bằng lái hợp lệ thuộc <strong>{selectedVehicleForAssign.homeFacility?.facilityName || 'bưu cục này'}</strong>. Vui lòng thêm tài xế mới hoặc đổi bưu cục trực thuộc.
+                      </div>
+                    )}
+
+                    <p className="text-[10px] text-gray-400 italic mt-2">
+                      * Hệ thống tự động lọc danh sách tài xế trực thuộc đúng bưu cục của xe và kiểm tra hạng bằng lái phù hợp.
+                    </p>
+                  </div>
+                );
+              })()}
+
+              <div className="pt-4 border-t border-[#e2e8f0] flex justify-end gap-2 bg-gray-50 -mx-6 -mb-6 p-4 mt-auto shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowAssignModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded text-xs font-semibold hover:bg-gray-50 text-gray-700 transition-colors cursor-pointer"
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-100 text-gray-700 transition-colors cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading || !selectedDriverId}
-                  className="px-4 py-2 bg-[#bc0100] hover:bg-[#a00100] text-white rounded text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 bg-[#bc0100] hover:bg-[#a00100] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   {actionLoading && <Loader2 size={12} className="animate-spin" />}
                   Xác nhận phân công

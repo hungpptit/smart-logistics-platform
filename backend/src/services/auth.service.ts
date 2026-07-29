@@ -34,7 +34,7 @@ export class AuthService {
     slug = slug.replace(/[^a-z0-9_]/g, "");
     const usernamePrefix = slug.substring(0, 20) || 'cust';
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const username = `${usernamePrefix}_${randomSuffix}`;
+    const username = dto.username?.trim() || `${usernamePrefix}_${randomSuffix}`;
 
     // 2. Hash password
     const saltRounds = 10;
@@ -74,7 +74,7 @@ export class AuthService {
           phone: dto.phone || '',
           email: dto.email,
           customerType: 'INDIVIDUAL',
-          status: 'ACTIVE',
+          status: 'DISABLED',
         },
       });
 
@@ -142,10 +142,16 @@ export class AuthService {
 
     const user = customer.user;
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { status: 'ACTIVE' },
-    });
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { status: 'ACTIVE' },
+      }),
+      prisma.customer.update({
+        where: { id: customer.id },
+        data: { status: 'ACTIVE' },
+      }),
+    ]);
 
     await redis.del(`otp:email:${email}`);
 
@@ -199,16 +205,9 @@ export class AuthService {
    * Login user and issue JWT
    */
   public async login(dto: LoginDto) {
-    const loginIdentifier = dto.username || dto.email;
-
-    const user = await prisma.user.findFirst({
+    const user = await prisma.user.findUnique({
       where: {
-        OR: [
-          { username: loginIdentifier },
-          { staff: { OR: [{ email: loginIdentifier }, { phone: loginIdentifier }] } },
-          { customer: { OR: [{ email: loginIdentifier }, { phone: loginIdentifier }] } },
-        ],
-        status: 'ACTIVE',
+        username: dto.username,
       },
       include: {
         managedFacilities: true,
