@@ -116,14 +116,6 @@ export class CreateOrderDto {
   @IsOptional()
   receiverContact?: OrderContactDto;
 
-  @IsUUID('4', { message: 'ID người gửi từ Address Book phải là UUID hợp lệ' })
-  @IsOptional()
-  senderContactId?: string;
-
-  @IsUUID('4', { message: 'ID người nhận từ Address Book phải là UUID hợp lệ' })
-  @IsOptional()
-  receiverContactId?: string;
-
   // Thông tin thanh toán và phụ phí
   @IsNumber({}, { message: 'Số tiền COD phải là một số thực' })
   @IsOptional()

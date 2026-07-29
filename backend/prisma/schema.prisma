@@ -119,6 +119,7 @@ enum ShipmentStatus {
   DELIVERY_FAILED
   RETURNING
   RETURNED
+  CANCELLED
 }
 
 enum ShipmentEventType {
@@ -353,7 +354,6 @@ model Customer {
   taxCode      String?        @map("tax_code") @db.VarChar(30)
   status       CustomerStatus @default(ACTIVE)
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   addresses    CustomerAddress[]
@@ -546,7 +546,6 @@ model Order {
   updatedBy             String?       @map("updated_by") @db.Uuid
   createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt             DateTime?     @map("deleted_at") @db.Timestamptz
 
   customer              Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
   service               Service       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
@@ -654,7 +653,6 @@ model Shipment {
   updatedBy             String?        @map("updated_by") @db.Uuid
   createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt             DateTime       @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt             DateTime?      @map("deleted_at") @db.Timestamptz
 
   route                 Route?         @relation(fields: [routeId], references: [id], onDelete: SetNull)
   originFacility        Facility?      @relation("ShipmentOriginFacility", fields: [originFacilityId], references: [id], onDelete: SetNull)
@@ -750,7 +748,6 @@ model Staff {
   preferredLongitude   Float?                  @map("preferred_longitude")
 
   createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime                @updatedAt @map("updated_at") @db.Timestamptz
 
   user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignedFacility     Facility?               @relation(fields: [assignedFacilityId], references: [id], onDelete: SetNull)

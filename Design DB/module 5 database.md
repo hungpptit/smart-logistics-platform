@@ -55,7 +55,6 @@ Bảng trung tâm đại diện cho "Một lần vận chuyển hàng hóa". M�
 | `updated_by` | UUID | ✅ | FK → `Users(id)` (ON DELETE SET NULL). Người cập nhật cuối cùng. |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo phiếu. |
 | `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật. |
-| `deleted_at` | TIMESTAMPTZ | ✅ | Xóa mềm phiếu vận chuyển. |
 
 * **Định nghĩa ENUMs:**
   ```sql
@@ -67,7 +66,9 @@ Bảng trung tâm đại diện cho "Một lần vận chuyển hàng hóa". M�
       'OUT_FOR_DELIVERY',   -- Tài xế đang đi giao chặng cuối cho khách nhận
       'DELIVERED',          -- Đã giao hàng thành công
       'FAILED',             -- Giao hàng thất bại
-      'RETURNING'           -- Đang trên đường chuyển hoàn lại cho người gửi
+      'RETURNING',          -- Đang trên đường chuyển hoàn lại cho người gửi
+      'RETURNED',           -- Đã chuyển hoàn xong cho người gửi
+      'CANCELLED'           -- Chuyến xe / Phiếu vận chuyển bị HỦY (Thay thế deleted_at)
   );
   ```
 

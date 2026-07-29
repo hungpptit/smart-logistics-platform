@@ -324,7 +324,7 @@ export class OrderService {
     const limit = parseInt(query.limit || '10', 10);
     const skip = (page - 1) * limit;
 
-    const where: any = { deletedAt: null };
+    const where: any = {};
     const andConditions: any[] = [];
 
     // If customer, only show their own orders
@@ -471,7 +471,7 @@ export class OrderService {
       },
     });
 
-    if (!order || order.deletedAt) {
+    if (!order) {
       throw new NotFoundException('Không tìm thấy đơn hàng');
     }
 
@@ -535,7 +535,7 @@ export class OrderService {
    */
   public async updateStatus(id: string, dto: UpdateOrderStatusDto, userId: string, userRoles: string[], changeSource: OrderChangeSource) {
     const order = await prisma.order.findUnique({
-      where: { id, deletedAt: null },
+      where: { id },
     });
 
     if (!order) {
@@ -620,7 +620,7 @@ export class OrderService {
    */
   public async cancelOrder(id: string, userId: string, userRoles: string[]) {
     const order = await prisma.order.findUnique({
-      where: { id, deletedAt: null },
+      where: { id },
     });
 
     if (!order) {
@@ -686,10 +686,10 @@ export class OrderService {
     }
 
     return await prisma.$transaction(async (tx) => {
-      // Mark as deleted/cancelled
+      // Mark as cancelled
       const cancelledOrder = await tx.order.update({
         where: { id },
-        data: { deletedAt: new Date() },
+        data: { status: 'CANCELLED' },
       });
 
       // Update payment to REFUNDED or leave as is
@@ -752,7 +752,7 @@ export class OrderService {
       include: { payment: true, customer: { include: { user: true } } },
     });
 
-    if (!order || order.deletedAt) {
+    if (!order) {
       throw new NotFoundException('Không tìm thấy đơn hàng');
     }
 

@@ -34,7 +34,6 @@ export class ShipmentService {
           status: {
             in: [ShipmentStatus.CREATED, ShipmentStatus.ASSIGNED, ShipmentStatus.IN_TRANSIT, ShipmentStatus.AT_HUB, ShipmentStatus.OUT_FOR_DELIVERY],
           },
-          deletedAt: null,
         },
       },
       include: {
@@ -136,7 +135,7 @@ export class ShipmentService {
     const limit = parseInt(query.limit || '10', 10);
     const skip = (page - 1) * limit;
 
-    const where: any = { deletedAt: null };
+    const where: any = { status: { not: ShipmentStatus.CANCELLED } };
 
     if (query.status) {
       where.status = query.status;
@@ -187,7 +186,7 @@ export class ShipmentService {
    */
   public async getShipmentById(id: string) {
     const shipment = await prisma.shipment.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, status: { not: ShipmentStatus.CANCELLED } },
       include: {
         route: {
           include: {
@@ -234,7 +233,7 @@ export class ShipmentService {
    */
   public async updateShipmentStatus(id: string, userId: string, dto: UpdateShipmentStatusDto) {
     const shipment = await prisma.shipment.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, status: { not: ShipmentStatus.CANCELLED } },
     });
 
     if (!shipment) {
@@ -349,7 +348,7 @@ export class ShipmentService {
    */
   public async deleteShipment(id: string) {
     const shipment = await prisma.shipment.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, status: { not: ShipmentStatus.CANCELLED } },
     });
 
     if (!shipment) {
@@ -363,7 +362,7 @@ export class ShipmentService {
     await prisma.shipment.update({
       where: { id },
       data: {
-        deletedAt: new Date(),
+        status: ShipmentStatus.CANCELLED,
       },
     });
 

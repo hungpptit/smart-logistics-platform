@@ -87,7 +87,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `tax_code` | VarChar(30) | Tùy chọn | Mã số thuế doanh nghiệp. VD: `0300588569` |
 | `status` | Enum | Bắt buộc (Default Active) | Trạng thái hồ sơ: `ACTIVE` (Hoạt động), `INACTIVE`, `BLOCKED` (Chặn tạo đơn), `DISABLED` (Vô hiệu hóa/Ẩn) |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Ngày khách hàng đăng ký hệ thống |
-| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật gần nhất |
 
 ---
 
@@ -106,6 +105,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS. VD: `10.7721` |
 | `longitude` | Double | Bắt buộc | Kinh độ định vị GPS. VD: `106.6578` |
 | `formatted_address`| Text | Bắt buộc | Địa chỉ hoàn chỉnh dạng chuỗi đầy đủ. VD: `268 Lý Thường Kiệt, Phường 14, Quận 10, TP.HCM` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
 
@@ -135,6 +135,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `id` | Uuid | **Khóa chính (PK)** | Mã loại kho bãi. VD: `ftype-01` |
 | `type_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã phân loại: `SORTING_CENTER` (Trung tâm chia chọn), `LAST_MILE_HUB` (Bưu cục phát chặng cuối) |
 | `type_name` | VarChar(100) | Bắt buộc | Tên hiển thị loại kho. VD: `Bưu cục Giao nhận Chặng cuối (Last-mile Hub)` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
 
@@ -155,6 +156,8 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `operating_status`| Enum | Bắt buộc (Default Active) | Trạng thái: `ACTIVE` (Đang mở cửa), `MAINTENANCE` (Bảo trì), `CLOSED` |
 | `opened_at` | Date | Bắt buộc | Ngày chính thức mở cửa hoạt động bưu cục. VD: `2025-01-01` |
 | `closed_at` | Date | Tùy chọn | Ngày đóng cửa bưu cục (nếu status = CLOSED). VD: `2026-07-29` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 
 ---
 
@@ -169,6 +172,8 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `zone_name` | VarChar(100) | Bắt buộc | Tên phân khu kho. VD: `Khu vực Nhập kho`, `Khu phân loại tự động`, `Khu chờ xuất giao` |
 | `zone_type` | Enum | Bắt buộc | Phân loại khu vực: `RECEIVING` (Khu nhận), `SORTING` (Khu phân loại), `SHIPPING` (Khu chờ xuất giao) |
 | `capacity` | Int | Tùy chọn | Sức chứa tối đa của phân khu (đơn vị: Số kiện hàng). VD: `5000` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 
 ---
 
@@ -186,6 +191,10 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `price_per_km` | Decimal(12,2)| Default 0 | Cước phụ trội tính thêm theo Km. VD: `5000.00` VNĐ/Km |
 | `free_weight_kg` | Float | Default 1.0 | Khối lượng miễn phí tối thiểu (Kg). VD: `1.0` Kg |
 | `price_per_kg` | Decimal(12,2)| Default 0 | Cước phụ trội tính thêm theo Kg. VD: `2500.00` VNĐ/Kg |
+| `service_name` | VarChar(100) | Bắt buộc | Tên dịch vụ cước. VD: `Giao hàng Hỏa tốc 2H` |
+| `estimated_delivery_hours` | Integer | Bắt buộc (Default 24) | Thời gian giao hàng tiêu chuẩn dự kiến (giờ) |
+| `is_active` | Boolean | Bắt buộc (Default True) | Trạng thái kích hoạt (`true`/`false`) |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
 
@@ -200,13 +209,11 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `service_id` | Uuid | **Khóa ngoại (FK ➔ bảng services)** | Dịch vụ vận chuyển đã chọn (Trỏ `services.id`). VD: `srv-01` |
 | `pickup_address_id`| Uuid | **Khóa ngoại (FK ➔ bảng addresses)** | Mã địa chỉ lấy hàng gốc |
 | `delivery_address_id`| Uuid | **Khóa ngoại (FK ➔ bảng addresses)** | Mã địa chỉ giao hàng gốc |
-| `sender_contact_id`| Uuid | **Khóa ngoại (FK ➔ bảng customer_contacts)**| Danh bạ người gửi đại diện |
-| `receiver_contact_id`| Uuid| **Khóa ngoại (FK ➔ bảng customer_contacts)**| Danh bạ người nhận đại diện |
 | `origin_facility_id`| Uuid| **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục nhận hàng đầu tiên. VD: `fac-01` |
 | `destination_facility_id`| Uuid| **Khóa ngoại (FK ➔ bảng facilities)**| Bưu cục phát hàng cuối cùng. VD: `fac-01` |
 | `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người khởi tạo đơn hàng. VD: `usr-01` |
 | `updated_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người cập nhật đơn gần nhất |
-| `status` | Enum | Bắt buộc | Trạng thái đơn hàng (`CREATED`, `READY_FOR_PICKUP`, `OUT_FOR_DELIVERY`, `DELIVERED`...) |
+| `status` | Enum | Bắt buộc | Trạng thái đơn hàng (`CREATED`, `READY_FOR_PICKUP`, `OUT_FOR_DELIVERY`, `DELIVERED`, `CANCELLED`...) |
 | `scheduled_pickup_at`| Timestamptz| Tùy chọn | Lịch hẹn khách đặt Shipper đến lấy hàng. VD: `2026-07-24 14:00:00+07` |
 | `sender_name` | VarChar(150) | Bắt buộc | Họ tên người gửi đóng băng snapshot. VD: `Phạm Tuấn Hưng` |
 | `sender_phone` | VarChar(20) | Bắt buộc | Số điện thoại người gửi snapshot. VD: `0987654321` |
@@ -223,6 +230,12 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `estimated_total_amount`| Decimal(12,2)| Default 0 | Tổng chi phí tạm tính. VD: `525000.00` VNĐ |
 | `pickup_type` | Enum | Bắt buộc (Default PICKUP) | Hình thức gửi hàng: `PICKUP` (Shipper đến lấy tận nơi), `DROP_OFF` (Khách tự mang ra bưu cục gửi) |
 | `estimated_delivery_date`| Timestamptz| Tùy chọn | Ngày & giờ dự kiến giao hàng thành công. VD: `2026-07-28 17:00:00+07` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tạo đơn hàng |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật trạng thái/thông tin đơn hàng gần nhất |
+| `estimated_insurance_fee` | Decimal(12,2) | Default 0 | Phí bảo hiểm hàng hóa tạm tính (VNĐ) |
+| `estimated_distance` | Decimal(10,2) | Tùy chọn | Khoảng cách dự tính (km) |
+| `estimated_duration` | Integer | Tùy chọn | Thời gian di chuyển dự tính (phút) |
+| `pricing_version` | Integer | Bắt buộc (Default 1) | Phiên bản bảng giá áp dụng |
 
 ---
 
@@ -246,6 +259,8 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `volume` | Decimal(10,4)| Bắt buộc | Thể tích quy đổi (m³). VD: `0.0030` m³ |
 | `is_fragile` | Boolean | Default False | Cảnh báo hàng dễ vỡ (`true` / `false`) |
 | `temperature_requirement`| VarChar(50)| Tùy chọn | Yêu cầu nhiệt độ bảo quản. VD: `2-8 °C`, `Đông lạnh (-18°C)` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 
 ---
 
@@ -261,6 +276,9 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `fee_payer` | Enum | Bắt buộc | Người trả cước: `SENDER` (Người gửi trả), `RECEIVER` (Người nhận trả) |
 | `payment_method` | Enum | Bắt buộc | Hình thức: `CASH` (Tiền mặt), `BANK_TRANSFER`, `E_WALLET`, `COD` |
 | `payment_status` | Enum | Default Unpaid | Trạng thái thanh toán: `UNPAID` (Chưa thanh toán), `PAID` (Đã thanh toán), `REFUNDED` |
+| `final_insurance_fee` | Decimal(12,2) | Bắt buộc | Phí bảo hiểm chính thức (VNĐ) |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 
 ---
 
@@ -275,6 +293,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `status` | Enum | Bắt buộc | Trạng thái chuyển đến. VD: `READY_FOR_PICKUP`, `OUT_FOR_DELIVERY` |
 | `change_source` | Enum | Bắt buộc | Nguồn tác động: `SYSTEM`, `CUSTOMER`, `DRIVER`, `ADMIN`, `API` |
 | `reason` | Text | Tùy chọn | Lý do chuyển trạng thái. VD: `Khách hàng khởi tạo đơn hàng mới` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
 
@@ -292,7 +311,9 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `destination_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Kho/Bưu cục đích đến của vận đơn. VD: `fac-01` |
 | `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Nhân viên khởi tạo vận đơn. VD: `usr-02` |
 | `updated_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người cập nhật vận đơn gần nhất |
-| `status` | Enum | Bắt buộc | Trạng thái vận đơn: `CREATED`, `IN_TRANSIT`, `OUT_FOR_DELIVERY`, `DELIVERED` |
+| `status` | Enum | Bắt buộc | Trạng thái vận đơn: `CREATED`, `ASSIGNED`, `IN_TRANSIT`, `AT_HUB`, `OUT_FOR_DELIVERY`, `DELIVERED`, `DELIVERY_FAILED`, `RETURNING`, `RETURNED`, `CANCELLED` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tạo phiếu vận chuyển |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật trạng thái phiếu gần nhất |
 
 ---
 
@@ -304,6 +325,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi gom hàng. VD: `spkg-01` |
 | `shipment_id` | Uuid | **Cặp khóa duy nhất [shipment_id, package_id]**, **FK ➔ bảng shipments** | Mã Vận đơn gom hàng (Trỏ `shipments.id`). VD: `spm-01` |
 | `package_id` | Uuid | **Khóa ngoại duy nhất (FK, Unique ➔ bảng packages)** | Kiện hàng duy nhất (Ràng buộc Unique đảm bảo 1 Kiện không nằm 2 Vận đơn cùng lúc). VD: `pkg-01` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
 
@@ -318,6 +340,8 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người ghi nhận sự kiện (User ID). VD: `usr-03` |
 | `event_type` | Enum | Bắt buộc | Loại sự kiện: `DRIVER_ASSIGNED`, `DEPARTED_FACILITY`, `ARRIVED_FACILITY`, `DELIVERY_SUCCESS` |
 | `event_time` | Timestamptz | Not Null | Thời điểm xảy ra sự kiện. VD: `2026-07-24 09:35:00+07` |
+| `latitude` | Double | Tùy chọn | Tọa độ Vĩ độ GPS. VD: `10.7721` |
+| `longitude` | Double | Tùy chọn | Tọa độ Kinh độ GPS. VD: `106.6578` |
 
 ---
 
@@ -361,7 +385,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `preferred_latitude` | Double | Tùy chọn | Vĩ độ khu vực ưu tiên nhận đơn giao |
 | `preferred_longitude`| Double | Tùy chọn | Kinh độ khu vực ưu tiên nhận đơn giao |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian tạo hồ sơ |
-| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 
 ---
 
@@ -381,6 +404,8 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `refrigeration_supported` | Boolean | Default False | Cờ hỗ trợ vận chuyển thùng hàng đông lạnh (`true` / `false`) |
 | `gps_device_id` | VarChar(100) | Tùy chọn | Mã định danh thiết bị GPS phần cứng gắn trên xe. VD: `GPS-DEV-88` |
 | `operating_status`| Enum | Bắt buộc | Trạng thái: `ACTIVE` (Sẵn sàng), `MAINTENANCE` (Đang sửa), `RETIRED` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 
 ---
 
@@ -392,6 +417,9 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `id` | Uuid | **Khóa chính (PK)** | Mã loại phương tiện. VD: `vtype-01` |
 | `type_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã loại xe: `MOTORBIKE`, `VAN_500KG`, `TRUCK_1.5TON` |
 | `type_name` | VarChar(100) | Bắt buộc | Tên hiển thị loại xe. VD: `Xe tải nhẹ 1.5 Tấn` |
+| `max_default_weight` | Decimal(10,2) | Bắt buộc | Tải trọng tiêu chuẩn xe (kg) |
+| `description` | Text | Tùy chọn | Mô tả chi tiết |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
 
@@ -442,6 +470,14 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `planned_distance_km` | Decimal(10,2)| Default 0 | Tổng quãng đường AI tính toán tối ưu (Km). VD: `14.85` Km |
 | `planned_duration_min`| Int | Default 0 | Tổng thời gian AI ước tính hoàn thành (Phút). VD: `125` Phút |
 | `status` | Enum | Default Planned | Trạng thái tuyến: `PLANNED` (AI vừa tính xong), `ASSIGNED`, `IN_PROGRESS`, `COMPLETED` |
+| `actual_distance_km` | Decimal(10,2) | Tùy chọn | Khoảng cách di chuyển thực tế (km) |
+| `actual_duration_min` | Integer | Tùy chọn | Thời gian di chuyển thực tế (phút) |
+| `total_stops` | Integer | Default 0 | Tổng số điểm dừng trên lộ trình AI |
+| `planned_start_at` | Timestamptz | Bắt buộc | Lịch trình xuất phát dự kiến |
+| `actual_start_at` | Timestamptz | Tùy chọn | Thời điểm thực tế xe xuất phát |
+| `completed_at` | Timestamptz | Tùy chọn | Thời điểm thực tế xe hoàn thành |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 
 ---
 
@@ -459,6 +495,13 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `stop_type` | Enum | Bắt buộc | Loại điểm dừng: `PICKUP` (Lấy hàng), `HUB` (Bưu cục), `DELIVERY` (Giao hàng) |
 | `latitude` / `longitude`| Double | Bắt buộc | Tọa độ GPS của điểm dừng. VD: `10.7721` / `106.6578` |
 | `status` | Enum | Default Pending | Trạng thái dừng: `PENDING` (Chờ ghé), `ARRIVED` (Đã đến), `DEPARTED`, `SKIPPED`, `FAILED` |
+| `address_snapshot` | Text | Bắt buộc | Địa chỉ điểm dừng đóng băng snapshot |
+| `latitude` | Double | Tùy chọn | Tọa độ Vĩ độ GPS. VD: `10.7721` |
+| `longitude` | Double | Tùy chọn | Tọa độ Kinh độ GPS. VD: `106.6578` |
+| `planned_arrival_at` | Timestamptz | Tùy chọn | Thời gian dự kiến đến stop |
+| `actual_arrival_at` | Timestamptz | Tùy chọn | Thời gian thực tế đến stop |
+| `planned_departure_at` | Timestamptz | Tùy chọn | Thời gian dự kiến rời stop |
+| `actual_departure_at` | Timestamptz | Tùy chọn | Thời gian thực tế rời stop |
 
 ---
 
@@ -474,6 +517,11 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `assigned_to` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Shipper được giao nhận ca. VD: `drv-01` |
 | `status` | Enum | Default Pending | Trạng thái ca: `PENDING` (Chờ nhận), `ACCEPTED` (Đã nhận ca), `REJECTED` (Từ chối) |
 | `rejection_reason` | Text | Tùy chọn | Lý do Shipper từ chối nhận ca. VD: `Xe bị thủng lốp trên đường đi ca` |
+| `task_type` | Enum | Bắt buộc | Loại nhiệm vụ điều phối |
+| `priority` | Integer | Default 1 | Mức ưu tiên nhiệm vụ (1: Thường, 5: Gấp) |
+| `note` | Text | Tùy chọn | Ghi chú điều phối / Check-in |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
+| `completed_at` | Timestamptz | Tùy chọn | Thời điểm thực tế xe hoàn thành |
 
 ---
 
@@ -488,6 +536,9 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `speed_mps` | Decimal(5,2) | Tùy chọn | Vận tốc di chuyển tính bằng m/s. VD: `8.50` m/s |
 | `heading_degrees` | Decimal(5,2) | Tùy chọn | Góc hướng di chuyển độ. VD: `90.00`° |
 | `recorded_at` | Timestamptz | Default Now | Thời điểm thiết bị lưu vết tọa độ. VD: `2026-07-24 08:15:00+07` |
+| `latitude` | Double | Tùy chọn | Tọa độ Vĩ độ GPS. VD: `10.7721` |
+| `longitude` | Double | Tùy chọn | Tọa độ Kinh độ GPS. VD: `106.6578` |
+| `accuracy_meters` | Decimal(5,2) | Tùy chọn | Độ chính xác GPS (m) |
 
 ---
 
@@ -503,6 +554,11 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `output_route_count` | Int | Bắt buộc | Số lượng Tuyến đường tối ưu sinh ra. VD: `3` tuyến |
 | `execution_time_ms` | Int | Bắt buộc | Thời gian thuật toán chạy xong (Milisecond). VD: `850` ms |
 | `fitness_score` | Decimal(8,4) | Tùy chọn | Điểm số thích nghi tối ưu (Fitness score GA). VD: `0.9850` |
+| `algorithm_version` | VarChar(20) | Tùy chọn | Phiên bản thuật toán AI |
+| `total_distance_km` | Decimal(10,2) | Bắt buộc | Tổng khoảng cách tuyến (km) |
+| `estimated_duration_min` | Integer | Bắt buộc | Tổng thời gian tuyến (phút) |
+| `optimization_status` | Enum | Bắt buộc | Trạng thái tối ưu AI |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
 
@@ -518,6 +574,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `new_driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Tài xế mới được điều động thay thế. VD: `drv-02` |
 | `adjustment_type` | VarChar(50) | Bắt buộc | Loại can thiệp: `REASSIGN_DRIVER` (Đổi tài xế), `MODIFY_STOPS`, `CANCEL_ROUTE` |
 | `reason` | Text | Bắt buộc | Lý do sự cố: `Tài xế hỏng xe giữa đường tại ngã tư Hàng Xanh` |
+| `adjusted_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian can thiệp điều chỉnh tuyến |
 
 ---
 
@@ -535,6 +592,11 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `delivery_result` | Enum | Bắt buộc | Kết quả: `SUCCESS` (Thành công), `FAILED` (Thất bại), `PARTIAL` |
 | `actual_cod_collected`| Decimal(12,2)| Tùy chọn | **Số tiền mặt COD thực tế Shipper đã thu tại chỗ** đối soát tài chính. VD: `500000.00` VNĐ |
 | `failure_reason` | Enum | Tùy chọn | Lý do thất bại: `RECIPIENT_UNAVAILABLE` (Khách không bắt máy), `INCORRECT_ADDRESS` |
+| `receiver_name` | VarChar(150) | Tùy chọn | Họ tên người nhận bàn giao POD |
+| `receiver_phone` | VarChar(20) | Tùy chọn | Số điện thoại người nhận bàn giao POD |
+| `verified_latitude` | Double | Tùy chọn | Vĩ độ GPS xác minh giao hàng |
+| `verified_longitude` | Double | Tùy chọn | Kinh độ GPS xác minh giao hàng |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
 
@@ -551,6 +613,9 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `scanned_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người thực hiện quét mã (User ID). VD: `usr-03` |
 | `barcode_value` | VarChar(100) | Bắt buộc | Giá trị chuỗi mã vạch vừa quét. VD: `PKG-8891-01` |
 | `scan_type` | Enum | Bắt buộc | Tác vụ quét: `INBOUND` (Nhập kho), `OUTBOUND` (Xuất kho), `SORTING`, `DELIVERY` |
+| `latitude` | Double | Tùy chọn | Tọa độ Vĩ độ GPS. VD: `10.7721` |
+| `longitude` | Double | Tùy chọn | Tọa độ Kinh độ GPS. VD: `106.6578` |
+| `scanned_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm quét barcode |
 
 ---
 
@@ -566,6 +631,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `check_out_at` | Timestamptz | Tùy chọn | Mốc thời gian bấm Check-out xong điểm dừng. VD: `2026-07-24 09:45:00+07` |
 | `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS thiết bị tại thời điểm Check-in. VD: `10.7735` |
 | `longitude` | Double | Bắt buộc | Kinh độ định vị GPS thiết bị tại thời điểm Check-in. VD: `106.6590` |
+| `note` | Text | Tùy chọn | Ghi chú điều phối / Check-in |
 
 ---
 
@@ -578,6 +644,10 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `delivery_proof_id`| Uuid | **Khóa ngoại (FK ➔ bảng delivery_proofs)**| Thuộc bằng chứng giao hàng nào (Trỏ `delivery_proofs.id`). VD: `dp-01` |
 | `file_type` | Enum | Bắt buộc | Loại file: `PHOTO` (Ảnh chụp), `SIGNATURE` (Chữ ký điện tử) |
 | `object_key` | VarChar(500)| Bắt buộc | Đường dẫn lưu trữ Cloud/S3. VD: `pod/2026/07/proof_dp01.jpg` |
+| `storage_provider` | VarChar(30) | Bắt buộc (Default S3) | Nhà cung cấp Cloud Storage (`S3`/`MinIO`) |
+| `mime_type` | VarChar(100) | Bắt buộc | Kiểu định dạng tệp (`image/jpeg`) |
+| `file_size_bytes` | BigInt | Tùy chọn | Dung lượng tệp tính bằng Bytes |
+| `uploaded_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tải tệp đính kèm lên |
 
 ---
 
@@ -596,6 +666,8 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người dùng/Nhân viên ghi nhận sự kiện. VD: `usr-03` |
 | `occurred_at` | Timestamptz | Bắt buộc | Thời điểm thực tế xảy ra sự kiện. VD: `2026-07-24 09:45:00+07` |
 | `created_at` | Timestamptz | Default Now | Thời điểm ghi nhận vào CSDL |
+| `latitude` | Double | Tùy chọn | Tọa độ Vĩ độ GPS. VD: `10.7721` |
+| `longitude` | Double | Tùy chọn | Tọa độ Kinh độ GPS. VD: `106.6578` |
 
 ---
 
@@ -612,12 +684,45 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `value_type` | Enum | Bắt buộc | Kiểu dữ liệu: `INTEGER`, `DECIMAL`, `STRING`, `BOOLEAN`, `JSON` |
 | `category` | Enum | Bắt buộc | Phân nhóm cấu hình: `AI`, `ROUTING`, `GPS`, `SYSTEM` |
 | `updated_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Admin thực hiện chỉnh sửa cấu hình gần nhất (Trỏ `users.id`). VD: `usr-01` |
+| `description` | Text | Tùy chọn | Mô tả chi tiết |
+| `is_editable` | Boolean | Bắt buộc (Default True) | Cờ cho phép chỉnh sửa (`true`/`false`) |
+| `is_active` | Boolean | Bắt buộc (Default True) | Trạng thái kích hoạt (`true`/`false`) |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
 
 ## 🗺️ MODULE 10: VIETNAMESE ADMINISTRATIVE UNITS (Đơn vị Hành chính Việt Nam)
 
-### 40. Bảng `provinces` (Tỉnh / Thành phố)
+### 40. Bảng `administrative_regions` (Vùng Địa lý Hành chính)
+📌 **Chức năng của bảng:** Quản lý danh mục các vùng kinh tế - địa lý hành chính Việt Nam (Đông Nam Bộ, Đồng Bằng Sông Hồng, Tây Nguyên...) phục vụ phân vùng kinh doanh và báo cáo quy hoạch.
+
+| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
+| :--- | :--- | :--- | :--- |
+| `id` | Integer | **Khóa chính (PK)** | Mã định danh vùng địa lý |
+| `name` | VarChar(255) | Bắt buộc | Tên vùng địa lý tiếng Việt. VD: `Đông Nam Bộ` |
+| `name_en` | VarChar(255) | Bắt buộc | Tên vùng địa lý tiếng Anh. VD: `Southeast` |
+| `code_name` | VarChar(255) | Tùy chọn | Mã CodeName vùng. VD: `dong_nam_bo` |
+| `code_name_en` | VarChar(255) | Tùy chọn | Mã CodeName tiếng Anh. VD: `southeast` |
+
+---
+
+### 41. Bảng `administrative_units` (Cấp Đơn vị Hành chính)
+📌 **Chức năng của bảng:** Quản lý danh mục cấp hành chính (Thành phố trực thuộc trung ương, Tỉnh, Quận, Huyện, Phường, Xã) chuẩn hóa quốc gia.
+
+| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
+| :--- | :--- | :--- | :--- |
+| `id` | Integer | **Khóa chính (PK)** | Mã định danh cấp đơn vị hành chính |
+| `full_name` | VarChar(255) | Tùy chọn | Tên tiếng Việt đầy đủ cấp hành chính. VD: `Thành phố` |
+| `full_name_en` | VarChar(255) | Tùy chọn | Tên tiếng Anh đầy đủ cấp hành chính. VD: `City` |
+| `short_name` | VarChar(255) | Tùy chọn | Tên viết tắt tiếng Việt |
+| `short_name_en` | VarChar(255) | Tùy chọn | Tên viết tắt tiếng Anh |
+| `code_name` | VarChar(255) | Tùy chọn | Mã CodeName cấp hành chính |
+| `code_name_en` | VarChar(255) | Tùy chọn | Mã CodeName tiếng Anh |
+
+---
+
+### 42. Bảng `provinces` (Tỉnh / Thành phố)
 📌 **Chức năng của bảng:** Quản lý danh mục mã và tên các Tỉnh / Thành phố trực thuộc Trung ương của Việt Nam (dùng để seed dữ liệu chuẩn địa chính quốc gia).
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
@@ -625,10 +730,14 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `code` | VarChar(20) | **Khóa chính (PK)** | Mã tỉnh/thành địa chính. VD: `79` (TP.HCM), `01` (Hà Nội) |
 | `name` | VarChar(255) | Bắt buộc | Tên tỉnh thành. VD: `Thành phố Hồ Chí Minh` |
 | `full_name` | VarChar(255) | Bắt buộc | Tên đầy đủ địa chính. VD: `Thành phố Hồ Chí Minh` |
+| `name_en` | VarChar(255) | Tùy chọn | Tên tiếng Anh địa chính |
+| `full_name_en` | VarChar(255) | Tùy chọn | Tên đầy đủ tiếng Anh địa chính |
+| `code_name` | VarChar(255) | Tùy chọn | Mã CodeName địa chính |
+| `administrative_unit_id` | Integer | Khóa ngoại (FK ➔ bảng administrative_units) | Đơn vị hành chính cấp tỉnh/huyện |
 
 ---
 
-### 41. Bảng `wards` (Phường / Xã - Trực thuộc Tỉnh/TP)
+### 43. Bảng `wards` (Phường / Xã - Trực thuộc Tỉnh/TP)
 📌 **Chức năng của bảng:** Quản lý danh mục các Phường / Xã liên kết trực tiếp với Tỉnh / Thành phố theo mô hình địa chính 2 cấp (Tỉnh/TP ➔ Phường/Xã) phục vụ việc chọn địa chỉ chuyển phát nhanh chóng trên Web và Mobile App.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
@@ -636,11 +745,16 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `code` | VarChar(20) | **Khóa chính (PK)** | Mã phường xã địa chính. VD: `26830` |
 | `name` | VarChar(255) | Bắt buộc | Tên phường xã. VD: `Phường 14` |
 | `province_code` | VarChar(20) | **Khóa ngoại (FK ➔ bảng provinces)** | Thuộc Tỉnh/TP nào (Trỏ `provinces.code`). VD: `79` |
+| `name_en` | VarChar(255) | Tùy chọn | Tên tiếng Anh địa chính |
+| `full_name` | VarChar(255) | Tùy chọn | Tên đầy đủ địa chính |
+| `full_name_en` | VarChar(255) | Tùy chọn | Tên đầy đủ tiếng Anh địa chính |
+| `code_name` | VarChar(255) | Tùy chọn | Mã CodeName địa chính |
+| `administrative_unit_id` | Integer | Khóa ngoại (FK ➔ bảng administrative_units) | Đơn vị hành chính cấp tỉnh/huyện |
 
 ---
 
 ## 💡 KẾT LUẬN
 
-Tài liệu Tự điển CSDL này hiện tại đã có đầy đủ mục **📌 Chức năng của bảng** trên tất cả 41 bảng dữ liệu, được bổ sung chi tiết về **Khóa chính (PK)**, **Khóa ngoại (FK)**, **Cặp khóa chính (Composite PK)**, **Khóa ngoại 1-1** và đồng bộ 100% với mã nguồn Prisma Schema (`schema.prisma`) và Báo cáo Thẩm định Kiến trúc. 
+Tài liệu Tự điển CSDL này hiện tại đã có đầy đủ mục **📌 Chức năng của bảng** trên tất cả các bảng dữ liệu, được bổ sung chi tiết về **Khóa chính (PK)**, **Khóa ngoại (FK)**, **Cặp khóa chính (Composite PK)**, **Khóa ngoại 1-1** và đồng bộ 100% với mã nguồn Prisma Schema (`schema.prisma`) và Báo cáo Thẩm định Kiến trúc. 
 
 Bạn có thể sử dụng file tài liệu này để giải trình mượt mà mục đích của từng bảng trước Giảng viên và Hội đồng phản biện!

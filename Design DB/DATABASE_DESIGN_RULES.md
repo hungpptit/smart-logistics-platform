@@ -199,21 +199,28 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO app_admin_user;
 
 Khi tiến hành refactor các Module tiếp theo, hãy áp dụng trực tiếp danh sách kiểm tra (Checklist) sau:
 
+### 👤 Module 1 & 2: Users & Profiles (Tài khoản & Hồ sơ)
+- [x] Bảng `customers` & `staff`: Loại bỏ hoàn toàn `deleted_at` và `updated_at` (Hồ sơ tĩnh chỉ giữ `created_at`).
+
 ### 📦 Module 3: Facilities & Warehouses (Quản lý Mạng lưới Kho bãi)
 - [x] Bảng `facilities`: Tích hợp trực tiếp `address_id` (trỏ `addresses.id`), loại bỏ bảng trung gian `facility_addresses`.
 - [x] Bảng `facilities`: Dùng `operating_status` (`ACTIVE`, `INACTIVE`, `MAINTENANCE`, `CLOSED`) thay `deleted_at`.
 - [x] Quan hệ Quản lý Kho: Kho trỏ tới `manager_user_id` trong `users` hoặc `staff_id` trong `staff`.
 - [x] Quan hệ Nhân viên Kho: Bảng `staff` có `assigned_facility_id` trỏ về `facilities(id)`.
 
-### 📦 Module 3: Orders & Packages (Quản lý Đơn hàng & Kiện hàng)
-- [ ] Bảng `orders`: Trỏ `customer_id` trực tiếp về `customers(id)`. Lưu thông tin người gửi/người nhận (`sender_name`, `sender_phone`, `receiver_name`, `receiver_phone`) trực tiếp snapshot trong `orders` để bảo đảm tính lịch sử.
-- [ ] Thay thế `deleted_at` bằng `is_hidden` trên `orders` và `packages`.
+### 📦 Module 4: Orders & Packages (Quản lý Đơn hàng & Kiện hàng)
+- [x] Bảng `orders`: Trỏ `customer_id` trực tiếp về `customers(id)`. Lưu thông tin người gửi/người nhận (`sender_name`, `sender_phone`, `receiver_name`, `receiver_phone`, `pickup_address_text`, `delivery_address_text`) trực tiếp snapshot trong `orders` để bảo đảm tính lịch sử.
+- [x] Bảng `orders`: Loại bỏ hoàn toàn `deleted_at` và `is_hidden`. Quản lý vòng đời đơn bằng `status` (`CREATED`, ..., `CANCELLED`).
 
 ### 🚛 Module 4: Fleet & Vehicles (Quản lý Đội xe & Phương tiện)
 - [ ] Bảng `driver_vehicle_assignments`: Trỏ `driver_id` về `staff(id)` (thay vì bảng `drivers` cũ).
 - [ ] Bảng `driver_locations`: Trỏ `driver_id` về `staff(id)`.
 
-### 🗺️ Module 5 & 6: Routing & Shipments (Tuyển đường AI & Chuyển tải)
+### 🚚 Module 5: Shipment Management (Quản lý Vận đơn & Trung chuyển)
+- [x] Bảng `shipments`: Loại bỏ hoàn toàn `deleted_at`, bổ sung `CANCELLED` vào Enum `ShipmentStatus` để quản lý việc hủy chuyến xe.
+- [x] Bảng `shipment_packages`: Ràng buộc `@unique([package_id])` đảm bảo 1 kiện hàng chỉ nằm trên 1 vận đơn active tại một thời điểm.
+
+### 🗺️ Module 6: Routing (Tuyến đường AI & Điều phối)
 - [ ] Bảng `dispatch_tasks`: Trỏ `assigned_to` về `staff(id)`.
 - [ ] Bảng `routes`: Trỏ tới `driver_vehicle_assignment_id` kết nối tới `staff`.
 

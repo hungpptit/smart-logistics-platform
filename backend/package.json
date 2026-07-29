@@ -9,9 +9,7 @@
     "dev": "tsx watch src/index.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "seed:all": "tsx prisma/seed_all_tables.ts",
     "db:clean": "tsx prisma/clean_data.ts",
-    "db:reset": "tsx prisma/clean_data.ts && tsx prisma/seed_all_tables.ts",
     "reset:demo": "tsx scripts/reset_route_demo_data.ts"
   },
   "prisma": {

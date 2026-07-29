@@ -37,7 +37,6 @@ export class RoutingService {
           { originFacilityId: facilityId, status: 'READY_FOR_PICKUP' },
           { destinationFacilityId: facilityId, status: 'AT_HUB' },
         ],
-        deletedAt: null,
       },
     });
 
@@ -491,9 +490,8 @@ export class RoutingService {
           { originFacilityId: facilityId },
           { destinationFacilityId: facilityId },
         ],
-        deletedAt: null,
       }
-      : { deletedAt: null };
+      : {};
 
     // Reset Velocity 4 pickup orders back to READY_FOR_PICKUP
     await prisma.order.updateMany({

@@ -29,7 +29,7 @@ export class StaffService {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      user: { status: 'ACTIVE' },
+      status: { not: 'DISABLED' },
       role: {
         roleCode: 'STAFF',
       },

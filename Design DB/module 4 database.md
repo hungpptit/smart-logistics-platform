@@ -64,7 +64,6 @@ Bảng trung tâm lưu trữ thông tin nghiệp vụ chính của đơn hàng.
 | `service_id` | UUID | ❌ | FK → `Services(id)` (ON DELETE RESTRICT). Gói dịch vụ vận chuyển sử dụng. |
 | **--- SENDER SNAPSHOT ---** | | | **Bảo toàn dữ liệu lịch sử gửi hàng** |
 | `pickup_address_id` | UUID | ✅ | FK → `Addresses(id)` (nullable, dùng để trace gốc). |
-| `sender_contact_id` | UUID | ✅ | FK → `CustomerContacts(id)` (nullable, dùng để trace gốc). |
 | `sender_name` | VARCHAR(150) | ❌ | Tên người gửi hàng thực tế tại thời điểm tạo đơn. |
 | `sender_phone` | VARCHAR(20) | ❌ | SĐT người gửi hàng thực tế tại thời điểm tạo đơn. |
 | `pickup_address_text`| TEXT | ❌ | Địa chỉ lấy hàng dạng text đầy đủ tại thời điểm tạo đơn. |
@@ -72,7 +71,6 @@ Bảng trung tâm lưu trữ thông tin nghiệp vụ chính của đơn hàng.
 | `pickup_longitude` | DOUBLE PRECISION | ❌ | Kinh độ GPS chính xác lúc lấy hàng. |
 | **--- RECEIVER SNAPSHOT ---**| | | **Thông tin người nhận (Thường nằm ngoài hệ thống)** |
 | `delivery_address_id`| UUID | ✅ | FK → `Addresses(id)` (nullable, dùng để trace gốc nếu có). |
-| `receiver_contact_id`| UUID | ✅ | FK → `CustomerContacts(id)` (nullable, dùng để trace gốc nếu có). |
 | `receiver_name` | VARCHAR(150) | ❌ | Tên người nhận hàng thực tế. |
 | `receiver_phone` | VARCHAR(20) | ❌ | SĐT người nhận hàng thực tế. |
 | `delivery_address_text`| TEXT | ❌ | Địa chỉ giao hàng dạng text đầy đủ. |
@@ -89,7 +87,6 @@ Bảng trung tâm lưu trữ thông tin nghiệp vụ chính của đơn hàng.
 | `updated_by` | UUID | ✅ | FK → `Users(id)` (ON DELETE SET NULL). Người cập nhật đơn cuối. |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo đơn. |
 | `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật đơn. |
-| `deleted_at` | TIMESTAMPTZ | ✅ | Xóa mềm đơn hàng. |
 
 * **Định nghĩa ENUMs:**
   ```sql

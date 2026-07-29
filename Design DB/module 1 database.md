@@ -146,7 +146,6 @@ Lưu thông tin liên lạc & pháp lý của Khách hàng cá nhân/doanh nghi�
 | `tax_code` | VARCHAR(30) | ✅ | Mã số thuế doanh nghiệp. |
 | `status` | `CustomerStatus`| ❌ | ENUM: `ACTIVE`, `INACTIVE`, `BLOCKED`, `DISABLED` (Mặc định `ACTIVE`). |
 | `created_at` | TIMESTAMPTZ | ❌ | Ngày đăng ký (`NOW()`). |
-| `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật gần nhất. |
 
 ---
 

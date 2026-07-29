@@ -1,4 +1,7 @@
+/// <reference types="node" />
 import { PrismaClient } from '@prisma/client';
+
+declare const process: any;
 
 const prisma = new PrismaClient();
 
@@ -19,9 +22,7 @@ const sampleLocations = [
 async function main() {
   console.log('🔍 Checking database for orders with missing or zero coordinates...');
 
-  const orders = await prisma.order.findMany({
-    where: { deletedAt: null },
-  });
+  const orders = await prisma.order.findMany();
 
   console.log(`📦 Total active orders in DB: ${orders.length}`);
 
