@@ -31,6 +31,7 @@ enum CustomerStatus {
   ACTIVE
   INACTIVE
   BLOCKED
+  DISABLED
 }
 
 enum CustomerAddressType {
@@ -45,13 +46,6 @@ enum FacilityStatus {
   INACTIVE
   MAINTENANCE
   CLOSED
-}
-
-enum FacilityAddressType {
-  MAIN
-  BILLING
-  RETURN
-  PICKUP
 }
 
 // FIX LỖI 9: Đổi DISPATCH thành SHIPPING
@@ -150,6 +144,7 @@ enum DriverEmploymentStatus {
   ACTIVE
   OFFLINE
   SUSPENDED
+  DISABLED
 }
 
 enum VehicleOperatingStatus {
@@ -357,7 +352,6 @@ model Customer {
   companyName  String?        @map("company_name") @db.VarChar(255)
   taxCode      String?        @map("tax_code") @db.VarChar(30)
   status       CustomerStatus @default(ACTIVE)
-  isHidden     Boolean        @default(false) @map("is_hidden")
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -386,7 +380,7 @@ model Address {
 
   wardRelation     Ward?             @relation(fields: [wardCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   customerAddresses CustomerAddress[]
-  facilityAddresses FacilityAddress[]
+  facilities        Facility[]
   pickupOrders      Order[]           @relation("OrderPickupAddress")
   deliveryOrders    Order[]           @relation("OrderDeliveryAddress")
 
@@ -434,6 +428,7 @@ model Facility {
   facilityTypeId   String         @map("facility_type_id") @db.Uuid
   parentFacilityId String?        @map("parent_facility_id") @db.Uuid
   managerUserId    String?        @map("manager_user_id") @db.Uuid
+  addressId        String?        @map("address_id") @db.Uuid
   
   // FIX LỖI 14: Thêm trực tiếp Tọa độ Hub để thuật toán AI Routing truy vấn siêu tốc
   latitude         Float          @db.DoublePrecision
@@ -444,13 +439,12 @@ model Facility {
   closedAt         DateTime?      @map("closed_at") @db.Date
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz
 
   facilityType      FacilityType      @relation(fields: [facilityTypeId], references: [id], onDelete: Restrict)
   parentFacility    Facility?         @relation("FacilityHierarchy", fields: [parentFacilityId], references: [id], onDelete: SetNull)
   childFacilities   Facility[]        @relation("FacilityHierarchy")
   manager           User?             @relation("FacilityManager", fields: [managerUserId], references: [id], onDelete: SetNull)
-  facilityAddresses FacilityAddress[]
+  address           Address?          @relation(fields: [addressId], references: [id], onDelete: SetNull)
   facilityZones     FacilityZone[]
   transfersFrom     ShipmentTransfer[] @relation("TransferFromFacility")
   transfersTo       ShipmentTransfer[] @relation("TransferToFacility")
@@ -470,22 +464,6 @@ model Facility {
   @@index([parentFacilityId], name: "idx_facilities_parent")
   @@index([operatingStatus], name: "idx_facilities_status")
   @@map("facilities")
-}
-
-model FacilityAddress {
-  id          String              @id @default(uuid()) @db.Uuid
-  facilityId  String              @map("facility_id") @db.Uuid
-  addressId   String              @map("address_id") @db.Uuid
-  addressType FacilityAddressType @map("address_type")
-  isPrimary   Boolean             @default(false) @map("is_primary")
-  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz
-
-  facility    Facility            @relation(fields: [facilityId], references: [id], onDelete: Cascade)
-  address     Address             @relation(fields: [addressId], references: [id], onDelete: Restrict)
-
-  @@unique([facilityId, addressId])
-  @@index([facilityId], name: "idx_facility_addr_fac")
-  @@map("facility_addresses")
 }
 
 model FacilityZone {
@@ -770,9 +748,7 @@ model Staff {
   hireDate             DateTime?               @map("hire_date") @db.Date
   preferredLatitude    Float?                  @map("preferred_latitude")
   preferredLongitude   Float?                  @map("preferred_longitude")
-  note                 String?                 @db.Text
 
-  isHidden             Boolean                 @default(false) @map("is_hidden")
   createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz
   updatedAt            DateTime                @updatedAt @map("updated_at") @db.Timestamptz
 

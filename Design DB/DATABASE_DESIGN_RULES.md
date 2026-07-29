@@ -199,10 +199,11 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO app_admin_user;
 
 Khi tiến hành refactor các Module tiếp theo, hãy áp dụng trực tiếp danh sách kiểm tra (Checklist) sau:
 
-### 📦 Module 2: Facilities & Warehouses (Quản lý Mạng lưới Kho bãi)
-- [ ] Bảng `facilities`: Dùng `is_hidden` thay `deleted_at`.
-- [ ] Quan hệ Quản lý Kho: Kho trỏ tới `manager_user_id` trong `users` hoặc `staff_id` trong `staff`.
-- [ ] Quan hệ Nhân viên Kho: Bảng `staff` có `assigned_facility_id` trỏ về `facilities(id)`.
+### 📦 Module 3: Facilities & Warehouses (Quản lý Mạng lưới Kho bãi)
+- [x] Bảng `facilities`: Tích hợp trực tiếp `address_id` (trỏ `addresses.id`), loại bỏ bảng trung gian `facility_addresses`.
+- [x] Bảng `facilities`: Dùng `operating_status` (`ACTIVE`, `INACTIVE`, `MAINTENANCE`, `CLOSED`) thay `deleted_at`.
+- [x] Quan hệ Quản lý Kho: Kho trỏ tới `manager_user_id` trong `users` hoặc `staff_id` trong `staff`.
+- [x] Quan hệ Nhân viên Kho: Bảng `staff` có `assigned_facility_id` trỏ về `facilities(id)`.
 
 ### 📦 Module 3: Orders & Packages (Quản lý Đơn hàng & Kiện hàng)
 - [ ] Bảng `orders`: Trỏ `customer_id` trực tiếp về `customers(id)`. Lưu thông tin người gửi/người nhận (`sender_name`, `sender_phone`, `receiver_name`, `receiver_phone`) trực tiếp snapshot trong `orders` để bảo đảm tính lịch sử.

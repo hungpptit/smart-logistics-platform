@@ -15,7 +15,7 @@ export class CustomerService {
       const emailExists = await prisma.customer.findFirst({
         where: {
           email: dto.email,
-          isHidden: false,
+          status: { not: 'DISABLED' },
         },
       });
       if (emailExists) {
@@ -27,7 +27,7 @@ export class CustomerService {
     const phoneExists = await prisma.customer.findFirst({
       where: {
         phone: dto.phone,
-        isHidden: false,
+        status: { not: 'DISABLED' },
       },
     });
     if (phoneExists) {
@@ -115,7 +115,7 @@ export class CustomerService {
     const limit = parseInt(query.limit || '10', 10);
     const skip = (page - 1) * limit;
 
-    const where: any = { isHidden: false };
+    const where: any = { status: { not: 'DISABLED' } };
 
     if (query.search) {
       where.OR = [
@@ -186,7 +186,7 @@ export class CustomerService {
       },
     });
 
-    if (!customer || customer.isHidden) {
+    if (!customer || customer.status === 'DISABLED') {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng');
     }
 
@@ -201,7 +201,7 @@ export class CustomerService {
       where: { id },
     });
 
-    if (!customer || customer.isHidden) {
+    if (!customer || customer.status === 'DISABLED') {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng để cập nhật');
     }
 
@@ -225,7 +225,7 @@ export class CustomerService {
       include: { user: true },
     });
 
-    if (!customer || customer.isHidden) {
+    if (!customer || customer.status === 'DISABLED') {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng để xóa');
     }
 
@@ -240,13 +240,13 @@ export class CustomerService {
     }
 
     await prisma.$transaction(async (tx) => {
-      // 1. Soft hide the customer
+      // 1. Soft delete customer status
       await tx.customer.update({
         where: { id },
-        data: { isHidden: true },
+        data: { status: 'DISABLED' },
       });
 
-      // 2. Soft hide the associated User
+      // 2. Disable associated User
       if (customer.userId) {
         await tx.user.update({
           where: { id: customer.userId },
@@ -268,7 +268,7 @@ export class CustomerService {
       where: { id: customerId },
     });
 
-    if (!customer || customer.isHidden) {
+    if (!customer) {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng');
     }
 
@@ -327,7 +327,7 @@ export class CustomerService {
       },
     });
 
-    if (!customer || customer.isHidden) {
+    if (!customer) {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng');
     }
 

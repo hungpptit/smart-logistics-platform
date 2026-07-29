@@ -29,7 +29,7 @@ export class StaffService {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      isHidden: false,
+      user: { status: 'ACTIVE' },
       role: {
         roleCode: 'STAFF',
       },
@@ -177,7 +177,7 @@ export class StaffService {
     const existing = await prisma.staff.findFirst({
       where: {
         email: dto.email,
-        isHidden: false,
+        user: { status: 'ACTIVE' },
       },
     });
 
@@ -190,7 +190,7 @@ export class StaffService {
       const existingCitizen = await prisma.staff.findFirst({
         where: {
           citizenId: dto.citizenId,
-          isHidden: false,
+          user: { status: 'ACTIVE' },
         },
       });
       if (existingCitizen) {
@@ -331,7 +331,7 @@ export class StaffService {
       const existingEmail = await prisma.staff.findFirst({
         where: {
           email: dto.email,
-          isHidden: false,
+          user: { status: 'ACTIVE' },
           NOT: { userId: id },
         },
       });
@@ -345,7 +345,7 @@ export class StaffService {
       const existingCitizen = await prisma.staff.findFirst({
         where: {
           citizenId: dto.citizenId,
-          isHidden: false,
+          user: { status: 'ACTIVE' },
           NOT: { userId: id },
         },
       });
@@ -451,7 +451,7 @@ export class StaffService {
         await tx.staff.update({
           where: { userId: id },
           data: {
-            isHidden: true,
+            employmentStatus: 'DISABLED',
           },
         });
       }

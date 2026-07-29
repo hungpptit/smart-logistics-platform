@@ -19,7 +19,7 @@ export class FacilityService {
     // Check parent facility if provided
     if (dto.parentFacilityId) {
       const parentExists = await prisma.facility.findUnique({
-        where: { id: dto.parentFacilityId, deletedAt: null },
+        where: { id: dto.parentFacilityId, operatingStatus: { not: 'CLOSED' } },
       });
       if (!parentExists) {
         throw new BadRequestException('Kho bãi cha không tồn tại hoặc đã bị xóa');
@@ -58,7 +58,7 @@ export class FacilityService {
         },
       });
 
-      // 2. Create Facility
+      // 2. Create Facility with addressId
       const facility = await tx.facility.create({
         data: {
           facilityCode,
@@ -66,20 +66,11 @@ export class FacilityService {
           facilityTypeId: dto.facilityTypeId,
           parentFacilityId: dto.parentFacilityId || null,
           managerUserId: dto.managerUserId || null,
+          addressId: address.id,
           operatingStatus: dto.operatingStatus || 'ACTIVE',
           openedAt: new Date(dto.openedAt),
           latitude: dto.address.latitude,
           longitude: dto.address.longitude,
-        },
-      });
-
-      // 3. Link Address to Facility
-      await tx.facilityAddress.create({
-        data: {
-          facilityId: facility.id,
-          addressId: address.id,
-          addressType: dto.address.addressType || 'MAIN',
-          isPrimary: true,
         },
       });
 
@@ -98,7 +89,7 @@ export class FacilityService {
     const limit = parseInt(query.limit || '10', 10);
     const skip = (page - 1) * limit;
 
-    const where: any = { deletedAt: null };
+    const where: any = { operatingStatus: { not: 'CLOSED' } };
 
     if (query.search) {
       where.OR = [
@@ -124,11 +115,7 @@ export class FacilityService {
         orderBy: { createdAt: 'desc' },
         include: {
           facilityType: true,
-          facilityAddresses: {
-            include: {
-              address: true,
-            },
-          },
+          address: true,
           manager: {
             select: {
               username: true,
@@ -166,13 +153,9 @@ export class FacilityService {
         facilityType: true,
         parentFacility: true,
         childFacilities: {
-          where: { deletedAt: null },
+          where: { operatingStatus: { not: 'CLOSED' } },
         },
-        facilityAddresses: {
-          include: {
-            address: true,
-          },
-        },
+        address: true,
         facilityZones: true,
         manager: {
           select: {
@@ -190,7 +173,7 @@ export class FacilityService {
       },
     });
 
-    if (!facility || facility.deletedAt) {
+    if (!facility || facility.operatingStatus === 'CLOSED') {
       throw new NotFoundException('Không tìm thấy thông tin kho bãi');
     }
 
@@ -202,7 +185,7 @@ export class FacilityService {
    */
   public async updateFacility(id: string, dto: UpdateFacilityDto) {
     const facility = await prisma.facility.findUnique({
-      where: { id, deletedAt: null },
+      where: { id, operatingStatus: { not: 'CLOSED' } },
     });
 
     if (!facility) {
@@ -215,7 +198,7 @@ export class FacilityService {
         throw new BadRequestException('Một kho bãi không thể làm cha của chính nó');
       }
       const parentExists = await prisma.facility.findUnique({
-        where: { id: dto.parentFacilityId, deletedAt: null },
+        where: { id: dto.parentFacilityId, operatingStatus: { not: 'CLOSED' } },
       });
       if (!parentExists) {
         throw new BadRequestException('Kho bãi cha mới không tồn tại');
@@ -240,9 +223,9 @@ export class FacilityService {
    */
   public async deleteFacility(id: string) {
     const facility = await prisma.facility.findUnique({
-      where: { id, deletedAt: null },
+      where: { id, operatingStatus: { not: 'CLOSED' } },
       include: {
-        childFacilities: { where: { deletedAt: null } },
+        childFacilities: { where: { operatingStatus: { not: 'CLOSED' } } },
       },
     });
 
@@ -272,7 +255,7 @@ export class FacilityService {
 
     await prisma.facility.update({
       where: { id },
-      data: { deletedAt: new Date() },
+      data: { operatingStatus: 'CLOSED', closedAt: new Date() },
     });
 
     return { success: true };
@@ -285,7 +268,7 @@ export class FacilityService {
    */
   public async createZone(facilityId: string, dto: CreateFacilityZoneDto) {
     const facility = await prisma.facility.findUnique({
-      where: { id: facilityId, deletedAt: null },
+      where: { id: facilityId, operatingStatus: { not: 'CLOSED' } },
     });
 
     if (!facility) {
@@ -322,7 +305,7 @@ export class FacilityService {
    */
   public async getZones(facilityId: string) {
     const facility = await prisma.facility.findUnique({
-      where: { id: facilityId, deletedAt: null },
+      where: { id: facilityId, operatingStatus: { not: 'CLOSED' } },
     });
 
     if (!facility) {

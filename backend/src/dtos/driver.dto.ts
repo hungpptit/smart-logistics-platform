@@ -37,10 +37,6 @@ export class CreateDriverDto {
   @IsOptional()
   homeFacilityId?: string;
 
-  @IsString({ message: 'Ghi chú phải là một chuỗi ký tự' })
-  @IsOptional()
-  note?: string;
-
   @IsNumber({}, { message: 'Vĩ độ mong muốn phải là một số thực' })
   @IsOptional()
   preferredLatitude?: number;
@@ -90,10 +86,6 @@ export class UpdateDriverDto {
   @IsUUID('4', { message: 'ID kho bãi phải là UUID hợp lệ' })
   @IsOptional()
   homeFacilityId?: string;
-
-  @IsString({ message: 'Ghi chú phải là một chuỗi ký tự' })
-  @IsOptional()
-  note?: string;
 
   @IsNumber({}, { message: 'Vĩ độ mong muốn phải là một số thực' })
   @IsOptional()

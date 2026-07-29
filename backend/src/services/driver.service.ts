@@ -11,7 +11,7 @@ export class DriverService {
   public async createDriver(dto: CreateDriverDto) {
     // Check if phone already exists in staff table
     const phoneExists = await prisma.staff.findFirst({
-      where: { phone: dto.phone, isHidden: false },
+      where: { phone: dto.phone, user: { status: 'ACTIVE' } },
     });
     if (phoneExists) {
       throw new BadRequestException('Số điện thoại tài xế đã tồn tại trên hệ thống');
@@ -55,7 +55,7 @@ export class DriverService {
     const emailExists = await prisma.staff.findFirst({
       where: {
         email: dto.email,
-        isHidden: false,
+        user: { status: 'ACTIVE' },
       },
     });
 
@@ -110,7 +110,6 @@ export class DriverService {
           employmentStatus: dto.employmentStatus || 'ACTIVE',
           userId: user.id,
           assignedFacilityId: dto.homeFacilityId || null,
-          note: dto.note || null,
           preferredLatitude: dto.preferredLatitude !== undefined ? dto.preferredLatitude : null,
           preferredLongitude: dto.preferredLongitude !== undefined ? dto.preferredLongitude : null,
           driverType: dto.driverType || 'HUB_DELIVERY',
@@ -149,7 +148,7 @@ export class DriverService {
     const limit = parseInt(query.limit || '10', 10);
     const skip = (page - 1) * limit;
 
-    const where: any = { isHidden: false, position: 'DRIVER' };
+    const where: any = { user: { status: 'ACTIVE' }, position: 'DRIVER' };
 
     if (query.search) {
       where.OR = [
@@ -227,7 +226,7 @@ export class DriverService {
       },
     });
 
-    if (!driver || driver.isHidden) {
+    if (!driver) {
       throw new NotFoundException('Không tìm thấy thông tin tài xế');
     }
 
@@ -242,14 +241,14 @@ export class DriverService {
       where: { id },
     });
 
-    if (!driver || driver.isHidden) {
+    if (!driver) {
       throw new NotFoundException('Không tìm thấy thông tin tài xế để cập nhật');
     }
 
     // Check unique phone if it changed
     if (dto.phone && dto.phone !== driver.phone) {
       const phoneExists = await prisma.staff.findFirst({
-        where: { phone: dto.phone, isHidden: false, NOT: { id } },
+        where: { phone: dto.phone, user: { status: 'ACTIVE' }, NOT: { id } },
       });
       if (phoneExists) {
         throw new BadRequestException('Số điện thoại mới đã tồn tại trên hệ thống');
@@ -288,7 +287,6 @@ export class DriverService {
         employmentStatus: (dto.employmentStatus as any) ?? driver.employmentStatus,
         userId: dto.userId !== undefined ? dto.userId : driver.userId,
         assignedFacilityId: dto.homeFacilityId !== undefined ? dto.homeFacilityId : driver.assignedFacilityId,
-        note: dto.note !== undefined ? dto.note : driver.note,
         preferredLatitude: dto.preferredLatitude !== undefined ? dto.preferredLatitude : driver.preferredLatitude,
         preferredLongitude: dto.preferredLongitude !== undefined ? dto.preferredLongitude : driver.preferredLongitude,
         driverType: (dto.driverType as any) ?? driver.driverType,
@@ -314,7 +312,7 @@ export class DriverService {
       include: { user: true },
     });
 
-    if (!driver || driver.isHidden) {
+    if (!driver) {
       throw new NotFoundException('Không tìm thấy tài xế để xóa');
     }
 
@@ -333,11 +331,11 @@ export class DriverService {
     }
 
     await prisma.$transaction(async (tx) => {
-      // 1. Soft hide the driver
+      // 1. Soft delete driver profile status
       await tx.staff.update({
         where: { id },
         data: {
-          isHidden: true,
+          employmentStatus: 'DISABLED',
         },
       });
 
@@ -353,7 +351,7 @@ export class DriverService {
         },
       });
 
-      // 3. Soft hide the associated User
+      // 3. Disable associated User
       if (driver.userId) {
         await tx.user.update({
           where: { id: driver.userId },
@@ -392,7 +390,7 @@ export class DriverService {
     const driver = await prisma.staff.findUnique({
       where: { id: dto.driverId },
     });
-    if (!driver || driver.isHidden) {
+    if (!driver) {
       throw new NotFoundException('Không tìm thấy tài xế hoạt động');
     }
 

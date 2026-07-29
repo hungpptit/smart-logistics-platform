@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsUUID, IsEnum, IsNumber, IsBoolean, ValidateNested, IsNotEmpty, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
-import { FacilityStatus, FacilityAddressType, FacilityZoneType } from '@prisma/client';
+import { FacilityStatus, FacilityZoneType } from '@prisma/client';
 
 export class FacilityAddressDto {
   @IsString({ message: 'Địa chỉ dòng 1 không được để trống' })
@@ -32,10 +32,6 @@ export class FacilityAddressDto {
 
   @IsNumber({}, { message: 'Kinh độ phải là một số thực' })
   longitude!: number;
-
-  @IsEnum(FacilityAddressType, { message: 'Loại địa chỉ kho không hợp lệ' })
-  @IsOptional()
-  addressType?: FacilityAddressType;
 
   @IsString({ message: 'Mã Phường/Xã phải là một chuỗi ký tự' })
   @IsOptional()

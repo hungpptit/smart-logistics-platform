@@ -51,7 +51,7 @@ export class RoutingController {
       let filterDriverId = driverId as string;
       if (!filterDriverId && user?.id) {
         const driverProfile = await prisma.staff.findFirst({
-          where: { userId: user.id, isHidden: false },
+          where: { userId: user.id },
         });
         if (driverProfile) {
           filterDriverId = driverProfile.id;

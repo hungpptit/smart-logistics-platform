@@ -85,8 +85,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `customer_type` | Enum | Bắt buộc | Loại khách hàng: `INDIVIDUAL` (Cá nhân gửi lẻ), `BUSINESS` (Doanh nghiệp/Shop) |
 | `company_name` | VarChar(255) | Tùy chọn | Tên công ty/Thương hiệu shop (nếu BIZ). VD: `Công ty TNHH Vinamilk` |
 | `tax_code` | VarChar(30) | Tùy chọn | Mã số thuế doanh nghiệp. VD: `0300588569` |
-| `status` | Enum | Bắt buộc (Default Active) | Trạng thái hồ sơ: `ACTIVE` (Hoạt động), `INACTIVE`, `BLOCKED` (Chặn tạo đơn) |
-| `is_hidden` | Boolean | Bắt buộc (Default False) | Flag ẩn hồ sơ (`true` / `false`). Thay thế `deleted_at` |
+| `status` | Enum | Bắt buộc (Default Active) | Trạng thái hồ sơ: `ACTIVE` (Hoạt động), `INACTIVE`, `BLOCKED` (Chặn tạo đơn), `DISABLED` (Vô hiệu hóa/Ẩn) |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Ngày khách hàng đăng ký hệ thống |
 | `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật gần nhất |
 
@@ -150,22 +149,12 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `facility_type_id`| Uuid | **Khóa ngoại (FK ➔ bảng facility_types)** | Mã loại hình kho bãi (Trỏ `facility_types.id`). VD: `ftype-02` |
 | `parent_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Mã bưu cục cấp trên trong cây phân cấp mạng lưới (Ví dụ Hub mẹ). VD: `fac-05` |
 | `manager_user_id`| Uuid | **Khóa ngoại (FK ➔ bảng users)** | Quản lý bưu cục (Trỏ User có Role Staff/Admin). VD: `usr-02` |
+| `address_id` | Uuid | **Khóa ngoại (FK ➔ bảng addresses)** | Mã địa chỉ của bưu cục/kho bãi (Trỏ `addresses.id`). VD: `addr-05` |
 | `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS Hub (Truy vấn siêu tốc cho AI Routing). VD: `10.7725` |
 | `longitude` | Double | Bắt buộc | Kinh độ định vị GPS Hub (Truy vấn siêu tốc cho AI Routing). VD: `106.6580` |
 | `operating_status`| Enum | Bắt buộc (Default Active) | Trạng thái: `ACTIVE` (Đang mở cửa), `MAINTENANCE` (Bảo trì), `CLOSED` |
 | `opened_at` | Date | Bắt buộc | Ngày chính thức mở cửa hoạt động bưu cục. VD: `2025-01-01` |
-
----
-
-### 11. Bảng `facility_addresses` (Địa chỉ Bưu cục - Bảng trung gian N:N)
-📌 **Chức năng của bảng:** Bảng trung gian liên kết bưu cục với thông tin địa chỉ trong bảng `addresses`, hỗ trợ phân loại địa chỉ bưu cục (Trụ sở chính `MAIN`, Địa chỉ xuất hóa đơn `BILLING`, Địa chỉ nhận hàng hoàn `RETURN`).
-
-| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
-| :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi địa chỉ kho. VD: `fadr-01` |
-| `facility_id` | Uuid | **Cặp khóa duy nhất [facility_id, address_id]**, **FK ➔ bảng facilities** | Mã bưu cục sở hữu địa chỉ. VD: `fac-01` |
-| `address_id` | Uuid | **Cặp khóa duy nhất [facility_id, address_id]**, **FK ➔ bảng addresses** | Mã địa chỉ được liên kết. VD: `addr-01` |
-| `address_type` | Enum | Bắt buộc | Loại địa chỉ kho: `MAIN` (Trụ sở chính), `BILLING`, `RETURN`, `PICKUP` |
+| `closed_at` | Date | Tùy chọn | Ngày đóng cửa bưu cục (nếu status = CLOSED). VD: `2026-07-29` |
 
 ---
 
@@ -367,12 +356,10 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `driver_license_number`| VarChar(50)| Khóa duy nhất (Unique), Tùy chọn| Số bằng lái xe GPLX (Chỉ dùng cho Driver). VD: `59012938102` |
 | `driver_license_class` | VarChar(10)| Tùy chọn | Hạng bằng lái xe GPLX (Chỉ dùng cho Driver). VD: `A1`, `B2`, `C`, `FC` |
 | `driver_type` | Enum | Tùy chọn | Loại tài xế: `HUB_DELIVERY` (Giao bưu cục), `ON_DEMAND` (Giao tức thì) |
-| `employment_status` | Enum | Tùy chọn (Default Active) | Trạng thái công tác: `ACTIVE` (Đang làm), `ON_LEAVE` (Nghỉ phép), `TERMINATED` |
+| `employment_status` | Enum | Tùy chọn (Default Active) | Trạng thái công tác: `ACTIVE` (Đang làm), `ON_LEAVE` (Nghỉ phép), `TERMINATED`, `DISABLED` (Vô hiệu hóa/Ẩn) |
 | `hire_date` | Date | Tùy chọn | Ngày chính thức tuyển dụng. VD: `2025-01-15` |
 | `preferred_latitude` | Double | Tùy chọn | Vĩ độ khu vực ưu tiên nhận đơn giao |
 | `preferred_longitude`| Double | Tùy chọn | Kinh độ khu vực ưu tiên nhận đơn giao |
-| `note` | Text | Tùy chọn | Ghi chú quản lý nhân sự / tài xế |
-| `is_hidden` | Boolean | Bắt buộc (Default False) | Flag ẩn hồ sơ nhân sự (`true` / `false`). Thay thế `deleted_at` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian tạo hồ sơ |
 | `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
 

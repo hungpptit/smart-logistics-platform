@@ -144,8 +144,7 @@ Lưu thông tin liên lạc & pháp lý của Khách hàng cá nhân/doanh nghi�
 | `customer_type` | `CustomerType` | ❌ | ENUM: `INDIVIDUAL` (Gửi lẻ), `BUSINESS` (Shop/Doanh nghiệp). |
 | `company_name` | VARCHAR(255) | ✅ | Tên công ty/Thương hiệu shop (nếu BIZ). |
 | `tax_code` | VARCHAR(30) | ✅ | Mã số thuế doanh nghiệp. |
-| `status` | `CustomerStatus`| ❌ | ENUM: `ACTIVE`, `INACTIVE`, `BLOCKED` (Mặc định `ACTIVE`). |
-| `is_hidden` | BOOLEAN | ❌ | Flag ẩn hồ sơ (Mặc định `false`). |
+| `status` | `CustomerStatus`| ❌ | ENUM: `ACTIVE`, `INACTIVE`, `BLOCKED`, `DISABLED` (Mặc định `ACTIVE`). |
 | `created_at` | TIMESTAMPTZ | ❌ | Ngày đăng ký (`NOW()`). |
 | `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật gần nhất. |
 
@@ -168,11 +167,9 @@ Hợp nhất toàn bộ hồ sơ nhân sự vận hành (Kho, Điều phối, V�
 | `driver_license_number`| VARCHAR(50)| ✅ | Số bằng lái xe (Duy nhất `UNIQUE`, Nullable nếu là staff văn phòng). |
 | `driver_license_class`| VARCHAR(10) | ✅ | Hạng bằng lái: `A1`, `B2`, `C`, `FC`... (Nullable). |
 | `driver_type` | `DriverType` | ✅ | ENUM: `HUB_DELIVERY`, `ON_DEMAND` (Nullable). |
-| `employment_status` | `DriverEmploymentStatus`| ✅ | ENUM: `ACTIVE`, `ON_LEAVE`, `TERMINATED` (Default `ACTIVE`). |
+| `employment_status` | `DriverEmploymentStatus`| ✅ | ENUM: `ACTIVE`, `OFFLINE`, `SUSPENDED`, `DISABLED` (Default `ACTIVE`). |
 | `hire_date` | DATE | ✅ | Ngày vào làm chính thức. |
 | `preferred_latitude` | DOUBLE | ✅ | Tọa độ vĩ độ ưu tiên nhận đơn. |
 | `preferred_longitude`| DOUBLE | ✅ | Tọa độ kinh độ ưu tiên nhận đơn. |
-| `note` | TEXT | ✅ | Ghi chú quản lý nhân sự/tài xế. |
-| `is_hidden` | BOOLEAN | 开启/❌ | Flag ẩn hồ sơ (Mặc định `false`). |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo hồ sơ. |
 | `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật gần nhất. |

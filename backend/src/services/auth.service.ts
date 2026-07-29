@@ -18,7 +18,7 @@ export class AuthService {
           { email: dto.email },
           { phone: dto.phone },
         ],
-        isHidden: false,
+        user: { status: 'ACTIVE' },
       },
     });
 
@@ -118,7 +118,7 @@ export class AuthService {
 
     // Find and activate user
     const customer = await prisma.customer.findFirst({
-      where: { email, isHidden: false },
+      where: { email },
       include: {
         user: {
           include: {

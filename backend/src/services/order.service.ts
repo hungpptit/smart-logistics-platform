@@ -17,7 +17,7 @@ export class OrderService {
     const customer = await prisma.customer.findUnique({
       where: { userId },
     });
-    if (!customer || customer.isHidden) {
+    if (!customer) {
       throw new BadRequestException('Không tìm thấy thông tin hồ sơ khách hàng liên kết với tài khoản này');
     }
     if (customer.status === 'BLOCKED') {
@@ -47,7 +47,7 @@ export class OrderService {
 
     // Check if customer exists
     const customerWithUser = await prisma.customer.findFirst({
-      where: { id: customerId, isHidden: false },
+      where: { id: customerId, user: { status: 'ACTIVE' } },
     });
     if (!customerWithUser) {
       throw new NotFoundException('Không tìm thấy khách hàng');
@@ -717,14 +717,7 @@ export class OrderService {
     const facilities = await prisma.facility.findMany({
       where: {
         operatingStatus: 'ACTIVE',
-        deletedAt: null,
       },
-      include: {
-        facilityAddresses: {
-          where: { isPrimary: true },
-          include: { address: true }
-        }
-      }
     });
 
     if (facilities.length === 0) return null;
@@ -733,13 +726,12 @@ export class OrderService {
     let minDistance = Infinity;
 
     for (const fac of facilities) {
-      const primaryAddr = fac.facilityAddresses[0]?.address;
-      if (primaryAddr) {
+      if (fac.latitude !== null && fac.longitude !== null) {
         const dist = this.geocodingService.calculateDistance(
           lat,
           lon,
-          primaryAddr.latitude,
-          primaryAddr.longitude
+          fac.latitude,
+          fac.longitude
         );
         if (dist < minDistance) {
           minDistance = dist;

@@ -16,14 +16,13 @@ Mọi thực thể quản trị sau này như tồn kho (`Inventory`), vận chu
 
 ---
 
-## 📊 Các Bảng Trong Module (4 Bảng)
+## 📊 Các Bảng Trong Module (3 Bảng)
 
 | STT | Bảng | Chức năng |
 | :--- | :--- | :--- |
-| 1 | `Facilities` | Quản lý danh sách các cơ sở logistics |
+| 1 | `Facilities` | Quản lý danh sách các cơ sở logistics (tích hợp `address_id`) |
 | 2 | `FacilityTypes` | Danh mục loại hình cơ sở (Tổng kho, Hub, Kho trung chuyển...) |
-| 3 | `FacilityAddresses`| Liên kết cơ sở với địa chỉ (trong Master Addresses) |
-| 4 | `FacilityZones` | Các khu vực chức năng bên trong cơ sở (Nhận hàng, lưu trữ, phân loại...) |
+| 3 | `FacilityZones` | Các khu vực chức năng bên trong cơ sở (Nhận hàng, lưu trữ, phân loại...) |
 
 ---
 
@@ -31,8 +30,7 @@ Mọi thực thể quản trị sau này như tồn kho (`Inventory`), vận chu
 
 ```mermaid
 graph TD
-    Addresses[Addresses] <-->|1..N| FacilityAddresses[FacilityAddresses]
-    Facilities[Facilities] -->|1..N| FacilityAddresses
+    Addresses[Addresses] -->|1..N| Facilities[Facilities]
     Facilities -->|1..N| FacilityZones[FacilityZones]
     FacilityTypes[FacilityTypes] -->|1..N| Facilities
     Facilities -->|parent_facility_id| Facilities
@@ -55,14 +53,14 @@ Bảng dữ liệu trung tâm của mạng lưới logistics, tổ chức cấu 
 | `facility_type_id` | UUID | ❌ | FK → `FacilityTypes(id)` (ON DELETE RESTRICT). |
 | `parent_facility_id`| UUID | ✅ | FK → `Facilities(id)`. Nếu bằng `NULL` thì đây là Tổng kho (Main Depot). |
 | `manager_user_id` | UUID | ✅ | FK → `Users(id)` (nullable). Người chịu trách nhiệm quản lý cơ sở. |
+| `address_id` | UUID | ✅ | FK → `Addresses(id)` (nullable). Mã địa chỉ của bưu cục/kho bãi. |
 | `latitude` | DOUBLE PRECISION | ❌ | Vĩ độ định vị GPS của Hub/Bưu cục. |
 | `longitude` | DOUBLE PRECISION | ❌ | Kinh độ định vị GPS của Hub/Bưu cục. |
 | `operating_status` | `facility_status_enum` | ❌ | Trạng thái hoạt động (`ACTIVE`, `INACTIVE`, `MAINTENANCE`, `CLOSED`). |
 | `opened_at` | DATE | ❌ | Ngày bắt đầu hoạt động. |
-| `note` | TEXT | ✅ | Ghi chú thêm. |
+| `closed_at` | DATE | ✅ | Ngày đóng cửa kho/bưu cục (khi status = CLOSED). |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo. |
 | `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật. |
-| `deleted_at` | TIMESTAMPTZ | ✅ | Xóa mềm (Soft Delete). |
 
 * **Định nghĩa ENUMs:**
   ```sql

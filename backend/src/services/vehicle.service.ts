@@ -34,7 +34,7 @@ export class VehicleService {
     // Check home facility if provided
     if (dto.homeFacilityId) {
       const facilityExists = await prisma.facility.findUnique({
-        where: { id: dto.homeFacilityId, deletedAt: null },
+        where: { id: dto.homeFacilityId, operatingStatus: { not: 'CLOSED' } },
       });
       if (!facilityExists) {
         throw new BadRequestException('Kho bãi hoạt động không tồn tại hoặc đã bị xóa');
@@ -204,7 +204,7 @@ export class VehicleService {
     // Check homeFacilityId if changed
     if (dto.homeFacilityId && dto.homeFacilityId !== vehicle.homeFacilityId) {
       const facilityExists = await prisma.facility.findUnique({
-        where: { id: dto.homeFacilityId, deletedAt: null },
+        where: { id: dto.homeFacilityId, operatingStatus: { not: 'CLOSED' } },
       });
       if (!facilityExists) {
         throw new BadRequestException('Kho bãi hoạt động mới không tồn tại hoặc đã bị xóa');

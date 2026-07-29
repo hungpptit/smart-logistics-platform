@@ -15,13 +15,9 @@ export class RoutingService {
   public async optimizeRoutesForFacility(facilityId: string, creatorId: string) {
     // 1. Fetch the facility and its primary address
     const facility = await prisma.facility.findUnique({
-      where: { id: facilityId, deletedAt: null },
+      where: { id: facilityId, operatingStatus: { not: 'CLOSED' } },
       include: {
-        facilityAddresses: {
-          include: {
-            address: true,
-          },
-        },
+        address: true,
       },
     });
 
@@ -29,17 +25,9 @@ export class RoutingService {
       throw new NotFoundException('Không tìm thấy thông tin kho bãi');
     }
 
-    const primaryAddress =
-      facility.facilityAddresses.find((fa) => fa.isPrimary)?.address ||
-      facility.facilityAddresses[0]?.address;
-
-    if (!primaryAddress) {
-      throw new BadRequestException('Kho bãi chưa có cấu hình địa chỉ/tọa độ');
-    }
-
     const facilityLocation = {
-      lat: primaryAddress.latitude,
-      lng: primaryAddress.longitude,
+      lat: facility.latitude,
+      lng: facility.longitude,
     };
 
     // 2. Fetch all orders ready for AI routing at this facility (Pickup or Delivery)
@@ -63,7 +51,7 @@ export class RoutingService {
         assignedFacilityId: facilityId,
         position: 'DRIVER',
         employmentStatus: 'ACTIVE',
-        isHidden: false,
+        user: { status: 'ACTIVE' },
       },
       include: {
         location: true,
@@ -339,11 +327,7 @@ export class RoutingService {
             id: true,
             facilityCode: true,
             facilityName: true,
-            facilityAddresses: {
-              include: {
-                address: true,
-              },
-            },
+            address: true,
           },
         },
         driverVehicleAssignment: {
@@ -413,11 +397,7 @@ export class RoutingService {
             id: true,
             facilityCode: true,
             facilityName: true,
-            facilityAddresses: {
-              include: {
-                address: true,
-              },
-            },
+            address: true,
           },
         },
         endFacility: {
