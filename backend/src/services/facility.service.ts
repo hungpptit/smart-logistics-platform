@@ -29,7 +29,7 @@ export class FacilityService {
     // Check manager user if provided
     if (dto.managerUserId) {
       const managerExists = await prisma.user.findFirst({
-        where: { id: dto.managerUserId, isHidden: false },
+        where: { id: dto.managerUserId },
       });
       if (!managerExists) {
         throw new BadRequestException('Tài khoản người quản lý không tồn tại');

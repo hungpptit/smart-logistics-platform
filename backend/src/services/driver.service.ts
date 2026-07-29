@@ -358,7 +358,6 @@ export class DriverService {
         await tx.user.update({
           where: { id: driver.userId },
           data: {
-            isHidden: true,
             status: 'DISABLED',
           },
         });
@@ -374,7 +373,6 @@ export class DriverService {
   public async getUnlinkedUsers() {
     return await prisma.user.findMany({
       where: {
-        isHidden: false,
         staff: null,
         role: {
           roleCode: 'SHIPPER',

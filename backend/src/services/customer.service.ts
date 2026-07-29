@@ -251,7 +251,6 @@ export class CustomerService {
         await tx.user.update({
           where: { id: customer.userId },
           data: {
-            isHidden: true,
             status: 'DISABLED',
           },
         });

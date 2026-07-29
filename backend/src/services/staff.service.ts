@@ -124,7 +124,6 @@ export class StaffService {
     const user = await prisma.user.findFirst({
       where: {
         id,
-        isHidden: false,
         role: {
           roleCode: 'STAFF',
         },
@@ -314,7 +313,6 @@ export class StaffService {
     const user = await prisma.user.findFirst({
       where: {
         id,
-        isHidden: false,
         role: {
           roleCode: 'STAFF',
         },
@@ -427,7 +425,6 @@ export class StaffService {
     const user = await prisma.user.findFirst({
       where: {
         id,
-        isHidden: false,
         role: {
           roleCode: 'STAFF',
         },
@@ -441,12 +438,11 @@ export class StaffService {
       throw new NotFoundException('Không tìm thấy nhân viên');
     }
 
-    // Soft hide using isHidden = true
+    // Update status to DISABLED when soft deleting
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id },
         data: {
-          isHidden: true,
           status: 'DISABLED',
         },
       });

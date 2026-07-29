@@ -83,7 +83,6 @@ Chỉ lưu thông tin xác thực danh tính. Không chứa PII (`email`, `phone
 | `username` | VARCHAR(50) | ❌ | Tên đăng nhập duy nhất (`UNIQUE`). |
 | `password_hash` | TEXT | ❌ | Chuỗi mật khẩu băm mã hóa Bcrypt. |
 | `status` | `UserStatus` | ❌ | ENUM: `ACTIVE`, `LOCKED`, `DISABLED`, `PENDING_VERIFICATION` (Mặc định `ACTIVE`). |
-| `is_hidden` | BOOLEAN | ❌ | Flag ẩn tài khoản (Mặc định `false`). Thay thế `deleted_at`. |
 | `role_id` | UUID | ❌ | Khóa ngoại tham chiếu $\rightarrow$ `roles(id)`. |
 | `last_login_at` | TIMESTAMPTZ | ✅ | Thời điểm đăng nhập gần nhất. |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo tài khoản (`NOW()`). |

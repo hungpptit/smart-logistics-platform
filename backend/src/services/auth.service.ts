@@ -208,7 +208,6 @@ export class AuthService {
           { staff: { OR: [{ email: loginIdentifier }, { phone: loginIdentifier }] } },
           { customer: { OR: [{ email: loginIdentifier }, { phone: loginIdentifier }] } },
         ],
-        isHidden: false,
       },
       include: {
         managedFacilities: true,
@@ -320,7 +319,7 @@ export class AuthService {
     }
 
     const user = await prisma.user.findFirst({
-      where: { id: userId, isHidden: false },
+      where: { id: userId },
       include: {
         role: true,
         staff: true,
@@ -362,7 +361,7 @@ export class AuthService {
    */
   public async getProfile(userId: string) {
     const user = await prisma.user.findFirst({
-      where: { id: userId, isHidden: false },
+      where: { id: userId },
       include: {
         managedFacilities: true,
         staff: {
@@ -414,7 +413,7 @@ export class AuthService {
    */
   public async changePassword(userId: string, dto: ChangePasswordDto) {
     const user = await prisma.user.findFirst({
-      where: { id: userId, isHidden: false },
+      where: { id: userId },
     });
 
     if (!user) {
@@ -448,7 +447,6 @@ export class AuthService {
           { staff: { email: dto.email } },
           { customer: { email: dto.email } },
         ],
-        isHidden: false,
       },
       include: {
         staff: true,
@@ -502,7 +500,6 @@ export class AuthService {
           { staff: { email: dto.email } },
           { customer: { email: dto.email } },
         ],
-        isHidden: false,
       },
     });
 
