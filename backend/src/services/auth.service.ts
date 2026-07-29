@@ -208,6 +208,7 @@ export class AuthService {
           { staff: { OR: [{ email: loginIdentifier }, { phone: loginIdentifier }] } },
           { customer: { OR: [{ email: loginIdentifier }, { phone: loginIdentifier }] } },
         ],
+        status: 'ACTIVE',
       },
       include: {
         managedFacilities: true,

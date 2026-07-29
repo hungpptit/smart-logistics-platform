@@ -38,7 +38,7 @@ export const authMiddleware = async (
 
     // Fetch user details with roles and permissions to ensure they are active and valid
     const user = await prisma.user.findFirst({
-      where: { id: decoded.id },
+      where: { id: decoded.id, status: 'ACTIVE' },
       include: {
         staff: true,
         customer: true,
