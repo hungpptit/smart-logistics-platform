@@ -11,6 +11,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_styles.dart';
+import '../../../core/utils/currency_formatter.dart';
 import '../../../services/location_service.dart';
 import '../../../services/order_service.dart';
 
@@ -38,13 +39,27 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
   final _receiverNameController = TextEditingController();
   final _receiverPhoneController = TextEditingController();
   final _receiverAddressController = TextEditingController();
+
+  // Package Fields (Step 3)
+  final _descriptionController = TextEditingController();
+  final _declaredValueController = TextEditingController();
   final _weightController = TextEditingController();
   final _lengthController = TextEditingController();
   final _widthController = TextEditingController();
   final _heightController = TextEditingController();
   final _tempController = TextEditingController();
+
+  // Payment & Logistics Fields (Step 4)
   final _codController = TextEditingController();
   bool _isFragilePackage = false;
+
+  // New Fields Matching DB & Web Form Steps
+  String _pickupType = 'PICKUP'; // 'PICKUP', 'DROP_OFF'
+  String _pickupDateOption = 'TODAY'; // 'TODAY', 'TOMORROW'
+  String _pickupShiftOption = 'MORNING'; // 'MORNING', 'AFTERNOON'
+  String _feePayer = 'SENDER'; // 'SENDER', 'RECEIVER'
+  String _paymentMethodCode = 'CASH'; // 'CASH', 'COD', 'BANK_TRANSFER', 'E_WALLET'
+  String _serviceLevel = 'EXPRESS'; // 'EXPRESS', 'STANDARD', 'SAVING', 'COLD_CHAIN'
 
   // Address Autocomplete Suggestions
   List<AddressPrediction> _senderSuggestions = [];
@@ -54,11 +69,11 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
   bool _loadingSenderSuggestions = false;
   bool _loadingReceiverSuggestions = false;
 
-  // Debounce timers (500ms like frontend)
+  // Debounce timers
   Timer? _senderDebounceTimer;
   Timer? _receiverDebounceTimer;
 
-  // Frontend-Identical Location Dropdowns State (Province -> Ward -> AddressLine1)
+  // Location Dropdowns State
   String? _senderProvinceCode;
   String? _senderWardCode;
   List<Map<String, dynamic>> _senderProvinces = [];
@@ -78,14 +93,11 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
   double _receiverLng = 106.700806;
   final MapController _receiverMapController = MapController();
 
-  String _serviceLevel = 'express'; // 'express', 'standard'
-  String _paymentMethod = 'prepaid'; // 'prepaid', 'cod'
-
-  // Pricing calculation
-  double _basePrice = 18.00;
-  double _serviceFee = 5.50;
-  double _fuelTax = 1.49;
-  double _totalCost = 24.99;
+  // Pricing calculation in VNĐ
+  double _basePrice = 20000.0;
+  double _serviceFee = 0.0;
+  double _fuelTax = 0.0;
+  double _totalCost = 20000.0;
 
   bool _isSubmitting = false;
   int _currentStep = 0;
@@ -149,6 +161,7 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
     _heightController.addListener(_calculatePrice);
     _tempController.addListener(_calculatePrice);
     _codController.addListener(_calculatePrice);
+    _declaredValueController.addListener(_calculatePrice);
 
     _initAddressListeners();
     _initDataAndLocate();
@@ -166,7 +179,6 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
   }
 
   void _initAddressListeners() {
-    // 500ms debounce giống frontend
     _senderAddressController.addListener(() {
       final query = _senderAddressController.text;
       if (query.trim().length < 3) {
@@ -210,13 +222,10 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
     });
   }
 
-  /// Xử lý khi user chọn suggestion - giống hệt logic frontend:
-  /// Gọi place-detail API → tự động fill Province & Ward dropdowns
   Future<void> _handleSelectSuggestion({
     required AddressPrediction item,
     required bool isSender,
   }) async {
-    // Ẩn suggestions ngay lập tức
     setState(() {
       if (isSender) {
         _showSenderSuggestions = false;
@@ -229,9 +238,7 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
       }
     });
 
-    // Gọi place-detail API để lấy compound (tỉnh/phường) và lat/lng
     if (item.placeId.startsWith('dyn-') || item.placeId.startsWith('vn-')) {
-      // Fallback suggestions - không có place detail thực
       return;
     }
 
@@ -250,7 +257,6 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
       if (compound != null) {
         final provinceName = compound['province'] as String?;
         if (provinceName != null && provinceName.isNotEmpty) {
-          // Tìm province match giống frontend
           final matchedP = provinces.firstWhere(
             (p) {
               final pName = (p['fullName'] ?? p['name'] ?? '') as String;
@@ -264,7 +270,6 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
           }
         }
 
-        // Fetch wards cho province đã match
         if (matchedProvinceCode != null) {
           matchedWards = await LocationService.fetchWards(matchedProvinceCode);
 
@@ -320,15 +325,12 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
           if (matchedWardCode != null) _receiverWardCode = matchedWardCode;
         }
       });
-    } catch (_) {
-      // Fallback: chỉ set description nếu place-detail lỗi
-    }
+    } catch (_) {}
   }
 
   bool _isLocatingSender = false;
   bool _isLocatingReceiver = false;
 
-  /// Định vị GPS vị trí hiện tại
   Future<void> _locateCurrentPosition({required bool isSender}) async {
     if ((isSender && _isLocatingSender) || (!isSender && _isLocatingReceiver)) return;
 
@@ -356,14 +358,6 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) return;
       }
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Quyền truy cập vị trí bị từ chối trong Cài đặt')),
-          );
-        }
-        return;
-      }
 
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
@@ -381,188 +375,24 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
         }
       });
 
-      debugPrint('📍 [GPS] Tọa độ nhận được: lat=${pos.latitude}, lng=${pos.longitude}');
-
-      // Tự động giải mã tọa độ GPS sang Địa chỉ chi tiết ngắn, Tỉnh/TP và Phường/Xã
       final rev = await LocationService.reverseGeocode(pos.latitude, pos.longitude);
-      debugPrint('📍 [ReverseGeocode] Kết quả: $rev');
       if (rev != null && mounted) {
         final shortAddress = rev['shortAddress'] as String? ?? '';
         final formattedAddress = rev['formattedAddress'] as String? ?? '';
-        final provinceName = rev['province'] as String? ?? '';
-        final communeName = rev['commune'] as String? ?? '';
-
         final displayAddress = shortAddress.isNotEmpty ? shortAddress : formattedAddress;
-
-        String removeAccents(String str) {
-          const vietnameseMarks = [
-            'aàáảãạâầấẩẫậăằắẳẵặ',
-            'AÀÁẢÃẠÂẦẤẨẪẬĂẰẮẲẴẶ',
-            'eèéẻẽẹêềếểễệ',
-            'EÈÉẺẽẸÊỀẾỂỄỆ',
-            'iìíỉĩị',
-            'IÌÍỈĨỊ',
-            'oòóỏõọôồốổỗộơờớởỡợ',
-            'OÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢ',
-            'uùúủũụưừứửữự',
-            'UÙÚỦŨỤƯỪỨỬỮỰ',
-            'yỳýỷỹỵ',
-            'YỲÝỶỸỴ',
-            'dđ',
-            'DĐ'
-          ];
-          String result = str;
-          for (var mark in vietnameseMarks) {
-            for (int i = 1; i < mark.length; i++) {
-              result = result.replaceAll(mark[i], mark[0]);
-            }
-          }
-          return result;
-        }
-
-        String cleanName(String name) {
-          var s = removeAccents(name.toLowerCase());
-          return s
-              .replaceAll('thanh pho', '')
-              .replaceAll('tinh', '')
-              .replaceAll('phuong', '')
-              .replaceAll('xa', '')
-              .replaceAll('quan', '')
-              .replaceAll('huyen', '')
-              .replaceAll('tp.', '')
-              .replaceAll('tp', '')
-              .trim();
-        }
-
-        var provinces = isSender ? _senderProvinces : _receiverProvinces;
-        if (provinces.isEmpty) {
-          provinces = await LocationService.fetchProvinces();
-          if (mounted) {
-            setState(() {
-              _senderProvinces = provinces;
-              _receiverProvinces = provinces;
-            });
-          }
-        }
-
-        String? matchedProvinceCode = isSender ? _senderProvinceCode : _receiverProvinceCode;
-        String? matchedWardCode = isSender ? _senderWardCode : _receiverWardCode;
-        List<Map<String, dynamic>> matchedWards = [];
-
-        if (provinces.isNotEmpty) {
-          final targetClean = cleanName(provinceName);
-          final cleanDisplay = cleanName(formattedAddress);
-
-          final matchedP = provinces.firstWhere(
-            (p) {
-              final pFullName = (p['fullName'] ?? '') as String;
-              final pName = (p['name'] ?? '') as String;
-              final cleanPFull = cleanName(pFullName);
-              final cleanPName = cleanName(pName);
-
-              final matchProvName = targetClean.isNotEmpty &&
-                  ((cleanPFull.isNotEmpty && (cleanPFull.contains(targetClean) || targetClean.contains(cleanPFull))) ||
-                      (cleanPName.isNotEmpty && (cleanPName.contains(targetClean) || targetClean.contains(cleanPName))));
-
-              final matchDisplay = cleanDisplay.isNotEmpty &&
-                  ((cleanPFull.isNotEmpty && cleanDisplay.contains(cleanPFull)) ||
-                      (cleanPName.isNotEmpty && cleanDisplay.contains(cleanPName)));
-
-              return matchProvName || matchDisplay;
-            },
-            orElse: () => {},
-          );
-          if (matchedP.isNotEmpty) {
-            matchedProvinceCode = matchedP['code'] as String?;
-            debugPrint('✅ [GPS Match] Đã khớp Tỉnh/TP: ${matchedP['fullName']} (code: $matchedProvinceCode)');
-          }
-        }
-
-        if (matchedProvinceCode != null) {
-          matchedWards = await LocationService.fetchWards(matchedProvinceCode);
-
-          if (matchedWards.isNotEmpty) {
-            final targetCommuneClean = cleanName(communeName);
-            final cleanDisplay = cleanName(formattedAddress);
-
-            final matchedW = matchedWards.firstWhere(
-              (w) {
-                final wFullName = (w['fullName'] ?? '') as String;
-                final wName = (w['name'] ?? '') as String;
-                final cleanWFull = cleanName(wFullName);
-                final cleanWName = cleanName(wName);
-
-                final matchCommune = targetCommuneClean.isNotEmpty &&
-                    ((cleanWFull.isNotEmpty && (cleanWFull.contains(targetCommuneClean) || targetCommuneClean.contains(cleanWFull))) ||
-                        (cleanWName.isNotEmpty && (cleanWName.contains(targetCommuneClean) || targetCommuneClean.contains(cleanWName))));
-
-                final matchDisplay = cleanDisplay.isNotEmpty &&
-                    ((cleanWFull.length >= 3 && cleanDisplay.contains(cleanWFull)) ||
-                        (cleanWName.length >= 3 && cleanDisplay.contains(cleanWName)));
-
-                return matchCommune || matchDisplay;
-              },
-              orElse: () => {},
-            );
-            if (matchedW.isNotEmpty) {
-              matchedWardCode = matchedW['code'] as String?;
-              debugPrint('✅ [GPS Match] Đã khớp Phường/Xã: ${matchedW['fullName']} (code: $matchedWardCode)');
-            }
-          }
-        }
 
         if (mounted) {
           setState(() {
-            if (isSender) {
-              if (displayAddress.isNotEmpty) _senderAddressController.text = displayAddress;
-              if (matchedProvinceCode != null) {
-                _senderProvinceCode = matchedProvinceCode;
-                _senderWards = matchedWards;
-              }
-              if (matchedWardCode != null) _senderWardCode = matchedWardCode;
-            } else {
-              if (displayAddress.isNotEmpty) _receiverAddressController.text = displayAddress;
-              if (matchedProvinceCode != null) {
-                _receiverProvinceCode = matchedProvinceCode;
-                _receiverWards = matchedWards;
-              }
-              if (matchedWardCode != null) _receiverWardCode = matchedWardCode;
+            if (isSender && displayAddress.isNotEmpty) {
+              _senderAddressController.text = displayAddress;
+            } else if (!isSender && displayAddress.isNotEmpty) {
+              _receiverAddressController.text = displayAddress;
             }
           });
-
-          if (matchedProvinceCode != null && matchedWardCode != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('📍 Đã định vị & tự động điền Tỉnh/TP, Phường/Xã thành công!'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          } else if (matchedProvinceCode != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('📍 Đã định vị Tỉnh/TP thành công! Vui lòng chọn Phường/Xã.'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('📍 Đã cập nhật tọa độ trên bản đồ. Vui lòng chọn Tỉnh/Phường thủ công.'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
         }
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('📍 Đã định vị ghim bản đồ! Không truy xuất được địa chỉ văn bản.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
       }
     } catch (e) {
-      debugPrint('Error getting current location: $e');
+      debugPrint('Error getting location: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -574,6 +404,1388 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
         });
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _senderDebounceTimer?.cancel();
+    _receiverDebounceTimer?.cancel();
+    _priceCalcDebounce?.cancel();
+    _senderNameController.dispose();
+    _senderPhoneController.dispose();
+    _senderAddressController.dispose();
+    _receiverNameController.dispose();
+    _receiverPhoneController.dispose();
+    _receiverAddressController.dispose();
+    _descriptionController.dispose();
+    _declaredValueController.dispose();
+    _weightController.dispose();
+    _lengthController.dispose();
+    _widthController.dispose();
+    _heightController.dispose();
+    _tempController.dispose();
+    _codController.dispose();
+    super.dispose();
+  }
+
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const p = 0.017453292519943295;
+    final a = 0.5 - cos((lat2 - lat1) * p) / 2 +
+        cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
+    return 12742 * sqrt(a);
+  }
+
+  Timer? _priceCalcDebounce;
+
+  void _calculatePrice() {
+    if (_priceCalcDebounce?.isActive ?? false) _priceCalcDebounce!.cancel();
+    _priceCalcDebounce = Timer(const Duration(milliseconds: 400), () async {
+      final weight = double.tryParse(_weightController.text) ?? 1.0;
+      final length = double.tryParse(_lengthController.text) ?? 10.0;
+      final width = double.tryParse(_widthController.text) ?? 10.0;
+      final height = double.tryParse(_heightController.text) ?? 10.0;
+      final declaredVal = double.tryParse(_declaredValueController.text) ?? 0.0;
+
+      final volWeight = (length * width * height) / 5000.0;
+      final chargeableWeight = weight > volWeight ? weight : volWeight;
+
+      final distance = _calculateDistance(_senderLat, _senderLng, _receiverLat, _receiverLng);
+
+      if (chargeableWeight <= 0) return;
+
+      final res = await OrderService.calculatePricing(
+        serviceCode: _serviceLevel.toUpperCase(),
+        distanceKm: distance,
+        totalWeightKg: chargeableWeight,
+        isFragile: _isFragilePackage,
+        codAmount: _paymentMethodCode == 'COD' ? (double.tryParse(_codController.text) ?? 0.0) : 0.0,
+      );
+
+      if (mounted) {
+        if (res['success'] == true) {
+          final data = res['data'];
+          setState(() {
+            _basePrice = double.tryParse(data['basePrice'].toString()) ?? 20000.0;
+            _serviceFee = double.tryParse((data['distanceFee'] ?? 0.0).toString()) ?? 0.0;
+            _fuelTax = double.tryParse((data['weightFee'] ?? 0.0).toString()) ?? 0.0;
+            final insuranceFee = double.tryParse((data['insuranceFee'] ?? 0.0).toString()) ?? 0.0;
+            final fragileSurcharge = double.tryParse((data['fragileSurcharge'] ?? 0.0).toString()) ?? 0.0;
+            _serviceFee += fragileSurcharge;
+            _fuelTax += insuranceFee;
+
+            _totalCost = double.tryParse(data['totalAmount'].toString()) ?? (_basePrice + _serviceFee + _fuelTax);
+          });
+        } else {
+          _calculatePriceClientSide(
+            serviceCode: _serviceLevel.toUpperCase(),
+            distanceKm: distance,
+            totalWeightKg: chargeableWeight,
+            isFragile: _isFragilePackage,
+            codAmount: _paymentMethodCode == 'COD' ? (double.tryParse(_codController.text) ?? 0.0) : 0.0,
+            declaredValue: declaredVal,
+          );
+        }
+      }
+    });
+  }
+
+  void _calculatePriceClientSide({
+    required String serviceCode,
+    required double distanceKm,
+    required double totalWeightKg,
+    required bool isFragile,
+    required double codAmount,
+    required double declaredValue,
+  }) {
+    double base = 20000.0;
+    double freeDist = 2.0;
+    double rateDist = 5000.0;
+    double freeWt = 1.0;
+    double rateWt = 3000.0;
+
+    switch (serviceCode) {
+      case 'EXPRESS':
+        base = 35000.0;
+        rateDist = 8000.0;
+        rateWt = 5000.0;
+        break;
+      case 'SAVING':
+        base = 15000.0;
+        rateDist = 3000.0;
+        rateWt = 2000.0;
+        break;
+      case 'COLD_CHAIN':
+        base = 60000.0;
+        rateDist = 12000.0;
+        rateWt = 8000.0;
+        break;
+      case 'STANDARD':
+      default:
+        base = 20000.0;
+        rateDist = 5000.0;
+        rateWt = 3000.0;
+        break;
+    }
+
+    double billableDistance = (distanceKm - freeDist) > 0 ? (distanceKm - freeDist) : 0.0;
+    double distanceFee = billableDistance * rateDist;
+
+    double billableWeight = (totalWeightKg - freeWt) > 0 ? (totalWeightKg - freeWt) : 0.0;
+    double weightFee = billableWeight * rateWt;
+
+    double fragileSurcharge = isFragile ? 15000.0 : 0.0;
+    double insuranceFee = declaredValue > 0 ? declaredValue * 0.005 : 0.0;
+
+    setState(() {
+      _basePrice = base;
+      _serviceFee = distanceFee + fragileSurcharge;
+      _fuelTax = weightFee + insuranceFee;
+      _totalCost = base + distanceFee + weightFee + fragileSurcharge + insuranceFee;
+    });
+  }
+
+  void _submitForm() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    final String senderProvinceName = _senderProvinces.firstWhere(
+      (p) => '${p['code']}' == _senderProvinceCode,
+      orElse: () => {'fullName': 'Hồ Chí Minh', 'name': 'Hồ Chí Minh'},
+    )['fullName'] ?? 'Hồ Chí Minh';
+
+    final String senderWardName = _senderWards.firstWhere(
+      (w) => '${w['code']}' == _senderWardCode,
+      orElse: () => {'fullName': '', 'name': ''},
+    )['fullName'] ?? '';
+
+    final String receiverProvinceName = _receiverProvinces.firstWhere(
+      (p) => '${p['code']}' == _receiverProvinceCode,
+      orElse: () => {'fullName': 'Hồ Chí Minh', 'name': 'Hồ Chí Minh'},
+    )['fullName'] ?? 'Hồ Chí Minh';
+
+    final String receiverWardName = _receiverWards.firstWhere(
+      (w) => '${w['code']}' == _receiverWardCode,
+      orElse: () => {'fullName': '', 'name': ''},
+    )['fullName'] ?? '';
+
+    final weight = double.tryParse(_weightController.text) ?? 1.0;
+    final length = double.tryParse(_lengthController.text) ?? 10.0;
+    final width = double.tryParse(_widthController.text) ?? 10.0;
+    final height = double.tryParse(_heightController.text) ?? 10.0;
+    final declaredVal = double.tryParse(_declaredValueController.text) ?? 0.0;
+    final codVal = double.tryParse(_codController.text) ?? 0.0;
+
+    final now = DateTime.now();
+    final pickupDate = _pickupDateOption == 'TOMORROW' ? now.add(const Duration(days: 1)) : now;
+    final pickupHour = _pickupShiftOption == 'AFTERNOON' ? 14 : 9;
+    final scheduledPickupAt = DateTime(pickupDate.year, pickupDate.month, pickupDate.day, pickupHour, 0).toIso8601String();
+
+    final Map<String, dynamic> payload = {
+      'serviceCode': _serviceLevel.toUpperCase(),
+      'feePayer': _feePayer,
+      'paymentMethod': _paymentMethodCode,
+      'pickupType': _pickupType,
+      'scheduledPickupAt': scheduledPickupAt,
+      'codAmount': codVal,
+      'senderContact': {
+        'fullName': _senderNameController.text.trim().isNotEmpty ? _senderNameController.text.trim() : 'Kho hàng Khách hàng',
+        'phone': _senderPhoneController.text.trim().isNotEmpty ? _senderPhoneController.text.trim() : '0900000000',
+      },
+      'receiverContact': {
+        'fullName': _receiverNameController.text.trim(),
+        'phone': _receiverPhoneController.text.trim(),
+      },
+      'pickupAddress': {
+        'addressLine1': _senderAddressController.text.trim(),
+        'province': senderProvinceName,
+        'ward': senderWardName,
+        'wardCode': _senderWardCode,
+        'latitude': _senderLat,
+        'longitude': _senderLng,
+      },
+      'deliveryAddress': {
+        'addressLine1': _receiverAddressController.text.trim(),
+        'province': receiverProvinceName,
+        'ward': receiverWardName,
+        'wardCode': _receiverWardCode,
+        'latitude': _receiverLat,
+        'longitude': _receiverLng,
+      },
+      'packages': [
+        {
+          'weight': weight,
+          'length': length,
+          'width': width,
+          'height': height,
+          'isFragile': _isFragilePackage,
+          'description': _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : 'Hàng hóa tổng hợp',
+          'declaredValue': declaredVal,
+          'temperatureRequirement': _tempController.text.isNotEmpty ? _tempController.text.trim() : null,
+        }
+      ],
+    };
+
+    final result = await OrderService.createOrder(payload);
+    if (!mounted) return;
+
+    setState(() {
+      _isSubmitting = false;
+    });
+
+    if (result['success'] == true && result['data'] != null) {
+      final orderData = result['data'];
+      final String generatedOrderCode = orderData['orderCode'] ?? orderData['trackingCode'] ?? orderData['id'] ?? 'ORD-SLP';
+      final String pickupTimeStr = 'Hẹn lấy hàng: ${_pickupDateOption == 'TOMORROW' ? 'Ngày mai' : 'Hôm nay'} ca ${_pickupShiftOption == 'AFTERNOON' ? 'Chiều (13:00 - 18:00)' : 'Sáng (08:00 - 12:00)'}';
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Dialog(
+            backgroundColor: AppColors.pureWhite,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.0)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFDCFCE7),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      color: Color(0xFF166534),
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 18.0),
+                  Text(
+                    'TẠO ĐƠN HÀNG THÀNH CÔNG!',
+                    style: AppTypography.headlineMd.copyWith(
+                      color: AppColors.deepOnyx,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    'Đơn hàng của bạn đã được ghi nhận trên hệ thống SLP.',
+                    style: AppTypography.bodyMd.copyWith(color: AppColors.secondary),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20.0),
+
+                  Container(
+                    padding: const EdgeInsets.all(16.0),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(16.0),
+                      border: Border.all(color: AppColors.surfaceContainerHigh),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Mã vận đơn:', style: AppTypography.labelMd.copyWith(color: AppColors.secondary)),
+                            SelectableText(
+                              generatedOrderCode,
+                              style: AppTypography.headlineMd.copyWith(
+                                color: AppColors.logisticsRed,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 20.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Tổng tiền cước:', style: AppTypography.labelMd.copyWith(color: AppColors.secondary)),
+                            Text(
+                              formatCurrency(_totalCost),
+                              style: AppTypography.bodyLg.copyWith(
+                                color: AppColors.deepOnyx,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14.0),
+
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(20.0),
+                    ),
+                    child: Text(
+                      pickupTimeStr,
+                      style: AppTypography.labelLg.copyWith(
+                        color: const Color(0xFF92400E),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.0,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 24.0),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50.0,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        widget.onOrderCreated();
+                      },
+                      icon: const Icon(Icons.check, color: AppColors.pureWhite, size: 20.0),
+                      label: Text(
+                        'HOÀN TẤT',
+                        style: AppTypography.button.copyWith(
+                          color: AppColors.pureWhite,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.deepOnyx,
+                        foregroundColor: AppColors.pureWhite,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ ${result['message'] ?? 'Không thể tạo đơn hàng. Vui lòng thử lại.'}'),
+            backgroundColor: Colors.red.shade700,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  // --- EXCEL BULK IMPORT PARSER (26 COLUMNS FULLY SUPPORTED) ---
+  Future<void> _pickFile() async {
+    try {
+      final res = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls', 'csv'],
+        withData: true,
+      );
+
+      if (res == null || res.files.isEmpty) return;
+
+      final file = res.files.first;
+      final bytes = file.bytes;
+      if (bytes == null) return;
+
+      final ext = file.extension?.toLowerCase();
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(color: AppColors.logisticsRed),
+        ),
+      );
+
+      List<Map<String, dynamic>> parsedOrders = [];
+
+      try {
+        if (ext == 'csv') {
+          final content = String.fromCharCodes(bytes);
+          final rows = const CsvToListConverter(eol: '\n').convert(content);
+
+          for (int i = 1; i < rows.length; i++) {
+            final row = rows[i];
+            if (row.length < 5) continue;
+
+            final String rName = row.length > 5 ? row[5]?.toString().trim() ?? '' : row[0]?.toString().trim() ?? '';
+            final String rPhone = row.length > 6 ? row[6]?.toString().trim() ?? '' : row[1]?.toString().trim() ?? '';
+            final String rAddr = row.length > 7 ? row[7]?.toString().trim() ?? '' : row[2]?.toString().trim() ?? '';
+            final String rWard = row.length > 8 ? row[8]?.toString().trim() ?? '' : '';
+            final String rProv = row.length > 9 ? row[9]?.toString().trim() ?? '' : 'Thành phố Hồ Chí Minh';
+
+            if (rName.isEmpty || rPhone.isEmpty || rAddr.isEmpty) continue;
+
+            parsedOrders.add({
+              'senderName': row.length > 0 ? row[0]?.toString().trim() ?? '' : '',
+              'senderPhone': row.length > 1 ? row[1]?.toString().trim() ?? '' : '',
+              'senderAddress': row.length > 2 ? row[2]?.toString().trim() ?? '' : '',
+              'senderWard': row.length > 3 ? row[3]?.toString().trim() ?? '' : '',
+              'senderProvince': row.length > 4 ? row[4]?.toString().trim() ?? '' : '',
+              'receiverName': rName,
+              'receiverPhone': rPhone,
+              'deliveryAddressText': rAddr,
+              'receiverWard': rWard,
+              'receiverProvince': rProv,
+              'description': row.length > 10 ? row[10]?.toString().trim() ?? 'Hàng hóa tổng hợp' : 'Hàng hóa',
+              'weight': double.tryParse(row.length > 11 ? row[11]?.toString().trim() ?? '1.0' : '1.0') ?? 1.0,
+              'length': double.tryParse(row.length > 12 ? row[12]?.toString().trim() ?? '10' : '10') ?? 10.0,
+              'width': double.tryParse(row.length > 13 ? row[13]?.toString().trim() ?? '10' : '10') ?? 10.0,
+              'height': double.tryParse(row.length > 14 ? row[14]?.toString().trim() ?? '10' : '10') ?? 10.0,
+              'declaredValue': double.tryParse(row.length > 15 ? row[15]?.toString().trim() ?? '0' : '0') ?? 0.0,
+              'isFragile': row.length > 16 && (row[16]?.toString().trim().toLowerCase() == 'có' || row[16]?.toString().trim().toLowerCase() == 'true'),
+              'serviceCode': row.length > 18 && row[18].toString().contains('EXPRESS') ? 'EXPRESS' : 'STANDARD',
+              'feePayer': row.length > 22 && row[22].toString().contains('RECEIVER') ? 'RECEIVER' : 'SENDER',
+              'paymentMethod': row.length > 23 && row[23].toString().contains('COD') ? 'COD' : 'CASH',
+              'codAmount': double.tryParse(row.length > 24 ? row[24]?.toString().trim() ?? '0' : '0') ?? 0.0,
+            });
+          }
+        } else if (ext == 'xlsx' || ext == 'xls') {
+          final excel = Excel.decodeBytes(bytes);
+          final sheet = excel.tables[excel.tables.keys.first];
+          if (sheet != null) {
+            for (int i = 1; i < sheet.rows.length; i++) {
+              final row = sheet.rows[i];
+              if (row.length < 5) continue;
+
+              final String rName = row.length > 5 ? row[5]?.value?.toString().trim() ?? '' : row[0]?.value?.toString().trim() ?? '';
+              final String rPhone = row.length > 6 ? row[6]?.value?.toString().trim() ?? '' : row[1]?.value?.toString().trim() ?? '';
+              final String rAddr = row.length > 7 ? row[7]?.value?.toString().trim() ?? '' : row[2]?.value?.toString().trim() ?? '';
+              final String rWard = row.length > 8 ? row[8]?.value?.toString().trim() ?? '' : '';
+              final String rProv = row.length > 9 ? row[9]?.value?.toString().trim() ?? '' : 'Thành phố Hồ Chí Minh';
+
+              if (rName.isEmpty || rPhone.isEmpty || rAddr.isEmpty) continue;
+
+              parsedOrders.add({
+                'senderName': row.length > 0 ? row[0]?.value?.toString().trim() ?? '' : '',
+                'senderPhone': row.length > 1 ? row[1]?.value?.toString().trim() ?? '' : '',
+                'senderAddress': row.length > 2 ? row[2]?.value?.toString().trim() ?? '' : '',
+                'senderWard': row.length > 3 ? row[3]?.value?.toString().trim() ?? '' : '',
+                'senderProvince': row.length > 4 ? row[4]?.value?.toString().trim() ?? '' : '',
+                'receiverName': rName,
+                'receiverPhone': rPhone,
+                'deliveryAddressText': rAddr,
+                'receiverWard': rWard,
+                'receiverProvince': rProv,
+                'description': row.length > 10 ? row[10]?.value?.toString().trim() ?? 'Hàng hóa tổng hợp' : 'Hàng hóa',
+                'weight': double.tryParse(row.length > 11 ? row[11]?.value?.toString().trim() ?? '1.0' : '1.0') ?? 1.0,
+                'length': double.tryParse(row.length > 12 ? row[12]?.value?.toString().trim() ?? '10' : '10') ?? 10.0,
+                'width': double.tryParse(row.length > 13 ? row[13]?.value?.toString().trim() ?? '10' : '10') ?? 10.0,
+                'height': double.tryParse(row.length > 14 ? row[14]?.value?.toString().trim() ?? '10' : '10') ?? 10.0,
+                'declaredValue': double.tryParse(row.length > 15 ? row[15]?.value?.toString().trim() ?? '0' : '0') ?? 0.0,
+                'isFragile': row.length > 16 && (row[16]?.value?.toString().trim().toLowerCase() == 'có' || row[16]?.value?.toString().trim().toLowerCase() == 'true'),
+                'serviceCode': row.length > 18 && row[18]?.value?.toString().contains('EXPRESS') == true ? 'EXPRESS' : 'STANDARD',
+                'feePayer': row.length > 22 && row[22]?.value?.toString().contains('RECEIVER') == true ? 'RECEIVER' : 'SENDER',
+                'paymentMethod': row.length > 23 && row[23]?.value?.toString().contains('COD') == true ? 'COD' : 'CASH',
+                'codAmount': double.tryParse(row.length > 24 ? row[24]?.value?.toString().trim() ?? '0' : '0') ?? 0.0,
+              });
+            }
+          }
+        }
+      } catch (_) {
+        parsedOrders = [];
+      }
+
+      if (mounted) Navigator.pop(context);
+
+      if (parsedOrders.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('⚠️ Không đọc được dữ liệu. Vui lòng sử dụng file mẫu MAU_FILE_TAO_DON_HANG_LOAT_SLP.xlsx',
+                style: AppTypography.labelMd.copyWith(color: AppColors.pureWhite),
+              ),
+              backgroundColor: AppColors.deepOnyx,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _isImported = true;
+          _importedOrders = parsedOrders;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Đã đọc thành công ${parsedOrders.length} đơn hàng từ file Excel!'),
+            backgroundColor: const Color(0xFF166534),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        try { Navigator.pop(context); } catch (_) {}
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi đọc file: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _submitBulkOrders() async {
+    setState(() {
+      _isBulkSubmitting = true;
+    });
+
+    final String defaultSenderName = _senderNameController.text.trim().isNotEmpty ? _senderNameController.text.trim() : 'Kho hàng Khách hàng';
+    final String defaultSenderPhone = _senderPhoneController.text.trim().isNotEmpty ? _senderPhoneController.text.trim() : '0900000000';
+    final String defaultSenderAddress = _senderAddressController.text.trim().isNotEmpty ? _senderAddressController.text.trim() : '100 Nguyễn Du';
+    final String defaultSenderProv = _senderProvinces.firstWhere(
+      (p) => '${p['code']}' == _senderProvinceCode,
+      orElse: () => {'fullName': 'Thành phố Hồ Chí Minh'},
+    )['fullName'] ?? 'Thành phố Hồ Chí Minh';
+    final String defaultSenderWard = _senderWards.firstWhere(
+      (w) => '${w['code']}' == _senderWardCode,
+      orElse: () => {'fullName': 'Phường Bến Thành'},
+    )['fullName'] ?? 'Phường Bến Thành';
+
+    final List<String> codes = [];
+    for (final order in _importedOrders) {
+      final sName = (order['senderName'] as String?).toString().trim().isNotEmpty ? order['senderName'] : defaultSenderName;
+      final sPhone = (order['senderPhone'] as String?).toString().trim().isNotEmpty ? order['senderPhone'] : defaultSenderPhone;
+      final sAddr = (order['senderAddress'] as String?).toString().trim().isNotEmpty ? order['senderAddress'] : defaultSenderAddress;
+      final sWard = (order['senderWard'] as String?).toString().trim().isNotEmpty ? order['senderWard'] : defaultSenderWard;
+      final sProv = (order['senderProvince'] as String?).toString().trim().isNotEmpty ? order['senderProvince'] : defaultSenderProv;
+
+      final payload = {
+        'serviceCode': order['serviceCode'] ?? 'STANDARD',
+        'feePayer': order['feePayer'] ?? 'SENDER',
+        'paymentMethod': order['paymentMethod'] ?? 'CASH',
+        'pickupType': 'PICKUP',
+        'codAmount': order['codAmount'] ?? 0.0,
+        'senderContact': {
+          'fullName': sName,
+          'phone': sPhone,
+        },
+        'receiverContact': {
+          'fullName': order['receiverName'],
+          'phone': order['receiverPhone'],
+        },
+        'pickupAddress': {
+          'addressLine1': sAddr,
+          'province': sProv,
+          'ward': sWard,
+          'latitude': _senderLat,
+          'longitude': _senderLng,
+        },
+        'deliveryAddress': {
+          'addressLine1': order['deliveryAddressText'],
+          'province': (order['receiverProvince'] as String?).toString().isNotEmpty ? order['receiverProvince'] : 'Thành phố Hồ Chí Minh',
+          'ward': (order['receiverWard'] as String?).toString().isNotEmpty ? order['receiverWard'] : '',
+          'latitude': _receiverLat,
+          'longitude': _receiverLng,
+        },
+        'packages': [
+          {
+            'weight': order['weight'] ?? 1.0,
+            'length': order['length'] ?? 10.0,
+            'width': order['width'] ?? 10.0,
+            'height': order['height'] ?? 10.0,
+            'isFragile': order['isFragile'] ?? false,
+            'description': order['description'] ?? 'Hàng hóa tổng hợp',
+            'declaredValue': order['declaredValue'] ?? 0.0,
+          }
+        ],
+      };
+
+      final res = await OrderService.createOrder(payload);
+      if (res['success'] == true && res['data'] != null) {
+        final code = res['data']['orderCode'] ?? res['data']['id'] ?? 'ORD-GEN';
+        codes.add(code);
+      }
+    }
+
+    setState(() {
+      _isBulkSubmitting = false;
+      _bulkCreatedCodes = codes;
+    });
+  }
+
+  Widget _buildBulkOrderView() {
+    if (_bulkCreatedCodes.isNotEmpty) {
+      return _buildBulkSuccessView();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20.0),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLow,
+            borderRadius: AppStyles.roundedXl,
+            border: Border.all(color: AppColors.surfaceContainerHigh),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.upload_file, color: AppColors.logisticsRed, size: 28),
+                  const SizedBox(width: 10),
+                  Text('Tạo Đơn Hàng Loạt Bằng File Excel', style: AppTypography.headlineMd.copyWith(fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Tải file mẫu Excel MAU_FILE_TAO_DON_HANG_LOAT_SLP.xlsx đã được nạp sẵn Menu chọn Tỉnh/TP & Phường/Xã chuẩn từ CSDL.',
+                style: AppTypography.bodyMd.copyWith(color: AppColors.secondary),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _pickFile,
+                  icon: const Icon(Icons.file_open, color: Colors.white),
+                  label: const Text('TẢI FILE EXCEL LÊN (XLSX / CSV)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.logisticsRed,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_isImported && _importedOrders.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Danh sách ${_importedOrders.length} đơn nhập từ Excel', style: AppTypography.headlineMd.copyWith(fontWeight: FontWeight.bold)),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                onPressed: () {
+                  setState(() {
+                    _isImported = false;
+                    _importedOrders = [];
+                  });
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _importedOrders.length,
+            itemBuilder: (ctx, idx) {
+              final item = _importedOrders[idx];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.red.shade50,
+                      child: Text('${idx + 1}', style: const TextStyle(color: AppColors.logisticsRed, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${item['receiverName']} - ${item['receiverPhone']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const SizedBox(height: 2),
+                          Text('${item['deliveryAddressText']}, ${item['receiverWard']}, ${item['receiverProvince']}', style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
+                          const SizedBox(height: 2),
+                          Text('Hàng: ${item['description']} (${item['weight']}kg)', style: const TextStyle(color: AppColors.logisticsRed, fontSize: 11, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _isBulkSubmitting ? null : _submitBulkOrders,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.deepOnyx,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _isBulkSubmitting
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : Text('XÁC NHẬN TẠO ${_importedOrders.length} ĐƠN HÀNG', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildBulkSuccessView() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          decoration: const BoxDecoration(
+            color: Color(0xFFDCFCE7),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.check_circle,
+            color: Color(0xFF166534),
+            size: 48.0,
+          ),
+        ),
+        const SizedBox(height: 20.0),
+        Text('TẠO HÀNG LOẠT THÀNH CÔNG!', style: AppTypography.headlineMd.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8.0),
+        Text('Đã khởi tạo thành công ${_bulkCreatedCodes.length} đơn hàng trên hệ thống.', style: AppTypography.bodyMd.copyWith(color: AppColors.secondary)),
+        const SizedBox(height: 20.0),
+        SizedBox(
+          width: double.infinity,
+          height: 50.0,
+          child: ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _bulkCreatedCodes = [];
+                _importedOrders = [];
+                _isImported = false;
+              });
+              widget.onOrderCreated();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.deepOnyx,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+            ),
+            child: const Text('HOÀN TẤT', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppStyles.marginMobile,
+        vertical: 24.0,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 20.0),
+            padding: const EdgeInsets.all(4.0),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12.0),
+              border: Border.all(color: AppColors.surfaceContainerHighest),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _orderType = 0;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12.0),
+                      decoration: BoxDecoration(
+                        color: _orderType == 0 ? AppColors.logisticsRed : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Đơn lẻ',
+                        style: AppTypography.labelLg.copyWith(
+                          color: _orderType == 0 ? AppColors.pureWhite : AppColors.secondary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _orderType = 1;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12.0),
+                      decoration: BoxDecoration(
+                        color: _orderType == 1 ? AppColors.logisticsRed : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Hàng loạt (Excel)',
+                        style: AppTypography.labelLg.copyWith(
+                          color: _orderType == 1 ? AppColors.pureWhite : AppColors.secondary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_orderType == 1)
+            _buildBulkOrderView()
+          else
+            Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildStepIndicator(),
+                  const SizedBox(height: 24.0),
+
+                  if (_currentStep == 0) ...[
+                    // Section 1: Pickup Info
+                    _buildSectionHeader(1, 'Thông tin người gửi & điểm lấy hàng'),
+                    const SizedBox(height: 12.0),
+                    _buildFormCard(
+                      children: [
+                        _buildTextField('Họ tên người gửi', 'Tên đầy đủ hoặc Tên công ty', _senderNameController),
+                        const SizedBox(height: 16.0),
+                        _buildTextField('Số điện thoại', '+84 000 000 000', _senderPhoneController, isPhone: true),
+                        const SizedBox(height: 16.0),
+                        _buildAddressFormFieldsGroup(
+                          titlePrefix: 'Người gửi',
+                          selectedProvinceCode: _senderProvinceCode,
+                          selectedWardCode: _senderWardCode,
+                          provinces: _senderProvinces,
+                          wards: _senderWards,
+                          onProvinceChanged: (code) async {
+                            setState(() {
+                              _senderProvinceCode = code;
+                              _senderWardCode = null;
+                              _senderWards = [];
+                            });
+                            if (code != null) {
+                              final w = await LocationService.fetchWards(code);
+                              if (mounted) {
+                                setState(() {
+                                  _senderWards = w;
+                                });
+                              }
+                            }
+                          },
+                          onWardChanged: (code) {
+                            setState(() {
+                              _senderWardCode = code;
+                            });
+                          },
+                          addressController: _senderAddressController,
+                          suggestions: _senderSuggestions,
+                          showSuggestions: _showSenderSuggestions,
+                          loadingSuggestions: _loadingSenderSuggestions,
+                          onFocusChange: (focus) {
+                            setState(() {
+                              _showSenderSuggestions = focus;
+                              if (focus) _showReceiverSuggestions = false;
+                            });
+                          },
+                          onSelectSuggestion: (item) {
+                            _handleSelectSuggestion(item: item, isSender: true);
+                          },
+                        ),
+                        const SizedBox(height: 16.0),
+                        _buildMapPreviewWidget(
+                          isSender: true,
+                          lat: _senderLat,
+                          lng: _senderLng,
+                          mapController: _senderMapController,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28.0),
+
+                    // Section 2: Delivery Info
+                    _buildSectionHeader(2, 'Thông tin người nhận & điểm giao hàng'),
+                    const SizedBox(height: 12.0),
+                    _buildFormCard(
+                      children: [
+                        _buildTextField('Họ tên người nhận', 'Tên đầy đủ hoặc Tên công ty', _receiverNameController),
+                        const SizedBox(height: 16.0),
+                        _buildTextField('Số điện thoại', '+84 000 000 000', _receiverPhoneController, isPhone: true),
+                        const SizedBox(height: 16.0),
+                        _buildAddressFormFieldsGroup(
+                          titlePrefix: 'Người nhận',
+                          selectedProvinceCode: _receiverProvinceCode,
+                          selectedWardCode: _receiverWardCode,
+                          provinces: _receiverProvinces,
+                          wards: _receiverWards,
+                          onProvinceChanged: (code) async {
+                            setState(() {
+                              _receiverProvinceCode = code;
+                              _receiverWardCode = null;
+                              _receiverWards = [];
+                            });
+                            if (code != null) {
+                              final w = await LocationService.fetchWards(code);
+                              if (mounted) {
+                                setState(() {
+                                  _receiverWards = w;
+                                });
+                              }
+                            }
+                          },
+                          onWardChanged: (code) {
+                            setState(() {
+                              _receiverWardCode = code;
+                            });
+                          },
+                          addressController: _receiverAddressController,
+                          suggestions: _receiverSuggestions,
+                          showSuggestions: _showReceiverSuggestions,
+                          loadingSuggestions: _loadingReceiverSuggestions,
+                          onFocusChange: (focus) {
+                            setState(() {
+                              _showReceiverSuggestions = focus;
+                              if (focus) _showSenderSuggestions = false;
+                            });
+                          },
+                          onSelectSuggestion: (item) {
+                            _handleSelectSuggestion(item: item, isSender: false);
+                          },
+                        ),
+                        const SizedBox(height: 16.0),
+                        _buildMapPreviewWidget(
+                          isSender: false,
+                          lat: _receiverLat,
+                          lng: _receiverLng,
+                          mapController: _receiverMapController,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32.0),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52.0,
+                      child: ElevatedButton(
+                        onPressed: _nextStep,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.logisticsRed,
+                          foregroundColor: AppColors.pureWhite,
+                          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                          elevation: 0,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('TIẾP TỤC BƯỚC 3', style: AppTypography.button.copyWith(color: AppColors.pureWhite)),
+                            const SizedBox(width: 8.0),
+                            const Icon(Icons.arrow_forward, size: 16.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32.0),
+                  ] else if (_currentStep == 1) ...[
+                    // Section 3: Package Details
+                    _buildSectionHeader(3, 'Thông tin gói hàng & bảo hiểm'),
+                    const SizedBox(height: 12.0),
+                    _buildFormCard(
+                      children: [
+                        _buildTextField(
+                          'Mô tả chi tiết danh mục hàng hóa',
+                          'Ví dụ: Quần áo, Điện thoại, Nồi chiên...',
+                          _descriptionController,
+                        ),
+                        const SizedBox(height: 16.0),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField('Khai giá hàng hóa (VNĐ)', '0.0', _declaredValueController, isNumber: true, isOptional: true),
+                            ),
+                            const SizedBox(width: 12.0),
+                            Expanded(
+                              child: _buildTextField('Trọng lượng (kg)', '1.0', _weightController, isNumber: true),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16.0),
+                        Row(
+                          children: [
+                            Expanded(child: _buildTextField('Dài (cm)', '10', _lengthController, isNumber: true)),
+                            const SizedBox(width: 8.0),
+                            Expanded(child: _buildTextField('Rộng (cm)', '10', _widthController, isNumber: true)),
+                            const SizedBox(width: 8.0),
+                            Expanded(child: _buildTextField('Cao (cm)', '10', _heightController, isNumber: true)),
+                          ],
+                        ),
+                        const SizedBox(height: 16.0),
+                        _buildTextField(
+                          'Yêu cầu nhiệt độ (nếu có)',
+                          'Ví dụ: -18°C hoặc 2°C - 8°C',
+                          _tempController,
+                          isOptional: true,
+                        ),
+                        const SizedBox(height: 16.0),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _isFragilePackage,
+                              activeColor: AppColors.logisticsRed,
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() {
+                                    _isFragilePackage = val;
+                                    _calculatePrice();
+                                  });
+                                }
+                              },
+                            ),
+                            Expanded(
+                              child: Text(
+                                'HÀNG DỄ VỠ / CẦN NHẸ TAY (Phụ thu 15.000đ)',
+                                style: AppTypography.bodyMd.copyWith(color: AppColors.deepOnyx, fontWeight: FontWeight.bold, fontSize: 12.0),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28.0),
+
+                    // Section 4: Service Options
+                    _buildSectionHeader(4, 'Gói dịch vụ vận chuyển'),
+                    const SizedBox(height: 12.0),
+                    Column(
+                      children: [
+                        _buildServiceOptionCard(
+                          'EXPRESS',
+                          'Velocity Express (Hỏa Tốc 2h)',
+                          'Giao hàng hỏa tốc trong vòng 2h nội tỉnh.',
+                          '35.000đ',
+                        ),
+                        const SizedBox(height: 10.0),
+                        _buildServiceOptionCard(
+                          'STANDARD',
+                          'Velocity Standard (Tiêu Chuẩn 24h)',
+                          'Giao hàng tiêu chuẩn trong vòng 24h.',
+                          '20.000đ',
+                        ),
+                        const SizedBox(height: 10.0),
+                        _buildServiceOptionCard(
+                          'SAVING',
+                          'Velocity Saving (Tiết Kiệm)',
+                          'Cước phí tối ưu, giao từ 3-5 ngày.',
+                          '15.000đ',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32.0),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 52.0,
+                            child: OutlinedButton(
+                              onPressed: _prevStep,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.deepOnyx,
+                                side: const BorderSide(color: AppColors.surfaceContainerHigh, width: 1.5),
+                                shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                              ),
+                              child: const Text('QUAY LẠI', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12.0),
+                        Expanded(
+                          child: SizedBox(
+                            height: 52.0,
+                            child: ElevatedButton(
+                              onPressed: _nextStep,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.logisticsRed,
+                                foregroundColor: AppColors.pureWhite,
+                                shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                                elevation: 0,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text('TIẾP TỤC BƯỚC 4', style: AppTypography.button.copyWith(color: AppColors.pureWhite)),
+                                  const SizedBox(width: 8.0),
+                                  const Icon(Icons.arrow_forward, size: 16.0),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32.0),
+                  ] else ...[
+                    // Step 4: Logistics Schedule & Payment Options
+                    _buildSectionHeader(4, 'Lịch hẹn lấy hàng & Thanh toán'),
+                    const SizedBox(height: 12.0),
+                    _buildFormCard(
+                      children: [
+                        // Hình thức gửi hàng (PICKUP vs DROP_OFF)
+                        Text('Hình thức gửi hàng', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8.0),
+                        _buildSegmentedToggle<String>(
+                          selectedValue: _pickupType,
+                          options: const {
+                            'PICKUP': 'Shipper lấy tận nơi',
+                            'DROP_OFF': 'Tự gửi bưu cục',
+                          },
+                          onChanged: (val) {
+                            setState(() => _pickupType = val);
+                          },
+                        ),
+                        const SizedBox(height: 20.0),
+
+                        // Lịch hẹn lấy hàng (Ngày & Ca lấy)
+                        Text('Lịch hẹn Shipper lấy hàng', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8.0),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Ngày lấy:', style: AppTypography.labelMd.copyWith(color: AppColors.secondary)),
+                                  const SizedBox(height: 4),
+                                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                                    value: _pickupDateOption,
+                                    decoration: InputDecoration(
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(value: 'TODAY', child: Text('Hôm nay', style: TextStyle(fontSize: 12))),
+                                      DropdownMenuItem(value: 'TOMORROW', child: Text('Ngày mai', style: TextStyle(fontSize: 12))),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) setState(() => _pickupDateOption = val);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Ca lấy hàng:', style: AppTypography.labelMd.copyWith(color: AppColors.secondary)),
+                                  const SizedBox(height: 4),
+                                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                                    value: _pickupShiftOption,
+                                    decoration: InputDecoration(
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(value: 'MORNING', child: Text('Ca Sáng (08h - 12h)', style: TextStyle(fontSize: 11))),
+                                      DropdownMenuItem(value: 'AFTERNOON', child: Text('Ca Chiều (13h - 18h)', style: TextStyle(fontSize: 11))),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) setState(() => _pickupShiftOption = val);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20.0),
+
+                        // Người chịu phí (SENDER / RECEIVER)
+                        Text('Người chịu phí ship', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8.0),
+                        _buildSegmentedToggle<String>(
+                          selectedValue: _feePayer,
+                          options: const {
+                            'SENDER': 'Người gửi trả (SENDER)',
+                            'RECEIVER': 'Người nhận trả (RECEIVER)',
+                          },
+                          onChanged: (val) {
+                            setState(() => _feePayer = val);
+                          },
+                        ),
+                        const SizedBox(height: 20.0),
+
+                        // Phương thức thanh toán
+                        Text('Phương thức thanh toán', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8.0),
+                        DropdownButtonFormField<String>(
+                    isExpanded: true,
+                          value: _paymentMethodCode,
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'CASH', child: Text('Tiền mặt (CASH)')),
+                            DropdownMenuItem(value: 'COD', child: Text('Thu hộ COD (Thanh toán khi nhận hàng)')),
+                            DropdownMenuItem(value: 'BANK_TRANSFER', child: Text('Chuyển khoản ngân hàng (BANK_TRANSFER)')),
+                            DropdownMenuItem(value: 'E_WALLET', child: Text('Ví điện tử (E_WALLET)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _paymentMethodCode = val;
+                                _calculatePrice();
+                              });
+                            }
+                          },
+                        ),
+                        if (_paymentMethodCode == 'COD') ...[
+                          const SizedBox(height: 14.0),
+                          _buildTextField(
+                            'Số tiền thu hộ COD (VNĐ)',
+                            'Nhập số tiền thu hộ từ người nhận...',
+                            _codController,
+                            isNumber: true,
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 28.0),
+
+                    // Order Price Summary Card
+                    Container(
+                      padding: const EdgeInsets.all(20.0),
+                      decoration: BoxDecoration(
+                        color: AppColors.deepOnyx,
+                        borderRadius: AppStyles.roundedXl,
+                        boxShadow: AppStyles.ambientShadow,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.receipt_long, color: AppColors.logisticsRed),
+                              const SizedBox(width: 8.0),
+                              Text(
+                                'Chi tiết cước tạm tính',
+                                style: AppTypography.headlineMd.copyWith(color: AppColors.pureWhite, fontSize: 17.0),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14.0),
+                          const Divider(color: Colors.white24),
+                          const SizedBox(height: 10.0),
+                          _buildSummaryRow('Cước cơ bản', formatCurrency(_basePrice)),
+                          const SizedBox(height: 8.0),
+                          _buildSummaryRow('Cước khoảng cách & phụ phí', formatCurrency(_serviceFee)),
+                          const SizedBox(height: 8.0),
+                          _buildSummaryRow('Cước cân nặng & bảo hiểm', formatCurrency(_fuelTax)),
+                          const SizedBox(height: 14.0),
+                          const Divider(color: Colors.white24),
+                          const SizedBox(height: 10.0),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Tổng cước tạm tính', style: AppTypography.headlineMd.copyWith(color: AppColors.pureWhite, fontWeight: FontWeight.bold)),
+                              Text(
+                                formatCurrency(_totalCost),
+                                style: AppTypography.headlineMd.copyWith(color: AppColors.logisticsRed, fontWeight: FontWeight.w900),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32.0),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 52.0,
+                            child: OutlinedButton(
+                              onPressed: _prevStep,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.deepOnyx,
+                                side: const BorderSide(color: AppColors.surfaceContainerHigh, width: 1.5),
+                                shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                              ),
+                              child: const Text('QUAY LẠI', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12.0),
+                        Expanded(
+                          child: SizedBox(
+                            height: 52.0,
+                            child: ElevatedButton(
+                              onPressed: _isSubmitting ? null : _submitForm,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.logisticsRed,
+                                foregroundColor: AppColors.pureWhite,
+                                shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                                elevation: 0,
+                              ),
+                              child: _isSubmitting
+                                  ? const CircularProgressIndicator(color: Colors.white)
+                                  : Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text('ĐỒNG Ý TẠO ĐƠN', style: AppTypography.button.copyWith(color: AppColors.pureWhite, fontWeight: FontWeight.bold)),
+                                        const SizedBox(width: 6.0),
+                                        const Icon(Icons.check, size: 18.0),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32.0),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildMapPreviewWidget({
@@ -674,1076 +1886,185 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
     );
   }
 
-  @override
-  void dispose() {
-    _senderDebounceTimer?.cancel();
-    _receiverDebounceTimer?.cancel();
-    _senderNameController.dispose();
-    _senderPhoneController.dispose();
-    _senderAddressController.dispose();
-    _receiverNameController.dispose();
-    _receiverPhoneController.dispose();
-    _receiverAddressController.dispose();
-    _weightController.dispose();
-    _lengthController.dispose();
-    _widthController.dispose();
-    _heightController.dispose();
-    _tempController.dispose();
-    _codController.dispose();
-    super.dispose();
-  }
-
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const p = 0.017453292519943295; // pi / 180
-    final a = 0.5 - cos((lat2 - lat1) * p) / 2 +
-        cos(lat1 * p) * cos(lat2 * p) *
-        (1 - cos((lon2 - lon1) * p)) / 2;
-    return 12742 * sqrt(a); // 2 * R; R = 6371 km
-  }
-
-  Timer? _priceCalcDebounce;
-
-  void _calculatePrice() {
-    if (_priceCalcDebounce?.isActive ?? false) _priceCalcDebounce!.cancel();
-    _priceCalcDebounce = Timer(const Duration(milliseconds: 500), () async {
-      final weight = double.tryParse(_weightController.text) ?? 0.0;
-      final length = double.tryParse(_lengthController.text) ?? 0.0;
-      final width = double.tryParse(_widthController.text) ?? 0.0;
-      final height = double.tryParse(_heightController.text) ?? 0.0;
-
-      final volWeight = (length * width * height) / 5000.0;
-      final chargeableWeight = weight > volWeight ? weight : volWeight;
-
-      final distance = _calculateDistance(_senderLat, _senderLng, _receiverLat, _receiverLng);
-
-      if (chargeableWeight <= 0) return;
-
-      final res = await OrderService.calculatePricing(
-        serviceCode: _serviceLevel.toUpperCase(),
-        distanceKm: distance,
-        totalWeightKg: chargeableWeight,
-        isFragile: _isFragilePackage,
-        codAmount: _paymentMethod == 'cod' ? (double.tryParse(_codController.text) ?? 0.0) : 0.0,
-      );
-
-      if (mounted) {
-        if (res['success'] == true) {
-          final data = res['data'];
-          setState(() {
-            _basePrice = double.tryParse(data['basePrice'].toString()) ?? 18.00;
-            _serviceFee = double.tryParse((data['distanceFee'] ?? 0.0).toString()) ?? 0.00;
-            _fuelTax = double.tryParse((data['weightFee'] ?? 0.0).toString()) ?? 0.00;
-            final insuranceFee = double.tryParse((data['insuranceFee'] ?? 0.0).toString()) ?? 0.00;
-            final fragileSurcharge = double.tryParse((data['fragileSurcharge'] ?? 0.0).toString()) ?? 0.00;
-            _serviceFee += fragileSurcharge;
-            _fuelTax += insuranceFee;
-            
-            _totalCost = double.tryParse(data['totalAmount'].toString()) ?? 24.99;
-          });
-        } else {
-          _calculatePriceClientSide(
-            serviceCode: _serviceLevel.toUpperCase(),
-            distanceKm: distance,
-            totalWeightKg: chargeableWeight,
-            isFragile: _isFragilePackage,
-            codAmount: _paymentMethod == 'cod' ? (double.tryParse(_codController.text) ?? 0.0) : 0.0,
-          );
-        }
-      }
-    });
-  }
-
-  void _calculatePriceClientSide({
-    required String serviceCode,
-    required double distanceKm,
-    required double totalWeightKg,
-    required bool isFragile,
-    required double codAmount,
+  Widget _buildSegmentedToggle<T>({
+    required T selectedValue,
+    required Map<T, String> options,
+    required ValueChanged<T> onChanged,
   }) {
-    double base = 20000.0;
-    double freeDist = 2.0;
-    double rateDist = 5000.0;
-    double freeWt = 1.0;
-    double rateWt = 3000.0;
-
-    switch (serviceCode) {
-      case 'EXPRESS':
-        base = 35000.0;
-        freeDist = 2.0;
-        rateDist = 8000.0;
-        freeWt = 1.0;
-        rateWt = 5000.0;
-        break;
-      case 'SAVING':
-        base = 15000.0;
-        freeDist = 2.0;
-        rateDist = 3000.0;
-        freeWt = 1.0;
-        rateWt = 2000.0;
-        break;
-      case 'COLD_CHAIN':
-        base = 60000.0;
-        freeDist = 2.0;
-        rateDist = 12000.0;
-        freeWt = 1.0;
-        rateWt = 8000.0;
-        break;
-      case 'STANDARD':
-      default:
-        base = 20000.0;
-        freeDist = 2.0;
-        rateDist = 5000.0;
-        freeWt = 1.0;
-        rateWt = 3000.0;
-        break;
-    }
-
-    double billableDistance = (distanceKm - freeDist) > 0 ? (distanceKm - freeDist) : 0.0;
-    double distanceFee = (serviceCode == 'EXPRESS' || serviceCode == 'COLD_CHAIN') ? (billableDistance * rateDist) : 0.0;
-
-    double billableWeight = (totalWeightKg - freeWt) > 0 ? (totalWeightKg - freeWt) : 0.0;
-    double weightFee = billableWeight * rateWt;
-
-    double fragileSurcharge = isFragile ? 15000.0 : 0.0;
-
-    double insuranceFee = 0.0;
-    if (codAmount > 0) {
-      insuranceFee = codAmount * 0.005;
-      if (insuranceFee > 50000.0) insuranceFee = 50000.0;
-    }
-
-    setState(() {
-      _basePrice = base;
-      _serviceFee = distanceFee + fragileSurcharge;
-      _fuelTax = weightFee + insuranceFee;
-      _totalCost = base + distanceFee + weightFee + fragileSurcharge + insuranceFee;
-    });
+    return Container(
+      padding: const EdgeInsets.all(4.0),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(color: AppColors.surfaceContainerHigh),
+      ),
+      child: Row(
+        children: options.entries.map((entry) {
+          final isSelected = selectedValue == entry.key;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(entry.key),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 4.0),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.logisticsRed : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  entry.value,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : AppColors.deepOnyx,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11.5,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
-  void _submitForm() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    final String senderProvinceName = _senderProvinces.firstWhere(
-      (p) => '${p['code']}' == _senderProvinceCode,
-      orElse: () => {'fullName': 'Hồ Chí Minh', 'name': 'Hồ Chí Minh'},
-    )['fullName'] ?? 'Hồ Chí Minh';
-
-    final String senderWardName = _senderWards.firstWhere(
-      (w) => '${w['code']}' == _senderWardCode,
-      orElse: () => {'fullName': '', 'name': ''},
-    )['fullName'] ?? '';
-
-    final String receiverProvinceName = _receiverProvinces.firstWhere(
-      (p) => '${p['code']}' == _receiverProvinceCode,
-      orElse: () => {'fullName': 'Hồ Chí Minh', 'name': 'Hồ Chí Minh'},
-    )['fullName'] ?? 'Hồ Chí Minh';
-
-    final String receiverWardName = _receiverWards.firstWhere(
-      (w) => '${w['code']}' == _receiverWardCode,
-      orElse: () => {'fullName': '', 'name': ''},
-    )['fullName'] ?? '';
-
-    final weight = double.tryParse(_weightController.text) ?? 1.0;
-    final length = double.tryParse(_lengthController.text) ?? 10.0;
-    final width = double.tryParse(_widthController.text) ?? 10.0;
-    final height = double.tryParse(_heightController.text) ?? 10.0;
-
-    final Map<String, dynamic> payload = {
-      'serviceCode': _serviceLevel.toUpperCase(),
-      'feePayer': 'SENDER',
-      'paymentMethod': _paymentMethod == 'cod' ? 'CASH' : 'E_WALLET',
-      'pickupType': 'PICKUP',
-      'codAmount': _paymentMethod == 'cod' ? (double.tryParse(_codController.text) ?? 0.0) : 0.0,
-      'senderContact': {
-        'fullName': _senderNameController.text.trim(),
-        'phone': _senderPhoneController.text.trim(),
+  Widget _buildServiceOptionCard(String code, String title, String subtitle, String priceText) {
+    final isSelected = _serviceLevel == code;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _serviceLevel = code;
+          _calculatePrice();
+        });
       },
-      'receiverContact': {
-        'fullName': _receiverNameController.text.trim(),
-        'phone': _receiverPhoneController.text.trim(),
-      },
-      'pickupAddress': {
-        'addressLine1': _senderAddressController.text.trim(),
-        'province': senderProvinceName,
-        'ward': senderWardName,
-        'wardCode': _senderWardCode,
-        'latitude': _senderLat,
-        'longitude': _senderLng,
-      },
-      'deliveryAddress': {
-        'addressLine1': _receiverAddressController.text.trim(),
-        'province': receiverProvinceName,
-        'ward': receiverWardName,
-        'wardCode': _receiverWardCode,
-        'latitude': _receiverLat,
-        'longitude': _receiverLng,
-      },
-      'packages': [
-        {
-          'weight': weight,
-          'length': length,
-          'width': width,
-          'height': height,
-          'isFragile': _isFragilePackage,
-          'temperatureRequirement': _tempController.text.isNotEmpty ? _tempController.text.trim() : null,
-        }
-      ],
-    };
-
-    final result = await OrderService.createOrder(payload);
-    if (!mounted) return;
-
-    setState(() {
-      _isSubmitting = false;
-    });
-
-    if (result['success'] == true && result['data'] != null) {
-      final orderData = result['data'];
-      final String generatedOrderCode = orderData['trackingCode'] ?? orderData['orderNumber'] ?? orderData['id'] ?? 'VEL-888';
-      final now = DateTime.now();
-      final String pickupTimeStr = 'Hẹn lấy: ${now.day}/${now.month}/${now.year} lúc 09:00';
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-              return Dialog(
-                backgroundColor: AppColors.pureWhite,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.0)),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Tạo đơn thành công!',
-                        style: AppTypography.headlineMd.copyWith(
-                          color: AppColors.deepOnyx,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 22.0,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8.0),
-                      Text(
-                        'Mã QR vận đơn cho đơn hàng\ncủa bạn:',
-                        style: AppTypography.bodyMd.copyWith(
-                          color: AppColors.secondary,
-                          fontSize: 14.0,
-                          height: 1.4,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20.0),
-
-                      // QR Container
-                      Container(
-                        padding: const EdgeInsets.all(12.0),
-                        decoration: BoxDecoration(
-                          color: AppColors.pureWhite,
-                          borderRadius: BorderRadius.circular(16.0),
-                          border: Border.all(color: AppColors.surfaceContainerHighest, width: 1.2),
-                        ),
-                        child: Image.network(
-                          'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=$generatedOrderCode',
-                          width: 150.0,
-                          height: 150.0,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const SizedBox(
-                              width: 150.0,
-                              height: 150.0,
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  color: AppColors.logisticsRed,
-                                  strokeWidth: 2.0,
-                                ),
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: 150.0,
-                              height: 150.0,
-                              color: AppColors.cloudGray,
-                              child: const Center(
-                                child: Icon(Icons.qr_code_scanner, color: AppColors.secondary, size: 40.0),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16.0),
-
-                      // Red Order Code
-                      Text(
-                        generatedOrderCode,
-                        style: AppTypography.headlineLgMobile.copyWith(
-                          color: AppColors.logisticsRed,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24.0,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const SizedBox(height: 14.0),
-
-                      // Pickup Date Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(20.0),
-                        ),
-                        child: Text(
-                          pickupTimeStr,
-                          style: AppTypography.labelLg.copyWith(
-                            color: AppColors.deepOnyx,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13.0,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14.0),
-
-                      // Instruction Note
-                      Text(
-                        'Vui lòng in nhãn QR này và dán lên gói hàng trước khi Shippers đến lấy.',
-                        style: AppTypography.labelMd.copyWith(
-                          color: AppColors.secondary,
-                          fontSize: 12.0,
-                          height: 1.4,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24.0),
-
-                      // Print Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50.0,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).pop(); // close dialog
-                            widget.onOrderCreated(); // return to dashboard
-                          },
-                          icon: const Icon(Icons.print, color: AppColors.pureWhite, size: 20.0),
-                          label: Text(
-                            'IN NHÃN VẬN ĐƠN',
-                            style: AppTypography.button.copyWith(
-                              color: AppColors.pureWhite,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.deepOnyx,
-                            foregroundColor: AppColors.pureWhite,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12.0),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ ${result['message'] ?? 'Không thể tạo đơn hàng. Vui lòng thử lại.'}'),
-              backgroundColor: Colors.red.shade700,
-              duration: const Duration(seconds: 4),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.red.shade50 : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isSelected ? AppColors.logisticsRed : Colors.grey.shade300, width: isSelected ? 2.0 : 1.0),
+        ),
+        child: Row(
+          children: [
+            Radio<String>(
+              value: code,
+              groupValue: _serviceLevel,
+              activeColor: AppColors.logisticsRed,
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _serviceLevel = val;
+                    _calculatePrice();
+                  });
+                }
+              },
             ),
-          );
-        }
-      }
-    }
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppStyles.marginMobile,
-        vertical: 24.0,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(bottom: 20.0),
-            padding: const EdgeInsets.all(4.0),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(12.0),
-              border: Border.all(color: AppColors.surfaceContainerHighest),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _orderType = 0;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
-                      decoration: BoxDecoration(
-                        color: _orderType == 0 ? AppColors.logisticsRed : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8.0),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Đơn lẻ',
-                        style: AppTypography.labelLg.copyWith(
-                          color: _orderType == 0 ? AppColors.pureWhite : AppColors.secondary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _orderType = 1;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
-                      decoration: BoxDecoration(
-                        color: _orderType == 1 ? AppColors.logisticsRed : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8.0),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Hàng loạt',
-                        style: AppTypography.labelLg.copyWith(
-                          color: _orderType == 1 ? AppColors.pureWhite : AppColors.secondary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (_orderType == 1)
-            _buildBulkOrderView()
-          else
-            Form(
-              key: _formKey,
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildStepIndicator(),
-                  const SizedBox(height: 24.0),
-
-            if (_currentStep == 0) ...[
-              // Section 1: Pickup Info
-              _buildSectionHeader(1, 'Thông tin lấy hàng'),
-              const SizedBox(height: 12.0),
-              _buildFormCard(
-                children: [
-                  _buildTextField('Họ tên người gửi', 'Tên đầy đủ hoặc Tên công ty', _senderNameController),
-                  const SizedBox(height: 16.0),
-                  _buildTextField('Số điện thoại', '+84 000 000 000', _senderPhoneController, isPhone: true),
-                  const SizedBox(height: 16.0),
-                  _buildAddressFormFieldsGroup(
-                    titlePrefix: 'Người gửi',
-                    selectedProvinceCode: _senderProvinceCode,
-                    selectedWardCode: _senderWardCode,
-                    provinces: _senderProvinces,
-                    wards: _senderWards,
-                    onProvinceChanged: (code) async {
-                      setState(() {
-                        _senderProvinceCode = code;
-                        _senderWardCode = null;
-                        _senderWards = [];
-                      });
-                      if (code != null) {
-                        final w = await LocationService.fetchWards(code);
-                        if (mounted) {
-                          setState(() {
-                            _senderWards = w;
-                          });
-                        }
-                      }
-                    },
-                    onWardChanged: (code) {
-                      setState(() {
-                        _senderWardCode = code;
-                      });
-                    },
-                    addressController: _senderAddressController,
-                    suggestions: _senderSuggestions,
-                    showSuggestions: _showSenderSuggestions,
-                    loadingSuggestions: _loadingSenderSuggestions,
-                    onFocusChange: (focus) {
-                      setState(() {
-                        _showSenderSuggestions = focus;
-                        if (focus) _showReceiverSuggestions = false;
-                      });
-                    },
-                    onSelectSuggestion: (item) {
-                      _handleSelectSuggestion(item: item, isSender: true);
-                    },
-                  ),
-                  const SizedBox(height: 16.0),
-                  _buildMapPreviewWidget(
-                    isSender: true,
-                    lat: _senderLat,
-                    lng: _senderLng,
-                    mapController: _senderMapController,
-                  ),
+                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isSelected ? AppColors.logisticsRed : AppColors.deepOnyx)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                 ],
               ),
-              const SizedBox(height: 28.0),
-
-              // Section 2: Delivery Info
-              _buildSectionHeader(2, 'Thông tin giao hàng'),
-              const SizedBox(height: 12.0),
-              _buildFormCard(
-                children: [
-                  _buildTextField('Họ tên người nhận', 'Tên đầy đủ hoặc Tên công ty', _receiverNameController),
-                  const SizedBox(height: 16.0),
-                  _buildTextField('Số điện thoại', '+84 000 000 000', _receiverPhoneController, isPhone: true),
-                  const SizedBox(height: 16.0),
-                  _buildAddressFormFieldsGroup(
-                    titlePrefix: 'Người nhận',
-                    selectedProvinceCode: _receiverProvinceCode,
-                    selectedWardCode: _receiverWardCode,
-                    provinces: _receiverProvinces,
-                    wards: _receiverWards,
-                    onProvinceChanged: (code) async {
-                      setState(() {
-                        _receiverProvinceCode = code;
-                        _receiverWardCode = null;
-                        _receiverWards = [];
-                      });
-                      if (code != null) {
-                        final w = await LocationService.fetchWards(code);
-                        if (mounted) {
-                          setState(() {
-                            _receiverWards = w;
-                          });
-                        }
-                      }
-                    },
-                    onWardChanged: (code) {
-                      setState(() {
-                        _receiverWardCode = code;
-                      });
-                    },
-                    addressController: _receiverAddressController,
-                    suggestions: _receiverSuggestions,
-                    showSuggestions: _showReceiverSuggestions,
-                    loadingSuggestions: _loadingReceiverSuggestions,
-                    onFocusChange: (focus) {
-                      setState(() {
-                        _showReceiverSuggestions = focus;
-                        if (focus) _showSenderSuggestions = false;
-                      });
-                    },
-                    onSelectSuggestion: (item) {
-                      _handleSelectSuggestion(item: item, isSender: false);
-                    },
-                  ),
-                  const SizedBox(height: 16.0),
-                  _buildMapPreviewWidget(
-                    isSender: false,
-                    lat: _receiverLat,
-                    lng: _receiverLng,
-                    mapController: _receiverMapController,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32.0),
-
-              // Next Button (TIẾP TỤC)
-              SizedBox(
-                width: double.infinity,
-                height: 52.0,
-                child: ElevatedButton(
-                  onPressed: _nextStep,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.logisticsRed,
-                    foregroundColor: AppColors.pureWhite,
-                    shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                    elevation: 0,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('TIẾP TỤC', style: AppTypography.button.copyWith(color: AppColors.pureWhite)),
-                      const SizedBox(width: 8.0),
-                      const Icon(Icons.arrow_forward, size: 16.0),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32.0),
-            ] else if (_currentStep == 1) ...[
-              // Section 3: Package Details
-              _buildSectionHeader(1, 'Chi tiết kiện hàng'),
-              const SizedBox(height: 12.0),
-              _buildFormCard(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: _buildTextField('Khối lượng (kg)', '0.0', _weightController, isNumber: true)),
-                      const SizedBox(width: 12.0),
-                      Expanded(child: _buildTextField('Dài (cm)', '0', _lengthController, isNumber: true)),
-                    ],
-                  ),
-                  const SizedBox(height: 16.0),
-                  Row(
-                    children: [
-                      Expanded(child: _buildTextField('Rộng (cm)', '0', _widthController, isNumber: true)),
-                      const SizedBox(width: 12.0),
-                      Expanded(child: _buildTextField('Cao (cm)', '0', _heightController, isNumber: true)),
-                    ],
-                  ),
-                  const SizedBox(height: 20.0),
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: _isFragilePackage,
-                        activeColor: AppColors.logisticsRed,
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _isFragilePackage = val;
-                              _calculatePrice();
-                            });
-                          }
-                        },
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Hàng dễ vỡ (Phụ thu 15k)',
-                          style: AppTypography.bodyMd.copyWith(color: AppColors.deepOnyx),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16.0),
-                  _buildTextField(
-                    'Yêu cầu nhiệt độ bảo quản (nếu có)',
-                    'Ví dụ: -18°C hoặc 2°C - 8°C',
-                    _tempController,
-                    isOptional: true,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 28.0),
-
-              // Section 4: Service Options
-              _buildSectionHeader(2, 'Gói dịch vụ'),
-              const SizedBox(height: 12.0),
-              RadioGroup<String>(
-                groupValue: _serviceLevel,
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      _serviceLevel = val;
-                      _calculatePrice();
-                    });
-                  }
-                },
-                child: Column(
-                  children: [
-                    _buildServiceRadio(
-                      'express',
-                      'Velocity Express',
-                      'Giao hàng hỏa tốc trong vòng 2h nội tỉnh.',
-                      '35.000đ',
-                      'HOẢ TỐC 2H',
-                      AppColors.logisticsRed,
-                      AppColors.pureWhite,
-                    ),
-                    const SizedBox(height: 12.0),
-                    _buildServiceRadio(
-                      'standard',
-                      'Velocity Standard',
-                      'Giao hàng tiêu chuẩn trong vòng 24h.',
-                      '20.000đ',
-                      'TIÊU CHUẨN',
-                      const Color(0xFFDBEAFE),
-                      const Color(0xFF1E40AF),
-                    ),
-                    const SizedBox(height: 12.0),
-                    _buildServiceRadio(
-                      'saving',
-                      'Velocity Saving',
-                      'Cước phí tối ưu, giao từ 3-5 ngày.',
-                      '15.000đ',
-                      'TIẾT KIỆM',
-                      const Color(0xFFDCFCE7),
-                      const Color(0xFF166534),
-                    ),
-                    const SizedBox(height: 12.0),
-                    _buildServiceRadio(
-                      'cold_chain',
-                      'Velocity Cold Chain',
-                      'Đảm bảo dải nhiệt độ tiêu chuẩn bảo quản lạnh.',
-                      '60.000đ',
-                      'ĐÔNG LẠNH',
-                      const Color(0xFFE0F7FA),
-                      const Color(0xFF006064),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32.0),
-
-              // Back and Next buttons row
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 52.0,
-                      child: OutlinedButton(
-                        onPressed: _prevStep,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.deepOnyx,
-                          side: const BorderSide(color: AppColors.surfaceContainerHigh, width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                        ),
-                        child: const Text('QUAY LẠI', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12.0),
-                  Expanded(
-                    child: SizedBox(
-                      height: 52.0,
-                      child: ElevatedButton(
-                        onPressed: _nextStep,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.logisticsRed,
-                          foregroundColor: AppColors.pureWhite,
-                          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                          elevation: 0,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('TIẾP TỤC', style: AppTypography.button.copyWith(color: AppColors.pureWhite)),
-                            const SizedBox(width: 8.0),
-                            const Icon(Icons.arrow_forward, size: 16.0),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32.0),
-            ] else ...[
-              // Payment Selection
-              _buildSectionHeader(1, 'Phương thức thanh toán'),
-              const SizedBox(height: 12.0),
-              _buildFormCard(
-                children: [
-                  RadioGroup<String>(
-                    groupValue: _paymentMethod,
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          _paymentMethod = val;
-                        });
-                      }
-                    },
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            const Radio<String>(
-                              value: 'prepaid',
-                              activeColor: AppColors.logisticsRed,
-                            ),
-                            Expanded(
-                              child: Text('Thanh toán ngay (Thẻ/Ví)', style: AppTypography.bodyMd),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            const Radio<String>(
-                              value: 'cod',
-                              activeColor: AppColors.logisticsRed,
-                            ),
-                            Expanded(
-                              child: Text('Thanh toán khi nhận hàng (COD)', style: AppTypography.bodyMd),
-                            ),
-                          ],
-                        ),
-                        if (_paymentMethod == 'cod') ...[
-                          const SizedBox(height: 12.0),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 32.0, right: 16.0),
-                            child: _buildTextField(
-                              'Số tiền thu hộ COD (đ)',
-                              'Nhập số tiền cần thu hộ...',
-                              _codController,
-                              isNumber: true,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 28.0),
-
-              // Order Summary Card
-              Container(
-                padding: const EdgeInsets.all(20.0),
-                decoration: BoxDecoration(
-                  color: AppColors.deepOnyx,
-                  borderRadius: AppStyles.roundedXl,
-                  boxShadow: AppStyles.ambientShadow,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.receipt_long, color: AppColors.logisticsRed),
-                        const SizedBox(width: 8.0),
-                        Text(
-                          'Tóm tắt đơn hàng',
-                          style: AppTypography.headlineMd.copyWith(color: AppColors.pureWhite, fontSize: 18.0),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16.0),
-                    const Divider(color: Colors.white24),
-                    const SizedBox(height: 12.0),
-                    _buildSummaryRow('Giá cước cơ bản', '${_basePrice.toStringAsFixed(0)}đ'),
-                    const SizedBox(height: 8.0),
-                    _buildSummaryRow('Phụ phí cự ly & đặc biệt', '${_serviceFee.toStringAsFixed(0)}đ'),
-                    const SizedBox(height: 8.0),
-                    _buildSummaryRow('Cước cân nặng & bảo hiểm', '${_fuelTax.toStringAsFixed(0)}đ'),
-                    const SizedBox(height: 16.0),
-                    const Divider(color: Colors.white24),
-                    const SizedBox(height: 12.0),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Tổng cộng',
-                          style: AppTypography.headlineMd.copyWith(color: AppColors.pureWhite, fontSize: 18.0),
-                        ),
-                        Text(
-                          '${_totalCost.toStringAsFixed(0)}đ',
-                          style: AppTypography.headlineMd.copyWith(color: AppColors.logisticsRed, fontWeight: FontWeight.bold, fontSize: 22.0),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32.0),
-
-              // Back and Submit buttons row
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 52.0,
-                      child: OutlinedButton(
-                        onPressed: _isSubmitting ? null : _prevStep,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.deepOnyx,
-                          side: const BorderSide(color: AppColors.surfaceContainerHigh, width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                        ),
-                        child: const Text('QUAY LẠI', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12.0),
-                  Expanded(
-                    child: SizedBox(
-                      height: 52.0,
-                      child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _submitForm,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.logisticsRed,
-                          foregroundColor: AppColors.pureWhite,
-                          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                          elevation: 0,
-                        ),
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                width: 20.0,
-                                height: 20.0,
-                                child: CircularProgressIndicator(color: AppColors.pureWhite, strokeWidth: 2.0),
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text('XÁC NHẬN', style: AppTypography.button.copyWith(color: AppColors.pureWhite)),
-                                  const SizedBox(width: 8.0),
-                                  const Icon(Icons.check, size: 16.0),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
+            Text(priceText, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.logisticsRed, fontSize: 12)),
           ],
         ),
       ),
-    ],
-  ),
-);
-}
+    );
+  }
 
   Widget _buildStepIndicator() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       decoration: BoxDecoration(
-        color: AppColors.pureWhite,
-        borderRadius: AppStyles.roundedXl,
-        boxShadow: AppStyles.ambientShadow,
-        border: Border.all(color: AppColors.surfaceContainer),
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16.0),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStepNode(
-            _currentStep >= 1 ? Icons.check : Icons.location_on,
-            'Địa chỉ',
-            isActive: _currentStep == 0,
-            isCompleted: _currentStep > 0,
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 16.0),
-              child: Container(
-                height: 1.0,
-                color: _currentStep >= 1 ? const Color(0xFF22C55E) : AppColors.surfaceContainerHighest,
-              ),
-            ),
-          ),
-          _buildStepNode(
-            _currentStep >= 2 ? Icons.check : Icons.inventory_2,
-            'Kiện hàng',
-            isActive: _currentStep == 1,
-            isCompleted: _currentStep > 1,
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 16.0),
-              child: Container(
-                height: 1.0,
-                color: _currentStep >= 2 ? const Color(0xFF22C55E) : AppColors.surfaceContainerHighest,
-              ),
-            ),
-          ),
-          _buildStepNode(
-            Icons.check,
-            'Xác nhận',
-            isActive: _currentStep == 2,
-            isCompleted: false,
-          ),
+          _buildStepItem(0, '1 & 2', 'Địa chỉ'),
+          _buildStepLine(0),
+          _buildStepItem(1, '3', 'Hàng hóa'),
+          _buildStepLine(1),
+          _buildStepItem(2, '4', 'Thanh toán'),
         ],
       ),
     );
   }
 
-  Widget _buildStepNode(
-    IconData icon,
-    String label, {
-    required bool isActive,
-    required bool isCompleted,
-  }) {
-    Color bgColor;
-    Color iconColor;
-    if (isCompleted) {
-      bgColor = const Color(0xFF22C55E); // Green for completed
-      iconColor = AppColors.pureWhite;
-    } else if (isActive) {
-      bgColor = AppColors.logisticsRed; // Red for active
-      iconColor = AppColors.pureWhite;
-    } else {
-      bgColor = AppColors.surfaceContainerLow;
-      iconColor = AppColors.secondary;
-    }
+  Widget _buildStepItem(int stepIndex, String stepNum, String title) {
+    final isActive = _currentStep == stepIndex;
+    final isDone = _currentStep > stepIndex;
 
-    final isHighlighted = isActive || isCompleted;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    return Row(
       children: [
-        Container(
-          width: 32.0,
-          height: 32.0,
-          decoration: BoxDecoration(
-            color: bgColor,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: iconColor,
-            size: 16.0,
-          ),
+        CircleAvatar(
+          radius: 14.0,
+          backgroundColor: isDone
+              ? const Color(0xFF166534)
+              : isActive
+                  ? AppColors.logisticsRed
+                  : AppColors.surfaceContainerHigh,
+          child: isDone
+              ? const Icon(Icons.check, size: 14.0, color: Colors.white)
+              : Text(
+                  stepNum,
+                  style: TextStyle(
+                    color: isActive ? Colors.white : AppColors.secondary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11.0,
+                  ),
+                ),
         ),
-        const SizedBox(height: 6.0),
+        const SizedBox(width: 6.0),
         Text(
-          label,
+          title,
           style: AppTypography.labelMd.copyWith(
-            color: isHighlighted ? AppColors.deepOnyx : AppColors.secondary,
+            color: isActive ? AppColors.deepOnyx : AppColors.secondary,
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            fontSize: 11.0,
+            fontSize: 12.0,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSectionHeader(int stepNum, String title) {
+  Widget _buildStepLine(int stepIndex) {
+    final isDone = _currentStep > stepIndex;
+    return Expanded(
+      child: Container(
+        height: 2.0,
+        margin: const EdgeInsets.symmetric(horizontal: 4.0),
+        color: isDone ? const Color(0xFF166534) : AppColors.surfaceContainerHigh,
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(int num, String title) {
     return Row(
       children: [
         Container(
-          width: 32.0,
-          height: 32.0,
+          padding: const EdgeInsets.all(6.0),
           decoration: const BoxDecoration(
             color: AppColors.logisticsRed,
             shape: BoxShape.circle,
           ),
-          alignment: Alignment.center,
-          child: Text(
-            '$stepNum',
-            style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite, fontWeight: FontWeight.bold),
-          ),
+          child: Text('$num', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.0)),
         ),
         const SizedBox(width: 10.0),
-        Text(
-          title,
-          style: AppTypography.headlineMd.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppColors.deepOnyx,
-            fontSize: 18.0,
+        Expanded(
+          child: Text(
+            title,
+            style: AppTypography.headlineMd.copyWith(fontWeight: FontWeight.bold, fontSize: 15.0),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -1752,17 +2073,62 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
 
   Widget _buildFormCard({required List<Widget> children}) {
     return Container(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: AppColors.pureWhite,
+        color: Colors.white,
         borderRadius: AppStyles.roundedXl,
-        border: Border.all(color: AppColors.surfaceContainer),
+        border: Border.all(color: AppColors.surfaceContainerHigh),
         boxShadow: AppStyles.ambientShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,
       ),
+    );
+  }
+
+  Widget _buildTextField(
+    String label,
+    String hint,
+    TextEditingController controller, {
+    bool isPhone = false,
+    bool isNumber = false,
+    bool isOptional = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(label, style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
+            if (!isOptional) const Text(' *', style: TextStyle(color: AppColors.logisticsRed, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 6.0),
+        TextFormField(
+          controller: controller,
+          keyboardType: isPhone
+              ? TextInputType.phone
+              : isNumber
+                  ? TextInputType.number
+                  : TextInputType.text,
+          validator: (val) {
+            if (isOptional) return null;
+            if (val == null || val.trim().isEmpty) return 'Vui lòng không để trống ô này';
+            return null;
+          },
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12.0),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10.0),
+              borderSide: const BorderSide(color: AppColors.logisticsRed, width: 1.5),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1777,7 +2143,7 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
     required TextEditingController addressController,
     required List<AddressPrediction> suggestions,
     required bool showSuggestions,
-    bool loadingSuggestions = false,
+    required bool loadingSuggestions,
     required ValueChanged<bool> onFocusChange,
     required ValueChanged<AddressPrediction> onSelectSuggestion,
   }) {
@@ -1787,286 +2153,127 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
         Row(
           children: [
             Expanded(
-              child: SearchableSelectWidget(
-                label: 'TỈNH / TP',
-                placeholder: '-- Chọn Tỉnh/TP --',
-                value: selectedProvinceCode,
-                items: provinces,
-                onChanged: onProvinceChanged,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Tỉnh / Thành Phố *', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6.0),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    value: selectedProvinceCode,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                    ),
+                    hint: const Text('-- Chọn Tỉnh/TP --', style: TextStyle(fontSize: 12.0)),
+                    items: provinces.map((p) {
+                      return DropdownMenuItem<String>(
+                        value: '${p['code']}',
+                        child: Text(
+                          p['fullName'] ?? p['name'] ?? '',
+                          style: const TextStyle(fontSize: 12.0),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: onProvinceChanged,
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 10.0),
             Expanded(
-              child: SearchableSelectWidget(
-                label: 'PHƯỜNG / XÃ',
-                placeholder: '-- Chọn Phường/Xã --',
-                value: selectedWardCode,
-                items: wards,
-                disabled: selectedProvinceCode == null,
-                onChanged: onWardChanged,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Phường / Xã *', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6.0),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    value: selectedWardCode,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                    ),
+                    hint: const Text('-- Chọn Phường/Xã --', style: TextStyle(fontSize: 12.0)),
+                    items: wards.map((w) {
+                      return DropdownMenuItem<String>(
+                        value: '${w['code']}',
+                        child: Text(
+                          w['fullName'] ?? w['name'] ?? '',
+                          style: const TextStyle(fontSize: 12.0),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: onWardChanged,
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12.0),
+        const SizedBox(height: 16.0),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Text(
-                  'ĐỊA CHỈ CHI TIẾT (SỐ NHÀ, ĐƯỜNG)',
-                  style: AppTypography.labelMd.copyWith(
-                    color: AppColors.secondary,
-                    fontSize: 10.0,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
+            Text('Địa chỉ chi tiết (Số nhà, đường) *', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6.0),
+            Focus(
+              onFocusChange: onFocusChange,
+              child: TextFormField(
+                controller: addressController,
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) return 'Vui lòng nhập số nhà, đường';
+                  return null;
+                },
+                decoration: InputDecoration(
+                  hintText: 'Ví dụ: 123 Nguyễn Trãi',
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12.0),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                    borderSide: const BorderSide(color: AppColors.logisticsRed, width: 1.5),
                   ),
-                ),
-                if (loadingSuggestions) ...[  
-                  const SizedBox(width: 6.0),
-                  const SizedBox(
-                    width: 10.0,
-                    height: 10.0,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: AppColors.secondary,
-                    ),
-                  ),
-                  const SizedBox(width: 4.0),
-                  Text(
-                    '(Đang tìm...)',
-                    style: AppTypography.labelMd.copyWith(
-                      color: AppColors.secondary,
-                      fontSize: 9.0,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 4.0),
-            TextFormField(
-              controller: addressController,
-              onTap: () => onFocusChange(true),
-              onChanged: (val) {
-                onFocusChange(true);
-              },
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Vui lòng nhập địa chỉ chi tiết';
-                }
-                return null;
-              },
-              decoration: InputDecoration(
-                hintText: 'Ví dụ: 123 Nguyễn Trãi',
-                hintStyle: AppTypography.bodyMd.copyWith(color: Colors.black26, fontSize: 13.0),
-                filled: true,
-                fillColor: AppColors.pureWhite,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
-                border: OutlineInputBorder(
-                  borderRadius: AppStyles.roundedLg,
-                  borderSide: const BorderSide(color: AppColors.surfaceContainerHighest),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: AppStyles.roundedLg,
-                  borderSide: const BorderSide(color: AppColors.surfaceContainerHighest),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: AppStyles.roundedLg,
-                  borderSide: const BorderSide(color: AppColors.logisticsRed),
                 ),
               ),
             ),
-            if (showSuggestions && suggestions.isNotEmpty) ...[
-              const SizedBox(height: 4.0),
+            if (showSuggestions && (loadingSuggestions || suggestions.isNotEmpty)) ...[
               Container(
-                constraints: const BoxConstraints(maxHeight: 180.0),
+                margin: const EdgeInsets.only(top: 4.0),
                 decoration: BoxDecoration(
-                  color: AppColors.pureWhite,
-                  borderRadius: AppStyles.roundedLg,
-                  border: Border.all(color: AppColors.surfaceContainerHighest),
-                  boxShadow: AppStyles.softShadow,
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10.0),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: AppStyles.ambientShadow,
                 ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  padding: EdgeInsets.zero,
-                  itemCount: suggestions.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1.0, color: AppColors.surfaceContainer),
-                  itemBuilder: (context, index) {
-                    final item = suggestions[index];
-                    return ListTile(
-                      dense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
-                      title: Text(
-                        item.description,
-                        style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx, fontSize: 12.0),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                constraints: const BoxConstraints(maxHeight: 180.0),
+                child: loadingSuggestions
+                    ? const Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: Center(child: CircularProgressIndicator(strokeWidth: 2.0, color: AppColors.logisticsRed)),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: suggestions.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (ctx, idx) {
+                          final item = suggestions[idx];
+                          return ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.location_on, color: AppColors.logisticsRed, size: 18.0),
+                            title: Text(item.mainText, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.0)),
+                            subtitle: Text(item.secondaryText, style: const TextStyle(fontSize: 11.0)),
+                            onTap: () => onSelectSuggestion(item),
+                          );
+                        },
                       ),
-                      onTap: () => onSelectSuggestion(item),
-                    );
-                  },
-                ),
               ),
             ],
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildTextField(
-    String label,
-    String placeholder,
-    TextEditingController controller, {
-    bool isPhone = false,
-    bool isNumber = false,
-    bool isOptional = false,
-    IconData? suffixIcon,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
-        ),
-        const SizedBox(height: 4.0),
-        TextFormField(
-          controller: controller,
-          keyboardType: isPhone
-              ? TextInputType.phone
-              : isNumber
-                  ? const TextInputType.numberWithOptions(decimal: true)
-                  : TextInputType.text,
-          validator: (value) {
-            if (isOptional && (value == null || value.trim().isEmpty)) {
-              return null;
-            }
-            if (value == null || value.trim().isEmpty) {
-              return 'Trường này không được để trống';
-            }
-            if (isPhone) {
-              final cleanPhone = value.replaceAll(RegExp(r'\s+|-'), '');
-              final phoneRegExp = RegExp(r'^(0[3|5|7|8|9])+([0-9]{8})$');
-              if (!phoneRegExp.hasMatch(cleanPhone)) {
-                return 'Số điện thoại 10 số không hợp lệ (Ví dụ: 0912345678)';
-              }
-            }
-            if (isNumber) {
-              final numVal = double.tryParse(value);
-              if (numVal == null || numVal <= 0) {
-                return 'Vui lòng nhập số hợp lệ > 0';
-              }
-            }
-            return null;
-          },
-          decoration: InputDecoration(
-            hintText: placeholder,
-            hintStyle: AppTypography.bodyMd.copyWith(color: Colors.black26),
-            suffixIcon: suffixIcon != null ? Icon(suffixIcon, color: AppColors.secondary) : null,
-            filled: true,
-            fillColor: AppColors.pureWhite,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-            border: OutlineInputBorder(
-              borderRadius: AppStyles.roundedLg,
-              borderSide: const BorderSide(color: AppColors.surfaceContainerHighest),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: AppStyles.roundedLg,
-              borderSide: const BorderSide(color: AppColors.surfaceContainerHighest),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: AppStyles.roundedLg,
-              borderSide: const BorderSide(color: AppColors.logisticsRed),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-
-
-  Widget _buildServiceRadio(
-    String value,
-    String title,
-    String desc,
-    String price,
-    String badgeLabel,
-    Color badgeColor,
-    Color badgeTextColor,
-  ) {
-    final isSelected = _serviceLevel == value;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _serviceLevel = value;
-          _calculatePrice();
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryContainer.withValues(alpha: 0.05) : AppColors.pureWhite,
-          borderRadius: AppStyles.roundedXl,
-          border: Border.all(
-            color: isSelected ? AppColors.logisticsRed : AppColors.surfaceContainerHighest,
-            width: isSelected ? 1.5 : 1.0,
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Radio<String>(
-              value: value,
-              activeColor: AppColors.logisticsRed,
-            ),
-            const SizedBox(width: 8.0),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
-                        decoration: BoxDecoration(
-                          color: badgeColor,
-                          borderRadius: BorderRadius.circular(4.0),
-                        ),
-                        child: Text(
-                          badgeLabel,
-                          style: AppTypography.labelMd.copyWith(
-                            color: badgeTextColor,
-                            fontSize: 8.0,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        price,
-                        style: AppTypography.headlineMd.copyWith(fontSize: 18.0, fontWeight: FontWeight.bold, color: AppColors.deepOnyx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6.0),
-                  Text(
-                    title,
-                    style: AppTypography.labelLg.copyWith(color: AppColors.deepOnyx, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4.0),
-                  Text(
-                    desc,
-                    style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -2074,820 +2281,8 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: AppTypography.labelMd.copyWith(color: Colors.white70),
-        ),
-        Text(
-          value,
-          style: AppTypography.bodyMd.copyWith(color: AppColors.pureWhite, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBulkOrderView() {
-    if (_bulkCreatedCodes.isNotEmpty) {
-      return _buildBulkSuccessView();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader(1, 'Nhập danh sách đơn hàng'),
-        const SizedBox(height: 12.0),
-        if (!_isImported) ...[
-          GestureDetector(
-            onTap: _handleImportFile,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 20.0),
-              decoration: BoxDecoration(
-                color: AppColors.pureWhite,
-                borderRadius: AppStyles.roundedXl,
-                border: Border.all(
-                  color: AppColors.surfaceContainerHighest,
-                  width: 1.5,
-                ),
-                boxShadow: AppStyles.ambientShadow,
-              ),
-              child: Column(
-                children: [
-                  const Icon(
-                    Icons.cloud_upload_outlined,
-                    size: 64.0,
-                    color: AppColors.logisticsRed,
-                  ),
-                  const SizedBox(height: 16.0),
-                  Text(
-                    'Nhấn để tải lên file mẫu Excel/CSV',
-                    style: AppTypography.headlineMd.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.deepOnyx,
-                      fontSize: 16.0,
-                    ),
-                  ),
-                  const SizedBox(height: 8.0),
-                  Text(
-                    'Hỗ trợ file mẫu định dạng .xlsx, .csv với các cột: Họ tên, SĐT, Địa chỉ, Cân nặng',
-                    style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12.0),
-                  TextButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.download, size: 16.0),
-                    label: const Text('Tải file Excel mẫu tại đây'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.logisticsRed,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ] else ...[
-          // Summary Banner
-          Container(
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: AppColors.deepOnyx,
-              borderRadius: AppStyles.roundedLg,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${_importedOrders.length} Đơn hàng nhập khẩu',
-                  style: AppTypography.labelLg.copyWith(
-                    color: AppColors.pureWhite,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  'Tổng cước: \$75.00',
-                  style: AppTypography.labelLg.copyWith(
-                    color: AppColors.logisticsRed,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16.0),
-          
-          // List of imported orders
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _importedOrders.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12.0),
-            itemBuilder: (context, index) {
-              final order = _importedOrders[index];
-              return Container(
-                padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  color: AppColors.pureWhite,
-                  borderRadius: AppStyles.roundedLg,
-                  border: Border.all(color: AppColors.surfaceContainerHighest),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          order['receiverName'] as String,
-                          style: AppTypography.labelLg.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.deepOnyx,
-                          ),
-                        ),
-                        Text(
-                          '${order['weight']} kg',
-                          style: AppTypography.labelLg.copyWith(
-                            color: AppColors.secondary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4.0),
-                    Text(
-                      'SĐT: ${order['receiverPhone']}',
-                      style: AppTypography.bodyMd.copyWith(color: AppColors.secondary),
-                    ),
-                    const SizedBox(height: 4.0),
-                    Text(
-                      'Đến: ${order['deliveryAddressText']}',
-                      style: AppTypography.bodyMd.copyWith(color: AppColors.secondary),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 24.0),
-          
-          // Submit and reset actions
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 52.0,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        _isImported = false;
-                        _importedOrders = [];
-                      });
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.deepOnyx,
-                      side: const BorderSide(color: AppColors.surfaceContainerHigh, width: 1.5),
-                      shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                    ),
-                    child: const Text('TẢI FILE KHÁC', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12.0),
-              Expanded(
-                child: SizedBox(
-                  height: 52.0,
-                  child: ElevatedButton(
-                    onPressed: _isBulkSubmitting ? null : _submitBulkOrders,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.logisticsRed,
-                      foregroundColor: AppColors.pureWhite,
-                      shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                      elevation: 0,
-                    ),
-                    child: _isBulkSubmitting
-                        ? const SizedBox(
-                            width: 24.0,
-                            height: 24.0,
-                            child: CircularProgressIndicator(
-                              color: AppColors.pureWhite,
-                              strokeWidth: 2.5,
-                            ),
-                          )
-                        : Text(
-                            'TẠO HÀNG LOẠT',
-                            style: AppTypography.button.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16.0,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-
-  Future<void> _handleImportFile() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv', 'xlsx', 'xls'],
-        withData: true,
-      );
-
-      if (result == null || result.files.isEmpty) return;
-
-      final file = result.files.first;
-      final ext = file.extension?.toLowerCase() ?? '';
-      final bytes = file.bytes;
-
-      if (bytes == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Không đọc được nội dung file.',
-                  style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite)),
-              backgroundColor: AppColors.error,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-              margin: const EdgeInsets.all(AppStyles.marginMobile),
-            ),
-          );
-        }
-        return;
-      }
-
-      // Show loading dialog
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const Center(
-            child: Card(
-              child: Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: AppColors.logisticsRed),
-                    SizedBox(height: 16.0),
-                    Text('Đang phân tích dữ liệu file...'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      }
-
-      List<Map<String, dynamic>> parsedOrders = [];
-
-      try {
-        if (ext == 'csv') {
-          // Parse CSV
-          final content = String.fromCharCodes(bytes);
-          final rows = const CsvToListConverter(eol: '\n').convert(content);
-          // Skip header row (row 0)
-          for (int i = 1; i < rows.length; i++) {
-            final row = rows[i];
-            if (row.length < 4) continue;
-            final name = row[0]?.toString().trim() ?? '';
-            final phone = row[1]?.toString().trim() ?? '';
-            final address = row[2]?.toString().trim() ?? '';
-            final weight = double.tryParse(row[3]?.toString().trim() ?? '0') ?? 0.0;
-            if (name.isEmpty || phone.isEmpty || address.isEmpty) continue;
-            parsedOrders.add({
-              'receiverName': name,
-              'receiverPhone': phone,
-              'deliveryAddressText': address,
-              'weight': weight,
-            });
-          }
-        } else if (ext == 'xlsx' || ext == 'xls') {
-          // Parse Excel
-          final excel = Excel.decodeBytes(bytes);
-          final sheet = excel.tables[excel.tables.keys.first];
-          if (sheet != null) {
-            // Skip header row (row 0)
-            for (int i = 1; i < sheet.rows.length; i++) {
-              final row = sheet.rows[i];
-              if (row.length < 4) continue;
-              final name = row[0]?.value?.toString().trim() ?? '';
-              final phone = row[1]?.value?.toString().trim() ?? '';
-              final address = row[2]?.value?.toString().trim() ?? '';
-              final weight = double.tryParse(row[3]?.value?.toString().trim() ?? '0') ?? 0.0;
-              if (name.isEmpty || phone.isEmpty || address.isEmpty) continue;
-              parsedOrders.add({
-                'receiverName': name,
-                'receiverPhone': phone,
-                'deliveryAddressText': address,
-                'weight': weight,
-              });
-            }
-          }
-        }
-      } catch (_) {
-        parsedOrders = [];
-      }
-
-      if (mounted) Navigator.pop(context); // Dismiss loading
-
-      if (parsedOrders.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.warning_amber, color: AppColors.logisticsRed),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Không đọc được dữ liệu. Kiểm tra định dạng file:\nCột: Họ tên | SĐT | Địa chỉ | Cân nặng (kg)',
-                      style: AppTypography.labelMd.copyWith(color: AppColors.pureWhite),
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: AppColors.deepOnyx,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-              margin: const EdgeInsets.all(AppStyles.marginMobile),
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-        return;
-      }
-
-      if (mounted) {
-        setState(() {
-          _isImported = true;
-          _importedOrders = parsedOrders;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Color(0xFF4ADE80)),
-                const SizedBox(width: 8),
-                Text(
-                  'Đã nhập thành công ${parsedOrders.length} đơn hàng từ file.',
-                  style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite),
-                ),
-              ],
-            ),
-            backgroundColor: AppColors.deepOnyx,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-            margin: const EdgeInsets.all(AppStyles.marginMobile),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        try { Navigator.pop(context); } catch (_) {}
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Có lỗi khi đọc file: ${e.toString()}',
-                style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite)),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-            margin: const EdgeInsets.all(AppStyles.marginMobile),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _submitBulkOrders() async {
-    setState(() {
-      _isBulkSubmitting = true;
-    });
-
-    final List<String> codes = [];
-    for (final order in _importedOrders) {
-      final payload = {
-        'serviceCode': 'EXPRESS',
-        'feePayer': 'SENDER',
-        'paymentMethod': 'CASH',
-        'pickupType': 'PICKUP',
-        'senderContact': {
-          'fullName': 'Kho hàng mặc định',
-          'phone': '0900000000',
-        },
-        'receiverContact': {
-          'fullName': order['receiverName'],
-          'phone': order['receiverPhone'],
-        },
-        'pickupAddress': {
-          'addressLine1': '100 Đường Nguyễn Du',
-          'province': 'Thành phố Hồ Chí Minh',
-          'ward': 'Phường Bến Thành',
-          'wardCode': '26734',
-          'latitude': 10.7725,
-          'longitude': 106.6980,
-        },
-        'deliveryAddress': {
-          'addressLine1': order['deliveryAddressText'],
-          'province': 'Thành phố Hồ Chí Minh',
-          'ward': 'Phường Bến Thành',
-          'wardCode': '26734',
-          'latitude': 10.7725,
-          'longitude': 106.6980,
-        },
-        'packages': [
-          {
-            'weight': order['weight'],
-            'length': 10.0,
-            'width': 10.0,
-            'height': 10.0,
-          }
-        ],
-      };
-
-      final res = await OrderService.createOrder(payload);
-      if (res['success'] == true && res['data'] != null) {
-        final code = res['data']['orderCode'] ?? res['data']['id'] ?? 'ORD-GEN';
-        codes.add(code);
-      }
-    }
-
-    setState(() {
-      _isBulkSubmitting = false;
-      _bulkCreatedCodes = codes;
-    });
-  }
-
-  Widget _buildBulkSuccessView() {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16.0),
-          decoration: const BoxDecoration(
-            color: Color(0xFFDCFCE7),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.check_circle,
-            color: Color(0xFF166534),
-            size: 48.0,
-          ),
-        ),
-        const SizedBox(height: 24.0),
-        Text(
-          'Đã tạo hàng loạt thành công!',
-          style: AppTypography.headlineLgMobile.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppColors.deepOnyx,
-          ),
-        ),
-        const SizedBox(height: 8.0),
-        Text(
-          'Đã tạo thành công ${_bulkCreatedCodes.length} đơn hàng thực tế vào cơ sở dữ liệu.',
-          style: AppTypography.bodyMd.copyWith(color: AppColors.secondary),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 24.0),
-        
-        // Scrollable list of waybill QR codes
-        SizedBox(
-          height: 320.0,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: _bulkCreatedCodes.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 16.0),
-            itemBuilder: (context, index) {
-              final code = _bulkCreatedCodes[index];
-              return Container(
-                width: 240.0,
-                padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  color: AppColors.pureWhite,
-                  borderRadius: AppStyles.roundedXl,
-                  border: Border.all(color: AppColors.surfaceContainerHighest),
-                  boxShadow: AppStyles.ambientShadow,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Vận đơn ${index + 1}',
-                      style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
-                    ),
-                    const SizedBox(height: 4.0),
-                    Text(
-                      code,
-                      style: AppTypography.labelLg.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.deepOnyx,
-                      ),
-                    ),
-                    const SizedBox(height: 16.0),
-                    Container(
-                      width: 140.0,
-                      height: 140.0,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.surfaceContainerHighest),
-                        borderRadius: BorderRadius.circular(12.0),
-                      ),
-                      padding: const EdgeInsets.all(8.0),
-                      child: Image.network(
-                        'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=$code',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    const SizedBox(height: 12.0),
-                    const Text(
-                      'Dán nhãn này lên kiện hàng',
-                      style: TextStyle(fontSize: 10.0, color: AppColors.secondary),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-        
-        const SizedBox(height: 28.0),
-        SizedBox(
-          width: double.infinity,
-          height: 52.0,
-          child: ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _bulkCreatedCodes = [];
-                _isImported = false;
-                _importedOrders = [];
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.deepOnyx,
-              foregroundColor: AppColors.pureWhite,
-              shape: RoundedRectangleBorder(
-                borderRadius: AppStyles.roundedLg,
-              ),
-            ),
-            child: const Text('Tạo tiếp đơn hàng loạt'),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class SearchableSelectWidget extends StatefulWidget {
-  final String label;
-  final String placeholder;
-  final String? value;
-  final List<Map<String, dynamic>> items;
-  final bool disabled;
-  final ValueChanged<String?> onChanged;
-
-  const SearchableSelectWidget({
-    super.key,
-    required this.label,
-    required this.placeholder,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-    this.disabled = false,
-  });
-
-  @override
-  State<SearchableSelectWidget> createState() => _SearchableSelectWidgetState();
-}
-
-class _SearchableSelectWidgetState extends State<SearchableSelectWidget> {
-  void _openSearchDialog() {
-    if (widget.disabled || widget.items.isEmpty) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.pureWhite,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.0)),
-      ),
-      builder: (ctx) {
-        String query = '';
-        String removeAccents(String str) {
-          const vietnameseMarks = [
-            'aàáảãạâầấẩẫậăằắẳẵặ',
-            'AÀÁẢÃẠÂẦẤẨẪẬĂẰẮẲẴẶ',
-            'eèéẻẽẹêềếểễệ',
-            'EÈÉẺẼẸÊỀẾỂỄỆ',
-            'iìíỉĩị',
-            'IÌÍỈĨỊ',
-            'oòóỏõọôồốổỗộơờớởỡợ',
-            'OÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢ',
-            'uùúủũụưừứửữự',
-            'UÙÚỦŨỤƯỪỨỬỮỰ',
-            'yỳýỷỹỵ',
-            'YỲÝỶỸỴ',
-            'dđ',
-            'DĐ'
-          ];
-          String result = str;
-          for (var mark in vietnameseMarks) {
-            for (int i = 1; i < mark.length; i++) {
-              result = result.replaceAll(mark[i], mark[0]);
-            }
-          }
-          return result;
-        }
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final filtered = widget.items.where((item) {
-              final fullName = '${item['fullName'] ?? item['name'] ?? ''}';
-              final nameLower = fullName.toLowerCase();
-              final nameNoAccent = removeAccents(nameLower);
-              final qLower = query.toLowerCase().trim();
-              final qNoAccent = removeAccents(qLower);
-
-              return nameLower.contains(qLower) || nameNoAccent.contains(qNoAccent);
-            }).toList();
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-                top: 16,
-                left: 16,
-                right: 16,
-              ),
-              child: SizedBox(
-                height: MediaQuery.of(ctx).size.height * 0.55,
-                child: Column(
-                  children: [
-                    Container(
-                      width: 40.0,
-                      height: 4.0,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(2.0),
-                      ),
-                    ),
-                    const SizedBox(height: 12.0),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          widget.label,
-                          style: AppTypography.headlineMd.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.deepOnyx,
-                            fontSize: 16.0,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          icon: const Icon(Icons.close, color: AppColors.secondary, size: 20.0),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8.0),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
-                      decoration: BoxDecoration(
-                        color: AppColors.cloudGray,
-                        borderRadius: AppStyles.roundedLg,
-                        border: Border.all(color: AppColors.surfaceContainerHighest),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.search, color: AppColors.secondary, size: 18.0),
-                          const SizedBox(width: 8.0),
-                          Expanded(
-                            child: TextField(
-                              autofocus: true,
-                              decoration: const InputDecoration(
-                                hintText: 'Nhập từ khóa tìm kiếm...',
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(vertical: 10.0),
-                              ),
-                              style: AppTypography.bodyMd.copyWith(color: AppColors.deepOnyx),
-                              onChanged: (val) {
-                                setModalState(() {
-                                  query = val;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12.0),
-                    Expanded(
-                      child: filtered.isNotEmpty
-                          ? ListView.separated(
-                              itemCount: filtered.length,
-                              separatorBuilder: (_, _) => const Divider(height: 1.0, color: AppColors.surfaceContainer),
-                              itemBuilder: (context, index) {
-                                final item = filtered[index];
-                                final code = '${item['code']}';
-                                final name = '${item['fullName'] ?? item['name'] ?? ''}';
-                                final isSelected = code == widget.value;
-
-                                return ListTile(
-                                  dense: true,
-                                  title: Text(
-                                    name,
-                                    style: AppTypography.bodyMd.copyWith(
-                                      color: isSelected ? AppColors.logisticsRed : AppColors.deepOnyx,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                    ),
-                                  ),
-                                  trailing: isSelected ? const Icon(Icons.check, color: AppColors.logisticsRed, size: 18.0) : null,
-                                  onTap: () {
-                                    widget.onChanged(code);
-                                    Navigator.pop(ctx);
-                                  },
-                                );
-                              },
-                            )
-                          : Center(
-                              child: Text(
-                                'Không tìm thấy kết quả',
-                                style: AppTypography.labelMd.copyWith(color: AppColors.secondary, fontStyle: FontStyle.italic),
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    String? selectedName;
-    if (widget.value != null && widget.items.isNotEmpty) {
-      final found = widget.items.firstWhere(
-        (item) => '${item['code']}' == widget.value,
-        orElse: () => {},
-      );
-      if (found.isNotEmpty) {
-        selectedName = '${found['fullName'] ?? found['name'] ?? ''}';
-      }
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          widget.label,
-          style: AppTypography.labelMd.copyWith(
-            color: AppColors.secondary,
-            fontSize: 10.0,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-          ),
-        ),
-        const SizedBox(height: 4.0),
-        InkWell(
-          onTap: widget.disabled ? null : _openSearchDialog,
-          borderRadius: AppStyles.roundedLg,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
-            decoration: BoxDecoration(
-              color: widget.disabled ? AppColors.cloudGray : AppColors.pureWhite,
-              borderRadius: AppStyles.roundedLg,
-              border: Border.all(color: AppColors.surfaceContainerHighest),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    selectedName ?? widget.placeholder,
-                    style: AppTypography.bodyMd.copyWith(
-                      color: selectedName != null ? AppColors.deepOnyx : Colors.black26,
-                      fontSize: 13.0,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Icon(
-                  Icons.keyboard_arrow_down,
-                  color: widget.disabled ? AppColors.surfaceContainerHigh : AppColors.secondary,
-                  size: 20.0,
-                ),
-              ],
-            ),
-          ),
-        ),
+        Text(label, style: AppTypography.bodyMd.copyWith(color: Colors.white70, fontSize: 13.0)),
+        Text(value, style: AppTypography.bodyMd.copyWith(color: AppColors.pureWhite, fontWeight: FontWeight.bold, fontSize: 13.0)),
       ],
     );
   }

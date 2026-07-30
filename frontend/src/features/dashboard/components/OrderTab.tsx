@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
 import { CreateOrderModal } from './CreateOrderModal';
+import { BulkOrderUploadModal } from './BulkOrderUploadModal';
 import { RouteOptimizationModal } from './RouteOptimizationModal';
 import { formatCurrency } from '../../../lib/utils';
 import {
@@ -19,7 +20,8 @@ import {
   Bot,
   RotateCcw,
   Printer,
-  QrCode
+  QrCode,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface PackageItem {
@@ -158,6 +160,7 @@ export const OrderTab: React.FC = () => {
   const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
   const [showPrintLabel, setShowPrintLabel] = useState<boolean>(false);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState<boolean>(false);
   const [isOptimizationModalOpen, setIsOptimizationModalOpen] = useState<boolean>(false);
   const [newStatus, setNewStatus] = useState<string>('');
   const [statusReason, setStatusReason] = useState<string>('');
@@ -605,9 +608,28 @@ export const OrderTab: React.FC = () => {
                 ? 'bg-gray-400 opacity-50 cursor-not-allowed'
                 : 'bg-[#bc0100] hover:bg-[#bc0100]/90 cursor-pointer'
                 }`}
-              title={isCustomerDisabled ? (error || 'Hồ sơ đang bị khóa hoặc ngưng hoạt động') : 'Tạo đơn hàng mới'}
+              title={isCustomerDisabled ? (error || 'Hồ sơ đang bị khóa hoặc ngưng hoạt động') : 'Tạo đơn hàng đơn lẻ'}
             >
-              Tạo đơn hàng
+              Tạo đơn lẻ
+            </button>
+
+            <button
+              onClick={() => {
+                if (isCustomerDisabled) {
+                  alert(error || 'Tài khoản của bạn đang bị khóa hoặc ngưng hoạt động. Không thể tạo đơn.');
+                  return;
+                }
+                setShowBulkUploadModal(true);
+              }}
+              disabled={isCustomerDisabled}
+              className={`text-white px-3.5 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-sm ${isCustomerDisabled
+                ? 'bg-gray-400 opacity-50 cursor-not-allowed'
+                : 'bg-emerald-700 hover:bg-emerald-800 cursor-pointer'
+                }`}
+              title="Upload đơn hàng loạt từ file Excel mẫu"
+            >
+              <FileSpreadsheet size={16} />
+              <span>Tạo Đơn Loạt (Excel)</span>
             </button>
           </div>
         </div>
@@ -1151,6 +1173,17 @@ export const OrderTab: React.FC = () => {
         }}
         token={token}
         isAdminOrStaff={!!isAdminOrStaff}
+      />
+
+      {/* Bulk Order Upload Excel Modal */}
+      <BulkOrderUploadModal
+        isOpen={showBulkUploadModal}
+        onClose={() => setShowBulkUploadModal(false)}
+        onSuccess={() => {
+          setCurrentPage(1);
+          fetchOrders(1);
+        }}
+        token={token}
       />
 
       {/* AI Route Optimization Modal */}
