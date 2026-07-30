@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_styles.dart';
+import '../../core/utils/currency_formatter.dart';
 import '../../services/order_service.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -451,9 +452,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           ),
           const SizedBox(height: 16.0),
-          _buildPriceRow('Cước vận chuyển:', '${shippingFee.toStringAsFixed(0)}đ'),
+          _buildPriceRow('Cước vận chuyển:', formatCurrency(shippingFee)),
           if (insuranceFee > 0)
-            _buildPriceRow('Phí thu hộ/bảo hiểm:', '${insuranceFee.toStringAsFixed(0)}đ'),
+            _buildPriceRow('Phí thu hộ/bảo hiểm:', formatCurrency(insuranceFee)),
           const Divider(),
           const SizedBox(height: 8.0),
           Row(
@@ -467,7 +468,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
               ),
               Text(
-                '${totalAmount.toStringAsFixed(0)}đ',
+                formatCurrency(totalAmount),
                 style: AppTypography.headlineLgMobile.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.logisticsRed,

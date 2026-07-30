@@ -4,6 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
 import { CreateOrderModal } from './CreateOrderModal';
 import { RouteOptimizationModal } from './RouteOptimizationModal';
+import { formatCurrency } from '../../../lib/utils';
 import {
   Search,
   Filter,
@@ -674,7 +675,7 @@ export const OrderTab: React.FC = () => {
                               {order.deliveryAddressText}
                             </td>
                             <td className="px-6 py-4 font-bold text-[#bc0100]">
-                              {formatPrice(order.totalAmount ?? (order as any).estimatedTotalAmount)}
+                              {formatCurrency(order.totalAmount ?? (order as any).estimatedTotalAmount)}
                             </td>
                             <td className="px-6 py-4">
                               <span
@@ -1121,7 +1122,7 @@ export const OrderTab: React.FC = () => {
                   <p><strong className="text-slate-800">Đến:</strong> {selectedOrder.receiverName}</p>
                   <p><strong className="text-slate-800">Kho nhận:</strong> {selectedOrder.destinationFacility?.facilityCode || 'N/A'}</p>
                   <p><strong className="text-slate-800">Số kiện:</strong> {selectedOrder.packages?.length || 1} kiện</p>
-                  <p className="text-red-600 font-bold">COD: {formatPrice(selectedOrder.codAmount ?? (selectedOrder as any).estimatedCodAmount)}</p>
+                  <p className="text-red-600 font-bold">COD: {formatCurrency(selectedOrder.codAmount ?? (selectedOrder as any).estimatedCodAmount)}</p>
                 </div>
               </div>
             </div>

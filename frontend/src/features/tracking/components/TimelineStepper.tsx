@@ -1,97 +1,170 @@
 import React from 'react';
-import { Check, Truck, CircleDot, Warehouse, Package } from 'lucide-react';
-import type { ShipmentStatus } from '../types';
+import { Check, Truck, CircleDot, Warehouse, Package, Clock, ShieldCheck, Building2 } from 'lucide-react';
 
 interface TimelineStepperProps {
-  status: ShipmentStatus;
-  timestamps: {
-    created: string;
-    hub: string;
-    transit: string;
-    out: string;
-    delivered: string;
-  };
+  status: string;
+  timestamps?: any;
 }
 
 export const TimelineStepper: React.FC<TimelineStepperProps> = ({ status, timestamps }) => {
-  const steps = [
+  const currentStatus = String(status || '').toUpperCase();
+
+  // Helper to determine step states based on full DB status enum
+  const getStepState = (stepKey: string): 'completed' | 'active' | 'pending' => {
+    // 1. CREATED
+    if (stepKey === 'CREATED') {
+      return 'completed';
+    }
+
+    // 2. IN_FACILITY (Arrival & Storage at Hub)
+    if (stepKey === 'IN_FACILITY') {
+      if (['CONFIRMED', 'ASSIGNED', 'PICKING_UP', 'PICKED_UP', 'IN_FACILITY', 'READY_FOR_DISPATCH', 'DISPATCHED'].includes(currentStatus)) {
+        if (currentStatus === 'IN_FACILITY' || currentStatus === 'READY_FOR_DISPATCH') return 'active';
+        return 'completed';
+      }
+      if (['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'].includes(currentStatus)) {
+        return 'completed';
+      }
+      return 'pending';
+    }
+
+    // 3. IN_TRANSIT (Inter-hub Transfer)
+    if (stepKey === 'IN_TRANSIT') {
+      if (currentStatus === 'IN_TRANSIT') return 'active';
+      if (['OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'].includes(currentStatus)) return 'completed';
+      return 'pending';
+    }
+
+    // 4. OUT_FOR_DELIVERY (Last-mile Motorbike Delivery)
+    if (stepKey === 'OUT_FOR_DELIVERY') {
+      if (currentStatus === 'OUT_FOR_DELIVERY') return 'active';
+      if (['DELIVERED', 'COMPLETED'].includes(currentStatus)) return 'completed';
+      return 'pending';
+    }
+
+    // 5. DELIVERED
+    if (stepKey === 'DELIVERED') {
+      if (['DELIVERED', 'COMPLETED'].includes(currentStatus)) return 'completed';
+      return 'pending';
+    }
+
+    return 'pending';
+  };
+
+  const defaultSteps = [
     {
-      key: 'DELIVERED',
-      title: 'Đã giao hàng thành công',
-      desc: 'Đơn hàng đã được bàn giao thành công cho người nhận.',
-      time: timestamps.delivered,
-      icon: <Check size={14} />,
+      key: 'CREATED',
+      title: '1. Khởi tạo đơn hàng',
+      desc: 'Đơn hàng đã được khởi tạo thành công trên hệ thống SLP.',
+      icon: Package,
     },
     {
-      key: 'OUT_FOR_DELIVERY',
-      title: 'Đang giao hàng',
-      desc: 'Tài xế đang vận chuyển đơn hàng đến địa chỉ của bạn.',
-      time: timestamps.out,
-      icon: <Truck size={14} />,
+      key: 'IN_FACILITY',
+      title: '2. Đã nhập kho bưu cục',
+      desc: 'Hàng hóa đã được tiếp nhận và phân loại tại bưu cục.',
+      icon: Warehouse,
     },
     {
       key: 'IN_TRANSIT',
-      title: 'Đang luân chuyển',
-      desc: 'Đơn hàng đang được di chuyển giữa các kho trung chuyển.',
-      time: timestamps.transit,
-      icon: <CircleDot size={14} />,
+      title: '3. Trung chuyển giữa các kho',
+      desc: 'Đơn hàng trên xe tải luân chuyển đến bưu cục giao hàng.',
+      icon: CircleDot,
     },
     {
-      key: 'PICKED_UP', // maps to "Arrived at Hub" in UI
-      title: 'Đã nhập kho trung chuyển',
-      desc: 'Hàng đã được gom và phân loại tại trung tâm khai thác hàng hóa.',
-      time: timestamps.hub,
-      icon: <Warehouse size={14} />,
+      key: 'OUT_FOR_DELIVERY',
+      title: '4. Shipper đang đi giao hàng (Xe máy 🏍️)',
+      desc: 'Shipper đang xếp sọt chở hàng đến tận nơi cho người nhận.',
+      icon: Truck,
     },
     {
-      key: 'CREATED',
-      title: 'Đã tiếp nhận đơn hàng',
-      desc: 'Đơn hàng đã được khởi tạo và ghi nhận trên hệ thống.',
-      time: timestamps.created,
-      icon: <Package size={14} />,
+      key: 'DELIVERED',
+      title: '5. Giao hàng thành công',
+      desc: 'Đơn hàng đã bàn giao hoàn tất cho người nhận.',
+      icon: ShieldCheck,
     },
   ];
 
-  // Helper to determine if a step is completed or active
-  const getStepStatusClass = (stepKey: string) => {
-    if (status === 'CREATED') {
-      if (stepKey === 'CREATED') return 'step-active';
-      return '';
+  // Map steps with actual DB history events if available
+  const displayTimeline = defaultSteps.map((ds) => {
+    const state = getStepState(ds.key);
+
+    let matchedEvent: any = null;
+    if (Array.isArray(timestamps) && timestamps.length > 0) {
+      matchedEvent = timestamps.find((t: any) => {
+        if (ds.key === 'CREATED' && t.status === 'CREATED') return true;
+        if (ds.key === 'IN_FACILITY' && ['IN_FACILITY', 'READY_FOR_DISPATCH', 'PICKED_UP'].includes(t.status)) return true;
+        if (ds.key === 'IN_TRANSIT' && t.status === 'IN_TRANSIT') return true;
+        if (ds.key === 'OUT_FOR_DELIVERY' && t.status === 'OUT_FOR_DELIVERY') return true;
+        if (ds.key === 'DELIVERED' && ['DELIVERED', 'COMPLETED'].includes(t.status)) return true;
+        return false;
+      });
     }
-    if (status === 'PICKED_UP') {
-      if (stepKey === 'CREATED') return 'step-completed';
-      if (stepKey === 'PICKED_UP') return 'step-active';
-      return '';
+
+    let timeString = 'Chờ thực hiện';
+    if (matchedEvent && matchedEvent.timestamp) {
+      timeString = matchedEvent.timestamp;
+    } else if (state === 'completed') {
+      timeString = 'Đã xác nhận';
+    } else if (state === 'active') {
+      timeString = 'Đang thực hiện';
     }
-    if (status === 'IN_TRANSIT') {
-      if (['CREATED', 'PICKED_UP'].includes(stepKey)) return 'step-completed';
-      if (stepKey === 'IN_TRANSIT') return 'step-active';
-      return '';
-    }
-    if (status === 'OUT_FOR_DELIVERY') {
-      if (['CREATED', 'PICKED_UP', 'IN_TRANSIT'].includes(stepKey)) return 'step-completed';
-      if (stepKey === 'OUT_FOR_DELIVERY') return 'step-active';
-      return '';
-    }
-    if (status === 'DELIVERED') {
-      return 'step-completed';
-    }
-    return '';
-  };
+
+    return {
+      key: ds.key,
+      title: matchedEvent?.title || ds.title,
+      desc: matchedEvent?.subtitle || ds.desc,
+      time: timeString,
+      state,
+      IconComp: ds.icon,
+    };
+  });
 
   return (
-    <div className="stepper-vertical">
-      {steps.map((step) => {
-        const statusClass = getStepStatusClass(step.key);
+    <div className="flex flex-col gap-5 relative pl-6 before:absolute before:left-3 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200">
+      {displayTimeline.map((step) => {
+        const Icon = step.IconComp;
+        const isCompleted = step.state === 'completed';
+        const isActive = step.state === 'active';
+
         return (
-          <div key={step.key} className={`step ${statusClass}`}>
-            <div className="step-icon">
-              {step.icon}
+          <div key={step.key} className="relative flex items-start gap-3">
+            {/* Step Icon Badge */}
+            <div
+              className={`absolute -left-6 top-0.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all z-10 ${
+                isActive
+                  ? 'bg-[#bc0100] text-white ring-4 ring-red-100 shadow-md scale-110'
+                  : isCompleted
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-400 border border-slate-300'
+              }`}
+            >
+              {isCompleted ? <Check size={13} strokeWidth={3} /> : isActive ? <Icon size={13} /> : <Clock size={12} />}
             </div>
-            <div className="step-content">
-              <h4 className="step-title">{step.title}</h4>
-              <p className="step-desc">{step.desc}</p>
-              <span className="step-time">{step.time}</span>
+
+            {/* Step Content Box */}
+            <div
+              className={`flex-1 p-3 rounded-lg border transition-all ${
+                isActive
+                  ? 'bg-red-50/60 border-red-300 ring-1 ring-red-200 shadow-xs'
+                  : isCompleted
+                  ? 'bg-white border-slate-200'
+                  : 'bg-slate-50/50 border-slate-200 opacity-60'
+              }`}
+            >
+              <div className="flex justify-between items-start gap-2">
+                <h4 className={`font-bold text-xs ${isActive ? 'text-red-700' : isCompleted ? 'text-slate-800' : 'text-slate-500'}`}>
+                  {step.title}
+                </h4>
+                {isActive && (
+                  <span className="bg-red-600 text-white text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded tracking-wider animate-pulse shrink-0">
+                    ĐANG THỰC HIỆN
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{step.desc}</p>
+              <div className="mt-1 text-[10px] font-medium text-slate-400 font-mono">
+                {step.time}
+              </div>
             </div>
           </div>
         );

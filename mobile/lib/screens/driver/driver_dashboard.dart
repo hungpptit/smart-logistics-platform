@@ -85,7 +85,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     final String str = value.toString();
     final RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
     final String result = str.replaceAllMapped(reg, (Match m) => '${m[1]}.');
-    return '$resultđ';
+    return '$result đ';
   }
 
   bool _isFetchingRoutes = false;
@@ -173,17 +173,28 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     stop['shipment']?['shipmentCode']?.toString() ??
                     (shipmentId != null ? 'ORD-${shipmentId.toString().substring(0, 8).toUpperCase()}' : 'ORD-66266482-0${i + 1}');
 
-                final String receiverName = firstOrder?['receiverName']?.toString() ?? 'Anh Minh';
-                final String receiverPhone = firstOrder?['receiverPhone']?.toString() ?? '0987.654.321';
-                final num codAmount = num.tryParse(firstOrder?['estimatedTotalAmount']?.toString() ?? firstOrder?['codAmount']?.toString() ?? firstOrder?['estimatedCodAmount']?.toString() ?? '35500') ?? 35500;
+                final String receiverName = firstOrder?['receiverName']?.toString() ?? 'Khách nhận';
+                final String receiverPhone = firstOrder?['receiverPhone']?.toString() ?? '';
+                
+                final paymentInfo = firstOrder?['payment'];
+                final String feePayer = (paymentInfo?['feePayer'] ?? firstOrder?['feePayer'] ?? 'SENDER').toString();
+                final num codAmount = num.tryParse(paymentInfo?['finalCodAmount']?.toString() ?? firstOrder?['estimatedCodAmount']?.toString() ?? firstOrder?['codAmount']?.toString() ?? '0') ?? 0;
+                final num shippingFee = num.tryParse(paymentInfo?['finalShippingFee']?.toString() ?? firstOrder?['estimatedTotalAmount']?.toString() ?? firstOrder?['totalAmount']?.toString() ?? '0') ?? 0;
+
+                final bool isReceiverPayFee = (feePayer == 'RECEIVER');
+                final num totalToCollect = stopType == 'DELIVERY' ? (codAmount + (isReceiverPayFee ? shippingFee : 0)) : 0;
 
                 mappedStops.add({
                   'index': i + 1,
                   'id': stop['id'] ?? '$i',
                   'shipmentId': shipmentId,
                   'orderCode': orderCode,
-                  'receiverName': '$receiverName ($receiverPhone)',
+                  'receiverName': receiverPhone.isNotEmpty ? '$receiverName ($receiverPhone)' : receiverName,
                   'codAmount': codAmount,
+                  'shippingFee': shippingFee,
+                  'feePayer': feePayer,
+                  'isReceiverPayFee': isReceiverPayFee,
+                  'totalToCollect': totalToCollect,
                   'title': stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng',
                   'address': address,
                   'latitude': lat,
@@ -2334,17 +2345,58 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  '👤 ${stop['receiverName'] ?? 'Anh Minh (0987.654.321)'}',
+                                  '👤 ${stop['receiverName'] ?? 'Khách nhận'}',
                                   style: const TextStyle(fontSize: 11.0, fontWeight: FontWeight.w600, color: AppColors.deepOnyx),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 8.0),
-                              Text(
-                                '💵 COD: ${_formatCurrency((stop['codAmount'] as num? ?? 0))}',
-                                style: const TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold, color: Colors.green),
-                              ),
                             ],
+                          ),
+                          const SizedBox(height: 8.0),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10.0),
+                            decoration: BoxDecoration(
+                              color: (stop['totalToCollect'] as num? ?? 0) > 0 ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8.0),
+                              border: Border.all(
+                                color: (stop['totalToCollect'] as num? ?? 0) > 0 ? const Color(0xFF166534) : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      (stop['totalToCollect'] as num? ?? 0) > 0 ? '💵 TỔNG CẦN THU KHÁCH:' : '✅ ĐÃ THANH TOÁN / KHÔNG THU TIỀN',
+                                      style: TextStyle(
+                                        fontSize: 11.0,
+                                        fontWeight: FontWeight.w800,
+                                        color: (stop['totalToCollect'] as num? ?? 0) > 0 ? const Color(0xFF166534) : const Color(0xFF475569),
+                                      ),
+                                    ),
+                                    if ((stop['totalToCollect'] as num? ?? 0) > 0)
+                                      Text(
+                                        _formatCurrency((stop['totalToCollect'] as num? ?? 0)),
+                                        style: const TextStyle(
+                                          fontSize: 13.0,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF15803D),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                if ((stop['totalToCollect'] as num? ?? 0) > 0) ...[
+                                  const SizedBox(height: 4.0),
+                                  Text(
+                                    '• Tiền COD thu hộ: ${_formatCurrency((stop['codAmount'] as num? ?? 0))}${(stop['isReceiverPayFee'] == true) ? '\n• Phí ship (Người nhận trả): ${_formatCurrency((stop['shippingFee'] as num? ?? 0))}' : ' (Người gửi đã trả cước)'}',
+                                    style: const TextStyle(fontSize: 10.0, color: Color(0xFF166534), height: 1.3),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         ],
                       ),

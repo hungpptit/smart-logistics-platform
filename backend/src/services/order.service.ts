@@ -228,6 +228,7 @@ export class OrderService {
           orderCode,
           status: 'CREATED',
           pickupType: dto.pickupType || 'PICKUP',
+          scheduledPickupAt: dto.scheduledPickupAt ? new Date(dto.scheduledPickupAt) : null,
           originFacilityId,
           destinationFacilityId,
 
@@ -272,6 +273,8 @@ export class OrderService {
             isFragile: pkg.isFragile || false,
             temperatureRequirement: pkg.temperatureRequirement || null,
             requiredVehicleTypeId: pkg.requiredVehicleTypeId || null,
+            description: pkg.description || null,
+            declaredValue: pkg.declaredValue ? pkg.declaredValue : null,
           },
         });
       }

@@ -11,6 +11,7 @@ import routingRouter from './routing.routes';
 import settingRouter from './setting.routes';
 import vehicleRouter from './vehicle.routes';
 import shipmentRouter from './shipment.routes';
+import trackingRouter from './tracking.route';
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use('/routes', routingRouter);
 router.use('/settings', settingRouter);
 router.use('/vehicles', vehicleRouter);
 router.use('/shipments', shipmentRouter);
+router.use('/tracking', trackingRouter);
 
 export default router;

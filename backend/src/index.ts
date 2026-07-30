@@ -5,6 +5,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRouter from './routes';
+import trackingRouter from './routes/tracking.route';
 import { errorMiddleware } from './middlewares/error.middleware';
 import { connectRedis } from './config/redis';
 import swaggerUi from 'swagger-ui-express';
@@ -37,6 +38,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Mount central routing system
 app.use('/api/v1', apiRouter);
+app.use('/api/tracking', trackingRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

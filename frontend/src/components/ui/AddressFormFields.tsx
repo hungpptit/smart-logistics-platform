@@ -18,6 +18,9 @@ interface AddressFormFieldsProps {
     longitude?: number;
   }) => void;
   required?: boolean;
+  hasErrorProvince?: boolean;
+  hasErrorWard?: boolean;
+  hasErrorAddressLine1?: boolean;
 }
 
 export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
@@ -28,6 +31,9 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
   addressLine1,
   onChange,
   required = true,
+  hasErrorProvince,
+  hasErrorWard,
+  hasErrorAddressLine1,
 }) => {
   const [provinces, setProvinces] = useState<any[]>([]);
   const [loadingProvinces, setLoadingProvinces] = useState<boolean>(false);
@@ -243,8 +249,8 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Tỉnh / TP</label>
+        <div className={`flex flex-col gap-1 rounded-md transition-all ${hasErrorProvince ? 'ring-2 ring-red-500 rounded p-0.5 bg-red-50/40' : ''}`}>
+          <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Tỉnh / TP {hasErrorProvince && <span className="text-red-500">*</span>}</label>
           <SearchableSelect
             options={provinces.map((p) => ({ value: p.code, label: p.fullName || p.name }))}
             value={provinceCode}
@@ -254,8 +260,8 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
             required={required}
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Phường / Xã</label>
+        <div className={`flex flex-col gap-1 rounded-md transition-all ${hasErrorWard ? 'ring-2 ring-red-500 rounded p-0.5 bg-red-50/40' : ''}`}>
+          <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Phường / Xã {hasErrorWard && <span className="text-red-500">*</span>}</label>
           <SearchableSelect
             options={wards.map((w) => ({ value: w.code, label: w.fullName || w.name }))}
             value={wardCode}
@@ -269,7 +275,7 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
       </div>
       <div className="flex flex-col gap-1 relative">
         <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">
-          Địa chỉ chi tiết (Số nhà, đường) {loadingSuggestions && <span className="text-[8px] text-gray-400 normal-case">(Đang tìm...)</span>}
+          Địa chỉ chi tiết (Số nhà, đường) {loadingSuggestions && <span className="text-[8px] text-gray-400 normal-case">(Đang tìm...)</span>} {hasErrorAddressLine1 && <span className="text-red-500">*</span>}
         </label>
         <input
           type="text"
@@ -279,7 +285,7 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
           onChange={handleAddressLine1Change}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
           onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-          className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
+          className={`w-full px-3 py-2 border rounded outline-none transition-colors ${hasErrorAddressLine1 ? 'border-red-500 bg-red-50/50 ring-1 ring-red-500' : 'border-[#e2e8f0] focus:border-[#bc0100]'}`}
         />
         {showSuggestions && suggestions.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#e2e8f0] rounded shadow-lg z-50 max-h-48 overflow-y-auto">

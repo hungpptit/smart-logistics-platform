@@ -71,6 +71,14 @@ export class CreateOrderPackageDto {
   @IsOptional()
   temperatureRequirement?: string;
 
+  @IsString({ message: 'Mô tả hàng hóa phải là một chuỗi ký tự' })
+  @IsOptional()
+  description?: string;
+
+  @IsNumber({}, { message: 'Giá trị khai giá phải là một số thực' })
+  @IsOptional()
+  declaredValue?: number;
+
   @IsUUID('4', { message: 'ID loại xe yêu cầu phải là UUID hợp lệ' })
   @IsOptional()
   requiredVehicleTypeId?: string;
@@ -130,6 +138,10 @@ export class CreateOrderDto {
   @IsEnum(PickupType, { message: 'Hình thức gửi hàng không hợp lệ (PICKUP hoặc DROP_OFF)' })
   @IsOptional()
   pickupType?: PickupType;
+
+  @IsString({ message: 'Lịch hẹn lấy hàng phải là một chuỗi ký tự ISO Date' })
+  @IsOptional()
+  scheduledPickupAt?: string;
 
   // Danh sách gói hàng/kiện hàng
   @IsArray({ message: 'Danh sách gói hàng phải là một mảng' })

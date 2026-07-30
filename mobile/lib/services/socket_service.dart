@@ -19,15 +19,18 @@ class SocketService {
       return;
     }
 
-    final serverUrl = AppConfig.baseUrl.replaceAll('/api/v1', '');
+    final serverUrl = AppConfig.baseUrl.replaceAll('/api/v1', '').replaceAll('/api', '');
     debugPrint('🔌 [SocketService] Đang kết nối tới Gateway Socket: $serverUrl');
 
     _socket = io.io(
       serverUrl,
       io.OptionBuilder()
           .setTransports(['websocket', 'polling'])
-          .disableAutoConnect()
-          .setExtraHeaders(token != null ? {'Authorization': 'Bearer $token'} : {})
+          .enableReconnection()
+          .setExtraHeaders({
+            'ngrok-skip-browser-warning': 'true',
+            if (token != null) 'Authorization': 'Bearer $token',
+          })
           .build(),
     );
 

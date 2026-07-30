@@ -1,101 +1,167 @@
 import React, { useEffect, useRef } from 'react';
-import { Map, MapControls, MapMarker, MarkerContent, MapRoute, MarkerPopup } from '@/components/ui/map';
-import { MapPin, Truck } from 'lucide-react';
+import { Map, MapControls, MapMarker, MarkerContent, MarkerPopup } from '@/components/ui/map';
+import { User, Building2 } from 'lucide-react';
 import MapLibreGL from 'maplibre-gl';
 
+// Vector SVG Xe Máy Chuẩn Silhouette Side-View (Theo Ảnh Mẫu)
+const MotorbikeIcon = ({ className = "w-6 h-6 text-white" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.44 9.25l-2.02-3.5A2 2 0 0015.69 4.7H13a1 1 0 000 2h2.69l1.45 2.5H12a1 1 0 00-.86.49l-2.5 4.33a4.5 4.5 0 101.73 1.01l1.76-3.03H16a4.5 4.5 0 103.44-2.75zM5.5 18a2.5 2.5 0 112.5-2.5A2.5 2.5 0 015.5 18zm13 0a2.5 2.5 0 112.5-2.5 2.5 2.5 0 01-2.5 2.5z"/>
+  </svg>
+);
+
 interface MapcnMapProps {
-  route: [number, number][]; // Coming in as [lat, lng] from mockDb
-  currentPos: [number, number]; // Coming in as [lat, lng]
-  destination: string;
+  route?: [number, number][]; // [lat, lng]
+  currentPos: [number, number]; // Shipper GPS or Facility GPS [lat, lng]
+  destination?: string;
+  receiverPos?: [number, number]; // Receiver GPS [lat, lng]
+  facilityPos?: [number, number]; // Facility GPS [lat, lng]
+  facilityName?: string;
+  shipperName?: string;
+  vehiclePlate?: string;
+  statusLabel?: string;
+  isOutForDelivery?: boolean; // true if Shipper is delivering by motorbike
 }
 
-export const MapcnMap: React.FC<MapcnMapProps> = ({ route, currentPos, destination }) => {
+export const MapcnMap: React.FC<MapcnMapProps> = ({
+  route = [],
+  currentPos,
+  destination = 'Địa chỉ người nhận',
+  receiverPos,
+  facilityPos,
+  facilityName = 'Bưu cục Phước Long',
+  shipperName = 'Shipper SLP',
+  vehiclePlate = 'Xe máy chuyên dụng',
+  statusLabel = 'Đang di chuyển',
+  isOutForDelivery = false,
+}) => {
   const mapRef = useRef<MapLibreGL.Map | null>(null);
 
-  // Convert route coordinates from [lat, lng] to [lng, lat] for MapLibre GL
-  const formattedRoute = route.map((coord) => [coord[1], coord[0]] as [number, number]);
-  const formattedCurrentPos = [currentPos[1], currentPos[0]] as [number, number];
+  // Convert coordinates to [lng, lat] for MapLibre GL
+  const formattedCurrentPos: [number, number] = [currentPos[1], currentPos[0]];
 
-  // Destination is the last coordinate of the route
-  const destCoords = formattedRoute[formattedRoute.length - 1];
+  const facilityCoords: [number, number] | null = facilityPos ? [facilityPos[1], facilityPos[0]] : formattedCurrentPos;
 
-  // Auto-fit bounds whenever the route changes
+  // Determine receiver coordinates (or fallback to destination of route)
+  let receiverCoords: [number, number] | null = receiverPos ? [receiverPos[1], receiverPos[0]] : null;
+  if (!receiverCoords && route && route.length > 0) {
+    const lastPoint = route[route.length - 1];
+    receiverCoords = [lastPoint[1], lastPoint[0]];
+  }
+
+  // All active points for auto-fit bounds
+  const allPoints: [number, number][] = [formattedCurrentPos];
+  if (receiverCoords) allPoints.push(receiverCoords);
+  if (facilityCoords) allPoints.push(facilityCoords);
+
+  // Auto-fit bounds whenever position updates
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || formattedRoute.length === 0) return;
+    if (!map || allPoints.length === 0) return;
 
-    const lons = formattedRoute.map((c) => c[0]);
-    const lats = formattedRoute.map((c) => c[1]);
+    const lons = allPoints.map((c) => c[0]);
+    const lats = allPoints.map((c) => c[1]);
 
     const minLon = Math.min(...lons);
     const maxLon = Math.max(...lons);
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
 
-    // Give some padding to make it look premium
     map.fitBounds([minLon, minLat, maxLon, maxLat], {
-      padding: { top: 60, bottom: 60, left: 60, right: 60 },
-      duration: 1200,
+      padding: { top: 80, bottom: 80, left: 80, right: 80 },
+      duration: 1000,
     });
-  }, [route]);
-
-  // Center on current position if no route is loaded
-  const centerCoord = formattedRoute.length > 0 ? formattedCurrentPos : [106.660172, 10.762622] as [number, number];
+  }, [currentPos, receiverPos]);
 
   return (
-    <div className="relative w-full h-full min-h-[450px] overflow-hidden rounded-lg border border-slate-200 shadow-sm">
+    <div className="relative w-full h-full min-h-[470px] overflow-hidden rounded-xl border border-slate-200 shadow-sm bg-slate-50">
+      {/* Live Badge Banner overlay */}
+      <div className="absolute top-3 left-3 z-10 bg-slate-900/90 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 border border-slate-700 shadow-md">
+        <div className={`w-2.5 h-2.5 rounded-full ${isOutForDelivery ? 'bg-red-500 animate-ping' : 'bg-blue-400'}`}></div>
+        <span className="font-bold text-[11px] uppercase tracking-wider text-white">
+          {isOutForDelivery ? 'ĐỊNH VỊ REAL-TIME SHIPPER XE MÁY 🏍️' : 'ĐƠN HÀNG LƯU TẠI BƯU CỤC 🏢'}
+        </span>
+      </div>
+
       <Map
         ref={mapRef}
-        center={centerCoord}
-        zoom={12}
-        className="w-full h-full min-h-[450px]"
+        center={isOutForDelivery ? formattedCurrentPos : (facilityCoords || formattedCurrentPos)}
+        zoom={14}
+        className="w-full h-full min-h-[470px]"
       >
-        {/* Render Route Polyline */}
-        {formattedRoute.length >= 2 && (
-          <MapRoute
-            coordinates={formattedRoute}
-            color="#bc0100" // Velocity Logistics Red
-            width={4}
-            opacity={0.9}
-            dashArray={[2, 2]} // Dashed routing line style
-          />
-        )}
-
-        {/* Destination Marker */}
-        {destCoords && (
-          <MapMarker longitude={destCoords[0]} latitude={destCoords[1]}>
+        {/* 👤 Receiver Marker (Icon Hình Người) with Pulsing Animation Ring */}
+        {receiverCoords && (
+          <MapMarker longitude={receiverCoords[0]} latitude={receiverCoords[1]}>
             <MarkerContent>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-red-600 shadow-md transition-transform duration-200 hover:scale-110">
-                <MapPin className="h-5 w-5 text-white" />
+              <div className="relative flex items-center justify-center cursor-pointer group">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-emerald-600 shadow-xl transition-transform duration-200 group-hover:scale-125 z-20">
+                  <User className="h-6 w-6 text-white" />
+                </div>
+                <span className="absolute -inset-2 animate-ping rounded-full border-2 border-emerald-500/80 opacity-90 z-10"></span>
               </div>
             </MarkerContent>
             <MarkerPopup closeButton={false}>
-              <div className="p-1 font-sans text-xs">
-                <h4 className="font-bold text-slate-800 text-sm">Điểm Đến</h4>
-                <p className="text-slate-600 mt-0.5">{destination}</p>
+              <div className="p-1.5 font-sans text-xs space-y-1">
+                <div className="flex items-center gap-1.5 text-emerald-700 font-extrabold text-xs">
+                  <User className="h-4 w-4 text-emerald-600" />
+                  <span>NGƯỜI NHẬN HÀNG</span>
+                </div>
+                <p className="text-slate-700 font-medium text-[11px] leading-snug">{destination}</p>
               </div>
             </MarkerPopup>
           </MapMarker>
         )}
 
-        {/* Live Driver Marker */}
-        <MapMarker longitude={formattedCurrentPos[0]} latitude={formattedCurrentPos[1]}>
-          <MarkerContent>
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-red-600 bg-slate-900 shadow-lg transition-transform duration-200 hover:scale-110">
-              <Truck className="h-5 w-5 text-white" />
-              {/* Pulse effect animation wrapper */}
-              <span className="absolute -inset-1 animate-ping rounded-full border-2 border-red-500/40 opacity-75"></span>
-            </div>
-          </MarkerContent>
-          <MarkerPopup closeButton={false}>
-            <div className="p-1 font-sans text-xs">
-              <h4 className="font-bold text-slate-800 text-sm">Tài xế giao nhận</h4>
-              <p className="text-slate-600 mt-0.5">Tọa độ: {currentPos[0].toFixed(5)}, {currentPos[1].toFixed(5)}</p>
-            </div>
-          </MarkerPopup>
-        </MapMarker>
+        {/* 🏢 IF NOT Out for Delivery -> Render Facility Marker (Bưu Cục) */}
+        {!isOutForDelivery && facilityCoords && (
+          <MapMarker longitude={facilityCoords[0]} latitude={facilityCoords[1]}>
+            <MarkerContent>
+              <div className="relative flex items-center justify-center cursor-pointer group">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-indigo-600 shadow-2xl transition-all duration-300 group-hover:scale-125 z-30">
+                  <Building2 className="h-6 w-6 text-white" />
+                </div>
+                <span className="absolute -inset-2 animate-ping rounded-full border-2 border-indigo-500/80 opacity-90 z-20"></span>
+              </div>
+            </MarkerContent>
+            <MarkerPopup closeButton={false}>
+              <div className="p-1.5 font-sans text-xs space-y-1">
+                <div className="flex items-center gap-1 text-indigo-700 font-extrabold text-xs">
+                  <Building2 className="h-4 w-4 text-indigo-600" />
+                  <span>ĐƠN HÀNG ĐANG Ở BƯU CỤC</span>
+                </div>
+                <p className="text-slate-800 font-bold">{facilityName}</p>
+                <p className="text-slate-500 text-[10px]">Trạng thái: {statusLabel}</p>
+              </div>
+            </MarkerPopup>
+          </MapMarker>
+        )}
 
-        {/* Map Controls (Zoom in/out, bearing, fullscreen) */}
+        {/* 🏍️ IF Out for Delivery -> Render Live Shipper Motorbike Marker */}
+        {isOutForDelivery && (
+          <MapMarker longitude={formattedCurrentPos[0]} latitude={formattedCurrentPos[1]}>
+            <MarkerContent>
+              <div className="relative flex items-center justify-center cursor-pointer group">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-[#bc0100] shadow-2xl transition-all duration-300 group-hover:scale-125 z-30">
+                  <MotorbikeIcon className="h-7 w-7 text-white" />
+                </div>
+                <span className="absolute -inset-2 animate-ping rounded-full border-2 border-[#bc0100]/80 opacity-90 z-20"></span>
+              </div>
+            </MarkerContent>
+            <MarkerPopup closeButton={false}>
+              <div className="p-1.5 font-sans text-xs space-y-1">
+                <div className="flex items-center gap-1 text-[#bc0100] font-extrabold text-xs">
+                  <MotorbikeIcon className="h-4 w-4 text-[#bc0100]" />
+                  <span>SHIPPER XE MÁY ĐANG ĐẾN</span>
+                </div>
+                <p className="text-slate-800 font-bold">{shipperName} ({vehiclePlate})</p>
+                <p className="text-slate-500 text-[10px]">Trạng thái: {statusLabel}</p>
+                <p className="text-slate-400 font-mono text-[9px]">GPS: {currentPos[0].toFixed(5)}, {currentPos[1].toFixed(5)}</p>
+              </div>
+            </MarkerPopup>
+          </MapMarker>
+        )}
+
+        {/* Map Controls */}
         <MapControls showZoom showCompass showFullscreen className="bottom-4 right-4" />
       </Map>
     </div>

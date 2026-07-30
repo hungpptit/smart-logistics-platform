@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Package, MapPin, Truck, User } from 'lucide-react';
+import { X, Package, MapPin, Truck, User, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, HelpCircle, ShieldCheck } from 'lucide-react';
 import { CONFIG } from '../../../config';
 import { geocodeAddress } from '../../../lib/geocoding';
 import { Map, MapMarker, MarkerContent, MapControls } from '../../../components/ui/map';
 import { AddressFormFields } from '../../../components/ui/AddressFormFields';
 import { useMapConfirmation } from '../../../hooks/useMapConfirmation';
+import { formatCurrency } from '../../../lib/utils';
 
 interface CreateOrderModalProps {
   isOpen: boolean;
@@ -14,6 +15,19 @@ interface CreateOrderModalProps {
   isAdminOrStaff: boolean;
 }
 
+// Regex format kiểm tra Số điện thoại hợp lệ (bắt đầu bằng 0 hoặc +84, gồm 10-11 chữ số)
+const VIETNAM_PHONE_REGEX = /^(0|\+84)[0-9]{9,10}$/;
+
+// Hàm làm sạch chuỗi đầu vào chống mã độc HTML / XSS Injection
+const sanitizeInput = (inputStr: string): string => {
+  if (!inputStr) return '';
+  return inputStr
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '');
+};
+
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   isOpen,
   onClose,
@@ -21,6 +35,28 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   token,
   isAdminOrStaff,
 }) => {
+  // Step Wizard State (1: Sender, 2: Receiver, 3: Package, 4: Service & Payment)
+  const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(1);
+
+  // Form Validation & Red Border Errors State
+  const [showErrors, setShowErrors] = useState<boolean>(false);
+  const [errors, setErrors] = useState<Record<string, boolean>>({});
+  const [errorMessages, setErrorMessages] = useState<Record<string, string>>({});
+
+  // Confirmation & Notification Modal Popups State
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [notificationState, setNotificationState] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: 'success',
+    title: '',
+    message: '',
+  });
+
   const [customers, setCustomers] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
@@ -46,21 +82,17 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   // Sender Coordinates & Map States
   const [senderLatitude, setSenderLatitude] = useState<number>(0);
   const [senderLongitude, setSenderLongitude] = useState<number>(0);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([105.8542, 21.0285]);
-  const [geocodingLoading, setGeocodingLoading] = useState<boolean>(false);
-  const mapRef = useRef<any>(null);
+  const [senderMapCenter, setSenderMapCenter] = useState<[number, number]>([105.8542, 21.0285]);
+  const [senderGeocodingLoading, setSenderGeocodingLoading] = useState<boolean>(false);
+  const senderMapRef = useRef<any>(null);
 
   const {
-    tempLatitude,
-    tempLongitude,
-    setTempLatitude,
-    setTempLongitude,
-    onMapClick,
-    onMarkerDragEnd,
-    onLocate,
-    handleCancel,
-    handleConfirm,
-    hasChanges
+    tempLatitude: senderTempLat,
+    tempLongitude: senderTempLng,
+    setTempLatitude: setSenderTempLat,
+    setTempLongitude: setSenderTempLng,
+    onMapClick: onSenderMapClick,
+    onMarkerDragEnd: onSenderMarkerDragEnd,
   } = useMapConfirmation({
     latitude: senderLatitude,
     longitude: senderLongitude,
@@ -68,25 +100,69 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       setSenderLatitude(lat);
       setSenderLongitude(lng);
     },
-    mapRef
+    mapRef: senderMapRef
   });
 
-  // Reset coordinates and center map on open
+  // Receiver States & Map States
+  const [receiverName, setReceiverName] = useState('');
+  const [receiverPhone, setReceiverPhone] = useState('');
+  const [receiverAddressLine1, setReceiverAddressLine1] = useState('');
+  const [receiverWard, setReceiverWard] = useState('');
+  const [receiverProvince, setReceiverProvince] = useState('');
+  const [receiverProvinceCode, setReceiverProvinceCode] = useState('');
+  const [receiverWardCode, setReceiverWardCode] = useState('');
+  const [receiverLatitude, setReceiverLatitude] = useState<number>(0);
+  const [receiverLongitude, setReceiverLongitude] = useState<number>(0);
+  const [receiverMapCenter, setReceiverMapCenter] = useState<[number, number]>([105.8542, 21.0285]);
+  const [receiverGeocodingLoading, setReceiverGeocodingLoading] = useState<boolean>(false);
+  const receiverMapRef = useRef<any>(null);
+
+  const {
+    tempLatitude: receiverTempLat,
+    tempLongitude: receiverTempLng,
+    setTempLatitude: setReceiverTempLat,
+    setTempLongitude: setReceiverTempLng,
+    onMapClick: onReceiverMapClick,
+    onMarkerDragEnd: onReceiverMarkerDragEnd,
+  } = useMapConfirmation({
+    latitude: receiverLatitude,
+    longitude: receiverLongitude,
+    onChange: (lat, lng) => {
+      setReceiverLatitude(lat);
+      setReceiverLongitude(lng);
+    },
+    mapRef: receiverMapRef
+  });
+
+  // Reset coordinates and states on modal open/close
   useEffect(() => {
     if (isOpen) {
+      setActiveStep(1);
+      setShowErrors(false);
+      setErrors({});
+      setErrorMessages({});
+      setShowConfirmModal(false);
+      setNotificationState({ isOpen: false, type: 'success', title: '', message: '' });
       setSenderLatitude(0);
       setSenderLongitude(0);
       setReceiverLatitude(0);
       setReceiverLongitude(0);
-      setMapCenter([105.8542, 21.0285]);
-      
-      // Fix map container size in modal
-      if (mapRef.current) {
-        setTimeout(() => {
-          mapRef.current.resize();
-        }, 300);
+      setSenderMapCenter([105.8542, 21.0285]);
+      setReceiverMapCenter([105.8542, 21.0285]);
+
+      if (senderMapRef.current) {
+        setTimeout(() => senderMapRef.current.resize(), 300);
+      }
+      if (receiverMapRef.current) {
+        setTimeout(() => receiverMapRef.current.resize(), 300);
       }
     } else {
+      setActiveStep(1);
+      setShowErrors(false);
+      setErrors({});
+      setErrorMessages({});
+      setShowConfirmModal(false);
+      setNotificationState({ isOpen: false, type: 'success', title: '', message: '' });
       setSenderName('');
       setSenderPhone('');
       setSenderAddressLine1('');
@@ -101,27 +177,32 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       setReceiverProvince('');
       setReceiverProvinceCode('');
       setReceiverWardCode('');
+      setDescription('');
+      setDeclaredValue('');
+      setPickupDateOption('TODAY');
+      setPickupShiftOption('MORNING');
     }
   }, [isOpen]);
 
-  const mapCallbackRef = useCallback((mapInstance: any) => {
-    mapRef.current = mapInstance;
+  const senderMapCallbackRef = useCallback((mapInstance: any) => {
+    senderMapRef.current = mapInstance;
     if (!mapInstance) return;
+    setTimeout(() => mapInstance.resize(), 300);
+    mapInstance.on('click', onSenderMapClick);
+  }, [onSenderMapClick]);
 
-    // Trigger map resize shortly after loading to ensure it sizes correctly in modal
-    setTimeout(() => {
-      mapInstance.resize();
-    }, 300);
+  const receiverMapCallbackRef = useCallback((mapInstance: any) => {
+    receiverMapRef.current = mapInstance;
+    if (!mapInstance) return;
+    setTimeout(() => mapInstance.resize(), 300);
+    mapInstance.on('click', onReceiverMapClick);
+  }, [onReceiverMapClick]);
 
-    mapInstance.on('click', onMapClick);
-  }, [onMapClick]);
-
-  const handleAutoLocate = async () => {
+  const handleSenderAutoLocate = async () => {
     if (!senderAddressLine1 && !senderWard && !senderProvince) return;
-
-    setGeocodingLoading(true);
+    setSenderGeocodingLoading(true);
     const fullAddress = [senderAddressLine1, senderWard, senderProvince].filter(Boolean).join(', ');
-    
+
     try {
       const coords = await geocodeAddress(fullAddress, token || '');
       if (coords) {
@@ -129,32 +210,49 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         const lng = parseFloat(coords.longitude.toFixed(6));
         setSenderLatitude(lat);
         setSenderLongitude(lng);
-        setTempLatitude(lat);
-        setTempLongitude(lng);
-        setMapCenter([lng, lat]);
-        mapRef.current?.flyTo({
+        setSenderTempLat(lat);
+        setSenderTempLng(lng);
+        setSenderMapCenter([lng, lat]);
+        senderMapRef.current?.flyTo({
           center: [lng, lat],
           zoom: 15,
           duration: 1000
         });
       }
     } catch (err) {
-      console.error('Error auto-locating address:', err);
+      console.error('Error auto-locating sender address:', err);
     } finally {
-      setGeocodingLoading(false);
+      setSenderGeocodingLoading(false);
     }
   };
 
-  // Receiver States
-  const [receiverName, setReceiverName] = useState('');
-  const [receiverPhone, setReceiverPhone] = useState('');
-  const [receiverAddressLine1, setReceiverAddressLine1] = useState('');
-  const [receiverWard, setReceiverWard] = useState('');
-  const [receiverProvince, setReceiverProvince] = useState('');
-  const [receiverProvinceCode, setReceiverProvinceCode] = useState('');
-  const [receiverWardCode, setReceiverWardCode] = useState('');
-  const [receiverLatitude, setReceiverLatitude] = useState<number>(0);
-  const [receiverLongitude, setReceiverLongitude] = useState<number>(0);
+  const handleReceiverAutoLocate = async () => {
+    if (!receiverAddressLine1 && !receiverWard && !receiverProvince) return;
+    setReceiverGeocodingLoading(true);
+    const fullAddress = [receiverAddressLine1, receiverWard, receiverProvince].filter(Boolean).join(', ');
+
+    try {
+      const coords = await geocodeAddress(fullAddress, token || '');
+      if (coords) {
+        const lat = parseFloat(coords.latitude.toFixed(6));
+        const lng = parseFloat(coords.longitude.toFixed(6));
+        setReceiverLatitude(lat);
+        setReceiverLongitude(lng);
+        setReceiverTempLat(lat);
+        setReceiverTempLng(lng);
+        setReceiverMapCenter([lng, lat]);
+        receiverMapRef.current?.flyTo({
+          center: [lng, lat],
+          zoom: 15,
+          duration: 1000
+        });
+      }
+    } catch (err) {
+      console.error('Error auto-locating receiver address:', err);
+    } finally {
+      setReceiverGeocodingLoading(false);
+    }
+  };
 
   // Helper to calculate distance in Km between two coordinates
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -162,11 +260,11 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     const R = 6371; // Earth's radius in km
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return parseFloat((R * c).toFixed(2));
   };
 
@@ -183,9 +281,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           const lng = parseFloat(coords.longitude.toFixed(6));
           setSenderLatitude(lat);
           setSenderLongitude(lng);
-          setTempLatitude(lat);
-          setTempLongitude(lng);
-          setMapCenter([lng, lat]);
+          setSenderTempLat(lat);
+          setSenderTempLng(lng);
+          setSenderMapCenter([lng, lat]);
         }
       } catch (err) {
         console.error('Error auto-geocoding sender address:', err);
@@ -197,7 +295,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
   // Auto-geocode receiver address in background to get destination coordinates for fee calculation
   useEffect(() => {
-    if (!receiverAddressLine1 || !receiverWard || !receiverProvince || !token) return;
+    if (receiverLatitude !== 0 || !receiverAddressLine1 || !receiverWard || !receiverProvince || !token) return;
 
     const delayDebounceFn = setTimeout(async () => {
       try {
@@ -208,6 +306,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           const lng = parseFloat(coords.longitude.toFixed(6));
           setReceiverLatitude(lat);
           setReceiverLongitude(lng);
+          setReceiverTempLat(lat);
+          setReceiverTempLng(lng);
+          setReceiverMapCenter([lng, lat]);
         }
       } catch (err) {
         console.error('Error auto-geocoding receiver address:', err);
@@ -215,7 +316,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     }, 1000);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [receiverAddressLine1, receiverWard, receiverProvince, token]);
+  }, [receiverAddressLine1, receiverWard, receiverProvince, token, receiverLatitude]);
 
   // Package States
   const [weight, setWeight] = useState<number>(1.0);
@@ -224,6 +325,12 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [height, setHeight] = useState<number>(10);
   const [isFragile, setIsFragile] = useState(false);
   const [temperatureRequirement, setTemperatureRequirement] = useState('');
+  const [description, setDescription] = useState('');
+  const [declaredValue, setDeclaredValue] = useState<number | ''>('');
+
+  // Fixed Pickup Time Slots (Morning: 10:30-12:00, Afternoon: 16:00-18:00)
+  const [pickupDateOption, setPickupDateOption] = useState<'TODAY' | 'TOMORROW'>('TODAY');
+  const [pickupShiftOption, setPickupShiftOption] = useState<'MORNING' | 'AFTERNOON'>('MORNING');
 
   // Fetch initial data (customers if admin, active services)
   useEffect(() => {
@@ -267,11 +374,172 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) return;
+  // Validate single step & return error flags + messages
+  const validateSingleStep = (stepNumber: 1 | 2 | 3 | 4) => {
+    const errs: Record<string, boolean> = {};
+    const msgs: Record<string, string> = {};
 
+    if (stepNumber === 1) {
+      if (isAdminOrStaff && !customerId) {
+        errs.customerId = true;
+        msgs.customerId = 'Vui lòng chọn khách hàng thanh toán!';
+      }
+      if (!senderName.trim()) {
+        errs.senderName = true;
+        msgs.senderName = 'Vui lòng nhập họ tên người gửi!';
+      }
+      const cleanSenderPhone = senderPhone.replace(/[\s\.\-\(\)]/g, '');
+      if (!cleanSenderPhone) {
+        errs.senderPhone = true;
+        msgs.senderPhone = 'Vui lòng nhập số điện thoại người gửi!';
+      } else if (!VIETNAM_PHONE_REGEX.test(cleanSenderPhone)) {
+        errs.senderPhone = true;
+        msgs.senderPhone = 'Số điện thoại không hợp lệ! Vui lòng nhập SĐT gồm 10 chữ số (VD: 0901234567 hoặc 0120741289)';
+      }
+      if (!senderAddressLine1.trim()) {
+        errs.senderAddressLine1 = true;
+        msgs.senderAddressLine1 = 'Vui lòng nhập số nhà, tên đường!';
+      }
+      if (!senderProvinceCode || !senderProvince) {
+        errs.senderProvince = true;
+        msgs.senderProvince = 'Vui lòng chọn Tỉnh/TP!';
+      }
+      if (!senderWardCode || !senderWard) {
+        errs.senderWard = true;
+        msgs.senderWard = 'Vui lòng chọn Phường/Xã!';
+      }
+    } else if (stepNumber === 2) {
+      if (!receiverName.trim()) {
+        errs.receiverName = true;
+        msgs.receiverName = 'Vui lòng nhập họ tên người nhận!';
+      }
+      const cleanReceiverPhone = receiverPhone.replace(/[\s\.\-\(\)]/g, '');
+      if (!cleanReceiverPhone) {
+        errs.receiverPhone = true;
+        msgs.receiverPhone = 'Vui lòng nhập số điện thoại người nhận!';
+      } else if (!VIETNAM_PHONE_REGEX.test(cleanReceiverPhone)) {
+        errs.receiverPhone = true;
+        msgs.receiverPhone = 'Số điện thoại không hợp lệ! Vui lòng nhập SĐT gồm 10 chữ số (VD: 0987654321 hoặc 0120741289)';
+      }
+      if (!receiverAddressLine1.trim()) {
+        errs.receiverAddressLine1 = true;
+        msgs.receiverAddressLine1 = 'Vui lòng nhập số nhà, tên đường!';
+      }
+      if (!receiverProvinceCode || !receiverProvince) {
+        errs.receiverProvince = true;
+        msgs.receiverProvince = 'Vui lòng chọn Tỉnh/TP!';
+      }
+      if (!receiverWardCode || !receiverWard) {
+        errs.receiverWard = true;
+        msgs.receiverWard = 'Vui lòng chọn Phường/Xã!';
+      }
+    } else if (stepNumber === 3) {
+      if (!weight || weight <= 0 || isNaN(weight)) {
+        errs.weight = true;
+        msgs.weight = 'Trọng lượng phải lớn hơn 0 kg!';
+      }
+      if (!length || length <= 0 || isNaN(length)) {
+        errs.length = true;
+        msgs.length = 'Chiều dài phải lớn hơn 0 cm!';
+      }
+      if (!width || width <= 0 || isNaN(width)) {
+        errs.width = true;
+        msgs.width = 'Chiều rộng phải lớn hơn 0 cm!';
+      }
+      if (!height || height <= 0 || isNaN(height)) {
+        errs.height = true;
+        msgs.height = 'Chiều cao phải lớn hơn 0 cm!';
+      }
+    }
+
+    return { isValid: Object.keys(errs).length === 0, errs, msgs };
+  };
+
+  // Find the earliest step with missing/invalid info across steps 1..4
+  const checkAllStepsForErrors = () => {
+    const accumulatedErrors: Record<string, boolean> = {};
+    const accumulatedMsgs: Record<string, string> = {};
+    let earliestInvalidStep: 1 | 2 | 3 | 4 | null = null;
+
+    for (let s = 1; s <= 4; s++) {
+      const { isValid, errs, msgs } = validateSingleStep(s as 1 | 2 | 3 | 4);
+      if (!isValid) {
+        Object.assign(accumulatedErrors, errs);
+        Object.assign(accumulatedMsgs, msgs);
+        if (!earliestInvalidStep) {
+          earliestInvalidStep = s as 1 | 2 | 3 | 4;
+        }
+      }
+    }
+
+    return { earliestInvalidStep, accumulatedErrors, accumulatedMsgs };
+  };
+
+  // Unrestricted Tab Click Handler (User can preview ANY tab freely)
+  const handleSelectTab = (targetStep: 1 | 2 | 3 | 4) => {
+    setActiveStep(targetStep);
+    if (targetStep === 1) setTimeout(() => senderMapRef.current?.resize(), 300);
+    if (targetStep === 2) setTimeout(() => receiverMapRef.current?.resize(), 300);
+  };
+
+  const handleNextStep = () => {
+    if (activeStep < 4) {
+      const nextStep = (activeStep + 1) as 1 | 2 | 3 | 4;
+      handleSelectTab(nextStep);
+    }
+  };
+
+  const handlePrevStep = () => {
+    if (activeStep > 1) {
+      const prevStep = (activeStep - 1) as 1 | 2 | 3 | 4;
+      handleSelectTab(prevStep);
+    }
+  };
+
+  // Trigger Confirmation Modal from Tab 4 Button
+  const handleOpenConfirmModal = () => {
+    setShowErrors(true);
+    const { earliestInvalidStep, accumulatedErrors, accumulatedMsgs } = checkAllStepsForErrors();
+    setErrors(accumulatedErrors);
+    setErrorMessages(accumulatedMsgs);
+
+    if (earliestInvalidStep) {
+      setActiveStep(earliestInvalidStep);
+      if (earliestInvalidStep === 1) setTimeout(() => senderMapRef.current?.resize(), 300);
+      if (earliestInvalidStep === 2) setTimeout(() => receiverMapRef.current?.resize(), 300);
+      return;
+    }
+
+    setShowConfirmModal(true);
+  };
+
+  // Execute Submission API call after user confirms in Modal Popup
+  const executeOrderSubmission = async () => {
+    if (!token) return;
+    setShowConfirmModal(false);
     setActionLoading(true);
+
+    let scheduledPickupAt: string | undefined = undefined;
+    if (pickupType === 'PICKUP') {
+      const pickupDate = new Date();
+      if (pickupDateOption === 'TOMORROW') {
+        pickupDate.setDate(pickupDate.getDate() + 1);
+      }
+      if (pickupShiftOption === 'MORNING') {
+        pickupDate.setHours(11, 0, 0, 0);
+      } else {
+        pickupDate.setHours(17, 0, 0, 0);
+      }
+      scheduledPickupAt = pickupDate.toISOString();
+    }
+
+    // Sanitize string inputs before constructing final API payload
+    const sanitizedSenderName = sanitizeInput(senderName);
+    const sanitizedSenderAddress = sanitizeInput(senderAddressLine1);
+    const sanitizedReceiverName = sanitizeInput(receiverName);
+    const sanitizedReceiverAddress = sanitizeInput(receiverAddressLine1);
+    const sanitizedDescription = sanitizeInput(description);
+    const sanitizedTempReq = sanitizeInput(temperatureRequirement);
 
     const payload = {
       customerId: isAdminOrStaff ? customerId : undefined,
@@ -280,12 +548,13 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       paymentMethod,
       codAmount: Number(codAmount),
       pickupType,
+      scheduledPickupAt,
       senderContact: {
-        fullName: senderName,
-        phone: senderPhone,
+        fullName: sanitizedSenderName,
+        phone: senderPhone.replace(/[\s\.\-\(\)]/g, ''),
       },
       pickupAddress: {
-        addressLine1: senderAddressLine1,
+        addressLine1: sanitizedSenderAddress,
         ward: senderWard,
         province: senderProvince,
         country: 'Vietnam',
@@ -294,11 +563,11 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         wardCode: senderWardCode || undefined,
       },
       receiverContact: {
-        fullName: receiverName,
-        phone: receiverPhone,
+        fullName: sanitizedReceiverName,
+        phone: receiverPhone.replace(/[\s\.\-\(\)]/g, ''),
       },
       deliveryAddress: {
-        addressLine1: receiverAddressLine1,
+        addressLine1: sanitizedReceiverAddress,
         ward: receiverWard,
         province: receiverProvince,
         country: 'Vietnam',
@@ -313,7 +582,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           width: Number(width),
           height: Number(height),
           isFragile,
-          temperatureRequirement: temperatureRequirement || undefined,
+          temperatureRequirement: sanitizedTempReq || undefined,
+          description: sanitizedDescription || undefined,
+          declaredValue: declaredValue !== '' ? Number(declaredValue) : undefined,
         }
       ]
     };
@@ -331,25 +602,36 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       const resData = await response.json();
 
       if (response.ok && resData.success) {
-        alert('Tạo đơn hàng vận chuyển thành công!');
-        onSuccess();
-        onClose();
+        setNotificationState({
+          isOpen: true,
+          type: 'success',
+          title: 'TẠO ĐƠN HÀNG THÀNH CÔNG!',
+          message: `Đơn hàng vận chuyển mã ${resData.data?.orderCode || ''} đã được tạo thành công trên hệ thống.`,
+        });
       } else {
-        alert(resData.message || 'Lỗi khi tạo đơn hàng.');
+        setNotificationState({
+          isOpen: true,
+          type: 'error',
+          title: 'KHÔNG THỂ TẠO ĐƠN HÀNG',
+          message: resData.message || 'Có lỗi xảy ra trong quá trình xử lý đơn hàng.',
+        });
       }
     } catch (err) {
-      console.error(err);
-      alert('Không thể kết nối đến máy chủ.');
+      console.error('Error creating order:', err);
+      setNotificationState({
+        isOpen: true,
+        type: 'error',
+        title: 'LỖI KẾT NỐI HỆ THỐNG',
+        message: 'Vui lòng kiểm tra kết nối mạng và thử lại sau ít phút.',
+      });
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Dynamic Pricing Calculation
+  // Pricing Summary calculations
+  const distanceKm = calculateDistance(senderLatitude, senderLongitude, receiverLatitude, receiverLongitude);
   const activeService = services.find((s) => s.serviceCode === serviceCode);
-  const distanceKm = (senderLatitude && senderLongitude && receiverLatitude && receiverLongitude)
-    ? calculateDistance(senderLatitude, senderLongitude, receiverLatitude, receiverLongitude)
-    : 0;
 
   let basePrice = 0;
   let distanceFee = 0;
@@ -386,33 +668,87 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     totalAmount = basePrice + distanceFee + weightFee + fragileSurcharge + insuranceFee;
   }
 
+  const stepsList = [
+    { step: 1, title: '1. Người Gửi & Điểm Lấy', icon: MapPin, color: 'text-red-600' },
+    { step: 2, title: '2. Người Nhận & Điểm Giao', icon: MapPin, color: 'text-blue-600' },
+    { step: 3, title: '3. Thông Tin Gói Hàng', icon: Package, color: 'text-amber-500' },
+    { step: 4, title: '4. Dịch Vụ & Thanh Toán', icon: Truck, color: 'text-emerald-600' },
+  ];
+
+  const getFieldErrorClass = (fieldName: string) => {
+    return showErrors && errors[fieldName]
+      ? 'border-red-500 bg-red-50/50 ring-1 ring-red-500 placeholder-red-300'
+      : 'border-[#e2e8f0] focus:border-[#bc0100]';
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg border border-[#e2e8f0] shadow-soft max-w-4xl w-full my-8 flex flex-col font-montserrat max-h-[90vh]">
+      <div className="bg-white rounded-xl border border-[#e2e8f0] shadow-2xl max-w-4xl w-full my-6 flex flex-col font-montserrat max-h-[92vh] overflow-hidden relative">
         {/* Header */}
         <div className="p-4 bg-[#161D25] text-white flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2">
-            <Package className="text-[#bc0100]" size={18} />
-            <h3 className="text-xs font-extrabold uppercase tracking-wider">Đặt Đơn Hàng Mới</h3>
+            <Package className="text-[#bc0100]" size={20} />
+            <h3 className="text-sm font-extrabold uppercase tracking-wider">Đặt Đơn Hàng Mới</h3>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white cursor-pointer transition-colors">
+          <button onClick={onClose} className="text-gray-400 hover:text-white cursor-pointer transition-colors p-1 rounded-lg hover:bg-white/10">
             <X size={18} />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 text-xs text-gray-600">
+        {/* 4-Step Stepper Tabs Header (Unrestricted Clicking Enabled) */}
+        <div className="bg-slate-100 border-b border-slate-200 p-2 flex items-center justify-between gap-1 overflow-x-auto shrink-0">
+          {stepsList.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeStep === item.step;
+            const stepHasErrors = showErrors && Object.keys(errors).some(key => {
+              if (item.step === 1) return ['customerId', 'senderName', 'senderPhone', 'senderAddressLine1', 'senderProvince', 'senderWard'].includes(key);
+              if (item.step === 2) return ['receiverName', 'receiverPhone', 'receiverAddressLine1', 'receiverProvince', 'receiverWard'].includes(key);
+              if (item.step === 3) return ['weight', 'length', 'width', 'height'].includes(key);
+              return false;
+            });
+
+            return (
+              <button
+                key={item.step}
+                type="button"
+                onClick={() => handleSelectTab(item.step as any)}
+                className={`flex-1 min-w-[140px] px-3 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all text-xs font-bold cursor-pointer ${
+                  isActive
+                    ? 'bg-white text-[#161D25] shadow-sm border border-slate-300 ring-2 ring-[#bc0100]/20'
+                    : stepHasErrors
+                    ? 'bg-red-100/70 text-red-700 border border-red-300 hover:bg-red-100'
+                    : 'text-slate-600 hover:bg-slate-200/60'
+                }`}
+              >
+                {stepHasErrors ? (
+                  <AlertCircle size={16} className="text-red-600 shrink-0" />
+                ) : (
+                  <Icon size={16} className={`${isActive ? item.color : 'text-slate-500'} shrink-0`} />
+                )}
+                <span className="truncate">{item.title}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Form Body - Prevents direct form submission on button clicks */}
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col text-xs text-gray-600">
           {/* Customer Selection for admin/staff */}
-          {isAdminOrStaff && (
-            <div className="p-4 bg-[#F4F4F4] rounded border border-gray-200 flex flex-col gap-2">
+          {isAdminOrStaff && activeStep === 1 && (
+            <div className={`p-3.5 mb-4 rounded-lg border flex flex-col gap-1.5 transition-all ${
+              showErrors && errors.customerId ? 'bg-red-50/60 border-red-400 ring-1 ring-red-400' : 'bg-slate-50 border-slate-200'
+            }`}>
               <div className="flex items-center gap-1.5 font-bold text-[#161D25] uppercase tracking-wider text-[10px]">
                 <User size={14} className="text-[#bc0100]" />
-                <span>Khách hàng thanh toán</span>
+                <span>Khách hàng thanh toán *</span>
               </div>
               <select
                 value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full px-3 py-2 border border-[#e2e8f0] rounded bg-white font-medium outline-none focus:border-[#bc0100]"
+                onChange={(e) => {
+                  setCustomerId(e.target.value);
+                  if (errors.customerId) setErrors(prev => ({ ...prev, customerId: false }));
+                }}
+                className={`w-full px-3 py-2 border rounded bg-white font-medium outline-none ${getFieldErrorClass('customerId')}`}
                 required
               >
                 <option value="">-- Chọn khách hàng --</option>
@@ -422,94 +758,130 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   </option>
                 ))}
               </select>
+              {showErrors && errorMessages.customerId && (
+                <span className="text-[10px] text-red-600 font-medium">{errorMessages.customerId}</span>
+              )}
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Left Column: Contacts */}
-            <div className="flex flex-col gap-6">
-              {/* Sender Section */}
-              <div className="border border-[#e2e8f0] p-4 rounded-lg flex flex-col gap-3">
-                <div className="flex items-center gap-1.5 font-bold text-[#161D25] uppercase tracking-wider text-[10px] border-b pb-2">
-                  <MapPin className="text-[#bc0100]" size={14} />
-                  <span>1. Thông tin người gửi & Điểm lấy</span>
+          {/* STEP 1: Sender & Pickup Address */}
+          {activeStep === 1 && (
+            <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+              <div className="border border-[#e2e8f0] p-4 rounded-xl flex flex-col gap-3 bg-white shadow-xs">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex items-center gap-1.5 font-bold text-[#161D25] uppercase tracking-wider text-[11px]">
+                    <MapPin className="text-[#bc0100]" size={16} />
+                    <span>1. THÔNG TIN NGƯỜI GỬI & ĐIỂM LẤY HÀNG</span>
+                  </div>
+                  {showErrors && (errors.senderName || errors.senderPhone || errors.senderAddressLine1 || errors.senderProvince || errors.senderWard) && (
+                    <span className="text-[10px] text-red-600 font-bold flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                      <AlertCircle size={12} />
+                      Vui lòng điền đúng thông tin viền đỏ!
+                    </span>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
-                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Họ tên người gửi</label>
+                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                      Họ tên người gửi <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
                       required
                       placeholder="Nguyễn Văn A"
                       value={senderName}
-                      onChange={(e) => setSenderName(e.target.value)}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
+                      onChange={(e) => {
+                        setSenderName(e.target.value);
+                        if (errors.senderName) setErrors(prev => ({ ...prev, senderName: false }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded outline-none transition-colors ${getFieldErrorClass('senderName')}`}
                     />
+                    {showErrors && errorMessages.senderName && (
+                      <span className="text-[10px] text-red-600 font-medium">{errorMessages.senderName}</span>
+                    )}
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Số điện thoại</label>
+                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                      Số điện thoại (10 chữ số) <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
                       required
                       placeholder="0901234567"
                       value={senderPhone}
-                      onChange={(e) => setSenderPhone(e.target.value)}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
+                      onChange={(e) => {
+                        setSenderPhone(e.target.value);
+                        if (errors.senderPhone) setErrors(prev => ({ ...prev, senderPhone: false }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded outline-none transition-colors ${getFieldErrorClass('senderPhone')}`}
                     />
+                    {showErrors && errorMessages.senderPhone && (
+                      <span className="text-[10px] text-red-600 font-medium">{errorMessages.senderPhone}</span>
+                    )}
                   </div>
                 </div>
+
                 <AddressFormFields
                   token={token}
                   provinceCode={senderProvinceCode}
                   wardCode={senderWardCode}
                   addressLine1={senderAddressLine1}
+                  hasErrorProvince={showErrors && errors.senderProvince}
+                  hasErrorWard={showErrors && errors.senderWard}
+                  hasErrorAddressLine1={showErrors && errors.senderAddressLine1}
                   onChange={({ province, provinceCode, ward, wardCode, addressLine1, latitude, longitude }) => {
                     setSenderProvince(province);
                     setSenderProvinceCode(provinceCode);
                     setSenderWard(ward);
                     setSenderWardCode(wardCode);
                     setSenderAddressLine1(addressLine1);
+
+                    if (province) setErrors(prev => ({ ...prev, senderProvince: false }));
+                    if (ward) setErrors(prev => ({ ...prev, senderWard: false }));
+                    if (addressLine1) setErrors(prev => ({ ...prev, senderAddressLine1: false }));
+
                     if (latitude !== undefined && longitude !== undefined) {
                       setSenderLatitude(latitude);
                       setSenderLongitude(longitude);
-                      setTempLatitude(latitude);
-                      setTempLongitude(longitude);
-                      setMapCenter([longitude, latitude]);
+                      setSenderTempLat(latitude);
+                      setSenderTempLng(longitude);
+                      setSenderMapCenter([longitude, latitude]);
                     }
                   }}
                   required
                 />
 
                 {/* Map for Sender Location */}
-                <div className="flex flex-col gap-1 mt-1 border-t border-gray-100 pt-3">
-                  <div className="flex justify-between items-center text-gray-400 font-bold uppercase tracking-wider text-[9px]">
+                <div className="flex flex-col gap-1 mt-2 border-t border-gray-100 pt-3">
+                  <div className="flex justify-between items-center text-gray-500 font-bold uppercase tracking-wider text-[9px]">
                     <span>Bản đồ định vị điểm lấy hàng</span>
                     <button
                       type="button"
-                      onClick={handleAutoLocate}
-                      disabled={geocodingLoading || (!senderAddressLine1 && !senderWard && !senderProvince)}
+                      onClick={handleSenderAutoLocate}
+                      disabled={senderGeocodingLoading || (!senderAddressLine1 && !senderWard && !senderProvince)}
                       className="text-[#bc0100] hover:text-[#900000] font-bold lowercase tracking-normal text-[10px] flex items-center gap-1 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
                     >
-                      {geocodingLoading ? 'Đang định vị...' : '🔍 [Nhấn để định vị tự động]'}
+                      {senderGeocodingLoading ? 'Đang định vị...' : '🔍 [Nhấn để định vị tự động]'}
                     </button>
                   </div>
-                  
-                  <div className="w-full h-64 rounded border border-[#e2e8f0] overflow-hidden relative mt-0.5 bg-gray-50">
+
+                  <div className="w-full h-64 rounded-lg border border-[#e2e8f0] overflow-hidden relative mt-1 bg-gray-50">
                     <Map
-                      ref={mapCallbackRef}
-                      center={mapCenter}
+                      ref={senderMapCallbackRef}
+                      center={senderMapCenter}
                       zoom={13}
                       className="w-full h-full"
                     >
-                      {tempLatitude !== 0 && tempLongitude !== 0 && (
+                      {senderTempLat !== 0 && senderTempLng !== 0 && (
                         <MapMarker
-                          longitude={tempLongitude}
-                          latitude={tempLatitude}
+                          longitude={senderTempLng}
+                          latitude={senderTempLat}
                           draggable
-                          onDragEnd={onMarkerDragEnd}
+                          onDragEnd={onSenderMarkerDragEnd}
                         >
                           <MarkerContent>
-                            <div 
+                            <div
                               className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white shadow-sm text-white transition-transform hover:scale-110"
                               style={{ backgroundColor: '#bc0100' }}
                             >
@@ -518,195 +890,319 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                           </MarkerContent>
                         </MapMarker>
                       )}
-                       <MapControls 
-                        showZoom 
-                        showLocate 
-                        onLocate={onLocate}
-                        className="top-2 right-2" 
-                      />
+                      <MapControls showZoom />
                     </Map>
- 
-                    {/* Accidental click protection / Confirmation Panel */}
-                    {hasChanges && (
-                      <div className="absolute inset-x-0 bottom-0 bg-[#161D25]/90 backdrop-blur-xs p-2 flex justify-between items-center text-[10px] text-white animate-fade-in shadow-lg z-10">
-                        <span className="font-medium text-gray-300">
-                          Vị trí thay đổi chưa lưu
-                        </span>
-                        <div className="flex gap-1.5">
-                          <button
-                            type="button"
-                            onClick={handleCancel}
-                            className="px-2 py-1 bg-gray-600 hover:bg-gray-500 rounded text-white font-bold transition-colors cursor-pointer"
-                          >
-                            Hủy
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleConfirm}
-                            className="px-2 py-1 bg-[#bc0100] hover:bg-[#a00100] rounded text-white font-bold transition-colors cursor-pointer"
-                          >
-                            Xác nhận lưu
-                          </button>
-                        </div>
-                      </div>
-                    )}
- 
-                    {!hasChanges && (
-                      <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-xs px-2 py-0.5 rounded text-[8px] text-gray-500 shadow-xs pointer-events-none select-none">
-                        Kéo marker hoặc click bản đồ để chọn tọa độ
-                      </div>
-                    )}
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-1">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-gray-400 font-bold uppercase tracking-wider text-[8px]">Vĩ độ (Latitude)</label>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      disabled
-                      value={senderLatitude || ''}
-                      placeholder="Chưa xác định"
-                      className="w-full px-3 py-1.5 border border-[#e2e8f0] rounded outline-none bg-gray-50 text-gray-500 cursor-not-allowed font-mono text-[10px]"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-gray-400 font-bold uppercase tracking-wider text-[8px]">Kinh độ (Longitude)</label>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      disabled
-                      value={senderLongitude || ''}
-                      placeholder="Chưa xác định"
-                      className="w-full px-3 py-1.5 border border-[#e2e8f0] rounded outline-none bg-gray-50 text-gray-500 cursor-not-allowed font-mono text-[10px]"
-                    />
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold text-gray-400 uppercase text-[8px] tracking-wider">Vĩ độ (Latitude)</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={senderLatitude !== 0 ? senderLatitude : 'Chưa xác định'}
+                        className="w-full px-2.5 py-1.5 border border-[#e2e8f0] rounded bg-gray-50 font-mono text-[10px] text-gray-500"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold text-gray-400 uppercase text-[8px] tracking-wider">Kinh độ (Longitude)</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={senderLongitude !== 0 ? senderLongitude : 'Chưa xác định'}
+                        className="w-full px-2.5 py-1.5 border border-[#e2e8f0] rounded bg-gray-50 font-mono text-[10px] text-gray-500"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Receiver Section */}
-              <div className="border border-[#e2e8f0] p-4 rounded-lg flex flex-col gap-3">
-                <div className="flex items-center gap-1.5 font-bold text-[#161D25] uppercase tracking-wider text-[10px] border-b pb-2">
-                  <MapPin className="text-green-600" size={14} />
-                  <span>2. Thông tin người nhận & Điểm giao</span>
+          {/* STEP 2: Receiver & Delivery Address */}
+          {activeStep === 2 && (
+            <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+              <div className="border border-[#e2e8f0] p-4 rounded-xl flex flex-col gap-3 bg-white shadow-xs">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex items-center gap-1.5 font-bold text-[#161D25] uppercase tracking-wider text-[11px]">
+                    <MapPin className="text-blue-600" size={16} />
+                    <span>2. THÔNG TIN NGƯỜI NHẬN & ĐIỂM GIAO HÀNG</span>
+                  </div>
+                  {showErrors && (errors.receiverName || errors.receiverPhone || errors.receiverAddressLine1 || errors.receiverProvince || errors.receiverWard) && (
+                    <span className="text-[10px] text-red-600 font-bold flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                      <AlertCircle size={12} />
+                      Vui lòng điền đúng thông tin viền đỏ!
+                    </span>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
-                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Họ tên người nhận</label>
+                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                      Họ tên người nhận <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
                       required
                       placeholder="Trần Thị B"
                       value={receiverName}
-                      onChange={(e) => setReceiverName(e.target.value)}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
+                      onChange={(e) => {
+                        setReceiverName(e.target.value);
+                        if (errors.receiverName) setErrors(prev => ({ ...prev, receiverName: false }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded outline-none transition-colors ${getFieldErrorClass('receiverName')}`}
                     />
+                    {showErrors && errorMessages.receiverName && (
+                      <span className="text-[10px] text-red-600 font-medium">{errorMessages.receiverName}</span>
+                    )}
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Số điện thoại</label>
+                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                      Số điện thoại (10 chữ số) <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
                       required
                       placeholder="0987654321"
                       value={receiverPhone}
-                      onChange={(e) => setReceiverPhone(e.target.value)}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
+                      onChange={(e) => {
+                        setReceiverPhone(e.target.value);
+                        if (errors.receiverPhone) setErrors(prev => ({ ...prev, receiverPhone: false }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded outline-none transition-colors ${getFieldErrorClass('receiverPhone')}`}
                     />
+                    {showErrors && errorMessages.receiverPhone && (
+                      <span className="text-[10px] text-red-600 font-medium">{errorMessages.receiverPhone}</span>
+                    )}
                   </div>
                 </div>
+
                 <AddressFormFields
                   token={token}
                   provinceCode={receiverProvinceCode}
                   wardCode={receiverWardCode}
                   addressLine1={receiverAddressLine1}
+                  hasErrorProvince={showErrors && errors.receiverProvince}
+                  hasErrorWard={showErrors && errors.receiverWard}
+                  hasErrorAddressLine1={showErrors && errors.receiverAddressLine1}
                   onChange={({ province, provinceCode, ward, wardCode, addressLine1, latitude, longitude }) => {
                     setReceiverProvince(province);
                     setReceiverProvinceCode(provinceCode);
                     setReceiverWard(ward);
                     setReceiverWardCode(wardCode);
                     setReceiverAddressLine1(addressLine1);
+
+                    if (province) setErrors(prev => ({ ...prev, receiverProvince: false }));
+                    if (ward) setErrors(prev => ({ ...prev, receiverWard: false }));
+                    if (addressLine1) setErrors(prev => ({ ...prev, receiverAddressLine1: false }));
+
                     if (latitude !== undefined && longitude !== undefined) {
                       setReceiverLatitude(latitude);
                       setReceiverLongitude(longitude);
+                      setReceiverTempLat(latitude);
+                      setReceiverTempLng(longitude);
+                      setReceiverMapCenter([longitude, latitude]);
                     }
                   }}
                   required
                 />
+
+                {/* Map for Receiver Location */}
+                <div className="flex flex-col gap-1 mt-2 border-t border-gray-100 pt-3">
+                  <div className="flex justify-between items-center text-gray-500 font-bold uppercase tracking-wider text-[9px]">
+                    <span>Bản đồ định vị điểm giao hàng</span>
+                    <button
+                      type="button"
+                      onClick={handleReceiverAutoLocate}
+                      disabled={receiverGeocodingLoading || (!receiverAddressLine1 && !receiverWard && !receiverProvince)}
+                      className="text-blue-600 hover:text-blue-800 font-bold lowercase tracking-normal text-[10px] flex items-center gap-1 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
+                    >
+                      {receiverGeocodingLoading ? 'Đang định vị...' : '🔍 [Nhấn để định vị tự động]'}
+                    </button>
+                  </div>
+
+                  <div className="w-full h-64 rounded-lg border border-[#e2e8f0] overflow-hidden relative mt-1 bg-gray-50">
+                    <Map
+                      ref={receiverMapCallbackRef}
+                      center={receiverMapCenter}
+                      zoom={13}
+                      className="w-full h-full"
+                    >
+                      {receiverTempLat !== 0 && receiverTempLng !== 0 && (
+                        <MapMarker
+                          longitude={receiverTempLng}
+                          latitude={receiverTempLat}
+                          draggable
+                          onDragEnd={onReceiverMarkerDragEnd}
+                        >
+                          <MarkerContent>
+                            <div
+                              className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white shadow-sm text-white transition-transform hover:scale-110 bg-blue-600"
+                            >
+                              <MapPin className="h-3 w-3" />
+                            </div>
+                          </MarkerContent>
+                        </MapMarker>
+                      )}
+                      <MapControls showZoom />
+                    </Map>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold text-gray-400 uppercase text-[8px] tracking-wider">Vĩ độ (Latitude)</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={receiverLatitude !== 0 ? receiverLatitude : 'Chưa xác định'}
+                        className="w-full px-2.5 py-1.5 border border-[#e2e8f0] rounded bg-gray-50 font-mono text-[10px] text-gray-500"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold text-gray-400 uppercase text-[8px] tracking-wider">Kinh độ (Longitude)</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={receiverLongitude !== 0 ? receiverLongitude : 'Chưa xác định'}
+                        className="w-full px-2.5 py-1.5 border border-[#e2e8f0] rounded bg-gray-50 font-mono text-[10px] text-gray-500"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+          )}
 
-            {/* Right Column: Packages, Service, Payment */}
-            <div className="flex flex-col gap-6">
-              {/* Package Details */}
-              <div className="border border-[#e2e8f0] p-4 rounded-lg flex flex-col gap-3 bg-slate-50/50">
-                <div className="flex items-center gap-1.5 font-bold text-[#161D25] uppercase tracking-wider text-[10px] border-b pb-2">
-                  <Package className="text-amber-500" size={14} />
-                  <span>3. Thông tin gói hàng</span>
+          {/* STEP 3: Package Details */}
+          {activeStep === 3 && (
+            <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+              <div className="border border-[#e2e8f0] p-4 rounded-xl flex flex-col gap-3 bg-white shadow-xs">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex items-center gap-1.5 font-bold text-[#161D25] uppercase tracking-wider text-[11px]">
+                    <Package className="text-amber-500" size={16} />
+                    <span>3. THÔNG TIN GÓI HÀNG</span>
+                  </div>
+                  {showErrors && (errors.weight || errors.length || errors.width || errors.height) && (
+                    <span className="text-[10px] text-red-600 font-bold flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                      <AlertCircle size={12} />
+                      Vui lòng điền trọng lượng & kích thước viền đỏ!
+                    </span>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Mô tả chi tiết danh mục hàng hóa (Nhiều mặt hàng)</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Ví dụ:&#10;1. Áo sơ mi nữ&#10;2. Áo thun cotton nam..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100] resize-y text-xs font-normal"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
-                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Trọng lượng (kg)</label>
+                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Khai giá hàng hóa (VNĐ)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      placeholder="Ví dụ: 500000"
+                      value={declaredValue}
+                      onChange={(e) => setDeclaredValue(e.target.value ? parseFloat(e.target.value) : '')}
+                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100] font-mono"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                      Trọng lượng (kg) <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="number"
                       step="0.01"
                       required
                       min="0.01"
                       value={weight}
-                      onChange={(e) => setWeight(parseFloat(e.target.value))}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100] font-mono"
+                      onChange={(e) => {
+                        setWeight(parseFloat(e.target.value));
+                        if (errors.weight) setErrors(prev => ({ ...prev, weight: false }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded outline-none font-mono transition-colors ${getFieldErrorClass('weight')}`}
                     />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Yêu cầu nhiệt độ (nếu có)</label>
-                    <input
-                      type="text"
-                      placeholder="Ví dụ: 2-8 °C"
-                      value={temperatureRequirement}
-                      onChange={(e) => setTemperatureRequirement(e.target.value)}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
-                    />
+                    {showErrors && errorMessages.weight && (
+                      <span className="text-[10px] text-red-600 font-medium">{errorMessages.weight}</span>
+                    )}
                   </div>
                 </div>
+
                 <div className="grid grid-cols-3 gap-3">
                   <div className="flex flex-col gap-1">
-                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Dài (cm)</label>
+                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                      Dài (cm) <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="number"
                       required
                       min="1"
                       value={length}
-                      onChange={(e) => setLength(parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100] font-mono"
+                      onChange={(e) => {
+                        setLength(parseInt(e.target.value));
+                        if (errors.length) setErrors(prev => ({ ...prev, length: false }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded outline-none font-mono transition-colors ${getFieldErrorClass('length')}`}
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Rộng (cm)</label>
+                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                      Rộng (cm) <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="number"
                       required
                       min="1"
                       value={width}
-                      onChange={(e) => setWidth(parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100] font-mono"
+                      onChange={(e) => {
+                        setWidth(parseInt(e.target.value));
+                        if (errors.width) setErrors(prev => ({ ...prev, width: false }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded outline-none font-mono transition-colors ${getFieldErrorClass('width')}`}
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Cao (cm)</label>
+                    <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">
+                      Cao (cm) <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="number"
                       required
                       min="1"
                       value={height}
-                      onChange={(e) => setHeight(parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100] font-mono"
+                      onChange={(e) => {
+                        setHeight(parseInt(e.target.value));
+                        if (errors.height) setErrors(prev => ({ ...prev, height: false }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded outline-none font-mono transition-colors ${getFieldErrorClass('height')}`}
                     />
                   </div>
                 </div>
-                <div className="text-[10px] text-gray-400 mt-1 leading-normal">
-                  * Trọng lượng quy đổi thể tích: <span className="font-bold text-gray-600 font-mono">{((length * width * height) / 5000).toFixed(2)} kg</span> (áp dụng nếu lớn hơn trọng lượng thực tế). Công thức chuẩn: (Dài x Rộng x Cao) / 5000.
+
+                <div className="text-[10px] text-gray-400 leading-normal bg-slate-50 p-2.5 rounded border border-slate-200">
+                  * Trọng lượng quy đổi thể tích: <span className="font-bold text-gray-700 font-mono">{((length * width * height) / 5000).toFixed(2)} kg</span> (áp dụng nếu lớn hơn trọng lượng thực tế). Công thức chuẩn: (Dài x Rộng x Cao) / 5000.
                 </div>
-                <div className="flex items-center gap-2 pt-1">
+
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Yêu cầu nhiệt độ (nếu có)</label>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: 2-8 °C"
+                    value={temperatureRequirement}
+                    onChange={(e) => setTemperatureRequirement(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#e2e8f0] rounded outline-none focus:border-[#bc0100]"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
                   <input
                     type="checkbox"
                     id="isFragileOrderCheckbox"
@@ -719,13 +1215,18 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   </label>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Service & Payment details */}
-              <div className="border border-[#e2e8f0] p-4 rounded-lg flex flex-col gap-3">
-                <div className="flex items-center gap-1.5 font-bold text-[#161D25] uppercase tracking-wider text-[10px] border-b pb-2">
-                  <Truck className="text-blue-500" size={14} />
-                  <span>4. Dịch vụ & Thanh toán</span>
+          {/* STEP 4: Service & Payment */}
+          {activeStep === 4 && (
+            <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+              <div className="border border-[#e2e8f0] p-4 rounded-xl flex flex-col gap-3 bg-white shadow-xs">
+                <div className="flex items-center gap-1.5 font-bold text-[#161D25] uppercase tracking-wider text-[11px] border-b pb-2">
+                  <Truck className="text-emerald-600" size={16} />
+                  <span>4. DỊCH VỤ & THANH TOÁN</span>
                 </div>
+
                 <div className="flex flex-col gap-1">
                   <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Gói cước dịch vụ</label>
                   {loadingServices ? (
@@ -740,7 +1241,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       >
                         {services.map((s) => (
                           <option key={s.id} value={s.serviceCode}>
-                            {s.serviceName} (Phí cơ bản: {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(s.basePrice)})
+                            {s.serviceName} (Phí cơ bản: {formatCurrency(s.basePrice)})
                           </option>
                         ))}
                       </select>
@@ -765,7 +1266,39 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {pickupType === 'PICKUP' && (
+                  <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg flex flex-col gap-2">
+                    <label className="font-bold text-amber-900 uppercase text-[9px] tracking-wider flex items-center gap-1">
+                      <span>⏰ Lịch hẹn shipper lấy hàng cố định</span>
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-bold text-gray-500 uppercase">Ngày lấy hàng</span>
+                        <select
+                          value={pickupDateOption}
+                          onChange={(e) => setPickupDateOption(e.target.value as any)}
+                          className="w-full px-2.5 py-1.5 border border-amber-300 rounded bg-white font-medium text-xs outline-none focus:border-[#bc0100]"
+                        >
+                          <option value="TODAY">Hôm nay ({new Date().toLocaleDateString('vi-VN')})</option>
+                          <option value="TOMORROW">Ngày mai ({new Date(Date.now() + 86400000).toLocaleDateString('vi-VN')})</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-bold text-gray-500 uppercase">Ca thu hàng</span>
+                        <select
+                          value={pickupShiftOption}
+                          onChange={(e) => setPickupShiftOption(e.target.value as any)}
+                          className="w-full px-2.5 py-1.5 border border-amber-300 rounded bg-white font-medium text-xs outline-none focus:border-[#bc0100]"
+                        >
+                          <option value="MORNING">☀️ Ca Sáng (10:30 - 12:00)</option>
+                          <option value="AFTERNOON">🌤️ Ca Chiều (16:00 - 18:00)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">Người chịu phí</label>
                     <select
@@ -808,25 +1341,25 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </div>
 
                 {activeService && (
-                  <div className="mt-4 p-4 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] flex flex-col gap-2.5">
+                  <div className="mt-2 p-4 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] flex flex-col gap-2.5">
                     <div className="font-extrabold text-[#161D25] uppercase tracking-wider text-[9px] border-b pb-1.5 flex justify-between items-center">
                       <span>Chi tiết cước tạm tính</span>
                       {distanceKm > 0 && <span className="text-gray-500 font-medium normal-case">(Khoảng cách: {distanceKm} km)</span>}
                     </div>
                     {serviceCode === 'EXPRESS' && distanceKm > 20 ? (
                       <div className="text-[11px] text-red-600 font-bold text-center py-4 bg-red-50 border border-red-100 rounded">
-                        DỊCH VỤ HỎA TỐC KHÔNG KHẢ DỤNG<br/>(Khoảng cách vượt quá giới hạn 20 km)
+                        DỊCH VỤ HỎA TỐC KHÔNG KHẢ DỤNG<br />(Khoảng cách vượt quá giới hạn 20 km)
                       </div>
                     ) : (
                       <div className="flex flex-col gap-1.5 text-[11px]">
                         <div className="flex justify-between items-center text-gray-500">
                           <span>Cước cơ bản:</span>
-                          <span className="font-medium text-gray-800">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(basePrice)}</span>
+                          <span className="font-medium text-gray-800">{formatCurrency(basePrice)}</span>
                         </div>
                         {distanceFee > 0 && (
                           <div className="flex justify-between items-center text-gray-500">
                             <span>Phí vượt cự ly (vượt {billableDistance} km):</span>
-                            <span className="font-medium text-gray-800">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(distanceFee)}</span>
+                            <span className="font-medium text-gray-800">+{formatCurrency(distanceFee)}</span>
                           </div>
                         )}
                         {weightFee > 0 && (
@@ -835,24 +1368,24 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                               Phí quá tải (vượt {billableWeight.toFixed(2)} kg
                               {((length * width * height) / 5000) > weight ? ' - quy đổi thể tích' : ''}):
                             </span>
-                            <span className="font-medium text-gray-800">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(weightFee)}</span>
+                            <span className="font-medium text-gray-800">+{formatCurrency(weightFee)}</span>
                           </div>
                         )}
                         {fragileSurcharge > 0 && (
                           <div className="flex justify-between items-center text-gray-500">
                             <span>Phụ thu hàng dễ vỡ:</span>
-                            <span className="font-medium text-[#bc0100]">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(fragileSurcharge)}</span>
+                            <span className="font-medium text-[#bc0100]">+{formatCurrency(fragileSurcharge)}</span>
                           </div>
                         )}
                         {insuranceFee > 0 && (
                           <div className="flex justify-between items-center text-gray-500">
                             <span>Phí bảo hiểm COD (0.5%):</span>
-                            <span className="font-medium text-gray-800">+{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(insuranceFee)}</span>
+                            <span className="font-medium text-gray-800">+{formatCurrency(insuranceFee)}</span>
                           </div>
                         )}
                         <div className="flex justify-between items-center font-bold text-sm border-t pt-2 mt-1">
                           <span className="text-[#161D25] uppercase tracking-wider text-[10px]">Tổng cước tạm tính:</span>
-                          <span className="text-base text-[#bc0100] font-extrabold">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalAmount)}</span>
+                          <span className="text-base text-[#bc0100] font-extrabold">{formatCurrency(totalAmount)}</span>
                         </div>
                       </div>
                     )}
@@ -860,27 +1393,162 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 )}
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-2 border-t border-gray-100 pt-4 mt-2 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 border border-gray-300 hover:bg-gray-50 rounded font-bold uppercase tracking-wider text-[10px]"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              disabled={actionLoading || (serviceCode === 'EXPRESS' && distanceKm > 20)}
-              className="px-6 py-2.5 bg-[#bc0100] hover:bg-[#a00100] text-white rounded font-bold uppercase tracking-wider text-[10px] disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-md animate-pulse-once"
-            >
-              {actionLoading ? 'Đang tạo đơn...' : 'Xác nhận tạo đơn'}
-            </button>
+          {/* Stepper Footer Action Bar - All Buttons use type="button" to avoid accidental form submit */}
+          <div className="flex justify-between items-center border-t border-gray-200 pt-4 mt-4 shrink-0">
+            <div>
+              {activeStep > 1 ? (
+                <button
+                  type="button"
+                  onClick={handlePrevStep}
+                  className="px-4 py-2.5 border border-gray-300 hover:bg-gray-100 rounded-lg font-bold uppercase tracking-wider text-[10px] text-gray-700 flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <ArrowLeft size={14} />
+                  <span>Quay lại</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2.5 border border-gray-300 hover:bg-gray-100 rounded-lg font-bold uppercase tracking-wider text-[10px] text-gray-500 cursor-pointer transition-colors"
+                >
+                  Hủy
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              {activeStep < 4 ? (
+                <button
+                  type="button"
+                  onClick={handleNextStep}
+                  className="px-6 py-2.5 bg-[#161D25] hover:bg-gray-800 text-white rounded-lg font-bold uppercase tracking-wider text-[10px] cursor-pointer flex items-center gap-1.5 shadow-sm transition-colors"
+                >
+                  <span>Tiếp tục</span>
+                  <ArrowRight size={14} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleOpenConfirmModal}
+                  disabled={actionLoading || (serviceCode === 'EXPRESS' && distanceKm > 20)}
+                  className="px-6 py-2.5 bg-[#bc0100] hover:bg-[#a00100] text-white rounded-lg font-bold uppercase tracking-wider text-[10px] disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-md transition-all"
+                >
+                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận tạo đơn'}
+                </button>
+              )}
+            </div>
           </div>
-        </form>
+        </div>
       </div>
+
+      {/* Confirmation Modal Popup before Order Creation */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="p-2.5 bg-amber-100 rounded-full text-amber-700">
+                <HelpCircle size={22} />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-800 text-sm">XÁC NHẬN TẠO ĐƠN HÀNG</h4>
+                <p className="text-[11px] text-slate-500">Vui lòng kiểm tra kỹ lại thông tin trước khi gửi lên hệ thống</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs space-y-2">
+              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                <span className="text-slate-500">Người gửi:</span>
+                <span className="font-bold text-slate-800">{senderName} ({senderPhone})</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                <span className="text-slate-500">Người nhận:</span>
+                <span className="font-bold text-slate-800">{receiverName} ({receiverPhone})</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                <span className="text-slate-500">Gói cước & Phí ship:</span>
+                <span className="font-bold text-slate-800">{formatCurrency(totalAmount)}</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                <span className="text-slate-500">Người trả cước:</span>
+                <span className="font-bold text-slate-800">{feePayer === 'SENDER' ? 'Người gửi trả' : 'Người nhận trả'}</span>
+              </div>
+              {codAmount > 0 && (
+                <div className="flex justify-between font-bold text-amber-700">
+                  <span>Tiền COD thu hộ:</span>
+                  <span>{formatCurrency(codAmount)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-bold text-slate-600 transition-colors cursor-pointer"
+              >
+                Xem lại đơn
+              </button>
+              <button
+                type="button"
+                onClick={executeOrderSubmission}
+                disabled={actionLoading}
+                className="px-5 py-2 bg-[#bc0100] hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow"
+              >
+                <ShieldCheck size={16} />
+                <span>{actionLoading ? 'Đang tạo đơn...' : 'Đồng ý tạo đơn'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Custom Popup (Success & Error Modal) */}
+      {notificationState.isOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-70 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 border border-slate-200 text-center space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex justify-center">
+              {notificationState.type === 'success' ? (
+                <div className="p-3 bg-emerald-100 rounded-full text-emerald-600 ring-8 ring-emerald-50">
+                  <CheckCircle2 size={36} />
+                </div>
+              ) : (
+                <div className="p-3 bg-red-100 rounded-full text-red-600 ring-8 ring-red-50">
+                  <AlertCircle size={36} />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <h4 className={`font-extrabold text-sm ${notificationState.type === 'success' ? 'text-emerald-800' : 'text-red-700'}`}>
+                {notificationState.title}
+              </h4>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                {notificationState.message}
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setNotificationState(prev => ({ ...prev, isOpen: false }));
+                  if (notificationState.type === 'success') {
+                    onSuccess();
+                    onClose();
+                  }
+                }}
+                className={`w-full py-2.5 rounded-lg text-xs font-bold text-white transition-colors cursor-pointer shadow ${
+                  notificationState.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {notificationState.type === 'success' ? 'Hoàn tất' : 'Đóng'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
