@@ -24,6 +24,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   bool _isDutyLoading = false;
 
   bool _isNavigating = false;
+  bool _isRouteExecuting = false;
   bool _isVoiceOn = true;
   bool _showTrafficAlert = false;
   Timer? _alertTimer;
@@ -209,7 +210,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 _driverStops.addAll(mappedStops);
               });
 
-              _updateGoongPolyline();
+              _roadPolylinePoints.clear();
+              _updateGoongPolyline(force: true);
             }
           }
         }
@@ -279,7 +281,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
         });
         _mapController.move(_currentLocation, 13.0);
         _navMapController.move(_currentLocation, 14.5);
-        _updateGoongPolyline();
+        _updateGoongPolyline(force: true);
       }
     } catch (e) {
       debugPrint("Lỗi lấy vị trí ban đầu: $e");
@@ -319,9 +321,18 @@ class _DriverDashboardState extends State<DriverDashboard> {
     });
   }
 
-  Future<void> _updateGoongPolyline() async {
+  Future<void> _updateGoongPolyline({bool force = false}) async {
     if (_driverStops.isEmpty) return;
-    if (_roadPolylinePoints.isNotEmpty) return; // Avoid redundant Goong API requests
+
+    if (!force && _roadPolylinePoints.isNotEmpty) {
+      final double startDistance = Geolocator.distanceBetween(
+        _currentLocation.latitude,
+        _currentLocation.longitude,
+        _roadPolylinePoints.first.latitude,
+        _roadPolylinePoints.first.longitude,
+      );
+      if (startDistance < 300) return; // Already aligned with current driver location
+    }
 
     final List<LatLng> stopLatLngs = _driverStops
         .map((s) {
@@ -339,7 +350,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
       if (mounted && fullRoute.isNotEmpty) {
         setState(() {
-          _roadPolylinePoints = fullRoute;
+          _roadPolylinePoints = [_currentLocation, ...fullRoute.skip(1)];
         });
       }
     }
@@ -469,9 +480,94 @@ class _DriverDashboardState extends State<DriverDashboard> {
   void _stopNavigation() {
     setState(() {
       _isNavigating = false;
+      _isRouteExecuting = false;
       _showTrafficAlert = false;
     });
     _alertTimer?.cancel();
+  }
+
+  void _showReportIncidentDialog() {
+    String selectedReason = 'Kẹt xe nghiêm trọng';
+    final TextEditingController noteController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              backgroundColor: AppColors.pureWhite,
+              shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+              title: const Row(
+                children: [
+                  Icon(Icons.report_problem, color: AppColors.logisticsRed, size: 24),
+                  SizedBox(width: 8),
+                  Text('Báo Cáo Sự Cố Tuyến Đường', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Chọn loại sự cố gặp phải:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedReason,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Kẹt xe nghiêm trọng', child: Text('🚦 Kẹt xe nghiêm trọng')),
+                      DropdownMenuItem(value: 'Sự cố xe / Thủng lốp', child: Text('🔧 Sự cố xe / Thủng lốp')),
+                      DropdownMenuItem(value: 'Không liên lạc được khách hàng', child: Text('📞 Không liên lạc được khách')),
+                      DropdownMenuItem(value: 'Thời tiết xấu / Ngập nước', child: Text('🌧️ Thời tiết xấu / Ngập nước')),
+                      DropdownMenuItem(value: 'Sự cố khác', child: Text('⚠️ Sự cố khác')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setModalState(() => selectedReason = val);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: noteController,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: 'Ghi chú thêm (không bắt buộc)',
+                      labelStyle: const TextStyle(fontSize: 11),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Hủy', style: TextStyle(color: AppColors.secondary)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('⚠️ Đã gửi báo cáo sự cố "$selectedReason" đến Bưu cục!'),
+                        backgroundColor: AppColors.logisticsRed,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.logisticsRed,
+                    foregroundColor: AppColors.pureWhite,
+                  ),
+                  child: const Text('Gửi báo cáo'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showShiftSummary() {
@@ -1337,6 +1433,15 @@ class _DriverDashboardState extends State<DriverDashboard> {
   // FULL SCREEN GPS NAVIGATION VIEW (Màn hình 2.6)
   // ----------------------------------------------------
   Widget _buildNavigationScreen() {
+    final activeStop = _driverStops.firstWhere(
+      (s) => s['isCheckedIn'] != true,
+      orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
+    );
+    final String targetAddress = activeStop['address']?.toString() ?? 'Chưa xác định điểm dừng';
+    final dynamic rawIndex = activeStop['index'] ?? activeStop['sequence'] ?? 1;
+    final int targetIndex = rawIndex is int ? rawIndex : (int.tryParse(rawIndex.toString()) ?? 1);
+    final String targetTitle = activeStop['title']?.toString() ?? 'Khách hàng';
+
     return Scaffold(
       body: Stack(
         children: [
@@ -1436,7 +1541,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
             left: 16.0,
             right: 16.0,
             child: Container(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(14.0),
               decoration: BoxDecoration(
                 color: AppColors.deepOnyx,
                 borderRadius: AppStyles.roundedXl,
@@ -1452,41 +1557,50 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       borderRadius: AppStyles.roundedLg,
                     ),
                     child: const Icon(
-                      Icons.turn_right,
-                      size: 36.0,
+                      Icons.navigation,
+                      size: 28.0,
                       color: AppColors.logisticsRed,
                     ),
                   ),
-                  const SizedBox(width: 16.0),
+                  const SizedBox(width: 14.0),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
                           children: [
-                            Text(
-                              '200m',
-                              style: AppTypography.headlineLgMobile.copyWith(
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
                                 color: AppColors.logisticsRed,
-                                fontWeight: FontWeight.bold,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'ĐIỂM DỪNG #$targetIndex',
+                                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
                               ),
                             ),
-                            const SizedBox(width: 6.0),
-                            Text(
-                              'sau đó'.toUpperCase(),
-                              style: AppTypography.labelMd.copyWith(color: Colors.white70),
+                            const SizedBox(width: 8.0),
+                            Expanded(
+                              child: Text(
+                                targetTitle.toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.labelMd.copyWith(color: Colors.white70),
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 2.0),
+                        const SizedBox(height: 4.0),
                         Text(
-                          'Rẽ phải vào đường Hai Bà Trưng',
+                          targetAddress,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: AppTypography.headlineMd.copyWith(
                             color: AppColors.pureWhite,
-                            fontSize: 16.0,
+                            fontSize: 13.0,
+                            height: 1.25,
                           ),
                         ),
                       ],
@@ -1560,7 +1674,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                               ),
                             ),
                             Text(
-                              'Chậm khoảng 3 phút trên đoạn đường Hai Bà Trưng.',
+                              'Chậm khoảng 3 phút trên tuyến đường di chuyển.',
                               style: AppTypography.labelMd.copyWith(color: const Color(0xFF663C00)),
                             ),
                           ],
@@ -1621,7 +1735,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
                   // Actions row
                   Container(
-                    padding: const EdgeInsets.all(12.0),
+                    padding: const EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
                       color: AppColors.pureWhite,
                       borderRadius: const BorderRadius.only(
@@ -1638,34 +1752,122 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     ),
                     child: Row(
                       children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 48.0,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                // Report incident
-                              },
-                              icon: const Icon(Icons.report, color: AppColors.pureWhite),
-                              label: const Text('BÁO CÁO SỰ CỐ'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.logisticsRed,
-                                foregroundColor: AppColors.pureWhite,
-                                shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                              ),
+                        // Small Incident Report button
+                        ElevatedButton.icon(
+                          onPressed: _showReportIncidentDialog,
+                          icon: const Icon(Icons.warning_amber_rounded, size: 16.0, color: AppColors.logisticsRed),
+                          label: const Text('Báo sự cố', style: TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade50,
+                            foregroundColor: AppColors.logisticsRed,
+                            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 12.0),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppStyles.roundedLg,
+                              side: BorderSide(color: AppColors.logisticsRed.withValues(alpha: 0.3)),
                             ),
+                            elevation: 0,
                           ),
                         ),
-                        const SizedBox(width: 12.0),
+                        const SizedBox(width: 8.0),
+
+                        // Main Start/Stop Execution button
+                        Expanded(
+                          child: SizedBox(
+                            height: 44.0,
+                            child: !_isRouteExecuting
+                                ? ElevatedButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        _isRouteExecuting = true;
+                                      });
+                                      ScaffoldMessenger.of(context).clearSnackBars();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Row(
+                                            children: [
+                                              Icon(Icons.navigation, color: Colors.white, size: 20),
+                                              SizedBox(width: 10),
+                                              Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text('Đã bắt đầu hành trình', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
+                                                  Text('Đang truyền tín hiệu định vị GPS thời gian thực', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                          backgroundColor: const Color(0xFF1E293B),
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          margin: const EdgeInsets.all(16),
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.play_arrow_rounded, size: 20.0),
+                                    label: const Text('BẮT ĐẦU CHẠY', style: TextStyle(fontSize: 12.0, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.logisticsRed,
+                                      foregroundColor: AppColors.pureWhite,
+                                      shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                                      elevation: 2,
+                                    ),
+                                  )
+                                : ElevatedButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        _isRouteExecuting = false;
+                                      });
+                                      ScaffoldMessenger.of(context).clearSnackBars();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Row(
+                                            children: [
+                                              Icon(Icons.pause_circle_filled, color: Colors.white, size: 20),
+                                              SizedBox(width: 10),
+                                              Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text('Đã dừng hành trình', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
+                                                  Text('Tạm ngắt truyền tín hiệu định vị GPS', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                          backgroundColor: const Color(0xFF334155),
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          margin: const EdgeInsets.all(16),
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.stop_rounded, size: 20.0),
+                                    label: const Text('DỪNG CHẠY', style: TextStyle(fontSize: 12.0, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.deepOnyx,
+                                      foregroundColor: AppColors.pureWhite,
+                                      shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                                      elevation: 2,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 8.0),
+
+                        // Close button
                         GestureDetector(
                           onTap: _stopNavigation,
                           child: Container(
-                            width: 48.0,
-                            height: 48.0,
+                            width: 44.0,
+                            height: 44.0,
                             decoration: BoxDecoration(
                               color: AppColors.surfaceContainerHigh,
                               borderRadius: AppStyles.roundedLg,
                             ),
-                            child: const Icon(Icons.close, color: AppColors.error, size: 28.0),
+                            child: const Icon(Icons.close, color: AppColors.secondary, size: 22.0),
                           ),
                         ),
                       ],
