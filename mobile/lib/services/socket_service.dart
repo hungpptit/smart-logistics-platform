@@ -61,6 +61,15 @@ class SocketService {
     }
   }
 
+  /// Lắng nghe sự kiện cập nhật/phân công lộ trình mới từ máy chủ real-time
+  void onRoutesUpdated(VoidCallback callback) {
+    if (_socket != null) {
+      _socket!.on('routes_updated', (_) => callback());
+      _socket!.on('route:assigned', (_) => callback());
+      _socket!.on('route:reset', (_) => callback());
+    }
+  }
+
   /// Phát tín hiệu tọa độ GPS từ thiết bị di động lên máy chủ
   void emitLocation({
     required String routeId,

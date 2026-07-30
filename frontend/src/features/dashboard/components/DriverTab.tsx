@@ -19,6 +19,7 @@ interface Driver {
   employeeCode: string;
   fullName: string;
   phone: string;
+  email?: string;
   citizenId?: string | null;
   driverLicenseNumber: string;
   driverLicenseClass: string;
@@ -27,7 +28,6 @@ interface Driver {
   employmentStatus: 'ACTIVE' | 'OFFLINE' | 'SUSPENDED';
   homeFacilityId?: string;
   assignedFacilityId?: string;
-  note?: string;
   createdAt: string;
   assignedFacility?: {
     id: string;
@@ -42,7 +42,7 @@ interface Driver {
   user?: {
     id: string;
     username: string;
-    email: string;
+    email?: string;
     status: string;
   };
 }
@@ -94,7 +94,6 @@ export const DriverTab: React.FC = () => {
     driverType: 'HUB_DELIVERY' as 'HUB_DELIVERY' | 'LINEHAUL_TRANSFER' | 'ON_DEMAND',
     employmentStatus: 'ACTIVE' as 'ACTIVE' | 'OFFLINE' | 'SUSPENDED',
     homeFacilityId: '',
-    note: '',
     createUser: false,
     email: '',
     username: ''
@@ -191,7 +190,6 @@ export const DriverTab: React.FC = () => {
       driverType: 'HUB_DELIVERY',
       employmentStatus: 'ACTIVE',
       homeFacilityId: '',
-      note: '',
       createUser: false,
       email: '',
       username: ''
@@ -213,10 +211,9 @@ export const DriverTab: React.FC = () => {
       hireDate: driver.hireDate ? driver.hireDate.split('T')[0] : '',
       driverType: driver.driverType || 'HUB_DELIVERY',
       employmentStatus: driver.employmentStatus,
-      homeFacilityId: driver.homeFacilityId || '',
-      note: driver.note || '',
+      homeFacilityId: driver.assignedFacilityId || driver.homeFacilityId || driver.assignedFacility?.id || driver.homeFacility?.id || '',
       createUser: false,
-      email: driver.user?.email || '',
+      email: driver.email || driver.user?.email || '',
       username: driver.user?.username || ''
     });
     setActionError(null);
@@ -452,7 +449,7 @@ export const DriverTab: React.FC = () => {
                           ? 'bg-red-50 text-red-700 border border-red-200'
                           : 'bg-gray-100 text-gray-600 border border-gray-200'
                       }`}>
-                        {drv.employmentStatus === 'ACTIVE' ? 'Đang hoạt động' : drv.employmentStatus === 'SUSPENDED' ? 'Đình chỉ' : 'Ngoại tuyến'}
+                        {drv.employmentStatus === 'ACTIVE' ? '🟢 Trực tuyến' : drv.employmentStatus === 'SUSPENDED' ? '🔴 Bị đình chỉ' : '⚪ Ngoại tuyến'}
                       </span>
                     </td>
                     <td className="p-4 text-gray-500 font-mono">
@@ -728,17 +725,6 @@ export const DriverTab: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100]"
                   />
                 </div>
-
-                {/* Note */}
-                <div className="col-span-2">
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Ghi chú</label>
-                  <textarea
-                    value={formData.note}
-                    onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#bc0100] focus:border-[#bc0100] h-16 resize-none"
-                    placeholder="Nhập ghi chú thêm..."
-                  />
-                </div>
               </div>
 
               <div className="pt-4 border-t border-[#e2e8f0] flex justify-end gap-2 bg-gray-50 -mx-6 -mb-6 p-4">
@@ -850,13 +836,17 @@ export const DriverTab: React.FC = () => {
                   </div>
                   <div className="col-span-2">
                     <span className="block text-[9px] font-bold text-gray-400 uppercase">Kho bãi trực thuộc</span>
-                    {selectedDriverDetail.homeFacility ? (
-                      <span className="block font-semibold text-gray-800 mt-1">
-                        {selectedDriverDetail.homeFacility.facilityName} ({selectedDriverDetail.homeFacility.facilityCode})
-                      </span>
-                    ) : (
-                      <span className="block text-gray-400 italic mt-1">Chưa phân kho</span>
-                    )}
+                    {(() => {
+                      const fac = selectedDriverDetail.assignedFacility || selectedDriverDetail.homeFacility;
+                      if (fac) {
+                        return (
+                          <span className="block font-semibold text-gray-800 mt-1">
+                            {fac.facilityName} ({fac.facilityCode})
+                          </span>
+                        );
+                      }
+                      return <span className="block text-gray-400 italic mt-1">Chưa phân kho</span>;
+                    })()}
                   </div>
                 </div>
               </div>
@@ -873,7 +863,9 @@ export const DriverTab: React.FC = () => {
                       </div>
                       <div>
                         <span className="block text-[9px] font-bold text-gray-400 uppercase">Email</span>
-                        <span className="font-semibold text-gray-800 break-all">{selectedDriverDetail.user.email}</span>
+                        <span className="font-semibold text-gray-800 break-all">
+                          {selectedDriverDetail.email || selectedDriverDetail.user?.email || 'Chưa liên kết'}
+                        </span>
                       </div>
                       <div className="col-span-2">
                         <span className="block text-[9px] font-bold text-gray-400 uppercase">Trạng thái tài khoản</span>
@@ -891,16 +883,6 @@ export const DriverTab: React.FC = () => {
                   )}
                 </div>
               </div>
-
-              {/* Note */}
-              {selectedDriverDetail.note && (
-                <div>
-                  <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Ghi chú</span>
-                  <p className="p-3 bg-amber-50/40 border border-amber-100 rounded text-gray-700 italic">
-                    {selectedDriverDetail.note}
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Modal Footer */}

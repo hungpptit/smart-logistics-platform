@@ -283,6 +283,7 @@ export class AuthService {
       refreshToken,
       user: {
         ...userWithoutPassword,
+        staffProfile: user.staff,
         fullName: profileFullName,
         email: profileEmail,
         phone: profilePhone,
@@ -395,6 +396,7 @@ export class AuthService {
 
     return {
       ...userWithoutPassword,
+      staffProfile: user.staff,
       fullName: profileFullName,
       email: profileEmail,
       phone: profilePhone,

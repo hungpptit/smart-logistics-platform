@@ -29,6 +29,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const normalizeUser = (userData: any): User | null => {
+    if (!userData) return null;
+    return {
+      ...userData,
+      staffProfile: userData.staffProfile || userData.staff || null,
+    };
+  };
+
   const handleSilentRefresh = async (): Promise<boolean> => {
     try {
       const response = await fetch(`${CONFIG.API_BASE_URL}/auth/refresh`, {
@@ -53,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         const profileData = await profileResponse.json();
         if (profileResponse.ok && profileData.success) {
-          setUser(profileData.data);
+          setUser(normalizeUser(profileData.data));
           return true;
         }
       }
@@ -81,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const resData = await response.json();
         if (response.ok && resData.success) {
-          setUser(resData.data);
+          setUser(normalizeUser(resData.data));
         } else if (response.status === 401) {
           // Access token expired, attempt silent refresh
           const success = await handleSilentRefresh();
@@ -131,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newToken = resData.data.accessToken;
         localStorage.setItem('token', newToken);
         setToken(newToken);
-        setUser(resData.data.user);
+        setUser(normalizeUser(resData.data.user));
         return { success: true, message: 'Đăng nhập thành công!' };
       } else {
         return { success: false, message: resData.message || 'Đăng nhập thất bại.' };
@@ -192,7 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newToken = resData.data.accessToken;
         localStorage.setItem('token', newToken);
         setToken(newToken);
-        setUser(resData.data.user);
+        setUser(normalizeUser(resData.data.user));
         return { success: true, message: 'Xác thực OTP và đăng nhập thành công!' };
       } else {
         return { success: false, message: resData.message || 'Mã OTP không hợp lệ hoặc đã hết hạn.' };

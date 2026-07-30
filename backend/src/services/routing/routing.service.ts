@@ -3,6 +3,7 @@ import { KMeansService } from './kmeans.service';
 import { AssignmentService } from './assignment.service';
 import { VRPService } from './vrp.service';
 import { BadRequestException, NotFoundException } from '../../middlewares/error.middleware';
+import { getTrackingGateway } from '../../gateways/tracking.gateway';
 
 export class RoutingService {
   private kmeansService = new KMeansService();
@@ -258,7 +259,7 @@ export class RoutingService {
         }
 
         const isPickup = order.status === 'READY_FOR_PICKUP';
-        const nextStatus = isPickup ? 'PICKUP_ASSIGNED' : 'IN_TRANSIT';
+        const nextStatus = isPickup ? 'PICKUP_ASSIGNED' : 'READY_FOR_DISPATCH';
 
         if (isPickup) {
           pickupOrderIds.push(order.id);
@@ -271,6 +272,7 @@ export class RoutingService {
           data: {
             routeId: route.id,
             shipmentId: shipment.id,
+            orderId: order.id,
             stopType: isPickup ? 'PICKUP' : 'DELIVERY',
             sequence: sequenceIndex++,
             addressSnapshot: (isPickup ? order.pickupAddressText : order.deliveryAddressText) || 'Unknown Address',
@@ -286,7 +288,7 @@ export class RoutingService {
           status: nextStatus,
           changedByUserId: creatorId || null,
           changeSource: 'SYSTEM',
-          reason: `Đơn hàng được AI phân bổ vào lộ trình tối ưu ${routeCode} cho tài xế ${driver.employeeCode} (${isPickup ? 'Tuyến lấy hàng' : 'Tuyến giao hàng'})`,
+          reason: `Đơn hàng được AI phân bổ vào sọt hàng ${routeCode} tại bưu cục (Trạng thái: Sẵn sàng giao hàng, chờ Tài xế quét QR mã Sọt để xuất kho)`,
         });
       }
 
@@ -308,7 +310,7 @@ export class RoutingService {
       if (deliveryOrderIds.length > 0) {
         await prisma.order.updateMany({
           where: { id: { in: deliveryOrderIds } },
-          data: { status: 'IN_TRANSIT' },
+          data: { status: 'READY_FOR_DISPATCH' },
         });
       }
 
@@ -320,6 +322,7 @@ export class RoutingService {
       createdRoutes.push(route);
     }
 
+    getTrackingGateway()?.broadcastRoutesUpdated();
     return createdRoutes;
   }
 
@@ -482,6 +485,8 @@ export class RoutingService {
                             orderCode: true,
                             receiverName: true,
                             receiverPhone: true,
+                            deliveryAddressText: true,
+                            pickupAddressText: true,
                             estimatedCodAmount: true,
                             estimatedTotalAmount: true,
                           },
@@ -535,7 +540,7 @@ export class RoutingService {
       await prisma.order.updateMany({
         where: {
           destinationFacilityId: validFacilityId,
-          status: { in: ['PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
+          status: { in: ['READY_FOR_DISPATCH', 'PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
         },
         data: { status: 'AT_HUB' },
       });
@@ -545,7 +550,7 @@ export class RoutingService {
         where: {
           originFacilityId: validFacilityId,
           destinationFacilityId: { not: validFacilityId },
-          status: { in: ['PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
+          status: { in: ['READY_FOR_DISPATCH', 'PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
         },
         data: { status: 'READY_FOR_PICKUP' },
       });
@@ -553,7 +558,7 @@ export class RoutingService {
       // Global reset fallback: reset all delivery orders in-transit back to AT_HUB
       await prisma.order.updateMany({
         where: {
-          status: { in: ['PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
+          status: { in: ['READY_FOR_DISPATCH', 'PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
         },
         data: { status: 'AT_HUB' },
       });
@@ -598,10 +603,111 @@ export class RoutingService {
     // Clean up RouteOptimization records
     await prisma.routeOptimization.deleteMany({});
 
+    getTrackingGateway()?.broadcastRoutesUpdated();
+
     return {
       resetOrdersCount: 80,
       deletedRoutesCount: routeIds.length,
     };
+  }
+
+  /**
+   * Confirm Tote Scan & Start Route Execution (Transition Route -> IN_PROGRESS and Orders -> OUT_FOR_DELIVERY)
+   */
+  public async confirmRouteStart(routeId: string, userId?: string) {
+    const route = await prisma.route.findFirst({
+      where: {
+        OR: [
+          { id: routeId },
+          { routeCode: routeId },
+        ],
+      },
+    });
+
+    if (!route) {
+      throw new NotFoundException('Không tìm thấy lộ trình / sọt hàng này');
+    }
+
+    // Collect order IDs linked to shipments and stops of this route
+    const stops = await prisma.routeStop.findMany({
+      where: { routeId: route.id },
+      select: {
+        orderId: true,
+        shipment: {
+          include: {
+            shipmentPackages: {
+              include: {
+                package: {
+                  select: { orderId: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const orderIds: string[] = [];
+    for (const stop of stops) {
+      if (stop.orderId) {
+        orderIds.push(stop.orderId);
+      }
+      if (stop.shipment?.shipmentPackages) {
+        for (const sp of stop.shipment.shipmentPackages) {
+          if (sp.package?.orderId) {
+            orderIds.push(sp.package.orderId);
+          }
+        }
+      }
+    }
+
+    // Fallback: If orderIds is empty, match orders by originFacilityId or packages currentFacilityId
+    if (orderIds.length === 0 && route.startFacilityId) {
+      const facilityOrders = await prisma.order.findMany({
+        where: {
+          OR: [
+            { originFacilityId: route.startFacilityId },
+            { packages: { some: { currentFacilityId: route.startFacilityId } } },
+          ],
+          status: { in: ['READY_FOR_DISPATCH', 'PICKUP_ASSIGNED'] },
+        },
+        select: { id: true },
+        take: route.totalStops || 50,
+      });
+      facilityOrders.forEach(o => orderIds.push(o.id));
+    }
+
+    // Update Route status to IN_PROGRESS
+    const updatedRoute = await prisma.route.update({
+      where: { id: route.id },
+      data: {
+        status: 'IN_PROGRESS',
+        actualStartAt: new Date(),
+      },
+    });
+
+    // Update all related orders status to OUT_FOR_DELIVERY
+    if (orderIds.length > 0) {
+      const uniqueOrderIds = Array.from(new Set(orderIds));
+      await prisma.order.updateMany({
+        where: { id: { in: uniqueOrderIds } },
+        data: { status: 'OUT_FOR_DELIVERY' },
+      });
+
+      // Insert OrderStatusHistory logs
+      const historyLogs = uniqueOrderIds.map(orderId => ({
+        orderId,
+        status: 'OUT_FOR_DELIVERY',
+        changedByUserId: userId || null,
+        changeSource: 'DRIVER',
+        reason: `Tài xế đã quét mã QR Sọt ${route.routeCode || route.id} và bắt đầu di chuyển đi giao hàng`,
+      }));
+      await prisma.orderStatusHistory.createMany({ data: historyLogs as any });
+    }
+
+    getTrackingGateway()?.broadcastRoutesUpdated();
+
+    return updatedRoute;
   }
 }
 

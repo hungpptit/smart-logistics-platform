@@ -22,6 +22,17 @@ export interface User {
       facilityName: string;
       facilityCode: string;
     } | null;
+    employmentStatus?: 'ACTIVE' | 'OFFLINE' | 'SUSPENDED' | 'DISABLED' | string | null;
+  } | null;
+  staff?: {
+    id: string;
+    assignedFacilityId: string | null;
+    assignedFacility?: {
+      id: string;
+      facilityName: string;
+      facilityCode: string;
+    } | null;
+    employmentStatus?: 'ACTIVE' | 'OFFLINE' | 'SUSPENDED' | 'DISABLED' | string | null;
   } | null;
 }
 

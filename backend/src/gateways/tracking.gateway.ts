@@ -1,12 +1,36 @@
 import { Server, Socket } from 'socket.io';
 import { redis } from '../config/redis';
 
+let trackingGatewayInstance: TrackingGateway | null = null;
+
+export function getTrackingGateway(): TrackingGateway | null {
+  return trackingGatewayInstance;
+}
+
 export class TrackingGateway {
   private io: Server;
 
   constructor(io: Server) {
     this.io = io;
+    trackingGatewayInstance = this;
     this.setupListeners();
+  }
+
+  public broadcastRoutesUpdated(): void {
+    if (this.io) {
+      this.io.emit('routes_updated');
+      this.io.emit('route:assigned');
+      this.io.emit('route:reset');
+      console.log('[Socket] Broadcasted routes_updated to all clients');
+    }
+  }
+
+  public broadcastDutyStatusChanged(driverId: string, userId: string, status: string): void {
+    if (this.io) {
+      this.io.emit('driver:duty_status_changed', { driverId, userId, status });
+      this.io.to('admin:monitoring').emit('driver:duty_status_changed', { driverId, userId, status });
+      console.log(`[Socket] Broadcasted driver:duty_status_changed: driverId=${driverId}, status=${status}`);
+    }
   }
 
   private setupListeners(): void {

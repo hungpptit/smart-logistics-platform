@@ -527,4 +527,31 @@ export class DriverService {
       },
     });
   }
+
+  /**
+   * Update duty status (ACTIVE / OFFLINE) for logged-in driver
+   */
+  public async updateDutyStatus(userId: string, status: 'ACTIVE' | 'OFFLINE') {
+    const driver = await prisma.staff.findFirst({
+      where: { userId },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Không tìm thấy thông tin tài xế');
+    }
+
+    if (driver.employmentStatus === 'SUSPENDED' || driver.employmentStatus === 'DISABLED') {
+      throw new BadRequestException('Tài khoản tài xế của bạn đang ở trạng thái bị đình chỉ hoặc tạm khóa. Không thể đổi ca làm việc.');
+    }
+
+    return await prisma.staff.update({
+      where: { id: driver.id },
+      data: {
+        employmentStatus: status as any,
+      },
+      include: {
+        assignedFacility: true,
+      },
+    });
+  }
 }

@@ -166,25 +166,25 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
 
 
-                            // Email / Username Input
+                            // Username Input
                             Text(
-                              'Email hoặc Tên đăng nhập',
+                              'Tên đăng nhập',
                               style: AppTypography.labelLg.copyWith(color: AppColors.deepOnyx),
                             ),
                             const SizedBox(height: 8.0),
                             TextFormField(
                               controller: _usernameController,
-                              keyboardType: TextInputType.emailAddress,
+                              keyboardType: TextInputType.text,
                               style: AppTypography.bodyMd,
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Vui lòng nhập Email hoặc Tên đăng nhập';
+                                  return 'Vui lòng nhập tên đăng nhập';
                                 }
                                 return null;
                               },
                               decoration: const InputDecoration(
-                                prefixIcon: Icon(Icons.mail, color: AppColors.secondary),
-                                hintText: 'ten@congty.com',
+                                prefixIcon: Icon(Icons.person, color: AppColors.secondary),
+                                hintText: 'shp_dangvanbi_1',
                               ),
                             ),
                             const SizedBox(height: 20.0),

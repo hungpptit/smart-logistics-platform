@@ -56,7 +56,7 @@ class AuthService {
   }
 
   // Login API Call
-  static Future<Map<String, dynamic>> login(String email, String password) async {
+  static Future<Map<String, dynamic>> login(String username, String password) async {
     try {
       final response = await http.post(
         Uri.parse('${AppConfig.baseUrl}/auth/login'),
@@ -65,7 +65,7 @@ class AuthService {
           'ngrok-skip-browser-warning': 'true',
         },
         body: jsonEncode({
-          'email': email,
+          'username': username,
           'password': password,
         }),
       );

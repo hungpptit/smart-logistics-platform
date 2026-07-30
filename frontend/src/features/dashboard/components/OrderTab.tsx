@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
 import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
 import { CreateOrderModal } from './CreateOrderModal';
@@ -115,7 +116,7 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
   PICK_FAILED: { label: 'Lấy hàng thất bại', color: '#dc2626', bg: '#fef2f2' },
   PICKED_UP: { label: 'Đã lấy hàng', color: '#16a34a', bg: '#f0fdf4' },
   ARRIVED_ORIGIN_FACILITY: { label: 'Đến kho gửi', color: '#059669', bg: '#ecfdf5' },
-  READY_FOR_DISPATCH: { label: 'Sẵn sàng điều phối', color: '#7c3aed', bg: '#f5f3ff' },
+  READY_FOR_DISPATCH: { label: 'Sẵn sàng giao hàng', color: '#7c3aed', bg: '#f5f3ff' },
   IN_TRANSIT: { label: 'Đang vận chuyển', color: '#3b82f6', bg: '#dbeafe' },
   AT_HUB: { label: 'Đã đến kho nhận', color: '#f59e0b', bg: '#fef3c7' },
   OUT_FOR_DELIVERY: { label: 'Đang giao hàng', color: '#06b6d4', bg: '#e0f7fa' },
@@ -140,8 +141,8 @@ export const OrderTab: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const isCustomerDisabled = !!error && (
-    error.includes('Hồ sơ khách hàng') || 
-    error.includes('ngưng hoạt động') || 
+    error.includes('Hồ sơ khách hàng') ||
+    error.includes('ngưng hoạt động') ||
     error.includes('bị khóa')
   );
 
@@ -290,6 +291,35 @@ export const OrderTab: React.FC = () => {
     fetchOrders(currentPage);
   }, [currentPage, statusFilter, facilityFilter, token]);
 
+  // Real-time socket & periodic background refresh for Order status changes
+  useEffect(() => {
+    if (!token) return;
+
+    const socketUrl = CONFIG.API_BASE_URL.replace('/api/v1', '');
+    const socket = io(socketUrl, {
+      transports: ['websocket'],
+      auth: { token }
+    });
+
+    socket.on('connect', () => {
+      socket.emit('join:admin');
+    });
+
+    const handleRefetch = () => {
+      fetchOrders(currentPage);
+    };
+
+    socket.on('routes_updated', handleRefetch);
+    socket.on('driver:duty_status_changed', handleRefetch);
+    socket.on('route:assigned', handleRefetch);
+    socket.on('route:reset', handleRefetch);
+
+    return () => {
+      socket.emit('leave:admin');
+      socket.disconnect();
+    };
+  }, [token, currentPage, statusFilter, facilityFilter, searchTerm]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (currentPage === 1) {
@@ -412,7 +442,7 @@ export const OrderTab: React.FC = () => {
       const originOrders: Order[] = [];
       const destOrders: Order[] = [];
       const selectedFacName = facilities.find(f => f.id === facilityFilter)?.facilityName || 'Kho đang chọn';
-      
+
       orders.forEach((order) => {
         if (order.originFacilityId === facilityFilter) {
           originOrders.push(order);
@@ -420,7 +450,7 @@ export const OrderTab: React.FC = () => {
           destOrders.push(order);
         }
       });
-      
+
       const result = [];
       if (originOrders.length > 0) {
         result.push({
@@ -461,8 +491,8 @@ export const OrderTab: React.FC = () => {
             <div className="text-xs">
               <p className="font-bold uppercase tracking-wider mb-0.5 text-amber-900">Cảnh báo: Chưa được phân công kho làm việc</p>
               <p className="text-amber-700 leading-relaxed font-medium">
-                Tài khoản nhân viên của bạn hiện chưa được liên kết với bất kỳ kho bãi/hub nào. 
-                Do đó, bạn chỉ có thể xem và quản lý các đơn hàng do chính bạn tạo. 
+                Tài khoản nhân viên của bạn hiện chưa được liên kết với bất kỳ kho bãi/hub nào.
+                Do đó, bạn chỉ có thể xem và quản lý các đơn hàng do chính bạn tạo.
                 Vui lòng liên hệ Quản trị viên (Admin) để được phân công kho làm việc.
               </p>
             </div>
@@ -523,10 +553,12 @@ export const OrderTab: React.FC = () => {
 
             <button
               onClick={() => fetchOrders(currentPage)}
-              className="p-2 border border-[#e2e8f0] rounded hover:bg-gray-50 text-gray-500 transition-colors"
-              title="Làm mới danh sách"
+              disabled={loading}
+              className="px-3 py-2 border border-[#e2e8f0] rounded hover:bg-gray-100 text-gray-700 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm bg-white"
+              title="Làm mới lại danh sách đơn hàng"
             >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={14} className={loading ? 'animate-spin text-[#bc0100]' : 'text-gray-600'} />
+              <span>Làm mới</span>
             </button>
 
             {isStaffOnly && facilityFilter !== userAssignedFacilityId && (
@@ -544,7 +576,7 @@ export const OrderTab: React.FC = () => {
                   title="Kích hoạt thuật toán AI K-Means & VRP gom cụm phân đơn cho tài xế"
                 >
                   <Bot size={16} className={optimizing ? 'animate-bounce' : ''} />
-                  <span>{optimizing ? 'Đang gom...' : '🤖 AI Gom Cụm'}</span>
+                  <span>{optimizing ? 'Đang gom...' : 'AI Gom Cụm'}</span>
                 </button>
 
                 <button
@@ -554,7 +586,7 @@ export const OrderTab: React.FC = () => {
                   title="[DEV TOOL] Hoàn tác toàn bộ lộ trình AI và khôi phục 80 đơn hàng về trạng thái ban đầu để test AI tiếp"
                 >
                   <RotateCcw size={14} className={resetting ? 'animate-spin' : ''} />
-                  <span>{resetting ? 'Đang reset...' : '↺ Hoàn tác AI (DEV)'}</span>
+                  <span>{resetting ? 'Đang reset...' : 'Hoàn tác AI (DEV)'}</span>
                 </button>
               </>
             )}
@@ -568,11 +600,10 @@ export const OrderTab: React.FC = () => {
                 setShowCreateModal(true);
               }}
               disabled={isCustomerDisabled}
-              className={`text-white px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${
-                isCustomerDisabled 
-                  ? 'bg-gray-400 opacity-50 cursor-not-allowed' 
-                  : 'bg-[#bc0100] hover:bg-[#bc0100]/90 cursor-pointer'
-              }`}
+              className={`text-white px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${isCustomerDisabled
+                ? 'bg-gray-400 opacity-50 cursor-not-allowed'
+                : 'bg-[#bc0100] hover:bg-[#bc0100]/90 cursor-pointer'
+                }`}
               title={isCustomerDisabled ? (error || 'Hồ sơ đang bị khóa hoặc ngưng hoạt động') : 'Tạo đơn hàng mới'}
             >
               Tạo đơn hàng
@@ -725,7 +756,7 @@ export const OrderTab: React.FC = () => {
                     } else {
                       pages.push(1);
                       if (current > 3) pages.push('...');
-                      
+
                       const start = Math.max(2, current - 1);
                       const end = Math.min(total - 1, current + 1);
                       for (let i = start; i <= end; i++) pages.push(i);
@@ -746,11 +777,10 @@ export const OrderTab: React.FC = () => {
                         <button
                           key={p}
                           onClick={() => setCurrentPage(p)}
-                          className={`min-w-[32px] h-[32px] px-2 text-xs font-bold rounded border transition-colors ${
-                            p === currentPage
-                              ? 'bg-[#bc0100] text-white border-[#bc0100] shadow-sm'
-                              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                          }`}
+                          className={`min-w-[32px] h-[32px] px-2 text-xs font-bold rounded border transition-colors ${p === currentPage
+                            ? 'bg-[#bc0100] text-white border-[#bc0100] shadow-sm'
+                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                            }`}
                         >
                           {p}
                         </button>

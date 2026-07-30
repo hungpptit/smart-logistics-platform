@@ -49,7 +49,7 @@ export class RoutingController {
       const user = (req as any).user;
 
       let filterDriverId = driverId as string;
-      const isDriverOnly = user?.roles?.includes('DRIVER') && !user?.roles?.includes('ADMIN') && !user?.roles?.includes('STAFF') && !user?.roles?.includes('DISPATCHER');
+      const isDriverOnly = (user?.roles?.includes('DRIVER') || user?.roles?.includes('SHIPPER')) && !user?.roles?.includes('ADMIN') && !user?.roles?.includes('STAFF') && !user?.roles?.includes('DISPATCHER');
       if (!filterDriverId && user?.id && isDriverOnly) {
         const driverProfile = await prisma.staff.findFirst({
           where: { userId: user.id },
@@ -111,6 +111,23 @@ export class RoutingController {
       return res.status(200).json({
         success: true,
         message: '🔄 Hoàn tác dữ liệu AI về trạng thái ban đầu thành công!',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public startRoute = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+
+      const result = await this.routingService.confirmRouteStart(id, userId);
+
+      return res.status(200).json({
+        success: true,
+        message: '✅ Đã xác nhận quét mã Sọt và chuyển các đơn hàng sang Đang đi giao (OUT_FOR_DELIVERY)',
         data: result,
       });
     } catch (error) {

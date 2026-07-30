@@ -110,5 +110,11 @@ router.get(
   routingController.getRouteById
 );
 
+router.post(
+  '/:id/start',
+  requireRoles(['ADMIN', 'STAFF', 'SHIPPER']),
+  routingController.startRoute
+);
+
 export default router;
 

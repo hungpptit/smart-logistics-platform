@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { DriverService } from '../services/driver.service';
+import { getTrackingGateway } from '../gateways/tracking.gateway';
 
 export class DriverController {
   private driverService = new DriverService();
@@ -116,6 +117,33 @@ export class DriverController {
         success: true,
         message: 'Lấy danh sách phân công đang hoạt động thành công',
         data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public updateDutyStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = (req as any).user?.id;
+      const { status } = req.body;
+
+      if (!status || !['ACTIVE', 'OFFLINE'].includes(status)) {
+        res.status(400).json({
+          success: false,
+          message: 'Trạng thái ca làm việc phải là ACTIVE hoặc OFFLINE',
+        });
+        return;
+      }
+
+      const updated = await this.driverService.updateDutyStatus(userId, status);
+
+      getTrackingGateway()?.broadcastDutyStatusChanged(updated?.id || '', userId, status);
+
+      res.status(200).json({
+        success: true,
+        message: status === 'ACTIVE' ? 'Đã bật ca làm việc (Trực tuyến)' : 'Đã kết thúc ca làm việc (Ngoại tuyến)',
+        data: updated,
       });
     } catch (error) {
       next(error);

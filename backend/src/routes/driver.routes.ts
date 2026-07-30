@@ -8,7 +8,15 @@ import { AssignVehicleDto, TerminateAssignmentDto } from '../dtos/assignment.dto
 const router = Router();
 const driverController = new DriverController();
 
-// Require auth and specific roles for all driver management operations
+// Driver Duty Status Toggle (Available for SHIPPER / DRIVER / STAFF / ADMIN)
+router.patch(
+  '/duty-status',
+  authMiddleware,
+  requireRoles(['SHIPPER', 'DRIVER', 'STAFF', 'ADMIN']),
+  driverController.updateDutyStatus
+);
+
+// Require auth and specific roles for administrative driver management operations
 router.use(authMiddleware);
 router.use(requireRoles(['ADMIN', 'STAFF']));
 

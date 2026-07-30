@@ -4,7 +4,7 @@ import { CONFIG } from '../../../config';
 import { io, Socket } from 'socket.io-client';
 import {
   Navigation, Earth, Truck, MapPin, Search, RefreshCw,
-  Play, Square, Clock, Loader2, AlertCircle, Bot, RotateCcw, Building2
+  Play, Square, Clock, Loader2, AlertCircle, Bot, RotateCcw, Building2, QrCode, X
 } from 'lucide-react';
 import { Map, MapControls, MapMarker, MarkerContent, MapRoute, MarkerPopup } from '../../../components/ui/map';
 import MapLibreGL from 'maplibre-gl';
@@ -45,6 +45,20 @@ interface RouteData {
       };
     }>;
   };
+  driver?: {
+    id: string;
+    employeeCode?: string;
+    fullName?: string;
+    phone?: string;
+    user?: {
+      fullName?: string;
+      username?: string;
+    };
+  };
+  vehicle?: {
+    vehicleCode?: string;
+    licensePlate?: string;
+  };
   driverVehicleAssignment?: {
     driver?: {
       id: string;
@@ -52,7 +66,7 @@ interface RouteData {
       fullName?: string;
       phone?: string;
       user?: {
-        fullName: string;
+        fullName?: string;
         phone?: string;
       };
     };
@@ -82,6 +96,7 @@ export const LiveTrackingTab: React.FC = () => {
   const [selectedRoute, setSelectedRoute] = useState<RouteData | null>(null);
   const [isOptimizationModalOpen, setIsOptimizationModalOpen] = useState(false);
   const [routeGeometry, setRouteGeometry] = useState<[number, number][]>([]);
+  const [qrModalRoute, setQrModalRoute] = useState<RouteData | null>(null);
 
   // Filters
   const [facilityFilter, setFacilityFilter] = useState<string>(user?.staffProfile?.assignedFacilityId || '');
@@ -320,6 +335,24 @@ export const LiveTrackingTab: React.FC = () => {
         }
         return prevSelected;
       });
+      // 3. Listen for duty status changes and route events
+      socket.on('routes_updated', () => {
+        console.log('[Socket] routes_updated received, refetching routes...');
+        fetchRoutes();
+      });
+
+      socket.on('driver:duty_status_changed', (data: any) => {
+        console.log('[Socket] driver:duty_status_changed received:', data);
+        fetchRoutes();
+      });
+
+      socket.on('route:assigned', () => {
+        fetchRoutes();
+      });
+
+      socket.on('route:reset', () => {
+        fetchRoutes();
+      });
     });
 
     socket.on('disconnect', () => {
@@ -333,6 +366,14 @@ export const LiveTrackingTab: React.FC = () => {
       }
     };
   }, [token]);
+
+  // Periodic background sync every 6 seconds as a failsafe
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchRoutes();
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [token, facilityFilter, statusFilter]);
 
   // Clean up simulation on unmount
   useEffect(() => {
@@ -544,10 +585,11 @@ export const LiveTrackingTab: React.FC = () => {
     }, 3000); // Emits update every 3 seconds to keep it active
   };
 
-  // Helper to extract driver name safely from either direct property or nested user property
-  const getDriverName = (driverObj?: any) => {
-    if (!driverObj) return '';
-    return driverObj.user?.fullName || driverObj.fullName || '';
+  // Helper to extract driver name safely from direct property or nested driverVehicleAssignment
+  const getDriverName = (driverObj?: any, directDriver?: any) => {
+    const target = directDriver || driverObj;
+    if (!target) return '';
+    return target.fullName || target.user?.fullName || target.employeeCode || '';
   };
 
   // Filters routes locally based on search query
@@ -555,12 +597,13 @@ export const LiveTrackingTab: React.FC = () => {
     const term = searchTerm.toLowerCase().trim();
     if (!term) return true;
 
-    const driverName = getDriverName(route.driverVehicleAssignment?.driver);
+    const driverName = getDriverName(route.driverVehicleAssignment?.driver, route.driver);
+    const vehiclePlate = route.driverVehicleAssignment?.vehicle?.licensePlate || route.vehicle?.licensePlate || '';
 
     return (
       route.routeCode.toLowerCase().includes(term) ||
       driverName.toLowerCase().includes(term) ||
-      (route.driverVehicleAssignment?.vehicle?.licensePlate || '').toLowerCase().includes(term) ||
+      vehiclePlate.toLowerCase().includes(term) ||
       route.startFacility.facilityName.toLowerCase().includes(term)
     );
   });
@@ -594,7 +637,7 @@ export const LiveTrackingTab: React.FC = () => {
                     title="Kích hoạt thuật toán AI K-Means & VRP gom cụm phân đơn cho tài xế"
                   >
                     <Bot size={12} />
-                    <span>🤖 AI Gom Cụm</span>
+                    <span>AI Gom Cụm</span>
                   </button>
 
                   <button
@@ -604,7 +647,7 @@ export const LiveTrackingTab: React.FC = () => {
                     title="[DEV TOOL] Hoàn tác toàn bộ lộ trình AI và khôi phục 80 đơn hàng về trạng thái ban đầu để test AI tiếp"
                   >
                     <RotateCcw size={12} className={resetting ? 'animate-spin' : ''} />
-                    <span>{resetting ? 'Đang reset...' : '↺ Hoàn tác AI (DEV)'}</span>
+                    <span>{resetting ? 'Đang reset...' : 'Hoàn tác AI (DEV)'}</span>
                   </button>
                 </>
               )}
@@ -683,8 +726,8 @@ export const LiveTrackingTab: React.FC = () => {
                   key={route.id}
                   onClick={() => handleSelectRoute(route.id)}
                   className={`p-4 cursor-pointer transition-all border-l-4 ${isSelected
-                      ? 'bg-[#bc0100]/5 border-[#bc0100]'
-                      : 'border-transparent hover:bg-gray-50/50'
+                    ? 'bg-[#bc0100]/5 border-[#bc0100]'
+                    : 'border-transparent hover:bg-gray-50/50'
                     }`}
                 >
                   <div className="flex justify-between items-start">
@@ -699,15 +742,15 @@ export const LiveTrackingTab: React.FC = () => {
                         )}
                       </div>
                       <p className="text-[10px] text-gray-500 font-medium mt-0.5">
-                        Tài xế: <span className="font-semibold text-gray-700">{getDriverName(route.driverVehicleAssignment?.driver) || 'Chưa gán'}</span>
+                        Tài xế: <span className="font-semibold text-gray-700">{getDriverName(route.driverVehicleAssignment?.driver, route.driver) || 'Chưa gán'}</span>
                       </p>
                     </div>
 
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[8px] font-extrabold uppercase ${route.status === 'IN_PROGRESS'
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                        : route.status === 'COMPLETED'
-                          ? 'bg-green-50 text-green-700 border border-green-200'
-                          : 'bg-gray-100 text-gray-600'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      : route.status === 'COMPLETED'
+                        ? 'bg-green-50 text-green-700 border border-green-200'
+                        : 'bg-gray-100 text-gray-600'
                       }`}>
                       {route.status === 'IN_PROGRESS' ? 'Đang giao' : route.status === 'COMPLETED' ? 'Đã xong' : 'Chưa chạy'}
                     </span>
@@ -715,7 +758,7 @@ export const LiveTrackingTab: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-1 mt-3 text-[10px] text-gray-400 font-mono">
                     <span className="flex items-center gap-1">
-                      <Truck size={10} /> {route.driverVehicleAssignment?.vehicle?.licensePlate || 'N/A'}
+                      <Truck size={10} /> {route.driverVehicleAssignment?.vehicle?.licensePlate || route.vehicle?.licensePlate || 'Xe máy Bưu cục'}
                     </span>
                     <span className="flex items-center gap-1 justify-end">
                       <Clock size={10} /> {route.plannedDurationMin} phút
@@ -727,6 +770,17 @@ export const LiveTrackingTab: React.FC = () => {
                       <Navigation size={10} /> {Number(route.plannedDistanceKm).toFixed(1)} km
                     </span>
                   </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setQrModalRoute(route);
+                    }}
+                    className="mt-3 w-full py-1.5 px-3 bg-[#161D25] hover:bg-black text-white text-[10px] font-bold rounded flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-98"
+                  >
+                    <QrCode size={12} className="text-[#bc0100]" />
+                    <span>Xem mã QR Sọt & Scan ({route.routeCode})</span>
+                  </button>
                 </div>
               );
             })
@@ -828,7 +882,7 @@ export const LiveTrackingTab: React.FC = () => {
                     </MarkerContent>
                     <MarkerPopup closeButton={false}>
                       <div className="p-2 text-xs font-sans max-w-[200px]">
-                        <h4 className="font-bold text-slate-800">{getDriverName(r.driverVehicleAssignment?.driver) || 'Tài xế'}</h4>
+                        <h4 className="font-bold text-slate-800">{getDriverName(r.driverVehicleAssignment?.driver, r.driver) || 'Tài xế'}</h4>
                         <p className="text-[10px] text-slate-400 font-mono mt-0.5">{r.routeCode}</p>
                         <div className="mt-2 space-y-1 text-slate-600">
                           <p>Vận tốc: <span className="font-bold text-slate-800">
@@ -864,8 +918,8 @@ export const LiveTrackingTab: React.FC = () => {
               <button
                 onClick={handleToggleSimulation}
                 className={`w-full py-2 px-4 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer ${isSimulating
-                    ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                    : 'bg-[#bc0100] hover:bg-[#a00100] text-white shadow-sm'
+                  ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                  : 'bg-[#bc0100] hover:bg-[#a00100] text-white shadow-sm'
                   }`}
               >
                 {isSimulating ? (
@@ -900,11 +954,11 @@ export const LiveTrackingTab: React.FC = () => {
             <div className="flex items-center gap-4 flex-wrap">
               <div>
                 <span className="text-[9px] font-bold text-gray-400 uppercase">Tài xế giao vận</span>
-                <p className="font-bold text-gray-800">{getDriverName(selectedRoute.driverVehicleAssignment?.driver) || 'Chưa gán'}</p>
+                <p className="font-bold text-gray-800">{getDriverName(selectedRoute.driverVehicleAssignment?.driver, selectedRoute.driver) || 'Chưa gán'}</p>
               </div>
               <div className="border-l border-gray-200 pl-4">
                 <span className="text-[9px] font-bold text-gray-400 uppercase">Phương tiện gán</span>
-                <p className="font-semibold text-gray-700">{selectedRoute.driverVehicleAssignment?.vehicle?.licensePlate || 'N/A'}</p>
+                <p className="font-semibold text-gray-700">{selectedRoute.driverVehicleAssignment?.vehicle?.licensePlate || selectedRoute.vehicle?.licensePlate || 'Xe máy Bưu cục'}</p>
               </div>
               <div className="border-l border-gray-200 pl-4">
                 <span className="text-[9px] font-bold text-gray-400 uppercase">Điểm xuất phát</span>
@@ -945,6 +999,82 @@ export const LiveTrackingTab: React.FC = () => {
         facilities={facilities}
         isAdmin={isAdmin}
       />
+
+      {/* TOTE QR CODE SCAN MODAL */}
+      {qrModalRoute && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-5 py-4 border-b border-gray-100 bg-[#fafafa] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <QrCode size={20} className="text-[#bc0100]" />
+                <div>
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-gray-800">
+                    Mã QR Sọt Hàng (Tote Scan Code)
+                  </h3>
+                  <p className="text-[10px] font-mono text-gray-500">{qrModalRoute.routeCode}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setQrModalRoute(null)}
+                className="p-1 hover:bg-gray-200 rounded-full transition-colors text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 text-center">
+              {/* QR Code Container */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 flex flex-col items-center justify-center">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrModalRoute.routeCode || qrModalRoute.id)}`}
+                  alt="Mã QR Sọt"
+                  className="w-48 h-48 rounded shadow-md border-2 border-white bg-white p-2"
+                />
+                <span className="mt-3 text-sm font-mono font-bold text-[#161D25] tracking-widest bg-gray-200/70 px-3 py-1 rounded">
+                  {qrModalRoute.routeCode || qrModalRoute.id}
+                </span>
+                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg mt-3 text-left leading-relaxed">
+                  📱 <strong>Hướng dẫn Test cho Shipper:</strong><br />
+                  Tài xế mở App <strong>Velocity Driver</strong> ➔ Nhấn <strong>Camera Quét QR</strong> ➔ Quét mã QR này trực tiếp từ màn hình máy tính để nhận sọt & chuyển đơn sang <strong>Đang đi giao (`OUT_FOR_DELIVERY`)</strong>.
+                </p>
+              </div>
+
+              {/* Route Summary */}
+              <div className="text-left text-xs space-y-2 bg-gray-50 p-3.5 rounded-lg border border-gray-200/70">
+                <div className="flex justify-between border-b border-gray-200/50 pb-1.5">
+                  <span className="text-gray-500 font-medium">Bưu cục phát:</span>
+                  <span className="font-bold text-gray-800">{qrModalRoute.startFacility?.facilityName || 'Bưu cục'}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-200/50 pb-1.5">
+                  <span className="text-gray-500 font-medium">Tài xế phụ trách:</span>
+                  <span className="font-bold text-[#bc0100]">
+                    {getDriverName(qrModalRoute.driverVehicleAssignment?.driver, qrModalRoute.driver) || 'Chưa gán'}
+                  </span>
+                </div>
+                <div className="flex justify-between border-b border-gray-200/50 pb-1.5">
+                  <span className="text-gray-500 font-medium">Phương tiện:</span>
+                  <span className="font-mono font-semibold text-gray-700">
+                    {qrModalRoute.driverVehicleAssignment?.vehicle?.licensePlate || qrModalRoute.vehicle?.licensePlate || 'Xe máy Bưu cục'}
+                  </span>
+                </div>
+                <div className="flex justify-between pt-0.5">
+                  <span className="text-gray-500 font-medium">Tổng số đơn/điểm dừng:</span>
+                  <span className="font-bold text-gray-900">{qrModalRoute.totalStops} đơn</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setQrModalRoute(null)}
+                className="px-4 py-2 bg-[#161D25] hover:bg-black text-white text-xs font-bold rounded transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

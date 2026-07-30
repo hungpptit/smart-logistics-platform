@@ -10,42 +10,47 @@ class DriverService {
 
   /// Fetch list of active/assigned routes for the logged in driver
   static Future<List<Map<String, dynamic>>> fetchMyRoutes() async {
-    try {
-      final token = await AuthService.getToken();
-      if (token == null || token.isEmpty) {
-        debugPrint('⚠️ [DriverService] Token rỗng hoặc hết hạn.');
-        return [];
-      }
+    final token = await AuthService.getToken();
+    if (token == null || token.isEmpty) {
+      debugPrint('⚠️ [DriverService] Token rỗng hoặc hết hạn.');
+      return [];
+    }
 
-      final url = Uri.parse('${AppConfig.baseUrl}/routes');
-      debugPrint('📡 [DriverService] Gọi GET $url');
+    final url = Uri.parse('${AppConfig.baseUrl}/routes');
 
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-          'ngrok-skip-browser-warning': 'true',
-        },
-      ).timeout(const Duration(seconds: 8));
+    for (int attempt = 1; attempt <= 2; attempt++) {
+      try {
+        debugPrint('📡 [DriverService] Gọi GET $url (lần $attempt)');
+        final response = await http.get(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+            'ngrok-skip-browser-warning': 'true',
+          },
+        ).timeout(const Duration(seconds: 8));
 
-      debugPrint('📨 [DriverService] Status: ${response.statusCode}');
+        debugPrint('📨 [DriverService] Status: ${response.statusCode}');
 
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        if (body['success'] == true && body['data'] != null) {
-          if (body['data'] is List) {
-            final list = List<Map<String, dynamic>>.from(body['data']);
-            debugPrint('✅ [DriverService] Nhận được ${list.length} lộ trình từ backend');
-            return list;
-          } else if (body['data'] is Map) {
-            debugPrint('✅ [DriverService] Nhận được 1 lộ trình (Map) từ backend');
-            return [Map<String, dynamic>.from(body['data'])];
+        if (response.statusCode == 200) {
+          final body = jsonDecode(response.body);
+          if (body['success'] == true && body['data'] != null) {
+            if (body['data'] is List) {
+              final list = List<Map<String, dynamic>>.from(body['data']);
+              debugPrint('✅ [DriverService] Nhận được ${list.length} lộ trình từ backend');
+              return list;
+            } else if (body['data'] is Map) {
+              debugPrint('✅ [DriverService] Nhận được 1 lộ trình (Map) từ backend');
+              return [Map<String, dynamic>.from(body['data'])];
+            }
           }
         }
+      } catch (e) {
+        debugPrint('💥 [DriverService] Lỗi fetchMyRoutes (lần $attempt): $e');
+        if (attempt == 1) {
+          await Future.delayed(const Duration(milliseconds: 400));
+        }
       }
-    } catch (e) {
-      debugPrint('💥 [DriverService] Lỗi fetchMyRoutes: $e');
     }
     return [];
   }
@@ -104,6 +109,61 @@ class DriverService {
       }
     } catch (e) {
       debugPrint('💥 [DriverService] Lỗi updateShipmentStatus: $e');
+    }
+    return false;
+  }
+
+  /// Update driver duty status (ACTIVE / OFFLINE)
+  static Future<bool> updateDutyStatus(String status) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || token.isEmpty) return false;
+
+      final url = Uri.parse('${AppConfig.baseUrl}/drivers/duty-status');
+      final response = await http.patch(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonEncode({'status': status}),
+      );
+
+      debugPrint('📡 [DriverService] Duty status update ($status): ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        return body['success'] == true;
+      }
+    } catch (e) {
+      debugPrint('💥 [DriverService] Error updating duty status: $e');
+    }
+    return false;
+  }
+
+  /// Confirm Tote Scan & Start Route (POST /routes/:id/start)
+  static Future<bool> startRoute(String routeId) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || token.isEmpty) return false;
+
+      final url = Uri.parse('${AppConfig.baseUrl}/routes/$routeId/start');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
+        },
+      );
+
+      debugPrint('📡 [DriverService] Confirm start route ($routeId): ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        return body['success'] == true;
+      }
+    } catch (e) {
+      debugPrint('💥 [DriverService] Lỗi startRoute: $e');
     }
     return false;
   }
