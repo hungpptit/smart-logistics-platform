@@ -16,18 +16,19 @@ export class OrderService {
   private async getCustomerIdByUserId(userId: string): Promise<string> {
     const customer = await prisma.customer.findUnique({
       where: { userId },
+      include: { user: true },
     });
     if (!customer) {
       throw new BadRequestException('Không tìm thấy thông tin hồ sơ khách hàng liên kết với tài khoản này');
     }
-    if (customer.status === 'BLOCKED') {
-      throw new BadRequestException('Hồ sơ khách hàng của bạn đang bị khóa');
+    if (customer.user?.status === 'LOCKED') {
+      throw new BadRequestException('Tài khoản của bạn đang bị khóa');
     }
-    if (customer.status === 'INACTIVE') {
-      throw new BadRequestException('Hồ sơ khách hàng của bạn đã ngưng hoạt động');
+    if (customer.user?.status === 'DISABLED') {
+      throw new BadRequestException('Tài khoản của bạn đã bị vô hiệu hóa');
     }
-    if (customer.status !== 'ACTIVE') {
-      throw new BadRequestException('Hồ sơ khách hàng của bạn đang không hoạt động');
+    if (customer.user?.status !== 'ACTIVE') {
+      throw new BadRequestException('Tài khoản của bạn đang không ở trạng thái hoạt động');
     }
     return customer.id;
   }
@@ -236,8 +237,6 @@ export class OrderService {
           pickupAddressText: pickupAddrSnapshot,
           pickupLatitude: pickupLat,
           pickupLongitude: pickupLon,
-          senderName: resolvedSenderName,
-          senderPhone: resolvedSenderPhone,
 
           deliveryAddressText: deliveryAddrSnapshot,
           deliveryLatitude: deliveryLat,
@@ -248,10 +247,8 @@ export class OrderService {
           estimatedShippingFee: pricing.shippingFee,
           estimatedInsuranceFee: pricing.insuranceFee,
           estimatedCodAmount: dto.codAmount || 0,
-          estimatedTotalAmount: pricing.totalAmount,
           estimatedDistance: distanceKm,
           estimatedDuration: durationMin,
-          pricingVersion: pricing.pricingVersion,
           estimatedDeliveryDate: estDeliveryDate,
           createdBy: creatorId,
         },

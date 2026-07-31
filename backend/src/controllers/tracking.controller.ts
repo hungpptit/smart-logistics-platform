@@ -21,6 +21,7 @@ export class TrackingController {
       const order = await prisma.order.findUnique({
         where: { orderCode: orderCodeClean },
         include: {
+          customer: true,
           pickupAddress: true,
           deliveryAddress: true,
           originFacility: true,
@@ -55,6 +56,9 @@ export class TrackingController {
         });
         return;
       }
+
+      const senderName = order.customer?.fullName || order.customer?.companyName || 'Người gửi';
+      const senderPhone = order.customer?.phone || 'N/A';
 
       // 2. Extract Route ID if assigned
       let activeRouteId: string | null = null;
@@ -123,7 +127,7 @@ export class TrackingController {
         let title = statusMap[h.status]?.label || h.status;
         let subtitle = h.note || 'Trạng thái được cập nhật trên hệ thống SLP';
 
-        if (h.status === 'CREATED') subtitle = `Đơn hàng đã được tạo thành công bởi ${order.senderName}`;
+        if (h.status === 'CREATED') subtitle = `Đơn hàng đã được tạo thành công bởi ${senderName}`;
         if (h.status === 'IN_FACILITY' || h.status === 'READY_FOR_DISPATCH') subtitle = `Hàng hóa đã phân loại và lưu kho tại ${order.destinationFacility?.facilityName || order.originFacility?.facilityName || 'Bưu cục phân phối'}`;
         if (h.status === 'IN_TRANSIT') subtitle = `Đơn hàng đang trên xe tải trung chuyển đến kho trung tâm`;
         if (h.status === 'OUT_FOR_DELIVERY') subtitle = `Shipper ${driverName} (${vehiclePlate}) đang chở sọt hàng đi giao`;
@@ -169,8 +173,8 @@ export class TrackingController {
         status: order.status,
         statusLabel: currentStatusInfo.label,
         eta: order.scheduledPickupAt ? new Date(order.scheduledPickupAt).toLocaleDateString('vi-VN') : 'Dự kiến hôm nay',
-        senderName: order.senderName,
-        senderPhone: order.senderPhone,
+        senderName: senderName,
+        senderPhone: senderPhone,
         senderAddress: order.pickupAddressText || [order.pickupAddress?.addressLine1, order.pickupAddress?.ward, order.pickupAddress?.province].filter(Boolean).join(', '),
         receiverName: order.receiverName,
         receiverPhone: order.receiverPhone,

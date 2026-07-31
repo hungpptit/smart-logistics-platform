@@ -10,13 +10,12 @@ interface Customer {
   customerType: 'INDIVIDUAL' | 'BUSINESS';
   companyName?: string;
   taxCode?: string;
-  status: string;
+  status?: string;
   note?: string;
   createdAt: string;
   user?: {
     username: string;
-    email?: string;
-    phone?: string;
+    status?: string;
   };
 }
 
@@ -132,15 +131,20 @@ export const CustomerTable: React.FC<CustomerTableProps> = ({
                   )}
                 </td>
                 <td className="p-4">
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
-                    c.status === 'ACTIVE'
-                      ? 'bg-green-50 text-green-700'
-                      : c.status === 'BLOCKED'
-                      ? 'bg-red-50 text-red-700'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {c.status === 'ACTIVE' ? 'Hoạt động' : c.status === 'BLOCKED' ? 'Bị khóa' : 'Tạm ngưng'}
-                  </span>
+                  {(() => {
+                    const statusVal = c.user?.status || c.status || 'ACTIVE';
+                    return (
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
+                        statusVal === 'ACTIVE'
+                          ? 'bg-green-50 text-green-700'
+                          : statusVal === 'LOCKED'
+                          ? 'bg-red-50 text-red-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {statusVal === 'ACTIVE' ? 'Hoạt động' : statusVal === 'LOCKED' ? 'Bị khóa' : 'Vô hiệu hóa'}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td className="p-4 text-right">
                   <div className="flex items-center justify-end gap-1.5">

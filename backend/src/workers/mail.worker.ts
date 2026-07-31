@@ -20,7 +20,20 @@ class MailWorker {
     try {
       console.log(`[MailWorker] Connecting to RabbitMQ at ${this.url}...`);
       const connection = await amqp.connect(this.url);
+      
+      connection.on('error', (err: any) => {
+        console.error('[MailWorker] RabbitMQ connection error:', err.message);
+      });
+
+      connection.on('close', () => {
+        console.warn('[MailWorker] RabbitMQ connection closed. Reconnecting in 10s...');
+        setTimeout(() => this.start(), 10000);
+      });
+
       const channel = await connection.createChannel();
+      channel.on('error', (err: any) => {
+        console.error('[MailWorker] RabbitMQ channel error:', err.message);
+      });
       
       await channel.assertQueue(this.queue, { durable: true });
       console.log(`[MailWorker] Listening for messages on queue "${this.queue}"...`);

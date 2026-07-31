@@ -18,6 +18,10 @@ class RabbitMQService {
       console.log(`[RabbitMQ] Connecting to ${this.url}...`);
       this.connection = await (amqp.connect(this.url) as any);
       this.channel = await this.connection.createChannel();
+      this.channel.on('error', (err: any) => {
+        console.error('[RabbitMQ] Channel error:', err.message);
+        this.isConnected = false;
+      });
       this.isConnected = true;
       console.log('[RabbitMQ] Connected and channel created successfully.');
 

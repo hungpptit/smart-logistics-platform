@@ -343,7 +343,7 @@ export class RoutingService {
       ];
     }
 
-    return await prisma.route.findMany({
+    const routes = await prisma.route.findMany({
       where,
       include: {
         startFacility: {
@@ -408,7 +408,8 @@ export class RoutingService {
                             receiverName: true,
                             receiverPhone: true,
                             estimatedCodAmount: true,
-                            estimatedTotalAmount: true,
+                            estimatedShippingFee: true,
+                            estimatedInsuranceFee: true,
                           },
                         },
                       },
@@ -427,6 +428,26 @@ export class RoutingService {
         createdAt: 'desc',
       },
     });
+
+    // Populate real-time GPS coordinates from Redis for each route
+    return await Promise.all(
+      routes.map(async (route) => {
+        let currentGpsLocation = null;
+        try {
+          const { redis } = await import('../../config/redis.js');
+          const gpsDataStr = await redis.get(`driver:location:${route.id}`);
+          if (gpsDataStr) {
+            currentGpsLocation = JSON.parse(gpsDataStr);
+          }
+        } catch (err) {
+          // Redis error silent fallback
+        }
+        return {
+          ...route,
+          currentGpsLocation,
+        };
+      })
+    );
   }
 
   /**
@@ -487,7 +508,8 @@ export class RoutingService {
                             deliveryAddressText: true,
                             pickupAddressText: true,
                             estimatedCodAmount: true,
-                            estimatedTotalAmount: true,
+                            estimatedShippingFee: true,
+                            estimatedInsuranceFee: true,
                           },
                         },
                       },

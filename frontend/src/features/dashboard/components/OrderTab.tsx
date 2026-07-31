@@ -63,8 +63,8 @@ interface Order {
   pickupType: 'PICKUP' | 'DROP_OFF';
   originFacilityId?: string | null;
   destinationFacilityId?: string | null;
-  senderName: string;
-  senderPhone: string;
+  senderName?: string;
+  senderPhone?: string;
   pickupAddressText: string;
   pickupLatitude: number;
   pickupLongitude: number;
@@ -86,12 +86,14 @@ interface Order {
     serviceCode: string;
     serviceName: string;
   };
-  customer: {
+  customer?: {
     id: string;
+    fullName?: string;
+    phone?: string;
     companyName?: string;
-    user: {
-      username: string;
-      email: string;
+    user?: {
+      username?: string;
+      email?: string;
     };
   };
   packages: PackageItem[];
@@ -593,42 +595,46 @@ export const OrderTab: React.FC = () => {
               </>
             )}
 
-            <button
-              onClick={() => {
-                if (isCustomerDisabled) {
-                  alert(error || 'Tài khoản của bạn đang bị khóa hoặc ngưng hoạt động. Không thể tạo đơn.');
-                  return;
-                }
-                setShowCreateModal(true);
-              }}
-              disabled={isCustomerDisabled}
-              className={`text-white px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${isCustomerDisabled
-                ? 'bg-gray-400 opacity-50 cursor-not-allowed'
-                : 'bg-[#bc0100] hover:bg-[#bc0100]/90 cursor-pointer'
-                }`}
-              title={isCustomerDisabled ? (error || 'Hồ sơ đang bị khóa hoặc ngưng hoạt động') : 'Tạo đơn hàng đơn lẻ'}
-            >
-              Tạo đơn lẻ
-            </button>
+            {!isAdmin && (
+              <>
+                <button
+                  onClick={() => {
+                    if (isCustomerDisabled) {
+                      alert(error || 'Tài khoản của bạn đang bị khóa hoặc ngưng hoạt động. Không thể tạo đơn.');
+                      return;
+                    }
+                    setShowCreateModal(true);
+                  }}
+                  disabled={isCustomerDisabled}
+                  className={`text-white px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${isCustomerDisabled
+                    ? 'bg-gray-400 opacity-50 cursor-not-allowed'
+                    : 'bg-[#bc0100] hover:bg-[#bc0100]/90 cursor-pointer'
+                    }`}
+                  title={isCustomerDisabled ? (error || 'Hồ sơ đang bị khóa hoặc ngưng hoạt động') : 'Tạo đơn hàng đơn lẻ'}
+                >
+                  Tạo đơn lẻ
+                </button>
 
-            <button
-              onClick={() => {
-                if (isCustomerDisabled) {
-                  alert(error || 'Tài khoản của bạn đang bị khóa hoặc ngưng hoạt động. Không thể tạo đơn.');
-                  return;
-                }
-                setShowBulkUploadModal(true);
-              }}
-              disabled={isCustomerDisabled}
-              className={`text-white px-3.5 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-sm ${isCustomerDisabled
-                ? 'bg-gray-400 opacity-50 cursor-not-allowed'
-                : 'bg-emerald-700 hover:bg-emerald-800 cursor-pointer'
-                }`}
-              title="Upload đơn hàng loạt từ file Excel mẫu"
-            >
-              <FileSpreadsheet size={16} />
-              <span>Tạo Đơn Loạt (Excel)</span>
-            </button>
+                <button
+                  onClick={() => {
+                    if (isCustomerDisabled) {
+                      alert(error || 'Tài khoản của bạn đang bị khóa hoặc ngưng hoạt động. Không thể tạo đơn.');
+                      return;
+                    }
+                    setShowBulkUploadModal(true);
+                  }}
+                  disabled={isCustomerDisabled}
+                  className={`text-white px-3.5 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-sm ${isCustomerDisabled
+                    ? 'bg-gray-400 opacity-50 cursor-not-allowed'
+                    : 'bg-emerald-700 hover:bg-emerald-800 cursor-pointer'
+                    }`}
+                  title="Upload đơn hàng loạt từ file Excel mẫu"
+                >
+                  <FileSpreadsheet size={16} />
+                  <span>Tạo Đơn Loạt (Excel)</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -892,7 +898,7 @@ export const OrderTab: React.FC = () => {
                     <MapPin className="text-[#bc0100] shrink-0 mt-0.5" size={14} />
                     <div>
                       <span className="text-gray-400 font-bold block text-[9px] uppercase tracking-wider mb-0.5">Người gửi & Điểm lấy</span>
-                      <p className="font-bold text-[#161D25]">{selectedOrder.senderName} ({selectedOrder.senderPhone})</p>
+                      <p className="font-bold text-[#161D25]">{selectedOrder.senderName || selectedOrder.customer?.fullName || 'Người gửi'} ({selectedOrder.senderPhone || selectedOrder.customer?.phone || 'N/A'})</p>
                       <p className="text-gray-500 mt-0.5 leading-relaxed">{selectedOrder.pickupAddressText}</p>
                       {selectedOrder.originFacility && (
                         <p className="text-blue-600 font-bold text-[10px] mt-1.5 flex items-center gap-1">

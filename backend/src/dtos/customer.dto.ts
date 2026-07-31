@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsBoolean, IsNumber, IsUUID, IsNotEmpty, IsEmail } from 'class-validator';
-import { CustomerType, CustomerStatus, CustomerAddressType } from '@prisma/client';
+import { CustomerType, UserStatus, CustomerAddressType } from '@prisma/client';
 
 export class CreateCustomerDto {
   @IsString({ message: 'Tên đăng nhập phải là một chuỗi ký tự' })
@@ -47,9 +47,9 @@ export class UpdateCustomerDto {
   @IsOptional()
   taxCode?: string;
 
-  @IsEnum(CustomerStatus, { message: 'Trạng thái khách hàng không hợp lệ' })
+  @IsEnum(UserStatus, { message: 'Trạng thái tài khoản không hợp lệ' })
   @IsOptional()
-  status?: CustomerStatus;
+  status?: UserStatus;
 
   @IsString({ message: 'Ghi chú phải là một chuỗi ký tự' })
   @IsOptional()

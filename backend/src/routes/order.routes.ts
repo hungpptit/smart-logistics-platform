@@ -29,8 +29,6 @@ router.use(authMiddleware);
  *             required:
  *               - customerId
  *               - serviceCode
- *               - senderName
- *               - senderPhone
  *               - senderAddressLine1
  *               - senderWard
  *               - senderProvince
@@ -49,12 +47,6 @@ router.use(authMiddleware);
  *                 type: string
  *                 enum: [EXPRESS, STANDARD, SAVING, COLD_CHAIN]
  *                 example: STANDARD
- *               senderName:
- *                 type: string
- *                 example: Nguyễn Văn A
- *               senderPhone:
- *                 type: string
- *                 example: 0912345678
  *               senderAddressLine1:
  *                 type: string
  *                 example: 100 Lê Lợi

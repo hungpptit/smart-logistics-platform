@@ -218,8 +218,16 @@ export const LiveTrackingTab: React.FC = () => {
       });
       const data = await response.json();
       if (response.ok && data.success) {
-        const fetchedRoutes = data.data || [];
-        setRoutes(fetchedRoutes);
+        const fetchedRoutes: RouteData[] = data.data || [];
+        setRoutes(prevRoutes => {
+          return fetchedRoutes.map(newRoute => {
+            const existing = prevRoutes.find(r => r.id === newRoute.id);
+            return {
+              ...newRoute,
+              currentGpsLocation: newRoute.currentGpsLocation || existing?.currentGpsLocation || null,
+            };
+          });
+        });
 
         // Auto-select first route if none selected
         if (fetchedRoutes.length > 0 && !selectedIdToKeep) {
@@ -335,24 +343,25 @@ export const LiveTrackingTab: React.FC = () => {
         }
         return prevSelected;
       });
-      // 3. Listen for duty status changes and route events
-      socket.on('routes_updated', () => {
-        console.log('[Socket] routes_updated received, refetching routes...');
-        fetchRoutes();
-      });
+    });
 
-      socket.on('driver:duty_status_changed', (data: any) => {
-        console.log('[Socket] driver:duty_status_changed received:', data);
-        fetchRoutes();
-      });
+    // 3. Listen for duty status changes and route events
+    socket.on('routes_updated', () => {
+      console.log('[Socket] routes_updated received, refetching routes...');
+      fetchRoutes();
+    });
 
-      socket.on('route:assigned', () => {
-        fetchRoutes();
-      });
+    socket.on('driver:duty_status_changed', (data: any) => {
+      console.log('[Socket] driver:duty_status_changed received:', data);
+      fetchRoutes();
+    });
 
-      socket.on('route:reset', () => {
-        fetchRoutes();
-      });
+    socket.on('route:assigned', () => {
+      fetchRoutes();
+    });
+
+    socket.on('route:reset', () => {
+      fetchRoutes();
     });
 
     socket.on('disconnect', () => {

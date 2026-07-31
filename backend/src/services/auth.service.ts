@@ -74,7 +74,6 @@ export class AuthService {
           phone: dto.phone || '',
           email: dto.email,
           customerType: 'INDIVIDUAL',
-          status: 'DISABLED',
         },
       });
 
@@ -142,16 +141,10 @@ export class AuthService {
 
     const user = customer.user;
 
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: user.id },
-        data: { status: 'ACTIVE' },
-      }),
-      prisma.customer.update({
-        where: { id: customer.id },
-        data: { status: 'ACTIVE' },
-      }),
-    ]);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { status: 'ACTIVE' },
+    });
 
     await redis.del(`otp:email:${email}`);
 

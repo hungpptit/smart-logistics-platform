@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { PrismaClient, CustomerType, CustomerStatus, FacilityStatus, VehicleOperatingStatus, DriverEmploymentStatus, OrderStatus, ShipmentStatus, FeePayer, PickupType, PaymentMethod, PaymentStatus } from '@prisma/client';
+import { PrismaClient, CustomerType, FacilityStatus, VehicleOperatingStatus, DriverEmploymentStatus, OrderStatus, ShipmentStatus, FeePayer, PickupType, PaymentMethod, PaymentStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 declare const process: any;
@@ -282,7 +282,6 @@ async function main() {
         email: `${c.username}@gmail.com`,
         customerType: c.type,
         companyName: c.name,
-        status: CustomerStatus.ACTIVE,
       },
     });
     createdCustomers.push({ ...custObj, meta: c });
@@ -407,8 +406,6 @@ async function main() {
         customerId: customer.id,
         serviceId: expressService.id,
         pickupAddressId: pickupAddress.id,
-        senderName: customer.fullName,
-        senderPhone: customer.phone || '0903000000',
         pickupAddressText: pickupAddress.formattedAddress,
         pickupLatitude: pickupAddress.latitude,
         pickupLongitude: pickupAddress.longitude,
@@ -421,7 +418,6 @@ async function main() {
         estimatedShippingFee: 25000,
         estimatedInsuranceFee: 0,
         estimatedCodAmount: (i % 3 === 0) ? 180000 : 0,
-        estimatedTotalAmount: 25000,
         estimatedDistance: 4.8,
         estimatedDuration: 20,
         status: OrderStatus.AT_HUB,

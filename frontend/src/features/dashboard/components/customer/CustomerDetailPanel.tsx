@@ -24,13 +24,12 @@ interface Customer {
   customerType: 'INDIVIDUAL' | 'BUSINESS';
   companyName?: string;
   taxCode?: string;
-  status: string;
+  status?: string;
   note?: string;
   createdAt: string;
   user?: {
     username: string;
-    email?: string;
-    phone?: string;
+    status?: string;
   };
 }
 
@@ -78,9 +77,9 @@ export const CustomerDetailPanel: React.FC<CustomerDetailPanelProps> = ({
               {customer.customerType === 'BUSINESS' ? 'Doanh Nghiệp' : 'Cá Nhân'}
             </span>
             <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${
-              customer.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              (customer.user?.status || 'ACTIVE') === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
             }`}>
-              {customer.status}
+              {customer.user?.status || 'ACTIVE'}
             </span>
           </div>
 

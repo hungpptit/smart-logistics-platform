@@ -15,7 +15,7 @@ export class CustomerService {
       const emailExists = await prisma.customer.findFirst({
         where: {
           email: dto.email,
-          status: { not: 'DISABLED' },
+          user: { status: { not: 'DISABLED' } },
         },
       });
       if (emailExists) {
@@ -28,7 +28,7 @@ export class CustomerService {
       const phoneExists = await prisma.customer.findFirst({
         where: {
           phone: dto.phone,
-          status: { not: 'DISABLED' },
+          user: { status: { not: 'DISABLED' } },
         },
       });
       if (phoneExists) {
@@ -90,7 +90,6 @@ export class CustomerService {
           customerType: dto.customerType,
           companyName: dto.companyName || null,
           taxCode: dto.taxCode || null,
-          status: 'ACTIVE',
         },
         include: {
           user: {
@@ -196,7 +195,7 @@ export class CustomerService {
       },
     });
 
-    if (!customer || customer.status === 'DISABLED') {
+    if (!customer || customer.user?.status === 'DISABLED') {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng');
     }
 
@@ -209,10 +208,18 @@ export class CustomerService {
   public async updateCustomer(id: string, dto: UpdateCustomerDto) {
     const customer = await prisma.customer.findUnique({
       where: { id },
+      include: { user: true },
     });
 
-    if (!customer || customer.status === 'DISABLED') {
+    if (!customer || customer.user?.status === 'DISABLED') {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng để cập nhật');
+    }
+
+    if (dto.status && customer.userId) {
+      await prisma.user.update({
+        where: { id: customer.userId },
+        data: { status: dto.status },
+      });
     }
 
     return await prisma.customer.update({
@@ -221,8 +228,8 @@ export class CustomerService {
         customerType: dto.customerType ?? customer.customerType,
         companyName: dto.companyName !== undefined ? dto.companyName : customer.companyName,
         taxCode: dto.taxCode !== undefined ? dto.taxCode : customer.taxCode,
-        status: dto.status ?? customer.status,
       },
+      include: { user: true },
     });
   }
 
@@ -235,7 +242,7 @@ export class CustomerService {
       include: { user: true },
     });
 
-    if (!customer || customer.status === 'DISABLED') {
+    if (!customer || customer.user?.status === 'DISABLED') {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng để xóa');
     }
 
@@ -249,23 +256,15 @@ export class CustomerService {
       throw new BadRequestException('Không thể xóa khách hàng đang có đơn hàng trong hệ thống');
     }
 
-    await prisma.$transaction(async (tx) => {
-      // 1. Soft delete customer status
-      await tx.customer.update({
-        where: { id },
-        data: { status: 'DISABLED' },
+    // Disable associated User
+    if (customer.userId) {
+      await prisma.user.update({
+        where: { id: customer.userId },
+        data: {
+          status: 'DISABLED',
+        },
       });
-
-      // 2. Disable associated User
-      if (customer.userId) {
-        await tx.user.update({
-          where: { id: customer.userId },
-          data: {
-            status: 'DISABLED',
-          },
-        });
-      }
-    });
+    }
 
     return { success: true };
   }

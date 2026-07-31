@@ -27,13 +27,6 @@ enum CustomerType {
   BUSINESS
 }
 
-enum CustomerStatus {
-  ACTIVE
-  INACTIVE
-  BLOCKED
-  DISABLED
-}
-
 enum CustomerAddressType {
   HOME
   OFFICE
@@ -345,7 +338,6 @@ model Customer {
   customerType CustomerType   @map("customer_type")
   companyName  String?        @map("company_name") @db.VarChar(255)
   taxCode      String?        @map("tax_code") @db.VarChar(30)
-  status       CustomerStatus @default(ACTIVE)
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
 
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -511,8 +503,6 @@ model Order {
   scheduledPickupAt     DateTime?     @map("scheduled_pickup_at") @db.Timestamptz
   
   pickupAddressId       String?       @map("pickup_address_id") @db.Uuid
-  senderName            String        @map("sender_name") @db.VarChar(150)
-  senderPhone           String        @map("sender_phone") @db.VarChar(20)
   pickupAddressText     String        @map("pickup_address_text") @db.Text
   pickupLatitude        Float         @map("pickup_latitude") @db.DoublePrecision
   pickupLongitude       Float         @map("pickup_longitude") @db.DoublePrecision
@@ -527,10 +517,8 @@ model Order {
   estimatedShippingFee  Decimal       @default(0.00) @map("estimated_shipping_fee") @db.Decimal(12, 2)
   estimatedInsuranceFee Decimal       @default(0.00) @map("estimated_insurance_fee") @db.Decimal(12, 2)
   estimatedCodAmount    Decimal       @default(0.00) @map("estimated_cod_amount") @db.Decimal(12, 2)
-  estimatedTotalAmount  Decimal       @default(0.00) @map("estimated_total_amount") @db.Decimal(12, 2)
   estimatedDistance     Decimal?      @map("estimated_distance") @db.Decimal(10, 2)
   estimatedDuration     Int?          @map("estimated_duration")
-  pricingVersion        Int           @default(1) @map("pricing_version")
   estimatedDeliveryDate DateTime?     @map("estimated_delivery_date") @db.Timestamptz
   pickupType            PickupType    @default(PICKUP) @map("pickup_type")
   originFacilityId      String?       @map("origin_facility_id") @db.Uuid
