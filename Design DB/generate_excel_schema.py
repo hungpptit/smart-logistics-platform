@@ -220,13 +220,13 @@ def build_excel():
         # 17. order_status_history
         {
             "name": "order_status_history (Nhật ký Trạng thái Đơn hàng)",
-            "headers": ["id", "order_id", "status", "changed_by_user_id", "change_source", "reason", "created_at"],
+            "headers": ["id", "order_id", "status", "changed_by_user_id", "reason", "created_at"],
             "rows": [
-                ["osh-01", "ord-01", "CREATED", "usr-01", "CUSTOMER", "Khách hàng khởi tạo đơn hàng mới", "2026-07-24 09:00:00"],
-                ["osh-02", "ord-02", "IN_TRANSIT", "usr-02", "SYSTEM", "Vận đơn xuất kho chặng trung chuyển", "2026-07-24 09:15:00"],
-                ["osh-03", "ord-03", "DELIVERED", "usr-03", "DRIVER", "Giao hàng thành công tại nhà người nhận", "2026-07-24 09:30:00"],
-                ["osh-04", "ord-04", "OUT_FOR_DELIVERY", "usr-03", "DRIVER", "Shipper nhận ca bắt đầu giao chặng cuối", "2026-07-24 09:45:00"],
-                ["osh-05", "ord-05", "CREATED", "usr-05", "CUSTOMER", "Khách hàng tạo đơn giao tiết kiệm", "2026-07-24 10:00:00"]
+                ["osh-01", "ord-01", "CREATED", "usr-01", "Khách hàng khởi tạo đơn hàng mới", "2026-07-24 09:00:00"],
+                ["osh-02", "ord-02", "IN_TRANSIT", "usr-02", "Vận đơn xuất kho chặng trung chuyển", "2026-07-24 09:15:00"],
+                ["osh-03", "ord-03", "DELIVERED", "usr-03", "Giao hàng thành công tại nhà người nhận", "2026-07-24 09:30:00"],
+                ["osh-04", "ord-04", "OUT_FOR_DELIVERY", "usr-03", "Shipper nhận ca bắt đầu giao chặng cuối", "2026-07-24 09:45:00"],
+                ["osh-05", "ord-05", "CREATED", "usr-05", "Khách hàng tạo đơn giao tiết kiệm", "2026-07-24 10:00:00"]
             ]
         },
         # 18. shipments

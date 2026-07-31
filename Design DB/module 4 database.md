@@ -100,7 +100,6 @@ Bảng trung tâm lưu trữ thông tin nghiệp vụ chính của đơn hàng.
       'ARRIVED_ORIGIN_FACILITY',
       'READY_FOR_DISPATCH'
   );
-  CREATE TYPE order_change_source_enum AS ENUM ('SYSTEM', 'CUSTOMER', 'DRIVER', 'ADMIN', 'API');
   ```
 
 * **Indexes & Constraints:**
@@ -189,7 +188,6 @@ Ghi nhận đầy đủ lịch sử thay đổi trạng thái của đơn hàng 
 | `order_id` | UUID | ❌ | FK → `Orders(id)` (ON DELETE CASCADE). |
 | `status` | `order_status_enum` | ❌ | Trạng thái được chuyển đến. |
 | `changed_by_user_id`| UUID | ✅ | FK → `Users(id)` (nullable). Người thực hiện cập nhật. |
-| `change_source` | `order_change_source_enum`| ❌ | Nguồn gốc thay đổi trạng thái. |
 | `reason` | TEXT | ✅ | Lý do thay đổi trạng thái (đặc biệt quan trọng với trạng thái `PICK_FAILED`). |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm bản ghi được ghi nhận (Mặc định `NOW()`). |
 
@@ -210,7 +208,6 @@ CREATE OR REPLACE FUNCTION log_order_status_history()
 RETURNS TRIGGER AS $$
 DECLARE
     v_user_id UUID;
-    v_source order_change_source_enum;
 BEGIN
     IF (TG_OP = 'INSERT') OR (OLD.status <> NEW.status) THEN
         -- Đọc thông tin từ session context của PostgreSQL (nếu được thiết lập bởi API layer)
@@ -218,12 +215,6 @@ BEGIN
             v_user_id := NULLIF(current_setting('app.current_user_id', true), '')::UUID;
         EXCEPTION WHEN OTHERS THEN
             v_user_id := NULL;
-        END;
-
-        BEGIN
-            v_source := COALESCE(NULLIF(current_setting('app.change_source', true), '')::order_change_source_enum, 'SYSTEM');
-        EXCEPTION WHEN OTHERS THEN
-            v_source := 'SYSTEM'::order_change_source_enum;
         END;
 
         -- Nếu là insert mới của đơn hàng và người tạo được khai báo trong created_by
@@ -238,7 +229,6 @@ BEGIN
             order_id, 
             status, 
             changed_by_user_id, 
-            change_source, 
             created_at
         )
         VALUES (
@@ -246,7 +236,6 @@ BEGIN
             NEW.id,
             NEW.status,
             v_user_id,
-            v_source,
             NOW()
         );
     END IF;

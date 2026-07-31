@@ -287,7 +287,6 @@ export class RoutingService {
           orderId: order.id,
           status: nextStatus,
           changedByUserId: creatorId || null,
-          changeSource: 'SYSTEM',
           reason: `Đơn hàng được AI phân bổ vào sọt hàng ${routeCode} tại bưu cục (Trạng thái: Sẵn sàng giao hàng, chờ Tài xế quét QR mã Sọt để xuất kho)`,
         });
       }
@@ -699,7 +698,6 @@ export class RoutingService {
         orderId,
         status: 'OUT_FOR_DELIVERY',
         changedByUserId: userId || null,
-        changeSource: 'DRIVER',
         reason: `Tài xế đã quét mã QR Sọt ${route.routeCode || route.id} và bắt đầu di chuyển đi giao hàng`,
       }));
       await prisma.orderStatusHistory.createMany({ data: historyLogs as any });

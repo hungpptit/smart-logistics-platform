@@ -20,7 +20,6 @@ import {
   Bot,
   RotateCcw,
   Printer,
-  QrCode,
   FileSpreadsheet
 } from 'lucide-react';
 
@@ -49,7 +48,6 @@ interface OrderPayment {
 interface OrderStatusHistory {
   id: string;
   status: string;
-  changeSource: string;
   reason?: string;
   createdAt: string;
   changedBy?: {
@@ -165,7 +163,7 @@ export const OrderTab: React.FC = () => {
   const [newStatus, setNewStatus] = useState<string>('');
   const [statusReason, setStatusReason] = useState<string>('');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
-  const [optimizing, setOptimizing] = useState<boolean>(false);
+  const [optimizing] = useState<boolean>(false);
   const isAdminOrStaff = user?.roles.includes('ADMIN') || user?.roles.includes('STAFF');
   const isAdmin = user?.roles.includes('ADMIN');
   const isStaff = user?.roles.includes('STAFF') && !user?.roles.includes('ADMIN');
@@ -1000,7 +998,7 @@ export const OrderTab: React.FC = () => {
                             <p className="text-gray-400 mt-1 italic leading-relaxed">"{hist.reason}"</p>
                           )}
                           <p className="text-[9px] text-gray-400 mt-0.5 font-medium uppercase">
-                            Nguồn: {hist.changeSource} {hist.changedBy?.username ? `(${hist.changedBy.username})` : ''}
+                            Thực hiện bởi: {hist.changedBy?.username || 'Hệ thống'}
                           </p>
                         </div>
                       );

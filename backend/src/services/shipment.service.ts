@@ -86,7 +86,6 @@ export class ShipmentService {
                 orderId: pkg.orderId,
                 status: 'PICKUP_ASSIGNED',
                 changedByUserId: creatorId,
-                changeSource: 'SYSTEM',
                 reason: `Đơn hàng được gom vào vận đơn ${shipmentCode} chuẩn bị lấy hàng`,
               },
             });
@@ -332,7 +331,6 @@ export class ShipmentService {
               orderId: sp.package.orderId,
               status: orderStatusUpdate as any,
               changedByUserId: userId,
-              changeSource: 'SYSTEM',
               reason,
             },
           });

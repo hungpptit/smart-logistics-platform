@@ -2,7 +2,6 @@ import { Response, NextFunction } from 'express';
 import { OrderService } from '../services/order.service';
 import { PricingService } from '../services/pricing/pricing.service';
 import { RequestWithUser } from '../middlewares/auth.middleware';
-import { OrderChangeSource } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { UnauthorizedException, NotFoundException } from '../middlewares/error.middleware';
 
@@ -84,8 +83,7 @@ export class OrderController {
     try {
       const userId = req.user?.id!;
       const roles = req.user?.roles || [];
-      const changeSource = OrderChangeSource.ADMIN;
-      const result = await this.orderService.updateStatus(req.params.id, req.body, userId, roles, changeSource);
+      const result = await this.orderService.updateStatus(req.params.id, req.body, userId, roles);
       res.status(200).json({
         success: true,
         message: 'Cập nhật trạng thái đơn hàng thành công',

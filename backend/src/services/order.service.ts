@@ -3,7 +3,7 @@ import { GeocodingService } from './geocoding.service';
 import { PricingService } from './pricing/pricing.service';
 import { CreateOrderDto, UpdateOrderStatusDto } from '../dtos/order.dto';
 import { BadRequestException, NotFoundException, ForbiddenException } from '../middlewares/error.middleware';
-import { OrderStatus, OrderChangeSource } from '@prisma/client';
+import { OrderStatus } from '@prisma/client';
 import { resolveAddressDetails } from '../utils/address-resolver';
 
 export class OrderService {
@@ -298,7 +298,6 @@ export class OrderService {
           orderId: order.id,
           status: 'CREATED',
           changedByUserId: creatorId,
-          changeSource: userRoles.includes('CUSTOMER') ? 'CUSTOMER' : 'ADMIN',
           reason: 'Đơn hàng được khởi tạo thành công trên hệ thống',
         },
       });
@@ -536,7 +535,7 @@ export class OrderService {
   /**
    * Update order status (Admin/Staff only)
    */
-  public async updateStatus(id: string, dto: UpdateOrderStatusDto, userId: string, userRoles: string[], changeSource: OrderChangeSource) {
+  public async updateStatus(id: string, dto: UpdateOrderStatusDto, userId: string, userRoles: string[]) {
     const order = await prisma.order.findUnique({
       where: { id },
     });
@@ -609,7 +608,6 @@ export class OrderService {
           orderId: id,
           status: dto.status,
           changedByUserId: userId,
-          changeSource,
           reason: dto.reason || `Cập nhật trạng thái đơn hàng sang ${dto.status}`,
         },
       });
@@ -707,7 +705,6 @@ export class OrderService {
           orderId: id,
           status: order.status, // Keep original status but write history
           changedByUserId: userId,
-          changeSource: userRoles.includes('CUSTOMER') ? 'CUSTOMER' : 'ADMIN',
           reason: 'Khách hàng yêu cầu hủy đơn hàng',
         },
       });

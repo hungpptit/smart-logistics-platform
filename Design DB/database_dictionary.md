@@ -281,7 +281,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 ---
 
 ### 17. Bảng `order_status_history` (Nhật ký Lịch sử Thay đổi Trạng thái Đơn hàng)
-📌 **Chức năng của bảng:** Ghi vết (Audit trail) toàn bộ lịch sử biến động trạng thái của đơn hàng từ khi tạo mới đến khi giao thành công hoặc hủy đơn. Ghi rõ thời điểm chuyển trạng thái, người thực hiện chuyển và nguồn tác động (`SYSTEM`, `CUSTOMER`, `DRIVER`, `ADMIN`, `API`).
+📌 **Chức năng của bảng:** Ghi vết (Audit trail) toàn bộ lịch sử biến động trạng thái của đơn hàng từ khi tạo mới đến khi giao thành công hoặc hủy đơn. Ghi rõ thời điểm chuyển trạng thái và người thực hiện chuyển (`changed_by_user_id`).
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
@@ -289,7 +289,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `order_id` | Uuid | **Khóa ngoại (FK ➔ bảng orders)** | Thuộc đơn hàng nào (Trỏ `orders.id`). VD: `ord-01` |
 | `changed_by_user_id`| Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người thực hiện chuyển trạng thái (User ID). VD: `usr-01` |
 | `status` | Enum | Bắt buộc | Trạng thái chuyển đến. VD: `READY_FOR_PICKUP`, `OUT_FOR_DELIVERY` |
-| `change_source` | Enum | Bắt buộc | Nguồn tác động: `SYSTEM`, `CUSTOMER`, `DRIVER`, `ADMIN`, `API` |
 | `reason` | Text | Tùy chọn | Lý do chuyển trạng thái. VD: `Khách hàng khởi tạo đơn hàng mới` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 

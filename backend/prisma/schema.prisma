@@ -78,14 +78,6 @@ enum OrderStatus {
   CANCELLED
 }
 
-enum OrderChangeSource {
-  SYSTEM
-  CUSTOMER
-  DRIVER
-  ADMIN
-  API
-}
-
 enum FeePayer {
   SENDER
   RECEIVER
@@ -626,7 +618,6 @@ model OrderStatusHistory {
   orderId          String            @map("order_id") @db.Uuid
   status           OrderStatus
   changedByUserId  String?           @map("changed_by_user_id") @db.Uuid
-  changeSource     OrderChangeSource @map("change_source")
   reason           String?           @db.Text
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
 
