@@ -15,9 +15,9 @@ export class VehicleService {
       throw new BadRequestException('Mã phương tiện đã tồn tại trên hệ thống');
     }
 
-    // Check if licensePlate already exists
+    // Check if plateNumber already exists
     const plateExists = await prisma.vehicle.findUnique({
-      where: { licensePlate: dto.licensePlate },
+      where: { plateNumber: dto.plateNumber },
     });
     if (plateExists) {
       throw new BadRequestException('Biển số xe đã tồn tại trên hệ thống');
@@ -31,10 +31,10 @@ export class VehicleService {
       throw new BadRequestException('Loại phương tiện không tồn tại');
     }
 
-    // Check home facility if provided
-    if (dto.homeFacilityId) {
+    // Check assigned facility if provided
+    if (dto.assignedFacilityId) {
       const facilityExists = await prisma.facility.findUnique({
-        where: { id: dto.homeFacilityId, operatingStatus: { not: 'CLOSED' } },
+        where: { id: dto.assignedFacilityId, operatingStatus: { not: 'CLOSED' } },
       });
       if (!facilityExists) {
         throw new BadRequestException('Kho bãi hoạt động không tồn tại hoặc đã bị xóa');
@@ -44,19 +44,18 @@ export class VehicleService {
     return await prisma.vehicle.create({
       data: {
         vehicleCode: dto.vehicleCode,
-        licensePlate: dto.licensePlate,
+        plateNumber: dto.plateNumber,
         vehicleTypeId: dto.vehicleTypeId,
-        homeFacilityId: dto.homeFacilityId || null,
+        assignedFacilityId: dto.assignedFacilityId || null,
         maxWeight: dto.maxWeight,
         maxVolume: dto.maxVolume,
         maxLength: dto.maxLength || null,
-        refrigerationSupported: dto.refrigerationSupported || false,
-        gpsDeviceId: dto.gpsDeviceId || null,
+        isRefrigerated: dto.isRefrigerated || false,
         operatingStatus: dto.operatingStatus || 'ACTIVE',
       },
       include: {
         vehicleType: true,
-        homeFacility: {
+        assignedFacility: {
           select: {
             id: true,
             facilityCode: true,
@@ -87,12 +86,12 @@ export class VehicleService {
     if (query.search) {
       where.OR = [
         { vehicleCode: { contains: query.search, mode: 'insensitive' } },
-        { licensePlate: { contains: query.search, mode: 'insensitive' } },
+        { plateNumber: { contains: query.search, mode: 'insensitive' } },
       ];
     }
 
     if (query.facilityId) {
-      where.homeFacilityId = query.facilityId;
+      where.assignedFacilityId = query.facilityId;
     }
 
     if (query.status) {
@@ -112,7 +111,7 @@ export class VehicleService {
         orderBy: { createdAt: 'desc' },
         include: {
           vehicleType: true,
-          homeFacility: {
+          assignedFacility: {
             select: {
               id: true,
               facilityCode: true,
@@ -142,7 +141,7 @@ export class VehicleService {
       where: { id },
       include: {
         vehicleType: true,
-        homeFacility: true,
+        assignedFacility: true,
         assignments: {
           where: { isActive: true },
           include: {
@@ -153,14 +152,14 @@ export class VehicleService {
     });
 
     if (!vehicle) {
-      throw new NotFoundException('Không tìm thấy phương tiện vận chuyển');
+      throw new NotFoundException('Không tìm thấy thông tin phương tiện');
     }
 
     return vehicle;
   }
 
   /**
-   * Update vehicle details
+   * Update vehicle information
    */
   public async updateVehicle(id: string, dto: UpdateVehicleDto) {
     const vehicle = await prisma.vehicle.findUnique({
@@ -168,7 +167,7 @@ export class VehicleService {
     });
 
     if (!vehicle) {
-      throw new NotFoundException('Không tìm thấy phương tiện để cập nhật');
+      throw new NotFoundException('Không tìm thấy thông tin phương tiện');
     }
 
     // Check unique vehicleCode if changed
@@ -177,17 +176,17 @@ export class VehicleService {
         where: { vehicleCode: dto.vehicleCode },
       });
       if (codeExists) {
-        throw new BadRequestException('Mã phương tiện mới đã tồn tại trên hệ thống');
+        throw new BadRequestException('Mã phương tiện đã tồn tại trong hệ thống');
       }
     }
 
-    // Check unique licensePlate if changed
-    if (dto.licensePlate && dto.licensePlate !== vehicle.licensePlate) {
+    // Check unique plateNumber if changed
+    if (dto.plateNumber && dto.plateNumber !== vehicle.plateNumber) {
       const plateExists = await prisma.vehicle.findUnique({
-        where: { licensePlate: dto.licensePlate },
+        where: { plateNumber: dto.plateNumber },
       });
       if (plateExists) {
-        throw new BadRequestException('Biển số xe mới đã tồn tại trên hệ thống');
+        throw new BadRequestException('Biển số xe đã tồn tại trong hệ thống');
       }
     }
 
@@ -201,10 +200,10 @@ export class VehicleService {
       }
     }
 
-    // Check homeFacilityId if changed
-    if (dto.homeFacilityId && dto.homeFacilityId !== vehicle.homeFacilityId) {
+    // Check assignedFacilityId if changed
+    if (dto.assignedFacilityId && dto.assignedFacilityId !== vehicle.assignedFacilityId) {
       const facilityExists = await prisma.facility.findUnique({
-        where: { id: dto.homeFacilityId, operatingStatus: { not: 'CLOSED' } },
+        where: { id: dto.assignedFacilityId, operatingStatus: { not: 'CLOSED' } },
       });
       if (!facilityExists) {
         throw new BadRequestException('Kho bãi hoạt động mới không tồn tại hoặc đã bị xóa');
@@ -215,19 +214,18 @@ export class VehicleService {
       where: { id },
       data: {
         vehicleCode: dto.vehicleCode ?? vehicle.vehicleCode,
-        licensePlate: dto.licensePlate ?? vehicle.licensePlate,
+        plateNumber: dto.plateNumber ?? vehicle.plateNumber,
         vehicleTypeId: dto.vehicleTypeId ?? vehicle.vehicleTypeId,
-        homeFacilityId: dto.homeFacilityId !== undefined ? dto.homeFacilityId : vehicle.homeFacilityId,
+        assignedFacilityId: dto.assignedFacilityId !== undefined ? dto.assignedFacilityId : vehicle.assignedFacilityId,
         maxWeight: dto.maxWeight ?? vehicle.maxWeight,
         maxVolume: dto.maxVolume ?? vehicle.maxVolume,
         maxLength: dto.maxLength !== undefined ? dto.maxLength : vehicle.maxLength,
-        refrigerationSupported: dto.refrigerationSupported ?? vehicle.refrigerationSupported,
-        gpsDeviceId: dto.gpsDeviceId !== undefined ? dto.gpsDeviceId : vehicle.gpsDeviceId,
+        isRefrigerated: dto.isRefrigerated ?? vehicle.isRefrigerated,
         operatingStatus: dto.operatingStatus ?? vehicle.operatingStatus,
       },
       include: {
         vehicleType: true,
-        homeFacility: {
+        assignedFacility: {
           select: {
             id: true,
             facilityCode: true,

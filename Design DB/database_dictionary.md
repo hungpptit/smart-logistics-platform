@@ -100,7 +100,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `place_id` | VarChar(255)| Tùy chọn | Mã định vị địa điểm từ Goong Map / Google Maps API. VD: `ChIJaX7y8Z4vdTER...` |
 | `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS. VD: `10.7721` |
 | `longitude` | Double | Bắt buộc | Kinh độ định vị GPS. VD: `106.6578` |
-| `formatted_address`| Text | Bắt buộc | Địa chỉ hoàn chỉnh dạng chuỗi đầy đủ. VD: `268 Lý Thường Kiệt, Phường 14, Quận 10, TP.HCM` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
@@ -380,14 +379,13 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | :--- | :--- | :--- | :--- |
 | `id` | Uuid | **Khóa chính (PK)** | Mã phương tiện. VD: `veh-01`, `veh-02` |
 | `vehicle_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã xe quản lý. VD: `XE-TRUCK-01`, `XE-BIKE-02` |
-| `license_plate` | VarChar(20) | Khóa duy nhất (Unique), Bắt buộc | Biển số xe đăng ký. VD: `59-P1 999.88` |
+| `plate_number` | VarChar(20) | Khóa duy nhất (Unique), Bắt buộc | Biển số xe đăng ký (Biển số). VD: `59-P1 999.88` |
 | `vehicle_type_id` | Uuid | **Khóa ngoại (FK ➔ bảng vehicle_types)**| Loại xe (Xe tải, Xe máy... Trỏ `vehicle_types.id`). VD: `vtype-01` |
-| `home_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục đậu/quản lý xe. VD: `fac-01` |
+| `assigned_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục đậu/quản lý xe. VD: `fac-01` |
 | `max_weight` | Decimal(10,2)| Bắt buộc | Tải trọng tối đa (Kg). VD: `1500.00` Kg |
 | `max_volume` | Decimal(10,4)| Bắt buộc | Thể tích thùng xe tối đa (m³). VD: `12.5000` m³ |
 | `max_length` | Decimal(6,2) | Tùy chọn | Chiều dài lòng thùng xe (m). VD: `3.50` m |
-| `refrigeration_supported` | Boolean | Default False | Cờ hỗ trợ vận chuyển thùng hàng đông lạnh (`true` / `false`) |
-| `gps_device_id` | VarChar(100) | Tùy chọn | Mã định danh thiết bị GPS phần cứng gắn trên xe. VD: `GPS-DEV-88` |
+| `is_refrigerated` | Boolean | Default False | Cờ xe có thùng bảo quản đông lạnh (`true` / `false`) |
 | `operating_status`| Enum | Bắt buộc | Trạng thái: `ACTIVE` (Sẵn sàng), `MAINTENANCE` (Đang sửa), `RETIRED` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
@@ -401,8 +399,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `id` | Uuid | **Khóa chính (PK)** | Mã loại phương tiện. VD: `vtype-01` |
 | `type_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã loại xe: `MOTORBIKE`, `VAN_500KG`, `TRUCK_1.5TON` |
 | `type_name` | VarChar(100) | Bắt buộc | Tên hiển thị loại xe. VD: `Xe tải nhẹ 1.5 Tấn` |
-| `max_default_weight` | Decimal(10,2) | Bắt buộc | Tải trọng tiêu chuẩn xe (kg) |
-| `description` | Text | Tùy chọn | Mô tả chi tiết |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---

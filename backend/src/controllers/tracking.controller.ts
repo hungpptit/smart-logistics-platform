@@ -76,7 +76,7 @@ export class TrackingController {
               driverName = driverStaff.user.username;
             }
             if (rs.route.vehicle) {
-              vehiclePlate = rs.route.vehicle.licensePlate || vehiclePlate;
+              vehiclePlate = rs.route.vehicle.plateNumber || vehiclePlate;
             }
             break;
           }
@@ -175,10 +175,10 @@ export class TrackingController {
         eta: order.scheduledPickupAt ? new Date(order.scheduledPickupAt).toLocaleDateString('vi-VN') : 'Dự kiến hôm nay',
         senderName: senderName,
         senderPhone: senderPhone,
-        senderAddress: order.pickupAddressText || order.pickupAddress?.formattedAddress || order.pickupAddress?.addressLine1 || '',
+        senderAddress: order.pickupAddressText || order.pickupAddress?.addressLine1 || '',
         receiverName: order.receiverName,
         receiverPhone: order.receiverPhone,
-        receiverAddress: order.deliveryAddressText || order.deliveryAddress?.formattedAddress || order.deliveryAddress?.addressLine1 || '',
+        receiverAddress: order.deliveryAddressText || order.deliveryAddress?.addressLine1 || '',
         originFacilityName: order.originFacility?.facilityName || 'Bưu cục Linh Trung',
         destinationFacilityName: currentFacilityName,
         driverName,

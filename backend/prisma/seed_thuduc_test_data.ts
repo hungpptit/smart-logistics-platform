@@ -29,52 +29,40 @@ async function main() {
   const addrHub1 = await prisma.address.create({
     data: {
       addressLine1: '180 Đặng Văn Bi',
-      ward: 'Phường Bình Thọ',
-      province: 'Thành phố Hồ Chí Minh',
       country: 'Vietnam',
       latitude: 10.8495,
       longitude: 106.7625,
-      formattedAddress: '180 Đặng Văn Bi, Phường Bình Thọ, TP. Thủ Đức, TP.HCM',
     },
   });
 
   const addrHub2 = await prisma.address.create({
     data: {
       addressLine1: '250 Đường Linh Trung',
-      ward: 'Phường Linh Trung',
-      province: 'Thành phố Hồ Chí Minh',
       country: 'Vietnam',
       latitude: 10.8580,
       longitude: 106.7750,
-      formattedAddress: '250 Đường Linh Trung, Phường Linh Trung, TP. Thủ Đức, TP.HCM',
     },
   });
 
   const addrHub3 = await prisma.address.create({
     data: {
       addressLine1: '85 Đỗ Xuân Hợp',
-      ward: 'Phường Phước Long B',
-      province: 'Thành phố Hồ Chí Minh',
       country: 'Vietnam',
       latitude: 10.8250,
       longitude: 106.7600,
-      formattedAddress: '85 Đỗ Xuân Hợp, Phường Phước Long B, TP. Thủ Đức, TP.HCM',
     },
   });
 
   const addrHub4 = await prisma.address.create({
     data: {
       addressLine1: '25 Song Hành',
-      ward: 'Phường An Phú',
-      province: 'Thành phố Hồ Chí Minh',
       country: 'Vietnam',
       latitude: 10.8010,
       longitude: 106.7420,
-      formattedAddress: '25 Song Hành, Phường An Phú, TP. Thủ Đức, TP.HCM',
     },
   });
 
-  // Tạo Bưu cục Đặng Văn Bi (Bưu cục nhận chặng cuối)
+  // Bưu cục Đặng Văn Bi (Kho giao chính)
   const hub1 = await prisma.facility.upsert({
     where: { facilityCode: 'FAC-TD-DANGBI' },
     update: {},
@@ -83,8 +71,6 @@ async function main() {
       facilityName: 'Bưu cục Đặng Văn Bi - TP. Thủ Đức',
       facilityTypeId: lastMileFacilityType.id,
       addressId: addrHub1.id,
-      latitude: 10.8495,
-      longitude: 106.7625,
       operatingStatus: FacilityStatus.ACTIVE,
       openedAt: new Date('2025-01-01'),
     },
@@ -99,8 +85,6 @@ async function main() {
       facilityName: 'Bưu cục Linh Trung - TP. Thủ Đức',
       facilityTypeId: lastMileFacilityType.id,
       addressId: addrHub2.id,
-      latitude: 10.8580,
-      longitude: 106.7750,
       operatingStatus: FacilityStatus.ACTIVE,
       openedAt: new Date('2025-01-01'),
     },
@@ -115,8 +99,6 @@ async function main() {
       facilityName: 'Bưu cục Phước Long - TP. Thủ Đức',
       facilityTypeId: lastMileFacilityType.id,
       addressId: addrHub3.id,
-      latitude: 10.8250,
-      longitude: 106.7600,
       operatingStatus: FacilityStatus.ACTIVE,
       openedAt: new Date('2025-01-01'),
     },
@@ -131,8 +113,6 @@ async function main() {
       facilityName: 'Bưu cục An Phú - TP. Thủ Đức',
       facilityTypeId: lastMileFacilityType.id,
       addressId: addrHub4.id,
-      latitude: 10.8010,
-      longitude: 106.7420,
       operatingStatus: FacilityStatus.ACTIVE,
       openedAt: new Date('2025-01-01'),
     },
@@ -222,9 +202,9 @@ async function main() {
       update: {},
       create: {
         vehicleCode: vehCode,
-        licensePlate: sh.plate,
+        plateNumber: sh.plate,
         vehicleTypeId: motorbikeType.id,
-        homeFacilityId: sh.facilityId,
+        assignedFacilityId: sh.facilityId,
         maxWeight: 150.0,
         maxVolume: 0.5,
         maxLength: 1.2,
@@ -366,12 +346,9 @@ async function main() {
     const pickupAddress = await prisma.address.create({
       data: {
         addressLine1: meta.pickupAddr.split(',')[0],
-        ward: meta.pickupAddr.split(',')[1]?.trim() || 'Phường Linh Trung',
-        province: 'Thành phố Hồ Chí Minh',
         country: 'Vietnam',
         latitude: meta.lat,
         longitude: meta.lng,
-        formattedAddress: `${meta.pickupAddr}, TP. Thủ Đức, TP.HCM`,
       },
     });
 
@@ -379,12 +356,9 @@ async function main() {
     const deliveryAddress = await prisma.address.create({
       data: {
         addressLine1: loc.addr.split(',')[0],
-        ward: loc.addr.split(',')[1]?.trim() || 'Phường Bình Thọ',
-        province: 'Thành phố Hồ Chí Minh',
         country: 'Vietnam',
         latitude: loc.lat,
         longitude: loc.lng,
-        formattedAddress: `${loc.addr}, TP. Thủ Đức, TP.HCM`,
       },
     });
 
@@ -397,7 +371,7 @@ async function main() {
         destinationFacilityId: hub1.id,
         status: OrderStatus.AT_HUB,
         pickupAddressId: pickupAddress.id,
-        pickupAddressText: pickupAddress.formattedAddress,
+        pickupAddressText: pickupAddress.addressLine1,
         pickupLatitude: pickupAddress.latitude,
         pickupLongitude: pickupAddress.longitude,
       },
@@ -406,13 +380,13 @@ async function main() {
         customerId: customer.id,
         serviceId: expressService.id,
         pickupAddressId: pickupAddress.id,
-        pickupAddressText: pickupAddress.formattedAddress,
+        pickupAddressText: pickupAddress.addressLine1,
         pickupLatitude: pickupAddress.latitude,
         pickupLongitude: pickupAddress.longitude,
         deliveryAddressId: deliveryAddress.id,
         receiverName: loc.name,
         receiverPhone: loc.phone,
-        deliveryAddressText: deliveryAddress.formattedAddress,
+        deliveryAddressText: deliveryAddress.addressLine1,
         deliveryLatitude: loc.lat,
         deliveryLongitude: loc.lng,
         estimatedShippingFee: 25000,

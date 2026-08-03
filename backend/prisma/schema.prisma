@@ -358,7 +358,6 @@ model Address {
   placeId          String?           @map("place_id") @db.VarChar(255)
   latitude         Float             @db.DoublePrecision
   longitude        Float             @db.DoublePrecision
-  formattedAddress String            @map("formatted_address") @db.Text
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
 
   wardRelation     Ward?             @relation(fields: [wardCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
@@ -734,23 +733,22 @@ model Staff {
 }
 
 model Vehicle {
-  id                     String                 @id @default(uuid()) @db.Uuid
-  vehicleCode            String                 @unique @map("vehicle_code") @db.VarChar(30)
-  licensePlate           String                 @unique @map("license_plate") @db.VarChar(20)
-  vehicleTypeId          String                 @map("vehicle_type_id") @db.Uuid
-  homeFacilityId         String?                @map("home_facility_id") @db.Uuid
-  maxWeight              Decimal                @map("max_weight") @db.Decimal(10, 2)
-  maxVolume              Decimal                @map("max_volume") @db.Decimal(10, 4)
-  maxLength              Decimal?               @map("max_length") @db.Decimal(6, 2)
-  refrigerationSupported Boolean                @default(false) @map("refrigeration_supported")
-  gpsDeviceId            String?                @map("gps_device_id") @db.VarChar(100)
-  operatingStatus        VehicleOperatingStatus @map("operating_status")
-  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz
+  id                 String                 @id @default(uuid()) @db.Uuid
+  vehicleCode        String                 @unique @map("vehicle_code") @db.VarChar(30)
+  plateNumber        String                 @unique @map("plate_number") @db.VarChar(20)
+  vehicleTypeId      String                 @map("vehicle_type_id") @db.Uuid
+  assignedFacilityId String?                @map("assigned_facility_id") @db.Uuid
+  maxWeight          Decimal                @map("max_weight") @db.Decimal(10, 2)
+  maxVolume          Decimal                @map("max_volume") @db.Decimal(10, 4)
+  maxLength          Decimal?               @map("max_length") @db.Decimal(6, 2)
+  isRefrigerated     Boolean                @default(false) @map("is_refrigerated")
+  operatingStatus    VehicleOperatingStatus @map("operating_status")
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz
 
-  vehicleType            VehicleType            @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict)
-  homeFacility           Facility?              @relation(fields: [homeFacilityId], references: [id], onDelete: SetNull)
-  assignments            DriverVehicleAssignment[]
-  routes                 Route[]
+  vehicleType        VehicleType            @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict)
+  assignedFacility   Facility?              @relation(fields: [assignedFacilityId], references: [id], onDelete: SetNull)
+  assignments        DriverVehicleAssignment[]
+  routes             Route[]
 
   @@index([vehicleTypeId], name: "idx_vehicles_type")
   @@map("vehicles")
@@ -760,8 +758,6 @@ model VehicleType {
   id                String    @id @default(uuid()) @db.Uuid
   typeCode          String    @unique @map("type_code") @db.VarChar(30)
   typeName          String    @map("type_name") @db.VarChar(100)
-  maxDefaultWeight  Decimal   @map("max_default_weight") @db.Decimal(10, 2)
-  description       String?   @db.Text
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   vehicles          Vehicle[]

@@ -125,7 +125,7 @@ router.get(
  *             type: object
  *             required:
  *               - vehicleCode
- *               - licensePlate
+ *               - plateNumber
  *               - vehicleTypeId
  *               - maxWeight
  *               - maxVolume
@@ -133,7 +133,7 @@ router.get(
  *               vehicleCode:
  *                 type: string
  *                 example: VAN-HB01
- *               licensePlate:
+ *               plateNumber:
  *                 type: string
  *                 example: 29C-88888
  *               vehicleTypeId:

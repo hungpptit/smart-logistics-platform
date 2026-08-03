@@ -396,7 +396,7 @@ export class RoutingService {
           select: {
             id: true,
             vehicleCode: true,
-            licensePlate: true,
+            plateNumber: true,
           },
         },
         driverVehicleAssignment: {
@@ -413,7 +413,7 @@ export class RoutingService {
               select: {
                 id: true,
                 vehicleCode: true,
-                licensePlate: true,
+                plateNumber: true,
               },
             },
           },
@@ -511,7 +511,7 @@ export class RoutingService {
               select: {
                 id: true,
                 vehicleCode: true,
-                licensePlate: true,
+                plateNumber: true,
               },
             },
           },

@@ -51,7 +51,6 @@ export class FacilityService {
           country: dto.address.country || 'Vietnam',
           latitude: dto.address.latitude,
           longitude: dto.address.longitude,
-          formattedAddress,
           wardCode: resolved.wardCode,
         },
       });

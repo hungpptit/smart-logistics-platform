@@ -291,7 +291,6 @@ export class CustomerService {
           country: dto.country || 'Vietnam',
           latitude: dto.latitude,
           longitude: dto.longitude,
-          formattedAddress,
           wardCode: resolved.wardCode,
         },
       });
@@ -374,7 +373,6 @@ export class CustomerService {
           country: dto.country !== undefined ? dto.country : undefined,
           latitude: dto.latitude !== undefined ? dto.latitude : undefined,
           longitude: dto.longitude !== undefined ? dto.longitude : undefined,
-          formattedAddress,
           wardCode: resolved.wardCode,
         },
       });

@@ -2,9 +2,10 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Verified Prisma Client types
 async function main() {
   const vehicles = await prisma.vehicle.findMany({
-    include: { vehicleType: true, homeFacility: true },
+    include: { vehicleType: true, assignedFacility: true },
   });
 
   console.log('\n========================================');
@@ -12,7 +13,7 @@ async function main() {
   console.log('========================================');
   vehicles.forEach((v, index) => {
     console.log(
-      `${index + 1}. [${v.vehicleCode}] BKS: ${v.licensePlate} | Loại: ${v.vehicleType.typeName} (${v.vehicleType.typeCode})`
+      `${index + 1}. [${v.vehicleCode}] BKS: ${v.plateNumber} | Loại: ${v.vehicleType.typeName} (${v.vehicleType.typeCode})`
     );
     console.log(
       `   👉 Tải trọng: ${v.maxWeight} kg | Thể tích: ${v.maxVolume} m³ | Chiều dài: ${v.maxLength} m | Trạng thái: ${v.operatingStatus}`
@@ -23,7 +24,7 @@ async function main() {
     users: await prisma.user.count(),
     customers: await prisma.customer.count(),
     facilities: await prisma.facility.count(),
-    drivers: await prisma.driver.count(),
+    drivers: await prisma.staff.count(),
     vehicles: await prisma.vehicle.count(),
     orders: await prisma.order.count(),
     packages: await prisma.package.count(),

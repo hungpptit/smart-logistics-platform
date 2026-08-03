@@ -8,7 +8,7 @@ export class CreateVehicleDto {
 
   @IsString({ message: 'Biển số xe không được để trống' })
   @IsNotEmpty({ message: 'Biển số xe không được để trống' })
-  licensePlate!: string;
+  plateNumber!: string;
 
   @IsUUID('4', { message: 'ID loại xe phải là UUID hợp lệ' })
   @IsNotEmpty({ message: 'Loại xe không được để trống' })
@@ -16,7 +16,7 @@ export class CreateVehicleDto {
 
   @IsUUID('4', { message: 'ID kho bãi phải là UUID hợp lệ' })
   @IsOptional()
-  homeFacilityId?: string;
+  assignedFacilityId?: string;
 
   @IsNumber({}, { message: 'Tải trọng tối đa phải là một số thực' })
   @IsNotEmpty({ message: 'Tải trọng tối đa không được để trống' })
@@ -30,13 +30,9 @@ export class CreateVehicleDto {
   @IsOptional()
   maxLength?: number;
 
-  @IsBoolean({ message: 'Hỗ trợ bảo quản lạnh phải là giá trị boolean' })
+  @IsBoolean({ message: 'Bảo quản lạnh phải là giá trị boolean' })
   @IsOptional()
-  refrigerationSupported?: boolean;
-
-  @IsString({ message: 'ID thiết bị GPS phải là chuỗi ký tự' })
-  @IsOptional()
-  gpsDeviceId?: string;
+  isRefrigerated?: boolean;
 
   @IsEnum(VehicleOperatingStatus, { message: 'Trạng thái hoạt động của xe không hợp lệ' })
   @IsOptional()
@@ -50,7 +46,7 @@ export class UpdateVehicleDto {
 
   @IsString({ message: 'Biển số xe phải là chuỗi ký tự' })
   @IsOptional()
-  licensePlate?: string;
+  plateNumber?: string;
 
   @IsUUID('4', { message: 'ID loại xe phải là UUID hợp lệ' })
   @IsOptional()
@@ -58,7 +54,7 @@ export class UpdateVehicleDto {
 
   @IsUUID('4', { message: 'ID kho bãi phải là UUID hợp lệ' })
   @IsOptional()
-  homeFacilityId?: string;
+  assignedFacilityId?: string;
 
   @IsNumber({}, { message: 'Tải trọng tối đa phải là một số thực' })
   @IsOptional()
@@ -72,13 +68,9 @@ export class UpdateVehicleDto {
   @IsOptional()
   maxLength?: number;
 
-  @IsBoolean({ message: 'Hỗ trợ bảo quản lạnh phải là giá trị boolean' })
+  @IsBoolean({ message: 'Bảo quản lạnh phải là giá trị boolean' })
   @IsOptional()
-  refrigerationSupported?: boolean;
-
-  @IsString({ message: 'ID thiết bị GPS phải là chuỗi ký tự' })
-  @IsOptional()
-  gpsDeviceId?: string;
+  isRefrigerated?: boolean;
 
   @IsEnum(VehicleOperatingStatus, { message: 'Trạng thái hoạt động của xe không hợp lệ' })
   @IsOptional()

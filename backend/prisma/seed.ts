@@ -91,17 +91,17 @@ async function main() {
   // 4. Seed Vehicle Types
   console.log('🚚 Seeding Vehicle Types...');
   const vehicleTypes = [
-    { typeCode: 'MOTORBIKE', typeName: 'Xe máy', maxDefaultWeight: 80.00, description: 'Phương tiện giao hàng chặng cuối linh hoạt ngõ hẻm' },
-    { typeCode: 'VAN', typeName: 'Xe bán tải / Van', maxDefaultWeight: 500.00, description: 'Giao hàng nội ô thành phố, chở hàng vừa và nhỏ' },
-    { typeCode: 'TRUCK_1T5', typeName: 'Xe tải 1.5 Tấn', maxDefaultWeight: 1500.00, description: 'Vận chuyển chặng giữa nội đô và liên quận' },
-    { typeCode: 'CONTAINER', typeName: 'Xe Container cỡ lớn', maxDefaultWeight: 30000.00, description: 'Vận chuyển liên tỉnh đường dài giữa các tổng kho' },
-    { typeCode: 'REFRIGERATED_TRUCK', typeName: 'Xe tải đông lạnh', maxDefaultWeight: 2000.00, description: 'Chuyên chở hàng thực phẩm, y tế yêu cầu bảo quản lạnh' },
+    { typeCode: 'MOTORBIKE', typeName: 'Xe máy giao hàng' },
+    { typeCode: 'VAN', typeName: 'Xe bán tải / Van' },
+    { typeCode: 'TRUCK_1T5', typeName: 'Xe tải 1.5 Tấn' },
+    { typeCode: 'CONTAINER', typeName: 'Xe Container cỡ lớn' },
+    { typeCode: 'REFRIGERATED_TRUCK', typeName: 'Xe tải đông lạnh' },
   ];
 
   for (const vt of vehicleTypes) {
     await prisma.vehicleType.upsert({
       where: { typeCode: vt.typeCode },
-      update: { typeName: vt.typeName, maxDefaultWeight: vt.maxDefaultWeight, description: vt.description },
+      update: { typeName: vt.typeName },
       create: vt,
     });
   }

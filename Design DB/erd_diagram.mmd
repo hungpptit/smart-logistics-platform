@@ -60,7 +60,6 @@ erDiagram
         varchar postal_code
         double_precision latitude
         double_precision longitude
-        text formatted_address
         varchar place_id
         timestamptz created_at
         timestamptz updated_at
@@ -287,14 +286,13 @@ erDiagram
     Vehicles {
         uuid id PK
         varchar vehicle_code UK
-        varchar license_plate UK
+        varchar plate_number UK
         uuid vehicle_type_id FK
-        uuid home_facility_id FK
+        uuid assigned_facility_id FK
         numeric max_weight
         numeric max_volume
         numeric max_length
-        boolean refrigeration_supported
-        varchar gps_device_id
+        boolean is_refrigerated
         vehicle_operating_status_enum operating_status
         timestamptz created_at
     }
@@ -302,8 +300,6 @@ erDiagram
         uuid id PK
         varchar type_code UK
         varchar type_name
-        numeric max_default_weight
-        text description
         timestamptz created_at
     }
     DriverVehicleAssignments {

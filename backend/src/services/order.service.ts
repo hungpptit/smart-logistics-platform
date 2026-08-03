@@ -67,7 +67,7 @@ export class OrderService {
       if (!addr) throw new BadRequestException('Địa chỉ lấy hàng không tồn tại');
       pickupLat = addr.latitude;
       pickupLon = addr.longitude;
-      pickupAddrSnapshot = addr.formattedAddress;
+      pickupAddrSnapshot = addr.addressLine1;
       resolvedPickupAddressId = addr.id;
     } else if (dto.pickupAddress) {
       // Resolve address details using administrative unit database
@@ -78,7 +78,7 @@ export class OrderService {
       const geocoded = await this.geocodingService.geocode(rawAddr);
       pickupLat = dto.pickupAddress.latitude ?? geocoded.latitude;
       pickupLon = dto.pickupAddress.longitude ?? geocoded.longitude;
-      pickupAddrSnapshot = geocoded.formattedAddress;
+      pickupAddrSnapshot = geocoded.formattedAddress || dto.pickupAddress.addressLine1;
 
       // Save new address
       const newAddr = await prisma.address.create({
@@ -87,7 +87,6 @@ export class OrderService {
           country: dto.pickupAddress.country || 'Vietnam',
           latitude: pickupLat,
           longitude: pickupLon,
-          formattedAddress: geocoded.formattedAddress,
           wardCode: resolved.wardCode,
         },
       });
@@ -109,7 +108,7 @@ export class OrderService {
       if (!addr) throw new BadRequestException('Địa chỉ giao hàng không tồn tại');
       deliveryLat = addr.latitude;
       deliveryLon = addr.longitude;
-      deliveryAddrSnapshot = addr.formattedAddress;
+      deliveryAddrSnapshot = addr.addressLine1;
       resolvedDeliveryAddressId = addr.id;
     } else if (dto.deliveryAddress) {
       // Resolve address details using administrative unit database
@@ -120,7 +119,7 @@ export class OrderService {
       const geocoded = await this.geocodingService.geocode(rawAddr);
       deliveryLat = dto.deliveryAddress.latitude ?? geocoded.latitude;
       deliveryLon = dto.deliveryAddress.longitude ?? geocoded.longitude;
-      deliveryAddrSnapshot = geocoded.formattedAddress;
+      deliveryAddrSnapshot = geocoded.formattedAddress || dto.deliveryAddress.addressLine1;
 
       // Save new address
       const newAddr = await prisma.address.create({
@@ -129,7 +128,6 @@ export class OrderService {
           country: dto.deliveryAddress.country || 'Vietnam',
           latitude: deliveryLat,
           longitude: deliveryLon,
-          formattedAddress: geocoded.formattedAddress,
           wardCode: resolved.wardCode,
         },
       });

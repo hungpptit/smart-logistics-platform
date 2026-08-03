@@ -516,7 +516,7 @@ export class DriverService {
         vehicle: {
           include: {
             vehicleType: true,
-            homeFacility: {
+            assignedFacility: {
               select: {
                 id: true,
                 facilityName: true,
