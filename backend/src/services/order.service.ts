@@ -84,8 +84,6 @@ export class OrderService {
       const newAddr = await prisma.address.create({
         data: {
           addressLine1: dto.pickupAddress.addressLine1,
-          ward: resolved.ward,
-          province: resolved.province,
           country: dto.pickupAddress.country || 'Vietnam',
           latitude: pickupLat,
           longitude: pickupLon,
@@ -128,8 +126,6 @@ export class OrderService {
       const newAddr = await prisma.address.create({
         data: {
           addressLine1: dto.deliveryAddress.addressLine1,
-          ward: resolved.ward,
-          province: resolved.province,
           country: dto.deliveryAddress.country || 'Vietnam',
           latitude: deliveryLat,
           longitude: deliveryLon,
@@ -715,6 +711,9 @@ export class OrderService {
       where: {
         operatingStatus: 'ACTIVE',
       },
+      include: {
+        address: true,
+      },
     });
 
     if (facilities.length === 0) return null;
@@ -723,12 +722,12 @@ export class OrderService {
     let minDistance = Infinity;
 
     for (const fac of facilities) {
-      if (fac.latitude !== null && fac.longitude !== null) {
+      if (fac.address && fac.address.latitude !== null && fac.address.longitude !== null) {
         const dist = this.geocodingService.calculateDistance(
           lat,
           lon,
-          fac.latitude,
-          fac.longitude
+          fac.address.latitude,
+          fac.address.longitude
         );
         if (dist < minDistance) {
           minDistance = dist;

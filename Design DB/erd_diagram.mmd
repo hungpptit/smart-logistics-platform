@@ -23,7 +23,6 @@ erDiagram
         uuid id PK
         varchar permission_code UK
         varchar permission_name
-        text description
         timestamptz created_at
     }
     RolePermissions {
@@ -57,8 +56,6 @@ erDiagram
         uuid id PK
         varchar address_line_1
         varchar address_line_2
-        varchar ward
-        varchar province
         varchar country
         varchar postal_code
         double_precision latitude
@@ -108,7 +105,6 @@ erDiagram
         date closed_at
         text note
         timestamptz created_at
-        timestamptz updated_at
         timestamptz deleted_at
     }
     FacilityTypes {
@@ -134,7 +130,6 @@ erDiagram
         facility_zone_type_enum zone_type
         integer capacity
         timestamptz created_at
-        timestamptz updated_at
     }
 
     FacilityTypes ||--o{ Facilities : "categorizes"
@@ -287,12 +282,7 @@ erDiagram
         driver_type_enum driver_type
         driver_employment_status_enum employment_status
         date hire_date
-        double_precision preferred_latitude
-        double_precision preferred_longitude
-        text note
-        boolean is_hidden
         timestamptz created_at
-        timestamptz updated_at
     }
     Vehicles {
         uuid id PK
@@ -307,7 +297,6 @@ erDiagram
         varchar gps_device_id
         vehicle_operating_status_enum operating_status
         timestamptz created_at
-        timestamptz updated_at
     }
     VehicleTypes {
         uuid id PK
@@ -329,9 +318,6 @@ erDiagram
         uuid driver_id PK, FK
         double_precision latitude
         double_precision longitude
-        real heading
-        real speed
-        real accuracy
         timestamptz recorded_at
     }
 
@@ -356,7 +342,6 @@ erDiagram
         integer total_estimated_duration_seconds
         double_precision start_latitude
         double_precision start_longitude
-        timestamptz planned_start_at
         timestamptz planned_end_at
         timestamptz actual_start_at
         timestamptz actual_end_at
@@ -371,11 +356,6 @@ erDiagram
         integer sequence_number
         route_stop_type_enum stop_type
         route_stop_status_enum status
-        timestamptz eta
-        timestamptz actual_arrival_at
-        timestamptz actual_departure_at
-        timestamptz created_at
-        timestamptz updated_at
     }
     DispatchTasks {
         uuid id PK
@@ -386,33 +366,8 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
-    RouteLocationLogs {
-        uuid id PK
-        uuid route_id FK
-        double_precision latitude
-        double_precision longitude
-        real speed
-        real heading
-        real accuracy
-        timestamptz recorded_at
-    }
-    RouteOptimizations {
-        uuid id PK
-        uuid route_id FK
-        varchar algorithm_name
-        numeric cost_metric
-        numeric optimization_duration_ms
-        jsonb input_parameters
-        timestamptz created_at
-    }
-
-    DriverVehicleAssignments ||--o{ Routes : "drives"
-    Routes ||--o{ RouteStops : "comprises"
-    Shipments ||--o{ RouteStops : "dropped_or_picked_at"
-    Facilities ||--o{ RouteStops : "located_at_stop"
     Routes ||--o{ DispatchTasks : "dispatched_via"
     Drivers ||--o{ DispatchTasks : "assigned_to_driver"
-    Routes ||--o{ RouteLocationLogs : "records_gps"
     Routes ||--o{ RouteOptimizations : "optimized_by"
     Routes ||--o| Shipments : "shipment_route"
 
@@ -449,7 +404,6 @@ erDiagram
         uuid shipment_id FK
         uuid route_stop_id FK
         delivery_result_enum delivery_result
-        varchar receiver_name
         delivery_failure_reason_enum failure_reason
         text failure_note
         timestamptz created_at
@@ -468,10 +422,9 @@ erDiagram
     TrackingAttachments {
         uuid id PK
         uuid delivery_proof_id FK
-        varchar file_name
-        varchar file_type
-        text file_url
-        timestamptz created_at
+        attachment_file_type_enum file_type
+        varchar file_url
+        timestamptz uploaded_at
     }
 
     Shipments ||--o{ TrackingEvents : "logs_timeline"

@@ -48,8 +48,6 @@ export class FacilityService {
       const address = await tx.address.create({
         data: {
           addressLine1: dto.address.addressLine1,
-          ward: resolved.ward,
-          province: resolved.province,
           country: dto.address.country || 'Vietnam',
           latitude: dto.address.latitude,
           longitude: dto.address.longitude,
@@ -69,8 +67,6 @@ export class FacilityService {
           addressId: address.id,
           operatingStatus: dto.operatingStatus || 'ACTIVE',
           openedAt: new Date(dto.openedAt),
-          latitude: dto.address.latitude,
-          longitude: dto.address.longitude,
         },
       });
 

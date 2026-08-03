@@ -168,7 +168,4 @@ Hợp nhất toàn bộ hồ sơ nhân sự vận hành (Kho, Điều phối, V�
 | `driver_type` | `DriverType` | ✅ | ENUM: `HUB_DELIVERY`, `ON_DEMAND` (Nullable). |
 | `employment_status` | `DriverEmploymentStatus`| ✅ | ENUM: `ACTIVE`, `OFFLINE`, `SUSPENDED`, `DISABLED` (Default `ACTIVE`). |
 | `hire_date` | DATE | ✅ | Ngày vào làm chính thức. |
-| `preferred_latitude` | DOUBLE | ✅ | Tọa độ vĩ độ ưu tiên nhận đơn. |
-| `preferred_longitude`| DOUBLE | ✅ | Tọa độ kinh độ ưu tiên nhận đơn. |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo hồ sơ. |
-| `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật gần nhất. |

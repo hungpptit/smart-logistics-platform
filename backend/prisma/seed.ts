@@ -32,40 +32,40 @@ async function main() {
   console.log('🛡️ Seeding Permissions...');
   const permissions = [
     // Auth Module
-    { permissionCode: 'USER_MANAGE', permissionName: 'Quản lý tài khoản', description: 'Tạo, sửa, xóa, khóa tài khoản người dùng' },
-    { permissionCode: 'ROLE_MANAGE', permissionName: 'Quản lý phân quyền', description: 'Quản lý vai trò và phân quyền hạn' },
+    { permissionCode: 'USER_MANAGE', permissionName: 'Quản lý tài khoản' },
+    { permissionCode: 'ROLE_MANAGE', permissionName: 'Quản lý phân quyền' },
     // Customer Module
-    { permissionCode: 'CUSTOMER_MANAGE', permissionName: 'Quản lý khách hàng', description: 'Quản lý hồ sơ và sổ địa chỉ khách hàng' },
-    { permissionCode: 'CUSTOMER_VIEW', permissionName: 'Xem hồ sơ khách hàng', description: 'Xem danh sách và chi tiết khách hàng' },
+    { permissionCode: 'CUSTOMER_MANAGE', permissionName: 'Quản lý khách hàng' },
+    { permissionCode: 'CUSTOMER_VIEW', permissionName: 'Xem hồ sơ khách hàng' },
     // Facility Module
-    { permissionCode: 'FACILITY_MANAGE', permissionName: 'Quản lý mạng lưới kho', description: 'Quản lý tổng kho, hub, trạm giao nhận' },
-    { permissionCode: 'FACILITY_VIEW', permissionName: 'Xem thông tin kho bãi', description: 'Xem danh sách các trạm/kho bãi' },
+    { permissionCode: 'FACILITY_MANAGE', permissionName: 'Quản lý mạng lưới kho' },
+    { permissionCode: 'FACILITY_VIEW', permissionName: 'Xem thông tin kho bãi' },
     // Order Module
-    { permissionCode: 'ORDER_CREATE', permissionName: 'Tạo đơn hàng', description: 'Tạo đơn hàng mới trên hệ thống' },
-    { permissionCode: 'ORDER_UPDATE', permissionName: 'Cập nhật đơn hàng', description: 'Sửa thông tin đơn hàng, đổi trạng thái' },
-    { permissionCode: 'ORDER_DELETE', permissionName: 'Xóa đơn hàng', description: 'Xóa mềm đơn hàng' },
-    { permissionCode: 'ORDER_VIEW', permissionName: 'Xem danh sách đơn hàng', description: 'Xem và tra cứu danh sách đơn hàng' },
+    { permissionCode: 'ORDER_CREATE', permissionName: 'Tạo đơn hàng' },
+    { permissionCode: 'ORDER_UPDATE', permissionName: 'Cập nhật đơn hàng' },
+    { permissionCode: 'ORDER_DELETE', permissionName: 'Xóa đơn hàng' },
+    { permissionCode: 'ORDER_VIEW', permissionName: 'Xem danh sách đơn hàng' },
     // Shipment Module
-    { permissionCode: 'SHIPMENT_CREATE', permissionName: 'Tạo chuyến hàng', description: 'Tạo phiếu vận chuyển gom nhiều kiện hàng' },
-    { permissionCode: 'SHIPMENT_UPDATE', permissionName: 'Cập nhật chuyến hàng', description: 'Điều chỉnh gom kiện, cập nhật trạng thái luân chuyển' },
-    { permissionCode: 'SHIPMENT_VIEW', permissionName: 'Xem phiếu vận chuyển', description: 'Tra cứu hành trình và trạng thái các chuyến hàng' },
+    { permissionCode: 'SHIPMENT_CREATE', permissionName: 'Tạo chuyến hàng' },
+    { permissionCode: 'SHIPMENT_UPDATE', permissionName: 'Cập nhật chuyến hàng' },
+    { permissionCode: 'SHIPMENT_VIEW', permissionName: 'Xem phiếu vận chuyển' },
     // Fleet Module
-    { permissionCode: 'DRIVER_MANAGE', permissionName: 'Quản lý tài xế', description: 'Quản lý hồ sơ tài xế và gán xe' },
-    { permissionCode: 'VEHICLE_MANAGE', permissionName: 'Quản lý phương tiện', description: 'Quản lý danh mục xe và đăng kiểm' },
+    { permissionCode: 'DRIVER_MANAGE', permissionName: 'Quản lý tài xế' },
+    { permissionCode: 'VEHICLE_MANAGE', permissionName: 'Quản lý phương tiện' },
     // Routing Module
-    { permissionCode: 'ROUTE_PLAN', permissionName: 'Lập tuyến đường', description: 'Tạo thủ công hoặc xếp tuyến cho xe chạy' },
-    { permissionCode: 'ROUTE_OPTIMIZE', permissionName: 'Tối ưu lộ trình AI', description: 'Chạy động cơ AI tối ưu hóa điểm dừng (VRP)' },
+    { permissionCode: 'ROUTE_PLAN', permissionName: 'Lập tuyến đường' },
+    { permissionCode: 'ROUTE_OPTIMIZE', permissionName: 'Tối ưu lộ trình AI' },
     // Tracking & POD Module
-    { permissionCode: 'POD_VERIFY', permissionName: 'Xác thực bàn giao POD', description: 'Xác nhận chữ ký, ảnh chụp, mã OTP khi giao nhận' },
-    { permissionCode: 'SCAN_BARCODE', permissionName: 'Quét barcode kiểm kho', description: 'Quét barcode/QR nhập xuất kho, phân loại' },
+    { permissionCode: 'POD_VERIFY', permissionName: 'Xác thực bàn giao POD' },
+    { permissionCode: 'SCAN_BARCODE', permissionName: 'Quét barcode kiểm kho' },
     // System Module
-    { permissionCode: 'SYSTEM_CONFIG', permissionName: 'Cấu hình hệ thống', description: 'Cấu hình thông số và siêu tham số AI' },
+    { permissionCode: 'SYSTEM_CONFIG', permissionName: 'Cấu hình hệ thống' },
   ];
 
   for (const p of permissions) {
     await prisma.permission.upsert({
       where: { permissionCode: p.permissionCode },
-      update: { permissionName: p.permissionName, description: p.description },
+      update: { permissionName: p.permissionName },
       create: p,
     });
   }
@@ -295,7 +295,6 @@ async function main() {
             phone: tu.phone,
             email: tu.email,
             customerType: 'INDIVIDUAL',
-            status: 'ACTIVE',
           }
         });
       } else {

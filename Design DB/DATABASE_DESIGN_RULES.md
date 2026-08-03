@@ -70,7 +70,7 @@ Hợp nhất các thực thể có cùng bản chất nhân sự/người dùng 
 - **Hợp nhất `staff_profiles` và `drivers` $\rightarrow$ Duy nhất bảng `staff` (`@map("staff")`)**:
   - Mọi người lao động trong công ty (Nhân viên văn phòng, Nhân viên điều phối bưu cục, Thủ kho, Tài xế giao hàng) đều lưu chung trong bảng `staff`.
   - Phân biệt chức vụ qua trường `position` (Enum: `ADMIN`, `DISPATCHER`, `WAREHOUSE_STAFF`, `DRIVER`).
-  - **Các trường chuyên biệt cho Tài xế** (`driver_license_number`, `driver_license_class`, `driver_type`, `employment_status`, `preferred_latitude`, `preferred_longitude`) được đặt là **Nullable** (`?`).
+  - **Các trường chuyên biệt cho Tài xế** (`driver_license_number`, `driver_license_class`, `driver_type`, `employment_status`) được đặt là **Nullable** (`?`).
     - Nếu `position == 'DRIVER'`: các trường này chứa dữ liệu bằng lái, loại xe.
     - Nếu `position != 'DRIVER'`: các trường này mang giá trị `NULL`.
 

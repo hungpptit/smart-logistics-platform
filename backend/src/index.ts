@@ -12,7 +12,6 @@ import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import { mailWorker } from './workers/mail.worker';
 import { TrackingGateway } from './gateways/tracking.gateway';
-import { locationWorker } from './workers/location.worker';
 
 dotenv.config();
 
@@ -54,7 +53,6 @@ app.use(errorMiddleware);
 const startServer = async () => {
   await connectRedis();
   await mailWorker.start();
-  locationWorker.start(); // Start GPS synchronization background worker
   httpServer.listen(PORT, () => {
     console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
     console.log(`📚 API Swagger Docs available at http://localhost:${PORT}/api-docs`);

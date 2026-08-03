@@ -200,9 +200,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   'latitude': lat,
                   'longitude': lng,
                   'packages': 1,
-                  'eta': (stop['plannedArrivalTime'] != null && stop['plannedArrivalTime'].toString().contains('T'))
-                      ? stop['plannedArrivalTime'].toString().split('T')[1].substring(0, 5)
-                      : 'Chờ giao',
+                  'eta': 'Chờ giao',
                   'distance': 'Theo tuyến',
                   'status': i == 0 ? 'ĐANG THỰC HIỆN' : 'TIẾP THEO',
                   'isActive': i == 0,

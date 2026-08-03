@@ -54,7 +54,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `id` | Uuid | **Khóa chính (PK)** | Mã định danh quyền hạn. VD: `per-01`, `per-02` |
 | `permission_code`| VarChar(50)| Khóa duy nhất (Unique), Bắt buộc | Mã quyền thao tác hệ thống. VD: `ORDER_CREATE`, `SHIPMENT_APPROVE`, `AI_ROUTE_OPTIMIZE` |
 | `permission_name`| VarChar(100)| Bắt buộc | Tên quyền chi tiết. VD: `Kích hoạt thuật toán AI tối ưu tuyến đường` |
-| `description` | Text | Tùy chọn | Mô tả phạm vi tác động của quyền trong hệ thống |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tạo quyền hạn |
 
 ---
@@ -85,7 +84,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `customer_type` | Enum | Bắt buộc | Loại khách hàng: `INDIVIDUAL` (Cá nhân gửi lẻ), `BUSINESS` (Doanh nghiệp/Shop) |
 | `company_name` | VarChar(255) | Tùy chọn | Tên công ty/Thương hiệu shop (nếu BIZ). VD: `Công ty TNHH Vinamilk` |
 | `tax_code` | VarChar(30) | Tùy chọn | Mã số thuế doanh nghiệp. VD: `0300588569` |
-| `status` | Enum | Bắt buộc (Default Active) | Trạng thái hồ sơ: `ACTIVE` (Hoạt động), `DISABLED` (Vô hiệu hóa) |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Ngày khách hàng đăng ký hệ thống |
 
 ---
@@ -97,9 +95,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | :--- | :--- | :--- | :--- |
 | `id` | Uuid | **Khóa chính (PK)** | Mã địa chỉ duy nhất. VD: `addr-01`, `addr-02` |
 | `address_line_1`| VarChar(255)| Bắt buộc | Số nhà, tên đường chi tiết. VD: `Số 268 Lý Thường Kiệt` |
-| `ward` | VarChar(100) | Bắt buộc | Phường / Xã. VD: `Phường 14` |
 | `ward_code` | VarChar(20) | **Khóa ngoại (FK ➔ bảng wards)** | Mã định danh Phường/Xã (Trỏ bảng `wards`). VD: `26830` |
-| `province` | VarChar(100) | Bắt buộc | Tỉnh / Thành phố trực thuộc TW. VD: `Thành phố Hồ Chí Minh` |
 | `country` | VarChar(100) | Default 'Vietnam' | Quốc gia. VD: `Vietnam` |
 | `place_id` | VarChar(255)| Tùy chọn | Mã định vị địa điểm từ Goong Map / Google Maps API. VD: `ChIJaX7y8Z4vdTER...` |
 | `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS. VD: `10.7721` |
@@ -118,7 +114,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `customer_id` | Uuid | **Cặp khóa duy nhất [customer_id, address_id]**, **FK ➔ bảng customers** | Mã khách hàng sở hữu địa chỉ. VD: `cust-01` |
 | `address_id` | Uuid | **Cặp khóa duy nhất [customer_id, address_id]**, **FK ➔ bảng addresses** | Mã địa chỉ được liên kết. VD: `addr-01` |
 | `address_type` | Enum | Bắt buộc | Loại địa chỉ: `HOME` (Nhà riêng), `OFFICE` (Văn phòng), `WAREHOUSE` (Kho hàng), `RETURN` (Trả hàng) |
-| `is_default` | Boolean | Default False | Đánh dấu địa chỉ lấy/giao mặc định (`true` / `false`) |
+| `is_default` | Boolean | Default False (**Partial Unique Index `WHERE is_default = true`**) | Đánh dấu địa chỉ lấy/giao mặc định (Đảm bảo tối đa 1 địa chỉ `true` cho mỗi khách hàng) |
 | `contact_name` | VarChar(150) | Tùy chọn | Họ tên người phụ trách liên hệ tại kho. VD: `Chị Mai - Trưởng Kho Q7` |
 | `contact_phone`| VarChar(20) | Tùy chọn | Số điện thoại liên hệ kho trực tiếp khi Shipper đến lấy. VD: `0912345678` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tạo bản ghi sổ địa chỉ |
@@ -151,8 +147,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `parent_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Mã bưu cục cấp trên trong cây phân cấp mạng lưới (Ví dụ Hub mẹ). VD: `fac-05` |
 | `manager_user_id`| Uuid | **Khóa ngoại (FK ➔ bảng users)** | Quản lý bưu cục (Trỏ User có Role Staff/Admin). VD: `usr-02` |
 | `address_id` | Uuid | **Khóa ngoại (FK ➔ bảng addresses)** | Mã địa chỉ của bưu cục/kho bãi (Trỏ `addresses.id`). VD: `addr-05` |
-| `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS Hub (Truy vấn siêu tốc cho AI Routing). VD: `10.7725` |
-| `longitude` | Double | Bắt buộc | Kinh độ định vị GPS Hub (Truy vấn siêu tốc cho AI Routing). VD: `106.6580` |
 | `operating_status`| Enum | Bắt buộc (Default Active) | Trạng thái: `ACTIVE` (Đang mở cửa), `MAINTENANCE` (Bảo trì), `CLOSED` |
 | `opened_at` | Date | Bắt buộc | Ngày chính thức mở cửa hoạt động bưu cục. VD: `2025-01-01` |
 | `closed_at` | Date | Tùy chọn | Ngày đóng cửa bưu cục (nếu status = CLOSED). VD: `2026-07-29` |
@@ -213,8 +207,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `updated_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người cập nhật đơn gần nhất |
 | `status` | Enum | Bắt buộc | Trạng thái đơn hàng (`CREATED`, `READY_FOR_PICKUP`, `OUT_FOR_DELIVERY`, `DELIVERED`, `CANCELLED`...) |
 | `scheduled_pickup_at`| Timestamptz| Tùy chọn | Lịch hẹn khách đặt Shipper đến lấy hàng. VD: `2026-07-24 14:00:00+07` |
-| `sender_name` | VarChar(150) | Bắt buộc | Họ tên người gửi đóng băng snapshot. VD: `Phạm Tuấn Hưng` |
-| `sender_phone` | VarChar(20) | Bắt buộc | Số điện thoại người gửi snapshot. VD: `0987654321` |
 | `pickup_address_text`| Text | Bắt buộc | Địa chỉ lấy hàng chi tiết đóng băng snapshot. VD: `268 Lý Thường Kiệt, P.14, Q.10` |
 | `pickup_latitude` | Double | Bắt buộc | Vĩ độ tọa độ lấy hàng. VD: `10.7721` |
 | `pickup_longitude`| Double | Bắt buộc | Kinh độ tọa độ lấy hàng. VD: `106.6578` |
@@ -224,16 +216,14 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `delivery_latitude`| Double | Bắt buộc | Vĩ độ tọa độ giao hàng. VD: `10.7740` |
 | `delivery_longitude`| Double | Bắt buộc | Kinh độ tọa độ giao hàng. VD: `106.7030` |
 | `estimated_shipping_fee`| Decimal(12,2)| Default 0 | Cước phí vận chuyển tạm tính. VD: `25000.00` VNĐ |
-| `estimated_cod_amount` | Decimal(12,2)| Default 0 | Tiền thu hộ COD dự kiến. VD: `500000.00` VNĐ |
-| `estimated_total_amount`| Decimal(12,2)| Default 0 | Tổng chi phí tạm tính. VD: `525000.00` VNĐ |
-| `pickup_type` | Enum | Bắt buộc (Default PICKUP) | Hình thức gửi hàng: `PICKUP` (Shipper đến lấy tận nơi), `DROP_OFF` (Khách tự mang ra bưu cục gửi) |
-| `estimated_delivery_date`| Timestamptz| Tùy chọn | Ngày & giờ dự kiến giao hàng thành công. VD: `2026-07-28 17:00:00+07` |
-| `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tạo đơn hàng |
-| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật trạng thái/thông tin đơn hàng gần nhất |
 | `estimated_insurance_fee` | Decimal(12,2) | Default 0 | Phí bảo hiểm hàng hóa tạm tính (VNĐ) |
+| `estimated_cod_amount` | Decimal(12,2)| Default 0 | Tiền thu hộ COD dự kiến. VD: `500000.00` VNĐ |
 | `estimated_distance` | Decimal(10,2) | Tùy chọn | Khoảng cách dự tính (km) |
 | `estimated_duration` | Integer | Tùy chọn | Thời gian di chuyển dự tính (phút) |
-| `pricing_version` | Integer | Bắt buộc (Default 1) | Phiên bản bảng giá áp dụng |
+| `estimated_delivery_date`| Timestamptz| Tùy chọn | Ngày & giờ dự kiến giao hàng thành công. VD: `2026-07-28 17:00:00+07` |
+| `pickup_type` | Enum | Bắt buộc (Default PICKUP) | Hình thức gửi hàng: `PICKUP` (Shipper đến lấy tận nơi), `DROP_OFF` (Khách tự mang ra bưu cục gửi) |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tạo đơn hàng |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật trạng thái/thông tin đơn hàng gần nhất |
 
 ---
 
@@ -379,8 +369,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `driver_type` | Enum | Tùy chọn | Loại tài xế: `HUB_DELIVERY` (Giao bưu cục), `ON_DEMAND` (Giao tức thì) |
 | `employment_status` | Enum | Tùy chọn (Default Active) | Trạng thái công tác: `ACTIVE` (Đang làm), `ON_LEAVE` (Nghỉ phép), `TERMINATED`, `DISABLED` (Vô hiệu hóa/Ẩn) |
 | `hire_date` | Date | Tùy chọn | Ngày chính thức tuyển dụng. VD: `2025-01-15` |
-| `preferred_latitude` | Double | Tùy chọn | Vĩ độ khu vực ưu tiên nhận đơn giao |
-| `preferred_longitude`| Double | Tùy chọn | Kinh độ khu vực ưu tiên nhận đơn giao |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian tạo hồ sơ |
 
 ---
@@ -434,16 +422,13 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 ---
 
 ### 26. Bảng `driver_locations` (Tọa độ GPS Thời gian thực hiện tại của Shipper)
-📌 **Chức năng của bảng:** Lưu trữ vị trí tọa độ GPS mới nhất (`latitude`, `longitude`), góc hướng di chuyển (`heading`) và vận tốc thực tế (`speed`) của từng tài xế. Bảng này được ứng dụng Mobile Shipper cập nhật liên tục ngầm (3-5 giây/lượt) để hiển thị vị trí Shipper thời gian thực trên bản đồ Web Admin.
+📌 **Chức năng của bảng:** Lưu trữ vị trí tọa độ GPS mới nhất (`latitude`, `longitude`) của từng tài xế. Bảng này được ứng dụng Mobile Shipper cập nhật vị trí hiện tại ngầm để hiển thị trên bản đồ Web Admin và hỗ trợ AI phân công đơn hàng cho Shipper đứng gần nhất.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
 | `driver_id` | Uuid | **Khóa chính (PK)**, **FK ➔ bảng staff** | Mã tài xế (Mỗi tài xế giữ 1 bản ghi vị trí hiện tại). VD: `stf-01` |
 | `latitude` | Double | Bắt buộc | Vĩ độ phát ngầm thời gian thực qua WebSocket. VD: `10.7735` |
 | `longitude` | Double | Bắt buộc | Kinh độ phát ngầm thời gian thực qua WebSocket. VD: `106.6590` |
-| `heading` | Float | Tùy chọn | Góc hướng di chuyển của xe (độ). VD: `180.0`° |
-| `speed` | Float | Tùy chọn | Vận tốc di chuyển thực tế (m/s). VD: `25.5` m/s |
-| `accuracy` | Float | Tùy chọn | Độ chính xác bán kính định vị GPS (m). VD: `3.0` m |
 | `recorded_at` | Timestamptz | Bắt buộc | Mốc thời gian thiết bị phát tọa độ gần nhất. VD: `2026-07-24 09:40:00+07` |
 
 ---
@@ -466,10 +451,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `planned_distance_km` | Decimal(10,2)| Default 0 | Tổng quãng đường AI tính toán tối ưu (Km). VD: `14.85` Km |
 | `planned_duration_min`| Int | Default 0 | Tổng thời gian AI ước tính hoàn thành (Phút). VD: `125` Phút |
 | `status` | Enum | Default Planned | Trạng thái tuyến: `PLANNED` (AI vừa tính xong), `ASSIGNED`, `IN_PROGRESS`, `COMPLETED` |
-| `actual_distance_km` | Decimal(10,2) | Tùy chọn | Khoảng cách di chuyển thực tế (km) |
-| `actual_duration_min` | Integer | Tùy chọn | Thời gian di chuyển thực tế (phút) |
 | `total_stops` | Integer | Default 0 | Tổng số điểm dừng trên lộ trình AI |
-| `planned_start_at` | Timestamptz | Bắt buộc | Lịch trình xuất phát dự kiến |
 | `actual_start_at` | Timestamptz | Tùy chọn | Thời điểm thực tế xe xuất phát |
 | `completed_at` | Timestamptz | Tùy chọn | Thời điểm thực tế xe hoàn thành |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
@@ -489,15 +471,10 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Vận đơn cần giao (Dùng cho điểm dừng Delivery Giao hàng). VD: `spm-01` |
 | `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục ghé trung chuyển (Dùng cho điểm dừng Hub) |
 | `stop_type` | Enum | Bắt buộc | Loại điểm dừng: `PICKUP` (Lấy hàng), `HUB` (Bưu cục), `DELIVERY` (Giao hàng) |
-| `latitude` / `longitude`| Double | Bắt buộc | Tọa độ GPS của điểm dừng. VD: `10.7721` / `106.6578` |
+| `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS của điểm dừng. VD: `10.7721` |
+| `longitude` | Double | Bắt buộc | Kinh độ định vị GPS của điểm dừng. VD: `106.6578` |
+| `address_snapshot` | Text | Bắt buộc | Chuỗi địa chỉ điểm dừng tại thời điểm chốt lộ trình |
 | `status` | Enum | Default Pending | Trạng thái dừng: `PENDING` (Chờ ghé), `ARRIVED` (Đã đến), `DEPARTED`, `SKIPPED`, `FAILED` |
-| `address_snapshot` | Text | Bắt buộc | Địa chỉ điểm dừng đóng băng snapshot |
-| `latitude` | Double | Tùy chọn | Tọa độ Vĩ độ GPS. VD: `10.7721` |
-| `longitude` | Double | Tùy chọn | Tọa độ Kinh độ GPS. VD: `106.6578` |
-| `planned_arrival_at` | Timestamptz | Tùy chọn | Thời gian dự kiến đến stop |
-| `actual_arrival_at` | Timestamptz | Tùy chọn | Thời gian thực tế đến stop |
-| `planned_departure_at` | Timestamptz | Tùy chọn | Thời gian dự kiến rời stop |
-| `actual_departure_at` | Timestamptz | Tùy chọn | Thời gian thực tế rời stop |
 
 ---
 
@@ -511,49 +488,26 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `route_id` | Uuid | **Khóa ngoại (FK ➔ bảng routes)** | Lộ trình được gán (Trỏ `routes.id`). VD: `rt-01` |
 | `assigned_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Staff/Admin thực hiện giao ca. VD: `usr-02` |
 | `assigned_to` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Shipper được giao nhận ca. VD: `drv-01` |
+| `task_type` | Enum | Bắt buộc | Loại nhiệm vụ điều phối (`PICKUP`, `DELIVERY`, `LINEHAUL`) |
+| `priority` | SmallInt | Default 1 | Mức độ ưu tiên nhiệm vụ (1: Tiêu chuẩn, 2: Gấp) |
 | `status` | Enum | Default Pending | Trạng thái ca: `PENDING` (Chờ nhận), `ACCEPTED` (Đã nhận ca), `REJECTED` (Từ chối) |
-| `rejection_reason` | Text | Tùy chọn | Lý do Shipper từ chối nhận ca. VD: `Xe bị thủng lốp trên đường đi ca` |
-| `task_type` | Enum | Bắt buộc | Loại nhiệm vụ điều phối |
-| `priority` | Integer | Default 1 | Mức ưu tiên nhiệm vụ (1: Thường, 5: Gấp) |
-| `note` | Text | Tùy chọn | Ghi chú điều phối / Check-in |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
-| `completed_at` | Timestamptz | Tùy chọn | Thời điểm thực tế xe hoàn thành |
-
----
-
-### 31. Bảng `route_location_logs` (Nhật ký GPS Tọa độ Vệt đường chạy)
-📌 **Chức năng của bảng:** Ghi vết chi tiết toàn bộ chuỗi tọa độ vệt đường chạy GPS thực tế của tài xế khi thực hiện lộ trình. Phục vụ việc xem lại hành trình di chuyển (Replay Route) và so sánh tuyến đường thực tế di chuyển với tuyến đường AI gợi ý.
-
-| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
-| :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi GPS vệt đường. VD: `rll-01` |
-| `route_id` | Uuid | **Khóa ngoại (FK ➔ bảng routes)** | Thuộc Lộ trình đang chạy. VD: `rt-01` |
-| `latitude` / `longitude`| Double | Bắt buộc | Tọa độ GPS ghi nhận thực tế trên đường. VD: `10.7728` / `106.6582` |
-| `speed_mps` | Decimal(5,2) | Tùy chọn | Vận tốc di chuyển tính bằng m/s. VD: `8.50` m/s |
-| `heading_degrees` | Decimal(5,2) | Tùy chọn | Góc hướng di chuyển độ. VD: `90.00`° |
-| `recorded_at` | Timestamptz | Default Now | Thời điểm thiết bị lưu vết tọa độ. VD: `2026-07-24 08:15:00+07` |
-| `latitude` | Double | Tùy chọn | Tọa độ Vĩ độ GPS. VD: `10.7721` |
-| `longitude` | Double | Tùy chọn | Tọa độ Kinh độ GPS. VD: `106.6578` |
-| `accuracy_meters` | Decimal(5,2) | Tùy chọn | Độ chính xác GPS (m) |
+| `completed_at` | Timestamptz | Tùy chọn | Thời điểm thực tế xe hoàn thành nhiệm vụ |
 
 ---
 
 ### 32. Bảng `route_optimizations` (Nhật ký Thuật toán AI Routing)
-📌 **Chức năng của bảng:** Nhật ký đánh giá hiệu năng thuật toán AI. Lưu vết mỗi lượt kích hoạt AI, số lượng đơn đầu vào, số lượng tuyến đầu ra, tổng quãng đường tối ưu, thời gian AI thực thi (ms), điểm số thích nghi GA (`fitness_score`) và **Snapshot toàn bộ cấu hình AI đã dùng `parameters_json`** (bán kính K-Means, population size, mutation rate).
+📌 **Chức năng của bảng:** Nhật ký đánh giá hiệu năng thuật toán AI. Lưu vết mỗi lượt kích hoạt AI Gom Cụm, bao gồm số lượng đơn đầu vào, số lượng tuyến đầu ra, tổng quãng đường tối ưu (km) và tổng thời gian dự kiến (phút).
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
 | `id` | Uuid | **Khóa chính (PK)** | Mã lượt chạy tối ưu AI. VD: `ro-01` |
-| `algorithm_name` | VarChar(50) | Bắt buộc | Thuật toán áp dụng: `K-Means + Genetic Algorithm (GA)` |
-| `parameters_json` | Json | Tùy chọn | **Snapshot cấu hình AI đã dùng**: `{"kmeans_radius_km": 5, "ga_pop_size": 100, "max_gen": 500, "mutation_rate": 0.05}` |
-| `input_shipment_count`| Int | Bắt buộc | Số lượng đơn/vận đơn đầu vào cần phân tuyến. VD: `45` đơn |
+| `algorithm_name` | VarChar(50) | Bắt buộc | Thuật toán áp dụng: `K-Means + Hungarian + GeneticAlgorithm` |
+| `input_shipment_count`| Int | Bắt buộc | Số lượng đơn/vận đơn đầu vào cần phân tuyến. VD: `50` đơn |
 | `output_route_count` | Int | Bắt buộc | Số lượng Tuyến đường tối ưu sinh ra. VD: `3` tuyến |
-| `execution_time_ms` | Int | Bắt buộc | Thời gian thuật toán chạy xong (Milisecond). VD: `850` ms |
-| `fitness_score` | Decimal(8,4) | Tùy chọn | Điểm số thích nghi tối ưu (Fitness score GA). VD: `0.9850` |
-| `algorithm_version` | VarChar(20) | Tùy chọn | Phiên bản thuật toán AI |
 | `total_distance_km` | Decimal(10,2) | Bắt buộc | Tổng khoảng cách tuyến (km) |
 | `estimated_duration_min` | Integer | Bắt buộc | Tổng thời gian tuyến (phút) |
-| `optimization_status` | Enum | Bắt buộc | Trạng thái tối ưu AI |
+| `optimization_status` | Enum | Bắt buộc | Trạng thái tối ưu AI (`SUCCESS` / `FAILED`) |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
 ---
@@ -588,8 +542,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `delivery_result` | Enum | Bắt buộc | Kết quả: `SUCCESS` (Thành công), `FAILED` (Thất bại), `PARTIAL` |
 | `actual_cod_collected`| Decimal(12,2)| Tùy chọn | **Số tiền mặt COD thực tế Shipper đã thu tại chỗ** đối soát tài chính. VD: `500000.00` VNĐ |
 | `failure_reason` | Enum | Tùy chọn | Lý do thất bại: `RECIPIENT_UNAVAILABLE` (Khách không bắt máy), `INCORRECT_ADDRESS` |
-| `receiver_name` | VarChar(150) | Tùy chọn | Họ tên người nhận bàn giao POD |
-| `receiver_phone` | VarChar(20) | Tùy chọn | Số điện thoại người nhận bàn giao POD |
 | `verified_latitude` | Double | Tùy chọn | Vĩ độ GPS xác minh giao hàng |
 | `verified_longitude` | Double | Tùy chọn | Kinh độ GPS xác minh giao hàng |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
@@ -632,17 +584,14 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 ---
 
 ### 37. Bảng `tracking_attachments` (Tệp đính kèm Chứng từ POD - Ảnh/Chữ ký)
-📌 **Chức năng của bảng:** Quản lý danh sách các tệp hình ảnh thực tế (ảnh chụp kiện hàng tại cửa nhà khách, hình ảnh chữ ký điện tử của người nhận) liên kết với chứng từ giao hàng `delivery_proofs`. Lưu trữ đường dẫn `object_key` trên hệ thống Cloud/Amazon S3.
+📌 **Chức năng của bảng:** Quản lý danh sách các tệp hình ảnh thực tế (ảnh chụp kiện hàng tại cửa nhà khách, hình ảnh chữ ký điện tử của người nhận) liên kết với chứng từ giao hàng `delivery_proofs`. Lưu trữ trực tiếp đường dẫn file `file_url` phục vụ hiển thị.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
 | `id` | Uuid | **Khóa chính (PK)** | Mã file đính kèm. VD: `ta-01` |
 | `delivery_proof_id`| Uuid | **Khóa ngoại (FK ➔ bảng delivery_proofs)**| Thuộc bằng chứng giao hàng nào (Trỏ `delivery_proofs.id`). VD: `dp-01` |
 | `file_type` | Enum | Bắt buộc | Loại file: `PHOTO` (Ảnh chụp), `SIGNATURE` (Chữ ký điện tử) |
-| `object_key` | VarChar(500)| Bắt buộc | Đường dẫn lưu trữ Cloud/S3. VD: `pod/2026/07/proof_dp01.jpg` |
-| `storage_provider` | VarChar(30) | Bắt buộc (Default S3) | Nhà cung cấp Cloud Storage (`S3`/`MinIO`) |
-| `mime_type` | VarChar(100) | Bắt buộc | Kiểu định dạng tệp (`image/jpeg`) |
-| `file_size_bytes` | BigInt | Tùy chọn | Dung lượng tệp tính bằng Bytes |
+| `file_url` | VarChar(500)| Bắt buộc | Đường dẫn xem tệp ảnh trực tiếp. VD: `https://storage.goong.io/pod/proof_dp01.jpg` |
 | `uploaded_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tải tệp đính kèm lên |
 
 ---

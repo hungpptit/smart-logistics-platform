@@ -305,7 +305,6 @@ model Permission {
   id             String           @id @default(uuid()) @db.Uuid
   permissionCode String           @unique @map("permission_code") @db.VarChar(50)
   permissionName String           @map("permission_name") @db.VarChar(100)
-  description    String?          @db.Text
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
   rolePermissions RolePermission[]
@@ -352,9 +351,7 @@ model Address {
   id               String            @id @default(uuid()) @db.Uuid
   addressLine1     String            @map("address_line_1") @db.VarChar(255)
   
-  ward             String            @db.VarChar(100)
   wardCode         String?           @map("ward_code") @db.VarChar(20)
-  province         String            @db.VarChar(100)
   country          String            @default("Vietnam") @db.VarChar(100)
   
   // FIX LỖI 13: Thêm placeId cho định vị API bản đồ (Goong Maps / Google Maps)
@@ -415,16 +412,10 @@ model Facility {
   parentFacilityId String?        @map("parent_facility_id") @db.Uuid
   managerUserId    String?        @map("manager_user_id") @db.Uuid
   addressId        String?        @map("address_id") @db.Uuid
-  
-  // FIX LỖI 14: Thêm trực tiếp Tọa độ Hub để thuật toán AI Routing truy vấn siêu tốc
-  latitude         Float          @db.DoublePrecision
-  longitude        Float          @db.DoublePrecision
-  
   operatingStatus  FacilityStatus @map("operating_status")
   openedAt         DateTime       @map("opened_at") @db.Date
   closedAt         DateTime?      @map("closed_at") @db.Date
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
   facilityType      FacilityType      @relation(fields: [facilityTypeId], references: [id], onDelete: Restrict)
   parentFacility    Facility?         @relation("FacilityHierarchy", fields: [parentFacilityId], references: [id], onDelete: SetNull)
@@ -460,7 +451,6 @@ model FacilityZone {
   zoneType   FacilityZoneType @map("zone_type")
   capacity   Int?
   createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt  DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   facility   Facility         @relation(fields: [facilityId], references: [id], onDelete: Cascade)
   packages   Package[]
@@ -756,7 +746,6 @@ model Vehicle {
   gpsDeviceId            String?                @map("gps_device_id") @db.VarChar(100)
   operatingStatus        VehicleOperatingStatus @map("operating_status")
   createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt              DateTime               @updatedAt @map("updated_at") @db.Timestamptz
 
   vehicleType            VehicleType            @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict)
   homeFacility           Facility?              @relation(fields: [homeFacilityId], references: [id], onDelete: SetNull)
@@ -802,9 +791,6 @@ model DriverLocation {
   driverId   String   @id @map("driver_id") @db.Uuid
   latitude   Float    @db.DoublePrecision
   longitude  Float    @db.DoublePrecision
-  heading    Float?   @db.Real
-  speed      Float?   @db.Real
-  accuracy   Float?   @db.Real
   recordedAt DateTime @map("recorded_at") @db.Timestamptz
 
   driver     Staff    @relation(fields: [driverId], references: [id], onDelete: Cascade)
@@ -830,12 +816,9 @@ model Route {
   endFacilityId              String?        @map("end_facility_id") @db.Uuid
   optimizationId             String?        @map("optimization_id") @db.Uuid
   plannedDistanceKm          Decimal        @default(0.00) @map("planned_distance_km") @db.Decimal(10, 2)
-  actualDistanceKm           Decimal?       @map("actual_distance_km") @db.Decimal(10, 2)
   plannedDurationMin         Int            @default(0) @map("planned_duration_min")
-  actualDurationMin          Int?           @map("actual_duration_min")
   totalStops                 Int            @default(0) @map("total_stops")
   status                     RouteStatus    @default(PLANNED)
-  plannedStartAt             DateTime       @map("planned_start_at") @db.Timestamptz
   actualStartAt              DateTime?      @map("actual_start_at") @db.Timestamptz
   completedAt                DateTime?      @map("completed_at") @db.Timestamptz
   createdAt                  DateTime       @default(now()) @map("created_at") @db.Timestamptz
@@ -848,7 +831,6 @@ model Route {
   endFacility                Facility?                @relation("RouteEndFacility", fields: [endFacilityId], references: [id], onDelete: Restrict)
   optimization               RouteOptimization?       @relation(fields: [optimizationId], references: [id], onDelete: SetNull)
   stops                      RouteStop[]
-  locationLogs               RouteLocationLog[]
   dispatchTasks              DispatchTask[]
   shipments                  Shipment[]
   adjustmentLogs             RouteAdjustmentLog[]
@@ -871,10 +853,6 @@ model RouteStop {
   addressSnapshot    String           @map("address_snapshot") @db.Text
   latitude           Float            @db.DoublePrecision
   longitude          Float            @db.DoublePrecision
-  plannedArrivalAt   DateTime?        @map("planned_arrival_at") @db.Timestamptz
-  actualArrivalAt    DateTime?        @map("actual_arrival_at") @db.Timestamptz
-  plannedDepartureAt DateTime?        @map("planned_departure_at") @db.Timestamptz
-  actualDepartureAt  DateTime?        @map("actual_departure_at") @db.Timestamptz
   status             RouteStopStatus  @default(PENDING)
 
   route              Route            @relation(fields: [routeId], references: [id], onDelete: Cascade)
@@ -899,10 +877,6 @@ model DispatchTask {
   taskType     DispatchTaskType   @map("task_type")
   priority     Int                @default(1) @db.SmallInt
   status       DispatchTaskStatus @default(PENDING)
-  
-  // FIX LỖI 17: Thêm lý do từ chối chuyến của Shipper
-  rejectionReason String?         @map("rejection_reason") @db.Text
-  note         String?            @db.Text
   createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz
   completedAt  DateTime?          @map("completed_at") @db.Timestamptz
 
@@ -915,36 +889,13 @@ model DispatchTask {
   @@map("dispatch_tasks")
 }
 
-model RouteLocationLog {
-  id             String   @id @default(uuid()) @db.Uuid
-  routeId        String   @map("route_id") @db.Uuid
-  latitude       Float    @db.DoublePrecision
-  longitude      Float    @db.DoublePrecision
-  speedMps       Decimal? @map("speed_mps") @db.Decimal(5, 2)
-  headingDegrees Decimal? @map("heading_degrees") @db.Decimal(5, 2)
-  accuracyMeters Decimal? @map("accuracy_meters") @db.Decimal(5, 2)
-  recordedAt     DateTime @default(now()) @map("recorded_at") @db.Timestamptz
-
-  route          Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
-
-  @@index([routeId, recordedAt(sort: Desc)], name: "idx_route_loc_route")
-  @@map("route_location_logs")
-}
-
 model RouteOptimization {
   id                    String             @id @default(uuid()) @db.Uuid
   algorithmName         String             @map("algorithm_name") @db.VarChar(50)
-  algorithmVersion      String?            @map("algorithm_version") @db.VarChar(20)
-  
-  // FIX LỖI 7: Snapshot toàn bộ tham số AI đã sử dụng
-  parametersJson        Json?              @map("parameters_json")
-  
   inputShipmentCount    Int                @map("input_shipment_count")
   outputRouteCount      Int                @map("output_route_count")
   totalDistanceKm       Decimal            @map("total_distance_km") @db.Decimal(10, 2)
   estimatedDurationMin  Int                @map("estimated_duration_min")
-  executionTimeMs       Int                @map("execution_time_ms")
-  fitnessScore          Decimal?           @map("fitness_score") @db.Decimal(8, 4)
   optimizationStatus    OptimizationStatus @map("optimization_status")
   createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz
 
@@ -1031,8 +982,6 @@ model DeliveryProof {
   // FIX LỖI 5: Thêm tiền COD thực tế Shipper đã thu
   actualCodCollected Decimal?             @map("actual_cod_collected") @db.Decimal(12, 2)
   
-  receiverName      String?               @map("receiver_name") @db.VarChar(150)
-  receiverPhone     String?               @map("receiver_phone") @db.VarChar(20)
   failureReason     DeliveryFailureReason? @map("failure_reason")
   verifiedLatitude  Float?                @map("verified_latitude") @db.DoublePrecision
   verifiedLongitude Float?                @map("verified_longitude") @db.DoublePrecision
@@ -1065,10 +1014,7 @@ model TrackingAttachment {
   id              String             @id @default(uuid()) @db.Uuid
   deliveryProofId String             @map("delivery_proof_id") @db.Uuid
   fileType        AttachmentFileType @map("file_type")
-  storageProvider String             @default("S3") @map("storage_provider") @db.VarChar(30)
-  objectKey       String             @map("object_key") @db.VarChar(500)
-  mimeType        String             @map("mime_type") @db.VarChar(100)
-  fileSizeBytes   BigInt?            @map("file_size_bytes")
+  fileUrl         String             @map("file_url") @db.VarChar(500)
   uploadedAt      DateTime           @default(now()) @map("uploaded_at") @db.Timestamptz
 
   deliveryProof   DeliveryProof      @relation(fields: [deliveryProofId], references: [id], onDelete: Cascade)

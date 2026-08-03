@@ -288,8 +288,6 @@ export class CustomerService {
       const address = await tx.address.create({
         data: {
           addressLine1: dto.addressLine1,
-          ward: resolved.ward,
-          province: resolved.province,
           country: dto.country || 'Vietnam',
           latitude: dto.latitude,
           longitude: dto.longitude,
@@ -373,8 +371,6 @@ export class CustomerService {
         where: { id: addressId },
         data: {
           addressLine1: dto.addressLine1 !== undefined ? dto.addressLine1 : undefined,
-          ward: resolved.ward,
-          province: resolved.province,
           country: dto.country !== undefined ? dto.country : undefined,
           latitude: dto.latitude !== undefined ? dto.latitude : undefined,
           longitude: dto.longitude !== undefined ? dto.longitude : undefined,

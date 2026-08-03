@@ -16,7 +16,6 @@ async function cleanData() {
     await prisma.driverCheckIn.deleteMany({});
     await prisma.barcodeScan.deleteMany({});
     await prisma.trackingEvent.deleteMany({});
-    await prisma.routeLocationLog.deleteMany({});
 
     // 2. Clean Route, Dispatch & Shipment Transfers
     console.log('  ❌ Cleaning Dispatch tasks, Route stops & Shipment transfers...');
@@ -41,16 +40,13 @@ async function cleanData() {
     await prisma.driverVehicleAssignment.deleteMany({});
     await prisma.vehicle.deleteMany({});
     await prisma.driverLocation.deleteMany({});
-    await prisma.driver.deleteMany({});
-    await prisma.staffProfile.deleteMany({});
+    await prisma.staff.deleteMany({});
     await prisma.facilityZone.deleteMany({});
-    await prisma.facilityAddress.deleteMany({});
     await prisma.facility.deleteMany({});
 
     // 5. Clean Customer profiles & Addresses
     console.log('  ❌ Cleaning Customer addresses, contacts, customers & address book...');
     await prisma.customerAddress.deleteMany({});
-    await prisma.customerContact.deleteMany({});
     await prisma.customer.deleteMany({});
     await prisma.address.deleteMany({});
 

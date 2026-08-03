@@ -70,10 +70,8 @@ export class TrackingGateway {
         latitude: number;
         longitude: number;
         speedMps?: number;
-        headingDegrees?: number;
-        accuracyMeters?: number;
       }) => {
-        const { routeId, latitude, longitude, speedMps, headingDegrees, accuracyMeters } = data;
+        const { routeId, latitude, longitude, speedMps } = data;
 
         if (!routeId || latitude === undefined || longitude === undefined) {
           console.warn('[Socket] Invalid location update received:', data);
@@ -85,8 +83,6 @@ export class TrackingGateway {
           latitude,
           longitude,
           speedMps: speedMps ?? null,
-          headingDegrees: headingDegrees ?? null,
-          accuracyMeters: accuracyMeters ?? null,
           recordedAt: new Date().toISOString()
         };
 

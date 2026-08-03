@@ -280,7 +280,7 @@ def build_excel():
         # 22. drivers
         {
             "name": "drivers (Hồ sơ Tài xế / Shipper - Clean Arch 1-1)",
-            "headers": ["id", "user_id", "employee_code", "citizen_id", "driver_license_number", "driver_license_class", "hire_date", "employment_status", "home_facility_id", "driver_type", "preferred_latitude", "preferred_longitude", "note", "created_at", "updated_at", "deleted_at"],
+            "headers": ["id", "user_id", "employee_code", "citizen_id", "driver_license_number", "driver_license_class", "hire_date", "employment_status", "home_facility_id", "driver_type", "created_at"],
             "rows": [
                 ["drv-01", "usr-03", "SHIPPER-Q10-09", "079098001234", "59012938102", "A1", "2025-01-15", "ACTIVE", "fac-01", "HUB_DELIVERY", None, None, None, "2026-07-10 14:00:00", "2026-07-10 14:00:00", None],
                 ["drv-02", "usr-05", "SHIPPER-Q10-10", "079098005678", "59012938999", "B2", "2025-02-01", "ACTIVE", "fac-01", "HUB_DELIVERY", None, None, None, "2026-07-12 10:00:00", "2026-07-12 10:00:00", None],
@@ -364,7 +364,7 @@ def build_excel():
         # 29. route_stops
         {
             "name": "route_stops (Chi tiết Điểm dừng Lộ trình)",
-            "headers": ["id", "route_id", "shipment_id", "order_id", "facility_id", "stop_type", "sequence", "address_snapshot", "latitude", "longitude", "planned_arrival_at", "actual_arrival_at", "planned_departure_at", "actual_departure_at", "status"],
+            "headers": ["id", "route_id", "shipment_id", "order_id", "facility_id", "stop_type", "sequence", "address_snapshot", "latitude", "longitude", "status"],
             "rows": [
                 ["rs-01", "rt-01", None, "ord-01", None, "PICKUP", 1, "268 Lý Thường Kiệt, Phường 14, Q10", 10.7721, 106.6578, "2026-07-24 08:30:00", "2026-07-24 08:28:00", "2026-07-24 08:35:00", "2026-07-24 08:34:00", "DEPARTED"],
                 ["rs-02", "rt-01", "spm-01", "ord-01", None, "DELIVERY", 2, "123 Nguyễn Huệ, Bến Nghé, Q1", 10.7740, 106.7030, "2026-07-24 09:10:00", "2026-07-24 09:12:00", "2026-07-24 09:20:00", "2026-07-24 09:18:00", "ARRIVED"],

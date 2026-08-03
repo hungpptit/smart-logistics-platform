@@ -24,8 +24,8 @@ export class TrackingController {
           customer: true,
           pickupAddress: true,
           deliveryAddress: true,
-          originFacility: true,
-          destinationFacility: true,
+          originFacility: { include: { address: true } },
+          destinationFacility: { include: { address: true } },
           packages: true,
           payment: true,
           service: true,
@@ -154,10 +154,10 @@ export class TrackingController {
       const receiverLat = Number(order.deliveryLatitude) || Number(order.deliveryAddress?.latitude) || 10.824;
       const receiverLng = Number(order.deliveryLongitude) || Number(order.deliveryAddress?.longitude) || 106.759;
 
-      const originFacilityLat = Number(order.originFacility?.latitude) || senderLat;
-      const originFacilityLng = Number(order.originFacility?.longitude) || senderLng;
-      const destFacilityLat = Number(order.destinationFacility?.latitude) || receiverLat;
-      const destFacilityLng = Number(order.destinationFacility?.longitude) || receiverLng;
+      const originFacilityLat = Number(order.originFacility?.address?.latitude) || senderLat;
+      const originFacilityLng = Number(order.originFacility?.address?.longitude) || senderLng;
+      const destFacilityLat = Number(order.destinationFacility?.address?.latitude) || receiverLat;
+      const destFacilityLng = Number(order.destinationFacility?.address?.longitude) || receiverLng;
 
       // Current Facility location (where package is currently stored if not out for delivery)
       const currentFacilityLat = destFacilityLat || originFacilityLat;
@@ -175,10 +175,10 @@ export class TrackingController {
         eta: order.scheduledPickupAt ? new Date(order.scheduledPickupAt).toLocaleDateString('vi-VN') : 'Dự kiến hôm nay',
         senderName: senderName,
         senderPhone: senderPhone,
-        senderAddress: order.pickupAddressText || [order.pickupAddress?.addressLine1, order.pickupAddress?.ward, order.pickupAddress?.province].filter(Boolean).join(', '),
+        senderAddress: order.pickupAddressText || order.pickupAddress?.formattedAddress || order.pickupAddress?.addressLine1 || '',
         receiverName: order.receiverName,
         receiverPhone: order.receiverPhone,
-        receiverAddress: order.deliveryAddressText || [order.deliveryAddress?.addressLine1, order.deliveryAddress?.ward, order.deliveryAddress?.province].filter(Boolean).join(', '),
+        receiverAddress: order.deliveryAddressText || order.deliveryAddress?.formattedAddress || order.deliveryAddress?.addressLine1 || '',
         originFacilityName: order.originFacility?.facilityName || 'Bưu cục Linh Trung',
         destinationFacilityName: currentFacilityName,
         driverName,

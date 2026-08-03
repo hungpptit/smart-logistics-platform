@@ -84,12 +84,7 @@ Trong phiên refactor Module 1 vừa qua, hệ thống đã thực hiện điề
 | `driver_type` | DriverType ENUM | Nullable | Loại tài xế: `HUB_DELIVERY`, `ON_DEMAND` |
 | `employment_status` | DriverEmploymentStatus| Nullable | Trạng thái: `ACTIVE`, `ON_LEAVE`, `TERMINATED` |
 | `hire_date` | Date | Nullable | Ngày chính thức tuyển dụng |
-| `preferred_latitude` | Double | Nullable | Tọa độ vĩ độ ưu tiên nhận đơn |
-| `preferred_longitude`| Double | Nullable | Tọa độ kinh độ ưu tiên nhận đơn |
-| `note` | Text | Nullable | Ghi chú nhân sự / tài xế |
-| `is_hidden` | Boolean | Default False | Flag ẩn hồ sơ nhân sự (Thay thế `deleted_at`) |
 | `created_at` | Timestamptz | Not Null | Mốc thời gian tạo |
-| `updated_at` | Timestamptz | Not Null | Mốc thời gian cập nhật |
 
 ---
 

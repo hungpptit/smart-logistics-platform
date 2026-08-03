@@ -30,8 +30,8 @@ export class RoutingService {
     }
 
     const facilityLocation = {
-      lat: facility.latitude,
-      lng: facility.longitude,
+      lat: facility.address?.latitude || 10.7728,
+      lng: facility.address?.longitude || 106.6582,
     };
 
     // 2. Fetch all orders ready for AI routing at this facility (Pickup or Delivery)
@@ -132,6 +132,20 @@ export class RoutingService {
     }
 
     const createdRoutes: any[] = [];
+    let totalOptimizationDistanceKm = 0;
+    let totalOptimizationDurationMin = 0;
+
+    // 5b. Create a single RouteOptimization record for the entire AI Optimization session
+    const optimization = await prisma.routeOptimization.create({
+      data: {
+        algorithmName: 'KMeans + Hungarian + GeneticAlgorithm',
+        inputShipmentCount: orders.length,
+        outputRouteCount: 0,
+        totalDistanceKm: 0,
+        estimatedDurationMin: 0,
+        optimizationStatus: 'SUCCESS',
+      },
+    });
 
     // 6. Run the routing logic for each assigned driver and cluster
     for (const assignment of assignments) {
@@ -175,18 +189,8 @@ export class RoutingService {
       let plannedDurationMin = Math.round((plannedDistanceKm / 30) * 60 + sortedOrders.length * 10);
       if (isNaN(plannedDurationMin)) plannedDurationMin = 30;
 
-      // 1. Create RouteOptimization log
-      const optimization = await prisma.routeOptimization.create({
-        data: {
-          algorithmName: 'KMeans + Hungarian + GeneticAlgorithm',
-          inputShipmentCount: sortedOrders.length,
-          outputRouteCount: 1,
-          totalDistanceKm: plannedDistanceKm,
-          estimatedDurationMin: plannedDurationMin,
-          executionTimeMs: 0,
-          optimizationStatus: 'SUCCESS',
-        },
-      });
+      totalOptimizationDistanceKm += plannedDistanceKm;
+      totalOptimizationDurationMin += plannedDurationMin;
 
       // 2. Create Route record
       const routeCode = `RT-${Date.now().toString().slice(-4)}${Math.floor(1000 + Math.random() * 9000)}`;
@@ -203,11 +207,22 @@ export class RoutingService {
           plannedDurationMin,
           totalStops: sortedOrders.length,
           status: 'PLANNED',
-          plannedStartAt: new Date(),
         },
       });
 
-      // 3. Pre-fetch all packages and existing shipment packages for these orders in one query
+      // 2b. Automatically create a DispatchTask for the assigned driver
+      const taskCode = `TSK-${Date.now().toString().slice(-4)}${Math.floor(1000 + Math.random() * 9000)}`;
+      await prisma.dispatchTask.create({
+        data: {
+          taskCode,
+          routeId: route.id,
+          assignedBy: creatorId || driver.userId,
+          assignedTo: driver.id,
+          taskType: 'ASSIGN_ROUTE',
+          priority: 1,
+          status: 'PENDING',
+        },
+      });
       const orderIds = sortedOrders.map((o: any) => o.id);
       const allPackages = await prisma.package.findMany({
         where: { orderId: { in: orderIds } },
@@ -320,6 +335,16 @@ export class RoutingService {
 
       createdRoutes.push(route);
     }
+
+    // 7. Update the RouteOptimization log with final output route count and aggregated totals
+    await prisma.routeOptimization.update({
+      where: { id: optimization.id },
+      data: {
+        outputRouteCount: createdRoutes.length,
+        totalDistanceKm: Number(totalOptimizationDistanceKm.toFixed(2)),
+        estimatedDurationMin: totalOptimizationDurationMin,
+      },
+    });
 
     getTrackingGateway()?.broadcastRoutesUpdated();
     return createdRoutes;
@@ -603,7 +628,6 @@ export class RoutingService {
     if (routeIds.length > 0) {
       // Clean up child tables
       await prisma.driverCheckIn.deleteMany({ where: { routeStop: { routeId: { in: routeIds } } } });
-      await prisma.routeLocationLog.deleteMany({ where: { routeId: { in: routeIds } } });
       await prisma.dispatchTask.deleteMany({ where: { routeId: { in: routeIds } } });
       await prisma.routeAdjustmentLog.deleteMany({ where: { routeId: { in: routeIds } } });
       await prisma.routeStop.deleteMany({ where: { routeId: { in: routeIds } } });

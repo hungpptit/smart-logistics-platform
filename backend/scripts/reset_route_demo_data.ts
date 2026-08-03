@@ -52,8 +52,6 @@ async function resetDemoRouteData() {
       data: {
         status: 'IN_PROGRESS',
         completedAt: null,
-        actualDistanceKm: null,
-        actualDurationMin: null,
       },
     });
 
@@ -62,8 +60,6 @@ async function resetDemoRouteData() {
       where: { routeId: route.id },
       data: {
         status: 'PENDING',
-        actualArrivalAt: null,
-        actualDepartureAt: null,
       },
     });
 

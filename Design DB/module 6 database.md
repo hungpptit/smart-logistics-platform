@@ -51,13 +51,8 @@ Hồ sơ nghiệp vụ tài xế. Tách biệt với bảng `Users` (Authenticat
 | `driver_license_class` | VARCHAR(10) | ❌ | Hạng GPLX (Ví dụ: `A1`, `A2`, `B2`, `C`, `FC`). |
 | `hire_date` | DATE | ❌ | Ngày ký hợp đồng/bắt đầu làm việc. |
 | `employment_status` | `driver_employment_status_enum`| ❌ | Trạng thái công việc (`ACTIVE`, `OFFLINE`, `SUSPENDED`). |
-| `preferred_latitude`| DOUBLE PRECISION | ✅ | Vĩ độ của điểm Driver Affinity (Khu vực hoạt động ưu tiên). |
-| `preferred_longitude`| DOUBLE PRECISION| ✅ | Kinh độ của điểm Driver Affinity (Khu vực hoạt động ưu tiên). |
 | `driver_type` | `driver_type_enum` | ❌ | Phân loại nhóm shipper (`HUB_DELIVERY` / `ON_DEMAND`). |
-| `home_facility_id` | UUID | ✅ | FK → `Facilities(id)` (ON DELETE SET NULL). Hub/Kho quản lý trực tiếp tài xế này. |
-| `note` | TEXT | ✅ | Ghi chú lý lịch hoặc vi phạm. |
 | `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo. |
-| `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật. |
 | `deleted_at` | TIMESTAMPTZ | ✅ | Xóa mềm hồ sơ tài xế. |
 
 * **Định nghĩa ENUMs:**
