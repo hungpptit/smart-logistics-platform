@@ -1,7 +1,9 @@
 import { prisma } from '../config/prisma';
 import { CreateShipmentDto, UpdateShipmentStatusDto } from '../dtos/shipment.dto';
 import { BadRequestException, NotFoundException } from '../middlewares/error.middleware';
-import { ShipmentStatus, ShipmentEventType } from '@prisma/client';
+import { ShipmentStatus, TrackingEventType, OrderStatus } from '@prisma/client';
+import { TRACKING_EVENT_CONFIG } from '../constants/tracking.constant';
+import { SHIPMENT_TO_TRACKING_EVENT_MAP, SHIPMENT_TO_ORDER_SYNC_MAP } from '../constants/status.constant';
 
 export class ShipmentService {
   /**
@@ -76,15 +78,15 @@ export class ShipmentService {
         const pkg = packages.find((p) => p.id === pkgId);
         if (pkg && pkg.order) {
           // If order is currently CREATED/READY_FOR_PICKUP, update to PICKUP_ASSIGNED
-          if (pkg.order.status === 'CREATED' || pkg.order.status === 'READY_FOR_PICKUP') {
+          if (pkg.order.status === OrderStatus.CREATED || pkg.order.status === OrderStatus.READY_FOR_PICKUP) {
             await tx.order.update({
               where: { id: pkg.orderId },
-              data: { status: 'PICKUP_ASSIGNED' },
+              data: { status: OrderStatus.PICKUP_ASSIGNED },
             });
             await tx.orderStatusHistory.create({
               data: {
                 orderId: pkg.orderId,
-                status: 'PICKUP_ASSIGNED',
+                status: OrderStatus.PICKUP_ASSIGNED,
                 changedByUserId: creatorId,
                 reason: `Đơn hàng được gom vào vận đơn ${shipmentCode} chuẩn bị lấy hàng`,
               },
@@ -93,12 +95,14 @@ export class ShipmentService {
         }
       }
 
-      // Create ShipmentEvent logs
-      await tx.shipmentEvent.create({
+      // Create TrackingEvent logs using Centralized Config
+      const eventMeta = TRACKING_EVENT_CONFIG['CREATED'];
+      await tx.trackingEvent.create({
         data: {
           shipmentId: shipment.id,
-          eventType: ShipmentEventType.CREATED,
-          eventTime: new Date(),
+          eventType: 'CREATED' as any,
+          description: eventMeta?.defaultDesc || 'Vận đơn mới đã được khởi tạo thành công',
+          occurredAt: new Date(),
           createdBy: creatorId,
         },
       });
@@ -115,7 +119,7 @@ export class ShipmentService {
               },
             },
           },
-          shipmentEvents: true,
+          trackingEvents: true,
         },
       });
     });
@@ -141,7 +145,9 @@ export class ShipmentService {
     }
 
     if (query.search) {
-      where.shipmentCode = { contains: query.search, mode: 'insensitive' };
+      where.OR = [
+        { shipmentCode: { contains: query.search, mode: 'insensitive' } },
+      ];
     }
 
     const [total, shipments] = await prisma.$transaction([
@@ -152,18 +158,11 @@ export class ShipmentService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          route: {
+          route: true,
+          shipmentPackages: {
             include: {
-              driverVehicleAssignment: {
-                include: {
-                  driver: true,
-                  vehicle: true,
-                },
-              },
+              package: true,
             },
-          },
-          _count: {
-            select: { shipmentPackages: true },
           },
         },
       }),
@@ -206,10 +205,9 @@ export class ShipmentService {
             },
           },
         },
-        shipmentEvents: {
-          orderBy: { eventTime: 'desc' },
+        trackingEvents: {
+          orderBy: { occurredAt: 'desc' },
           include: {
-            facility: true,
             creator: {
               select: {
                 username: true,
@@ -239,34 +237,10 @@ export class ShipmentService {
       throw new NotFoundException('Không tìm thấy vận đơn để cập nhật');
     }
 
-    // Map ShipmentStatus to ShipmentEventType for log
-    let eventType: ShipmentEventType = ShipmentEventType.EXCEPTION_OCCURRED;
-    switch (dto.status) {
-      case ShipmentStatus.CREATED:
-        eventType = ShipmentEventType.CREATED;
-        break;
-      case ShipmentStatus.ASSIGNED:
-        eventType = ShipmentEventType.DRIVER_ASSIGNED;
-        break;
-      case ShipmentStatus.IN_TRANSIT:
-        eventType = ShipmentEventType.DEPARTED_FACILITY;
-        break;
-      case ShipmentStatus.AT_HUB:
-        eventType = ShipmentEventType.ARRIVED_FACILITY;
-        break;
-      case ShipmentStatus.OUT_FOR_DELIVERY:
-        eventType = ShipmentEventType.OUT_FOR_DELIVERY;
-        break;
-      case ShipmentStatus.DELIVERED:
-        eventType = ShipmentEventType.DELIVERY_SUCCESS;
-        break;
-      case ShipmentStatus.DELIVERY_FAILED:
-        eventType = ShipmentEventType.DELIVERY_FAIL;
-        break;
-      case ShipmentStatus.RETURNING:
-        eventType = ShipmentEventType.RETURN_STARTED;
-        break;
-    }
+    // Lookup TrackingEventType and Meta from Centralized Map Constants
+    const eventType = SHIPMENT_TO_TRACKING_EVENT_MAP[dto.status] || ('EXCEPTION_OCCURRED' as any);
+    const eventMeta = TRACKING_EVENT_CONFIG[eventType as string];
+    const description = dto.notes || eventMeta?.defaultDesc || 'Cập nhật trạng thái vận đơn';
 
     return await prisma.$transaction(async (tx) => {
       // 1. Update Shipment status
@@ -278,15 +252,15 @@ export class ShipmentService {
         },
       });
 
-      // 2. Create ShipmentEvent
-      await tx.shipmentEvent.create({
+      // 2. Create TrackingEvent
+      await tx.trackingEvent.create({
         data: {
           shipmentId: id,
           eventType,
-          facilityId: dto.facilityId || null,
+          description,
           latitude: dto.latitude || null,
           longitude: dto.longitude || null,
-          eventTime: new Date(),
+          occurredAt: new Date(),
           createdBy: userId,
         },
       });
@@ -299,37 +273,20 @@ export class ShipmentService {
         },
       });
 
-      for (const sp of shipmentPackages) {
-        let orderStatusUpdate: string | null = null;
-        let reason = '';
-
-        if (dto.status === ShipmentStatus.IN_TRANSIT) {
-          orderStatusUpdate = 'PICKED_UP';
-          reason = `Đơn hàng đã được lấy và đang trong quá trình luân chuyển qua vận đơn ${shipment.shipmentCode}`;
-        } else if (dto.status === ShipmentStatus.AT_HUB) {
-          orderStatusUpdate = 'ARRIVED_ORIGIN_FACILITY';
-          reason = `Hàng đã cập kho trung chuyển trung tâm`;
-        } else if (dto.status === ShipmentStatus.OUT_FOR_DELIVERY) {
-          orderStatusUpdate = 'OUT_FOR_DELIVERY';
-          reason = `Đơn hàng đang được shipper đi giao`;
-        } else if (dto.status === ShipmentStatus.DELIVERED) {
-          orderStatusUpdate = 'DELIVERED';
-          reason = `Đơn giao hàng thành công`;
-        } else if (dto.status === ShipmentStatus.DELIVERY_FAILED) {
-          orderStatusUpdate = 'FAILED';
-          reason = `Giao hàng thất bại: ${dto.notes || 'Không liên lạc được khách hàng'}`;
-        }
-
-        if (orderStatusUpdate) {
+      // 3. Update all packages parent Order status based on shipment transitions (using Centralized Sync Map)
+      const orderSyncMeta = SHIPMENT_TO_ORDER_SYNC_MAP[dto.status];
+      if (orderSyncMeta) {
+        const reason = orderSyncMeta.getReason(shipment.shipmentCode, dto.notes);
+        for (const sp of shipmentPackages) {
           await tx.order.update({
             where: { id: sp.package.orderId },
-            data: { status: orderStatusUpdate as any },
+            data: { status: orderSyncMeta.orderStatus },
           });
 
           await tx.orderStatusHistory.create({
             data: {
               orderId: sp.package.orderId,
-              status: orderStatusUpdate as any,
+              status: orderSyncMeta.orderStatus,
               changedByUserId: userId,
               reason,
             },

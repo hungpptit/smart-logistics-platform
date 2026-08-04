@@ -24,6 +24,7 @@ interface Driver {
   driverLicenseNumber: string;
   driverLicenseClass: string;
   driverType?: 'HUB_DELIVERY' | 'LINEHAUL_TRANSFER' | 'ON_DEMAND';
+  driverTypes?: { id?: string; driverType: 'HUB_DELIVERY' | 'LINEHAUL_TRANSFER' | 'ON_DEMAND' }[];
   hireDate: string;
   employmentStatus: 'ACTIVE' | 'OFFLINE' | 'SUSPENDED';
   homeFacilityId?: string;
@@ -92,6 +93,7 @@ export const DriverTab: React.FC = () => {
     driverLicenseClass: '',
     hireDate: new Date().toISOString().split('T')[0],
     driverType: 'HUB_DELIVERY' as 'HUB_DELIVERY' | 'LINEHAUL_TRANSFER' | 'ON_DEMAND',
+    driverTypes: ['HUB_DELIVERY'] as ('HUB_DELIVERY' | 'LINEHAUL_TRANSFER' | 'ON_DEMAND')[],
     employmentStatus: 'ACTIVE' as 'ACTIVE' | 'OFFLINE' | 'SUSPENDED',
     homeFacilityId: '',
     createUser: false,
@@ -188,6 +190,7 @@ export const DriverTab: React.FC = () => {
       driverLicenseClass: '',
       hireDate: new Date().toISOString().split('T')[0],
       driverType: 'HUB_DELIVERY',
+      driverTypes: ['HUB_DELIVERY'],
       employmentStatus: 'ACTIVE',
       homeFacilityId: '',
       createUser: false,
@@ -201,6 +204,9 @@ export const DriverTab: React.FC = () => {
   const handleOpenEditModal = (driver: Driver) => {
     setIsEditing(true);
     setSelectedDriverId(driver.id);
+    const existingTypes = driver.driverTypes?.length
+      ? driver.driverTypes.map((dt) => dt.driverType)
+      : [driver.driverType || 'HUB_DELIVERY'];
     setFormData({
       userId: driver.userId || '',
       fullName: driver.fullName,
@@ -209,7 +215,8 @@ export const DriverTab: React.FC = () => {
       driverLicenseNumber: driver.driverLicenseNumber,
       driverLicenseClass: driver.driverLicenseClass,
       hireDate: driver.hireDate ? driver.hireDate.split('T')[0] : '',
-      driverType: driver.driverType || 'HUB_DELIVERY',
+      driverType: existingTypes[0] || 'HUB_DELIVERY',
+      driverTypes: existingTypes as any,
       employmentStatus: driver.employmentStatus,
       homeFacilityId: driver.assignedFacilityId || driver.homeFacilityId || driver.assignedFacility?.id || driver.homeFacility?.id || '',
       createUser: false,
@@ -436,9 +443,26 @@ export const DriverTab: React.FC = () => {
                       })()}
                     </td>
                     <td className="p-4">
-                      <div className="flex flex-col">
+                      <div className="flex flex-col gap-1">
                         <span className="font-semibold text-gray-700">Hạng: {drv.driverLicenseClass}</span>
                         <span className="text-[10px] text-gray-400 font-mono">Số: {drv.driverLicenseNumber}</span>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {(drv.driverTypes?.length
+                            ? drv.driverTypes
+                            : [{ driverType: drv.driverType || 'HUB_DELIVERY' }]
+                          ).map((dt, idx) => (
+                            <span
+                              key={idx}
+                              className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200"
+                            >
+                              {dt.driverType === 'HUB_DELIVERY'
+                                ? 'Bưu cục'
+                                : dt.driverType === 'LINEHAUL_TRANSFER'
+                                ? 'Trung chuyển'
+                                : 'Tức thì'}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </td>
                     <td className="p-4">
@@ -595,21 +619,45 @@ export const DriverTab: React.FC = () => {
                   />
                 </div>
 
-                {/* Driver Type */}
-                <div>
+                {/* Driver Types (Multi-select) */}
+                <div className="col-span-2">
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                    Loại tài xế <span className="text-[#bc0100]">*</span>
+                    Loại hình giao hàng (Chọn 1 hoặc nhiều) <span className="text-[#bc0100]">*</span>
                   </label>
-                  <SearchableSelect
-                    required
-                    value={formData.driverType}
-                    onChange={(val) => setFormData({ ...formData, driverType: val as any })}
-                    options={[
+                  <div className="flex flex-wrap gap-4 p-3 bg-gray-50 border border-gray-200 rounded-md text-xs">
+                    {[
                       { value: 'HUB_DELIVERY', label: 'Tài xế Bưu cục chặng cuối (Hub Courier)' },
-                      { value: 'LINEHAUL_TRANSFER', label: 'Tài xế Trung chuyển Liên Bưu cục / Kho tổng (Linehaul Transfer)' },
+                      { value: 'LINEHAUL_TRANSFER', label: 'Tài xế Trung chuyển Liên Bưu cục (Linehaul)' },
                       { value: 'ON_DEMAND', label: 'Tài xế giao tức thì (On-Demand Express)' }
-                    ]}
-                  />
+                    ].map((item) => {
+                      const isChecked = formData.driverTypes?.includes(item.value as any);
+                      return (
+                        <label key={item.value} className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={!!isChecked}
+                            onChange={(e) => {
+                              let updated = [...(formData.driverTypes || [])];
+                              if (e.target.checked) {
+                                if (!updated.includes(item.value as any)) updated.push(item.value as any);
+                              } else {
+                                if (updated.length > 1) {
+                                  updated = updated.filter((t) => t !== item.value);
+                                }
+                              }
+                              setFormData({
+                                ...formData,
+                                driverTypes: updated,
+                                driverType: updated[0] || 'HUB_DELIVERY',
+                              });
+                            }}
+                            className="rounded border-gray-300 text-[#bc0100] focus:ring-[#bc0100]"
+                          />
+                          <span className="font-medium text-gray-700">{item.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Home Facility (Warehouse) */}

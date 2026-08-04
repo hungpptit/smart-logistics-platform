@@ -16,19 +16,77 @@ async function main() {
   const shipperRole = await prisma.role.findUnique({ where: { roleCode: 'SHIPPER' } });
   const customerRole = await prisma.role.findUnique({ where: { roleCode: 'CUSTOMER' } });
   const motorbikeType = await prisma.vehicleType.findFirst({ where: { typeCode: 'MOTORBIKE' } });
-  const lastMileFacilityType = await prisma.facilityType.findFirst({ where: { OR: [{ typeCode: 'MICRO_HUB' }, { typeCode: 'LAST_MILE_HUB' }, { typeCode: 'HUB' }] } });
+  
+  const sortingCenterType = await prisma.facilityType.findFirst({ where: { typeCode: 'SORTING_CENTER' } });
+  const provincialHubType = await prisma.facilityType.findFirst({ where: { typeCode: 'PROVINCIAL_HUB' } });
+  const lastMileFacilityType = await prisma.facilityType.findFirst({ where: { OR: [{ typeCode: 'WARD_STATION' }, { typeCode: 'LAST_MILE_STATION' }, { typeCode: 'MICRO_HUB' }] } });
   const expressService = await prisma.service.findFirst({ where: { serviceCode: 'EXPRESS' } });
 
-  if (!staffRole || !shipperRole || !customerRole || !motorbikeType || !lastMileFacilityType || !expressService) {
+  if (!staffRole || !shipperRole || !customerRole || !motorbikeType || !sortingCenterType || !provincialHubType || !lastMileFacilityType || !expressService) {
     throw new Error('Chưa seed master lookup data (Roles, FacilityType, VehicleType, Service). Vui lòng chạy npx prisma db seed trước!');
   }
 
-  // 2. Tạo 4 Bưu cục TP. Thủ Đức (3 Bưu cục chặng đầu gửi + 1 Bưu cục Đặng Văn Bi chặng cuối nhận)
-  console.log('📍 Tạo 4 Bưu cục TP. Thủ Đức (Đặng Văn Bi là Bưu cục nhận chặng cuối)...');
-  
+  // 2. Tạo Cây Phân cấp Mạng lưới 3 Cấp Kho
+  console.log('📍 Tạo Cây Phân cấp Mạng lưới 3 Cấp Kho (Sorting Center -> Provincial Hub -> Last Mile Stations)...');
+
+  // Cấp 1: Tổng Kho Miền Nam (Q.12)
+  const addrSC = await prisma.address.create({
+    data: {
+      addressLine1: 'Km 19 Quốc Lộ 1A, Phường Trung Mỹ Tây, Quận 12',
+      country: 'Vietnam',
+      latitude: 10.8520,
+      longitude: 106.6200,
+    },
+  });
+
+  const sortingCenter = await prisma.facility.upsert({
+    where: { facilityCode: 'FAC-SC-SOUTH' },
+    update: {},
+    create: {
+      facilityCode: 'FAC-SC-SOUTH',
+      facilityName: 'Tổng Kho Miền Nam (Sorting Center Q.12)',
+      facilityTypeId: sortingCenterType.id,
+      parentFacilityId: null,
+      provinceCode: '79',
+      addressId: addrSC.id,
+      operatingStatus: FacilityStatus.ACTIVE,
+      openedAt: new Date('2025-01-01'),
+    },
+  });
+
+  // Cấp 2: Kho Tổng TP.HCM (Tân Bình)
+  const addrHubHCM = await prisma.address.create({
+    data: {
+      addressLine1: '102 Trường Chinh, Phường 12, Quận Tân Bình, TP. Hồ Chí Minh',
+      country: 'Vietnam',
+      latitude: 10.8050,
+      longitude: 106.6500,
+    },
+  });
+
+  const provincialHub = await prisma.facility.upsert({
+    where: { facilityCode: 'FAC-HUB-HCM' },
+    update: {
+      parentFacilityId: sortingCenter.id,
+      provinceCode: '79',
+      addressId: addrHubHCM.id,
+    },
+    create: {
+      facilityCode: 'FAC-HUB-HCM',
+      facilityName: 'Kho Tổng TP. Hồ Chí Minh (Provincial Hub)',
+      facilityTypeId: provincialHubType.id,
+      parentFacilityId: sortingCenter.id,
+      provinceCode: '79',
+      addressId: addrHubHCM.id,
+      operatingStatus: FacilityStatus.ACTIVE,
+      openedAt: new Date('2025-01-01'),
+    },
+  });
+
+  // Cấp 3: 4 Trạm Bưu cục Phát TP. Thủ Đức
   const addrHub1 = await prisma.address.create({
     data: {
-      addressLine1: '180 Đặng Văn Bi',
+      addressLine1: '180 Đặng Văn Bi, Phường Bình Thọ, TP. Thủ Đức, TP. Hồ Chí Minh',
       country: 'Vietnam',
       latitude: 10.8495,
       longitude: 106.7625,
@@ -37,7 +95,7 @@ async function main() {
 
   const addrHub2 = await prisma.address.create({
     data: {
-      addressLine1: '250 Đường Linh Trung',
+      addressLine1: '250 Đường Linh Trung, Phường Linh Trung, TP. Thủ Đức, TP. Hồ Chí Minh',
       country: 'Vietnam',
       latitude: 10.8580,
       longitude: 106.7750,
@@ -46,7 +104,7 @@ async function main() {
 
   const addrHub3 = await prisma.address.create({
     data: {
-      addressLine1: '85 Đỗ Xuân Hợp',
+      addressLine1: '85 Đỗ Xuân Hợp, Phường Phước Long B, TP. Thủ Đức, TP. Hồ Chí Minh',
       country: 'Vietnam',
       latitude: 10.8250,
       longitude: 106.7600,
@@ -55,21 +113,26 @@ async function main() {
 
   const addrHub4 = await prisma.address.create({
     data: {
-      addressLine1: '25 Song Hành',
+      addressLine1: '25 Song Hành, Phường An Phú, TP. Thủ Đức, TP. Hồ Chí Minh',
       country: 'Vietnam',
       latitude: 10.8010,
       longitude: 106.7420,
     },
   });
 
-  // Bưu cục Đặng Văn Bi (Kho giao chính)
+  // Bưu cục Đặng Văn Bi (Trạm phát chặng cuối chính)
   const hub1 = await prisma.facility.upsert({
     where: { facilityCode: 'FAC-TD-DANGBI' },
-    update: {},
+    update: {
+      parentFacilityId: provincialHub.id,
+      provinceCode: '79',
+    },
     create: {
       facilityCode: 'FAC-TD-DANGBI',
       facilityName: 'Bưu cục Đặng Văn Bi - TP. Thủ Đức',
       facilityTypeId: lastMileFacilityType.id,
+      parentFacilityId: provincialHub.id,
+      provinceCode: '79',
       addressId: addrHub1.id,
       operatingStatus: FacilityStatus.ACTIVE,
       openedAt: new Date('2025-01-01'),
@@ -79,11 +142,16 @@ async function main() {
   // Bưu cục Linh Trung (Kho gửi 1)
   const hub2 = await prisma.facility.upsert({
     where: { facilityCode: 'FAC-TD-LINHTRUNG' },
-    update: {},
+    update: {
+      parentFacilityId: provincialHub.id,
+      provinceCode: '79',
+    },
     create: {
       facilityCode: 'FAC-TD-LINHTRUNG',
       facilityName: 'Bưu cục Linh Trung - TP. Thủ Đức',
       facilityTypeId: lastMileFacilityType.id,
+      parentFacilityId: provincialHub.id,
+      provinceCode: '79',
       addressId: addrHub2.id,
       operatingStatus: FacilityStatus.ACTIVE,
       openedAt: new Date('2025-01-01'),
@@ -93,11 +161,16 @@ async function main() {
   // Bưu cục Phước Long (Kho gửi 2)
   const hub3 = await prisma.facility.upsert({
     where: { facilityCode: 'FAC-TD-PHUOCLONG' },
-    update: {},
+    update: {
+      parentFacilityId: provincialHub.id,
+      provinceCode: '79',
+    },
     create: {
       facilityCode: 'FAC-TD-PHUOCLONG',
       facilityName: 'Bưu cục Phước Long - TP. Thủ Đức',
       facilityTypeId: lastMileFacilityType.id,
+      parentFacilityId: provincialHub.id,
+      provinceCode: '79',
       addressId: addrHub3.id,
       operatingStatus: FacilityStatus.ACTIVE,
       openedAt: new Date('2025-01-01'),
@@ -107,11 +180,16 @@ async function main() {
   // Bưu cục An Phú (Kho gửi 3 xa xa)
   const hub4 = await prisma.facility.upsert({
     where: { facilityCode: 'FAC-TD-ANPHU' },
-    update: {},
+    update: {
+      parentFacilityId: provincialHub.id,
+      provinceCode: '79',
+    },
     create: {
       facilityCode: 'FAC-TD-ANPHU',
       facilityName: 'Bưu cục An Phú - TP. Thủ Đức',
       facilityTypeId: lastMileFacilityType.id,
+      parentFacilityId: provincialHub.id,
+      provinceCode: '79',
       addressId: addrHub4.id,
       operatingStatus: FacilityStatus.ACTIVE,
       openedAt: new Date('2025-01-01'),
@@ -191,9 +269,11 @@ async function main() {
         position: 'DRIVER',
         assignedFacilityId: sh.facilityId,
         driverLicenseNumber: `GPLX-TD-99${sh.code.slice(-2)}`,
-        driverType: 'HUB_DELIVERY',
+        driverTypes: {
+          create: [{ driverType: 'HUB_DELIVERY' }],
+        },
         employmentStatus: DriverEmploymentStatus.ACTIVE,
-      },
+      } as any,
     });
 
     const vehCode = `VEH-${sh.code}`;

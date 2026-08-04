@@ -4,6 +4,7 @@ import { DashboardShell } from '../layouts/DashboardShell';
 import type { MenuItem } from '../layouts/Sidebar';
 import { useAuth } from '../../../../context/AuthContext';
 import { CONFIG } from '../../../../config';
+import { STOP_TYPE_MAP, ROUTE_STOP_STATUS_MAP } from '../../../../constants/enumLabels';
 
 interface RouteStop {
   id: string;
@@ -162,7 +163,7 @@ const TodayRouteTab: React.FC = () => {
                             stop.stopType === 'PICKUP' ? 'bg-blue-50 text-blue-600' :
                             stop.stopType === 'HUB' ? 'bg-amber-50 text-amber-600' : 'bg-purple-50 text-purple-600'
                           }`}>
-                            {stop.stopType === 'PICKUP' ? 'LẤY HÀNG' : stop.stopType === 'HUB' ? 'TRUNG CHUYỂN' : 'GIAO HÀNG'}
+                            {STOP_TYPE_MAP[stop.stopType]?.label || stop.stopType}
                           </span>
                           {orderCode && <span className="text-xs text-gray-500 font-semibold">{orderCode}</span>}
                           {stop.plannedArrivalTime && (
@@ -181,7 +182,7 @@ const TodayRouteTab: React.FC = () => {
                         isDone ? 'bg-emerald-50 text-emerald-700' :
                         stop.status === 'ARRIVED' ? 'bg-amber-50 text-amber-700' : 'bg-gray-50 text-gray-500'
                       }`}>
-                        {isDone ? 'ĐÃ XONG' : stop.status === 'ARRIVED' ? 'ĐANG ĐẾN' : 'CHỜ'}
+                        {isDone ? 'ĐÃ XONG' : ROUTE_STOP_STATUS_MAP[stop.status]?.label || stop.status}
                       </span>
                     </div>
                   </div>

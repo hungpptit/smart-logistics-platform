@@ -4,6 +4,7 @@ import { AssignmentService } from './assignment.service';
 import { VRPService } from './vrp.service';
 import { BadRequestException, NotFoundException } from '../../middlewares/error.middleware';
 import { getTrackingGateway } from '../../gateways/tracking.gateway';
+import { OrderStatus } from '@prisma/client';
 
 export class RoutingService {
   private kmeansService = new KMeansService();
@@ -273,8 +274,8 @@ export class RoutingService {
           }
         }
 
-        const isPickup = order.status === 'READY_FOR_PICKUP';
-        const nextStatus = isPickup ? 'PICKUP_ASSIGNED' : 'READY_FOR_DISPATCH';
+        const isPickup = order.status === OrderStatus.READY_FOR_PICKUP;
+        const nextStatus = isPickup ? OrderStatus.PICKUP_ASSIGNED : OrderStatus.READY_FOR_DISPATCH;
 
         if (isPickup) {
           pickupOrderIds.push(order.id);
@@ -318,13 +319,13 @@ export class RoutingService {
       if (pickupOrderIds.length > 0) {
         await prisma.order.updateMany({
           where: { id: { in: pickupOrderIds } },
-          data: { status: 'PICKUP_ASSIGNED' },
+          data: { status: OrderStatus.PICKUP_ASSIGNED },
         });
       }
       if (deliveryOrderIds.length > 0) {
         await prisma.order.updateMany({
           where: { id: { in: deliveryOrderIds } },
-          data: { status: 'READY_FOR_DISPATCH' },
+          data: { status: OrderStatus.READY_FOR_DISPATCH },
         });
       }
 
@@ -586,9 +587,9 @@ export class RoutingService {
       await prisma.order.updateMany({
         where: {
           destinationFacilityId: validFacilityId,
-          status: { in: ['READY_FOR_DISPATCH', 'PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
+          status: { in: [OrderStatus.READY_FOR_DISPATCH, OrderStatus.PICKUP_ASSIGNED, OrderStatus.PICKING, OrderStatus.PICKED_UP, OrderStatus.IN_TRANSIT, OrderStatus.OUT_FOR_DELIVERY] },
         },
-        data: { status: 'AT_HUB' },
+        data: { status: OrderStatus.AT_HUB },
       });
 
       // Pickup orders waiting for pickup at origin facility -> Reset to READY_FOR_PICKUP
@@ -596,17 +597,17 @@ export class RoutingService {
         where: {
           originFacilityId: validFacilityId,
           destinationFacilityId: { not: validFacilityId },
-          status: { in: ['READY_FOR_DISPATCH', 'PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
+          status: { in: [OrderStatus.READY_FOR_DISPATCH, OrderStatus.PICKUP_ASSIGNED, OrderStatus.PICKING, OrderStatus.PICKED_UP, OrderStatus.IN_TRANSIT, OrderStatus.OUT_FOR_DELIVERY] },
         },
-        data: { status: 'READY_FOR_PICKUP' },
+        data: { status: OrderStatus.READY_FOR_PICKUP },
       });
     } else {
       // Global reset fallback: reset all delivery orders in-transit back to AT_HUB
       await prisma.order.updateMany({
         where: {
-          status: { in: ['READY_FOR_DISPATCH', 'PICKUP_ASSIGNED', 'PICKING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
+          status: { in: [OrderStatus.READY_FOR_DISPATCH, OrderStatus.PICKUP_ASSIGNED, OrderStatus.PICKING, OrderStatus.PICKED_UP, OrderStatus.IN_TRANSIT, OrderStatus.OUT_FOR_DELIVERY] },
         },
-        data: { status: 'AT_HUB' },
+        data: { status: OrderStatus.AT_HUB },
       });
     }
 
@@ -627,7 +628,6 @@ export class RoutingService {
 
     if (routeIds.length > 0) {
       // Clean up child tables
-      await prisma.driverCheckIn.deleteMany({ where: { routeStop: { routeId: { in: routeIds } } } });
       await prisma.dispatchTask.deleteMany({ where: { routeId: { in: routeIds } } });
       await prisma.routeAdjustmentLog.deleteMany({ where: { routeId: { in: routeIds } } });
       await prisma.routeStop.deleteMany({ where: { routeId: { in: routeIds } } });
@@ -638,7 +638,7 @@ export class RoutingService {
       if (shipmentIds.length > 0) {
         await prisma.shipmentPackage.deleteMany({ where: { shipmentId: { in: shipmentIds } } });
         await prisma.shipmentTransfer.deleteMany({ where: { shipmentId: { in: shipmentIds } } });
-        await prisma.shipmentEvent.deleteMany({ where: { shipmentId: { in: shipmentIds } } });
+        await prisma.trackingEvent.deleteMany({ where: { shipmentId: { in: shipmentIds } } });
         await prisma.shipment.deleteMany({ where: { id: { in: shipmentIds } } });
       }
 
@@ -714,7 +714,7 @@ export class RoutingService {
             { originFacilityId: route.startFacilityId },
             { packages: { some: { currentFacilityId: route.startFacilityId } } },
           ],
-          status: { in: ['READY_FOR_DISPATCH', 'PICKUP_ASSIGNED'] },
+          status: { in: [OrderStatus.READY_FOR_DISPATCH, OrderStatus.PICKUP_ASSIGNED] },
         },
         select: { id: true },
         take: route.totalStops || 50,

@@ -149,7 +149,11 @@ export class AssignmentService {
           let capacityPenalty = 0;
           let vehiclePenalty = 0;
 
-          const isMotorcycleDriver = driver.driverLicenseClass === 'A1' || driver.driverLicenseClass === 'A2' || driver.driverType === 'HUB_DELIVERY';
+          const isMotorcycleDriver =
+            driver.driverLicenseClass === 'A1' ||
+            driver.driverLicenseClass === 'A2' ||
+            ((driver as any).driverTypes && (driver as any).driverTypes.some((dt: any) => dt.driverType === 'HUB_DELIVERY')) ||
+            (driver as any).driverType === 'HUB_DELIVERY';
 
           if (activeAssignment) {
             const maxWeight = Number(activeAssignment.vehicle.maxWeight || 0);

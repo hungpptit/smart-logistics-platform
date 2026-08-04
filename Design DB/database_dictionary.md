@@ -315,21 +315,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ---
 
-### 20. Bảng `shipment_events` (Sự kiện Nhật ký Vận đơn)
-📌 **Chức năng của bảng:** Ghi vết hành trình chi tiết của vận đơn khi di chuyển qua các mốc quan trọng (Xuất kho departure, Đến bưu cục trung gian arrival, Shipper nhận hàng out for delivery, Giao hàng thành công delivery success).
 
-| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
-| :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã sự kiện vận đơn. VD: `se-01` |
-| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Thuộc vận đơn nào (Trỏ `shipments.id`). VD: `spm-01` |
-| `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục phát sinh sự kiện. VD: `fac-01` |
-| `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người ghi nhận sự kiện (User ID). VD: `usr-03` |
-| `event_type` | Enum | Bắt buộc | Loại sự kiện: `DRIVER_ASSIGNED`, `DEPARTED_FACILITY`, `ARRIVED_FACILITY`, `DELIVERY_SUCCESS` |
-| `event_time` | Timestamptz | Not Null | Thời điểm xảy ra sự kiện. VD: `2026-07-24 09:35:00+07` |
-| `latitude` | Double | Tùy chọn | Tọa độ Vĩ độ GPS. VD: `10.7721` |
-| `longitude` | Double | Tùy chọn | Tọa độ Kinh độ GPS. VD: `106.6578` |
-
----
 
 ### 21. Bảng `shipment_transfers` (Luân chuyển Hàng giữa các Bưu cục)
 📌 **Chức năng của bảng:** Quản lý quy trình giao nhận luân chuyển vận đơn giữa bưu cục gửi (`from_facility_id`) và bưu cục nhận (`to_facility_id`). Theo dõi thời điểm xuất xe (`dispatched_at`), thời điểm xe cập bến kho (`arrived_at`) và nhân viên kho bấm Xác nhận nhập kho (`received_by`).
@@ -365,10 +351,21 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `assigned_facility_id`| Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục công tác/trực thuộc quản lý. VD: `fac-01` |
 | `driver_license_number`| VarChar(50)| Khóa duy nhất (Unique), Tùy chọn| Số bằng lái xe GPLX (Chỉ dùng cho Driver). VD: `59012938102` |
 | `driver_license_class` | VarChar(10)| Tùy chọn | Hạng bằng lái xe GPLX (Chỉ dùng cho Driver). VD: `A1`, `B2`, `C`, `FC` |
-| `driver_type` | Enum | Tùy chọn | Loại tài xế: `HUB_DELIVERY` (Giao bưu cục), `ON_DEMAND` (Giao tức thì) |
 | `employment_status` | Enum | Tùy chọn (Default Active) | Trạng thái công tác: `ACTIVE` (Đang làm), `ON_LEAVE` (Nghỉ phép), `TERMINATED`, `DISABLED` (Vô hiệu hóa/Ẩn) |
 | `hire_date` | Date | Tùy chọn | Ngày chính thức tuyển dụng. VD: `2025-01-15` |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian tạo hồ sơ |
+
+---
+
+### 22b. Bảng `staff_driver_types` (Bảng trung gian N-N Loại hình Giao hàng Tài xế)
+📌 **Chức năng của bảng:** Lưu danh sách các loại hình giao hàng mà 1 tài xế (`staff`) đăng ký đảm nhận (`HUB_DELIVERY`, `LINEHAUL_TRANSFER`, `ON_DEMAND`). Cho phép 1 tài xế có thể đăng ký chạy nhiều hình thức cùng lúc.
+
+| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
+| :--- | :--- | :--- | :--- |
+| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi phân công loại hình. |
+| `staff_id` | Uuid | **Khóa ngoại (FK ➔ bảng staff)** | Mã tài xế thực hiện. |
+| `driver_type` | Enum | Bắt buộc | Loại hình giao hàng: `HUB_DELIVERY` (Giao bưu cục chặng cuối), `LINEHAUL_TRANSFER` (Trung chuyển liên tỉnh/bưu cục), `ON_DEMAND` (Giao tức thì). |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian gán/đăng ký loại hình. |
 
 ---
 
@@ -471,6 +468,8 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `longitude` | Double | Bắt buộc | Kinh độ định vị GPS của điểm dừng. VD: `106.6578` |
 | `address_snapshot` | Text | Bắt buộc | Chuỗi địa chỉ điểm dừng tại thời điểm chốt lộ trình |
 | `status` | Enum | Default Pending | Trạng thái dừng: `PENDING` (Chờ ghé), `ARRIVED` (Đã đến), `DEPARTED`, `SKIPPED`, `FAILED` |
+| `arrived_at` | Timestamptz | Tùy chọn | Thời điểm thực tế Shipper bấm Check-in / đến nơi. VD: `2026-07-24 09:40:00+07` |
+| `departed_at` | Timestamptz | Tùy chọn | Thời điểm thực tế Shipper bấm Check-out / rời đi. VD: `2026-07-24 09:45:00+07` |
 
 ---
 
@@ -563,21 +562,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ---
 
-### 36. Bảng `driver_check_ins` (Nhật ký Check-in Điểm dừng của Shipper)
-📌 **Chức năng của bảng:** Ghi nhận chính xác mốc thời gian và vị trí tọa độ GPS khi Shipper bấm nút "Đã đến điểm dừng" (Check-in) và "Đã rời điểm dừng" (Check-out) trên ứng dụng Mobile. Phục vụ việc kiểm soát thời gian dừng đỗ thực tế tại nhà khách hàng.
 
-| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
-| :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã bản ghi check-in. VD: `dci-01` |
-| `route_stop_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng route_stops)**| Gắn duy nhất với điểm dừng. VD: `rs-01` |
-| `driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Shipper thực hiện check-in (Trỏ `drivers.id`). VD: `drv-01` |
-| `check_in_at` | Timestamptz | Default Now | Mốc thời gian bấm Check-in trên App. VD: `2026-07-24 09:40:00+07` |
-| `check_out_at` | Timestamptz | Tùy chọn | Mốc thời gian bấm Check-out xong điểm dừng. VD: `2026-07-24 09:45:00+07` |
-| `latitude` | Double | Bắt buộc | Vĩ độ định vị GPS thiết bị tại thời điểm Check-in. VD: `10.7735` |
-| `longitude` | Double | Bắt buộc | Kinh độ định vị GPS thiết bị tại thời điểm Check-in. VD: `106.6590` |
-| `note` | Text | Tùy chọn | Ghi chú điều phối / Check-in |
-
----
 
 ### 37. Bảng `tracking_attachments` (Tệp đính kèm Chứng từ POD - Ảnh/Chữ ký)
 📌 **Chức năng của bảng:** Quản lý danh sách các tệp hình ảnh thực tế (ảnh chụp kiện hàng tại cửa nhà khách, hình ảnh chữ ký điện tử của người nhận) liên kết với chứng từ giao hàng `delivery_proofs`. Lưu trữ trực tiếp đường dẫn file `file_url` phục vụ hiển thị.

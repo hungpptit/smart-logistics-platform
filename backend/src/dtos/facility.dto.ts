@@ -50,6 +50,10 @@ export class CreateFacilityDto {
   @IsOptional()
   parentFacilityId?: string;
 
+  @IsString({ message: 'Mã Tỉnh/Thành phố phải là một chuỗi ký tự' })
+  @IsOptional()
+  provinceCode?: string;
+
   @IsUUID('4', { message: 'ID người quản lý phải là UUID hợp lệ' })
   @IsOptional()
   managerUserId?: string;
@@ -82,6 +86,10 @@ export class UpdateFacilityDto {
   @IsUUID('4', { message: 'ID kho bãi cha phải là UUID hợp lệ' })
   @IsOptional()
   parentFacilityId?: string;
+
+  @IsString({ message: 'Mã Tỉnh/Thành phố phải là một chuỗi ký tự' })
+  @IsOptional()
+  provinceCode?: string;
 
   @IsUUID('4', { message: 'ID người quản lý phải là UUID hợp lệ' })
   @IsOptional()

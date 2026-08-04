@@ -32,6 +32,12 @@ interface Facility {
   closedAt?: string;
   note?: string;
   facilityType?: FacilityType;
+  address?: FacilityAddress;
+  province?: {
+    code: string;
+    name: string;
+    fullName: string;
+  };
   facilityAddresses?: Array<{
     address: FacilityAddress;
     addressType: string;
@@ -115,17 +121,26 @@ export const FacilityDetailPanel: React.FC<FacilityDetailPanelProps> = ({
               <span className="font-bold text-[#161D25]">{facility.manager?.username || 'Chưa chỉ định'}</span>
             </div>
 
-            {facility.facilityAddresses?.[0]?.address && (
-              <div className="flex flex-col gap-0.5 col-span-2 border-t border-gray-200 pt-2 mt-1">
-                <span className="text-gray-400 text-[10px] flex items-center gap-1"><MapPin size={10} /> Địa chỉ vật lý</span>
-                <span className="font-medium text-gray-700 leading-relaxed">
-                  {facility.facilityAddresses[0].address.formattedAddress}
-                </span>
-                <span className="text-[9px] font-mono text-gray-400">
-                  GPS: {facility.facilityAddresses[0].address.latitude.toFixed(6)}, {facility.facilityAddresses[0].address.longitude.toFixed(6)}
-                </span>
-              </div>
-            )}
+            {(() => {
+              const addrObj = facility.address || facility.facilityAddresses?.[0]?.address;
+              const formattedText = addrObj?.formattedAddress || addrObj?.addressLine1 || facility.province?.fullName;
+              if (!formattedText) return null;
+              return (
+                <div className="flex flex-col gap-0.5 col-span-2 border-t border-gray-200 pt-2 mt-1">
+                  <span className="text-gray-400 text-[10px] flex items-center gap-1 font-bold uppercase tracking-wider">
+                    <MapPin size={10} className="text-[#bc0100]" /> Địa chỉ kho bãi
+                  </span>
+                  <span className="font-semibold text-gray-800 leading-relaxed">
+                    {formattedText}
+                  </span>
+                  {addrObj?.latitude !== undefined && addrObj?.longitude !== undefined && (
+                    <span className="text-[9px] font-mono text-gray-400">
+                      Tọa độ GPS: {Number(addrObj.latitude).toFixed(6)}, {Number(addrObj.longitude).toFixed(6)}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {facility.note && (

@@ -7,24 +7,123 @@ export class FacilityService {
   /**
    * Create a new facility with address
    */
-  public async createFacility(dto: CreateFacilityDto) {
-    // Check if facility type exists
-    const typeExists = await prisma.facilityType.findUnique({
-      where: { id: dto.facilityTypeId },
-    });
-    if (!typeExists) {
+  /**
+   * Validate 3-Tier Facility Hierarchy & Geographic Constraints
+   */
+  private async validateFacilityHierarchy(facilityTypeId: string, parentFacilityId?: string | null, provinceCode?: string | null) {
+    const currentType = await prisma.facilityType.findUnique({ where: { id: facilityTypeId } });
+    if (!currentType) {
       throw new BadRequestException('Mã loại kho bãi không tồn tại');
     }
 
-    // Check parent facility if provided
-    if (dto.parentFacilityId) {
-      const parentExists = await prisma.facility.findUnique({
-        where: { id: dto.parentFacilityId, operatingStatus: { not: 'CLOSED' } },
-      });
-      if (!parentExists) {
-        throw new BadRequestException('Kho bãi cha không tồn tại hoặc đã bị xóa');
+    const typeCode = currentType.typeCode.toUpperCase();
+
+    // 1. SORTING_CENTER must NOT have a parent facility (must be null)
+    if (typeCode === 'SORTING_CENTER') {
+      if (parentFacilityId && parentFacilityId.trim().length > 0) {
+        throw new BadRequestException('Kho Tổng Miền (SORTING_CENTER) là cấp cao nhất, không được có kho cấp trên!');
       }
     }
+    // 2. PROVINCIAL_HUB must have parent facility pointing to a SORTING_CENTER
+    else if (typeCode === 'PROVINCIAL_HUB') {
+      if (!parentFacilityId || !parentFacilityId.trim()) {
+        throw new BadRequestException('Kho Tổng Tỉnh (PROVINCIAL_HUB) bắt buộc phải chọn Kho cấp trên là Kho Tổng Miền (SORTING_CENTER)!');
+      }
+      const parent = await prisma.facility.findUnique({
+        where: { id: parentFacilityId },
+        include: { facilityType: true },
+      });
+      if (!parent || parent.facilityType.typeCode.toUpperCase() !== 'SORTING_CENTER') {
+        throw new BadRequestException('Kho cấp trên của Kho Tổng Tỉnh (PROVINCIAL_HUB) phải là Kho Tổng Miền (SORTING_CENTER)!');
+      }
+    }
+    // 3. WARD_STATION (or LAST_MILE_STATION / MICRO_HUB) must have parent facility pointing to a PROVINCIAL_HUB
+    else if (typeCode === 'WARD_STATION' || typeCode === 'LAST_MILE_STATION' || typeCode === 'MICRO_HUB') {
+      if (!parentFacilityId || !parentFacilityId.trim()) {
+        throw new BadRequestException('Trạm Bưu cục Phường/Xã (WARD_STATION) bắt buộc phải chọn Kho cấp trên là Kho Tổng Tỉnh (PROVINCIAL_HUB)!');
+      }
+      const parent = await prisma.facility.findUnique({
+        where: { id: parentFacilityId },
+        include: { facilityType: true },
+      });
+      if (!parent || parent.facilityType.typeCode.toUpperCase() !== 'PROVINCIAL_HUB') {
+        throw new BadRequestException('Kho cấp trên của Trạm Bưu cục Phường/Xã (WARD_STATION) phải là Kho Tổng Tỉnh (PROVINCIAL_HUB)!');
+      }
+
+      // 🛑 GEOGRAPHIC INTEGRITY CHECK: Cross-province assignment prevention!
+      if (parent.provinceCode && provinceCode && parent.provinceCode !== provinceCode) {
+        const [parentProv, childProv] = await Promise.all([
+          prisma.province.findUnique({ where: { code: parent.provinceCode } }),
+          prisma.province.findUnique({ where: { code: provinceCode } }),
+        ]);
+        throw new BadRequestException(
+          `Không thể gán Bưu cục Phường/Xã tại ${childProv?.fullName || provinceCode} vào Kho Tổng Tỉnh thuộc ${parentProv?.fullName || parent.provinceCode}. Kho mẹ và trạm con phải thuộc cùng Tỉnh/Thành phố!`
+        );
+      }
+    }
+  }
+
+  /**
+   * Create a new facility with address
+   */
+  public async createFacility(dto: CreateFacilityDto) {
+    const resolved = await resolveAddressDetails(dto.address);
+
+    // Auto-detect provinceCode from address ward if not explicitly passed
+    let effectiveProvinceCode = dto.provinceCode;
+    if (!effectiveProvinceCode && resolved.wardCode) {
+      const wardObj = await prisma.ward.findUnique({ where: { code: resolved.wardCode } });
+      if (wardObj?.provinceCode) {
+        effectiveProvinceCode = wardObj.provinceCode;
+      }
+    }
+
+    const currentType = await prisma.facilityType.findUnique({ where: { id: dto.facilityTypeId } });
+    if (!currentType) {
+      throw new BadRequestException('Mã loại kho bãi không tồn tại');
+    }
+
+    const typeCode = currentType.typeCode.toUpperCase();
+
+    // 🤖 100% AUTOMATIC PARENT HUB ASSIGNMENT ENGINE
+    if (typeCode === 'SORTING_CENTER') {
+      // Level 1: Always NULL parent
+      dto.parentFacilityId = undefined;
+    } else if (typeCode === 'PROVINCIAL_HUB') {
+      // Level 2: Auto-assign SORTING_CENTER based on Province's Economic Region
+      if (!dto.parentFacilityId && effectiveProvinceCode) {
+        const prov = await prisma.province.findUnique({ where: { code: effectiveProvinceCode } });
+        if (prov?.administrativeRegionId) {
+          const matchingSC = await prisma.facility.findFirst({
+            where: {
+              facilityType: { typeCode: 'SORTING_CENTER' },
+              province: { administrativeRegionId: prov.administrativeRegionId },
+              operatingStatus: { not: 'CLOSED' },
+            },
+          });
+          if (matchingSC) {
+            dto.parentFacilityId = matchingSC.id;
+          }
+        }
+      }
+    } else if (['WARD_STATION', 'LAST_MILE_STATION', 'MICRO_HUB'].includes(typeCode)) {
+      // Level 3: Auto-assign PROVINCIAL_HUB based on Province
+      if (!dto.parentFacilityId && effectiveProvinceCode) {
+        const matchingHub = await prisma.facility.findFirst({
+          where: {
+            provinceCode: effectiveProvinceCode,
+            facilityType: { typeCode: 'PROVINCIAL_HUB' },
+            operatingStatus: { not: 'CLOSED' },
+          },
+        });
+        if (matchingHub) {
+          dto.parentFacilityId = matchingHub.id;
+        }
+      }
+    }
+
+    // Validate 3-Tier Hierarchy & Geographic Consistency
+    await this.validateFacilityHierarchy(dto.facilityTypeId, dto.parentFacilityId, effectiveProvinceCode);
 
     // Check manager user if provided
     if (dto.managerUserId) {
@@ -40,9 +139,6 @@ export class FacilityService {
     const count = await prisma.facility.count();
     const facilityCode = `FAC-${String(count + 1).padStart(6, '0')}`;
 
-    const resolved = await resolveAddressDetails(dto.address);
-    const formattedAddress = `${dto.address.addressLine1}, ${resolved.ward}, ${resolved.province}, ${dto.address.country || 'Vietnam'}`;
-
     return await prisma.$transaction(async (tx) => {
       // 1. Create Address
       const address = await tx.address.create({
@@ -55,13 +151,14 @@ export class FacilityService {
         },
       });
 
-      // 2. Create Facility with addressId
+      // 2. Create Facility with addressId & provinceCode
       const facility = await tx.facility.create({
         data: {
           facilityCode,
           facilityName: dto.facilityName,
           facilityTypeId: dto.facilityTypeId,
           parentFacilityId: dto.parentFacilityId || null,
+          provinceCode: effectiveProvinceCode || null,
           managerUserId: dto.managerUserId || null,
           addressId: address.id,
           operatingStatus: dto.operatingStatus || 'ACTIVE',
@@ -110,6 +207,8 @@ export class FacilityService {
         orderBy: { createdAt: 'desc' },
         include: {
           facilityType: true,
+          parentFacility: true,
+          province: true,
           address: true,
           manager: {
             select: {
@@ -187,18 +286,15 @@ export class FacilityService {
       throw new NotFoundException('Không tìm thấy kho bãi để cập nhật');
     }
 
-    // Check parent facility if changing
-    if (dto.parentFacilityId && dto.parentFacilityId !== facility.parentFacilityId) {
-      if (dto.parentFacilityId === id) {
-        throw new BadRequestException('Một kho bãi không thể làm cha của chính nó');
-      }
-      const parentExists = await prisma.facility.findUnique({
-        where: { id: dto.parentFacilityId, operatingStatus: { not: 'CLOSED' } },
-      });
-      if (!parentExists) {
-        throw new BadRequestException('Kho bãi cha mới không tồn tại');
-      }
+    const targetTypeId = dto.facilityTypeId || facility.facilityTypeId;
+    const targetParentId = dto.parentFacilityId !== undefined ? dto.parentFacilityId : facility.parentFacilityId;
+    const targetProvinceCode = dto.provinceCode !== undefined ? dto.provinceCode : facility.provinceCode;
+
+    if (dto.parentFacilityId && dto.parentFacilityId === id) {
+      throw new BadRequestException('Một kho bãi không thể làm cha của chính nó');
     }
+
+    await this.validateFacilityHierarchy(targetTypeId, targetParentId, targetProvinceCode);
 
     return await prisma.facility.update({
       where: { id },
@@ -206,6 +302,7 @@ export class FacilityService {
         facilityName: dto.facilityName ?? facility.facilityName,
         facilityTypeId: dto.facilityTypeId ?? facility.facilityTypeId,
         parentFacilityId: dto.parentFacilityId !== undefined ? dto.parentFacilityId : facility.parentFacilityId,
+        provinceCode: dto.provinceCode !== undefined ? dto.provinceCode : facility.provinceCode,
         managerUserId: dto.managerUserId !== undefined ? dto.managerUserId : facility.managerUserId,
         operatingStatus: dto.operatingStatus ?? facility.operatingStatus,
         closedAt: dto.closedAt ? new Date(dto.closedAt) : facility.closedAt,

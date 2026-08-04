@@ -237,26 +237,8 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
-    ShipmentEvents {
-        uuid id PK
-        uuid shipment_id FK
-        shipment_event_type_enum event_type
-        text description
-        timestamptz event_time
-    }
-    ShipmentTransfers {
-        uuid id PK
-        uuid shipment_id FK
-        uuid origin_facility_id FK
-        uuid destination_facility_id FK
-        transfer_status_enum status
-        timestamptz transferred_at
-        timestamptz received_at
-    }
-
     Shipments ||--o{ ShipmentPackages : "contains"
     Packages ||--o{ ShipmentPackages : "shipped_via"
-    Shipments ||--o{ ShipmentEvents : "logs_events"
     Shipments ||--o{ ShipmentTransfers : "routed_between_depots"
     Facilities ||--o{ ShipmentTransfers : "origin_warehouse"
     Facilities ||--o{ ShipmentTransfers : "destination_warehouse"
@@ -278,9 +260,14 @@ erDiagram
         uuid assigned_facility_id FK
         varchar driver_license_number
         varchar driver_license_class
-        driver_type_enum driver_type
         driver_employment_status_enum employment_status
         date hire_date
+        timestamptz created_at
+    }
+    StaffDriverTypes {
+        uuid id PK
+        uuid staff_id FK
+        driver_type_enum driver_type
         timestamptz created_at
     }
     Vehicles {
@@ -352,6 +339,8 @@ erDiagram
         integer sequence_number
         route_stop_type_enum stop_type
         route_stop_status_enum status
+        timestamptz arrived_at
+        timestamptz departed_at
     }
     DispatchTasks {
         uuid id PK

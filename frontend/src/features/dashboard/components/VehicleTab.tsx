@@ -6,6 +6,7 @@ import {
   ChevronLeft, ChevronRight, X, Loader2, Compass, UserMinus, UserPlus
 } from 'lucide-react';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { VEHICLE_STATUS_MAP } from '../../../constants/enumLabels';
 
 interface Facility {
   id: string;
@@ -718,7 +719,7 @@ export const VehicleTab: React.FC = () => {
                             ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
                             : 'bg-red-50 text-red-700 border border-red-200'
                         }`}>
-                          {vh.operatingStatus === 'ACTIVE' ? 'Đang hoạt động' : vh.operatingStatus === 'MAINTENANCE' ? 'Bảo dưỡng' : 'Thanh lý'}
+                          {VEHICLE_STATUS_MAP[vh.operatingStatus]?.label || vh.operatingStatus}
                         </span>
                       </td>
 

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/prisma';
 import { redis } from '../config/redis';
+import { PUBLIC_ORDER_STATUS_MAP, getOrderStatusSubtitle } from '../constants/status.constant';
 
 export class TrackingController {
   /**
@@ -104,34 +105,19 @@ export class TrackingController {
       }
 
       // 4. Comprehensive DB Status Mapping
-      const statusMap: Record<string, { label: string; chipClass: string }> = {
-        CREATED: { label: 'ĐÃ TẠO ĐƠN HÀNG', chipClass: 'created' },
-        CONFIRMED: { label: 'ĐÃ XÁC NHẬN ĐƠN HÀNG', chipClass: 'confirmed' },
-        ASSIGNED: { label: 'ĐÃ PHÂN CÔNG SHIPPER', chipClass: 'assigned' },
-        PICKING_UP: { label: 'SHIPPER ĐANG ĐẾN LẤY HÀNG', chipClass: 'picking_up' },
-        PICKED_UP: { label: 'ĐÃ LẤY HÀNG THÀNH CÔNG', chipClass: 'picked_up' },
-        IN_FACILITY: { label: 'ĐÃ LƯU KHO BƯU CỤC', chipClass: 'in_facility' },
-        READY_FOR_DISPATCH: { label: 'ĐÃ NHẬP KHO - SẴN SÀNG GIAO HÀNG', chipClass: 'ready' },
-        DISPATCHED: { label: 'ĐÃ XUẤT KHO THỦ ĐỨC', chipClass: 'dispatched' },
-        IN_TRANSIT: { label: 'ĐANG TRUNG CHUYỂN GIỮA KHO', chipClass: 'in_transit' },
-        OUT_FOR_DELIVERY: { label: 'SHIPPER ĐANG GIAO HÀNG (XE MÁY 🏍️)', chipClass: 'out_for_delivery' },
-        DELIVERED: { label: 'GIAO HÀNG THÀNH CÔNG', chipClass: 'delivered' },
-        COMPLETED: { label: 'HOÀN TẤT ĐƠN HÀNG', chipClass: 'delivered' },
-        CANCELLED: { label: 'ĐÃ HỦY ĐƠN HÀNG', chipClass: 'cancelled' },
-      };
-
-      const currentStatusInfo = statusMap[order.status] || { label: String(order.status), chipClass: 'default' };
+      const currentStatusInfo = PUBLIC_ORDER_STATUS_MAP[order.status] || { label: String(order.status), chipClass: 'default' };
 
       // 5. Construct Status History Timeline Events from DB Status History
       const timelineEvents = (order.statusHistory || []).map((h: any) => {
-        let title = statusMap[h.status]?.label || h.status;
-        let subtitle = h.note || 'Trạng thái được cập nhật trên hệ thống SLP';
-
-        if (h.status === 'CREATED') subtitle = `Đơn hàng đã được tạo thành công bởi ${senderName}`;
-        if (h.status === 'IN_FACILITY' || h.status === 'READY_FOR_DISPATCH') subtitle = `Hàng hóa đã phân loại và lưu kho tại ${order.destinationFacility?.facilityName || order.originFacility?.facilityName || 'Bưu cục phân phối'}`;
-        if (h.status === 'IN_TRANSIT') subtitle = `Đơn hàng đang trên xe tải trung chuyển đến kho trung tâm`;
-        if (h.status === 'OUT_FOR_DELIVERY') subtitle = `Shipper ${driverName} (${vehiclePlate}) đang chở sọt hàng đi giao`;
-        if (h.status === 'DELIVERED' || h.status === 'COMPLETED') subtitle = `Đã giao thành công cho người nhận ${order.receiverName}`;
+        const title = PUBLIC_ORDER_STATUS_MAP[h.status]?.label || h.status;
+        const subtitle = getOrderStatusSubtitle(h.status, {
+          senderName,
+          facilityName: order.destinationFacility?.facilityName || order.originFacility?.facilityName || 'Bưu cục phân phối',
+          driverName,
+          vehiclePlate,
+          receiverName: order.receiverName || '',
+          defaultReason: h.note
+        });
 
         return {
           status: h.status,

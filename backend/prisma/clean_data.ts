@@ -13,7 +13,6 @@ async function cleanData() {
     console.log('  ❌ Cleaning Tracking, POD & Scan attachments...');
     await prisma.trackingAttachment.deleteMany({});
     await prisma.deliveryProof.deleteMany({});
-    await prisma.driverCheckIn.deleteMany({});
     await prisma.barcodeScan.deleteMany({});
     await prisma.trackingEvent.deleteMany({});
 
@@ -22,7 +21,6 @@ async function cleanData() {
     await prisma.dispatchTask.deleteMany({});
     await prisma.routeStop.deleteMany({});
     await prisma.shipmentTransfer.deleteMany({});
-    await prisma.shipmentEvent.deleteMany({});
     await prisma.shipmentPackage.deleteMany({});
     await prisma.shipment.deleteMany({});
     await prisma.route.deleteMany({});

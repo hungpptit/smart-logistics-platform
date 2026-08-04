@@ -1,5 +1,6 @@
 import React from 'react';
 import { Eye, Edit2, Trash2, ChevronLeft, ChevronRight, RefreshCw, AlertTriangle, Warehouse } from 'lucide-react';
+import { FACILITY_TYPE_MAP } from '../../../../constants/enumLabels';
 
 interface FacilityType {
   id: string;
@@ -32,6 +33,12 @@ interface Facility {
   closedAt?: string;
   note?: string;
   facilityType?: FacilityType;
+  address?: FacilityAddress;
+  province?: {
+    code: string;
+    name: string;
+    fullName: string;
+  };
   facilityAddresses?: Array<{
     address: FacilityAddress;
     addressType: string;
@@ -117,7 +124,8 @@ export const FacilityTable: React.FC<FacilityTableProps> = ({
         <tbody className="divide-y divide-[#e2e8f0] text-xs">
           {facilities.map((f) => {
             const isSelected = selectedFacility?.id === f.id;
-            const primaryAddress = f.facilityAddresses?.[0]?.address;
+            const addressObj = f.address || f.facilityAddresses?.[0]?.address;
+            const addressText = addressObj?.formattedAddress || addressObj?.addressLine1 || (f.province ? `${f.province.fullName}` : null);
             return (
               <tr 
                 key={f.id} 
@@ -130,15 +138,21 @@ export const FacilityTable: React.FC<FacilityTableProps> = ({
                   </div>
                 </td>
                 <td className="p-4">
-                  <span className="inline-flex px-2 py-0.5 rounded-[4px] text-[9px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
-                    {f.facilityType?.typeName || 'Chưa phân loại'}
-                  </span>
+                  {(() => {
+                    const typeCode = f.facilityType?.typeCode || '';
+                    const meta = FACILITY_TYPE_MAP[typeCode];
+                    return (
+                      <span className={`inline-flex px-2 py-0.5 rounded-[4px] text-[9px] font-bold border ${meta?.bgClass || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                        {meta?.label || f.facilityType?.typeName || 'Chưa phân loại'}
+                      </span>
+                    );
+                  })()}
                 </td>
-                <td className="p-4 text-gray-600 max-w-[200px] truncate">
-                  {primaryAddress ? (
-                    <span title={primaryAddress.formattedAddress}>{primaryAddress.formattedAddress}</span>
+                <td className="p-4 text-gray-600 max-w-[220px] truncate">
+                  {addressText ? (
+                    <span title={addressText} className="font-medium text-gray-700">{addressText}</span>
                   ) : (
-                    <span className="text-gray-400 italic">Chưa xác định tọa độ</span>
+                    <span className="text-gray-400 italic">Chưa xác định địa điểm</span>
                   )}
                 </td>
                 <td className="p-4">

@@ -118,17 +118,22 @@ export class DriverService {
           employmentStatus: dto.employmentStatus || 'ACTIVE',
           userId: user.id,
           assignedFacilityId: dto.homeFacilityId || null,
-          driverType: dto.driverType || 'HUB_DELIVERY',
-        },
+          driverTypes: {
+            create: (dto.driverTypes && dto.driverTypes.length > 0 ? dto.driverTypes : ['HUB_DELIVERY']).map((t) => ({
+              driverType: t as any,
+            })),
+          },
+        } as any,
         include: {
           assignedFacility: true,
+          driverTypes: true,
           user: {
             select: {
               username: true,
               status: true,
             },
           },
-        },
+        } as any,
       });
     });
 
@@ -187,6 +192,7 @@ export class DriverService {
               facilityName: true,
             },
           },
+          driverTypes: true,
           user: {
             select: {
               id: true,
@@ -194,7 +200,7 @@ export class DriverService {
               status: true,
             },
           },
-        },
+        } as any,
       }),
     ]);
 
@@ -217,6 +223,7 @@ export class DriverService {
       where: { id },
       include: {
         assignedFacility: true,
+        driverTypes: true,
         user: {
           select: {
             id: true,
@@ -229,7 +236,7 @@ export class DriverService {
             vehicle: true,
           },
         },
-      },
+      } as any,
     });
 
     if (!driver) {
@@ -281,6 +288,18 @@ export class DriverService {
       }
     }
 
+    if (dto.driverTypes && Array.isArray(dto.driverTypes)) {
+      await (prisma as any).staffDriverType.deleteMany({
+        where: { staffId: id },
+      });
+      await (prisma as any).staffDriverType.createMany({
+        data: dto.driverTypes.map((t) => ({
+          staffId: id,
+          driverType: t as any,
+        })),
+      });
+    }
+
     return await prisma.staff.update({
       where: { id },
       data: {
@@ -293,17 +312,17 @@ export class DriverService {
         employmentStatus: (dto.employmentStatus as any) ?? driver.employmentStatus,
         userId: dto.userId !== undefined ? dto.userId : driver.userId,
         assignedFacilityId: dto.homeFacilityId !== undefined ? dto.homeFacilityId : driver.assignedFacilityId,
-        driverType: (dto.driverType as any) ?? driver.driverType,
       },
       include: {
         assignedFacility: true,
+        driverTypes: true,
         user: {
           select: {
             username: true,
             status: true,
           },
         },
-      },
+      } as any,
     });
   }
 

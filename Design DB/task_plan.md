@@ -12,7 +12,7 @@ Tài liệu này tổng hợp toàn bộ các yêu cầu tái cấu trúc CSDL, 
 | **2** | **Phase 1: Thuộc tính đơn giản** | Đổi tên `refrigeration_supported` ➔ `is_refrigerated` (bảng `vehicles`) | ✅ ĐÃ HOÀN THÀNH | Đã cập nhật thành thuộc tính boolean chuẩn |
 | **3** | **Phase 1: Thuộc tính đơn giản** | Đổi tên `home_facility_id` ➔ `assigned_facility_id` (bảng `vehicles`) | ✅ ĐÃ HOÀN THÀNH | Đã đổi tên rõ nghĩa bưu cục gán xe |
 | **4** | **Phase 1: Thuộc tính đơn giản** | Xóa trường `formatted_address` khỏi bảng `addresses` | ✅ ĐÃ HOÀN THÀNH | Đã loại bỏ chuỗi địa chỉ ghép sẵn |
-| **5** | **Phase 2: Mối quan hệ N-N** | Tạo bảng trung gian N-N giữa Tài xế (`staff`) và Loại hình giao hàng | ⏳ CHỜ THỰC HIỆN | 1 Tài xế có thể đăng ký nhiều hình thức giao |
+| **5** | **Phase 2: Mối quan hệ N-N** | Tạo bảng trung gian N-N giữa Tài xế (`staff`) và Loại hình giao hàng | ✅ ĐÃ HOÀN THÀNH | Đã tách thành bảng trung gian staff_driver_types |
 | **6** | **Phase 3: Mạng lưới Bưu cục** | Tái cấu trúc `facilities` gắn với Địa lý (Mỗi tỉnh 1 Kho tổng Hub) | ⏳ CHỜ THỰC HIỆN | Phân cấp Hub mẹ - Trạm con rõ ràng theo Tỉnh |
 | **7** | **Phase 4: Tái cấu trúc Packages** | Chuyển đổi bảng `packages` (Bao tải/Sọt hàng gom từ nhiều đơn) | ⏳ CHỜ THỰC HIỆN | 1 Package có thể chứa nhiều đơn hàng gom |
 

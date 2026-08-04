@@ -107,17 +107,7 @@ enum ShipmentStatus {
   CANCELLED
 }
 
-enum ShipmentEventType {
-  CREATED
-  DRIVER_ASSIGNED
-  DEPARTED_FACILITY
-  ARRIVED_FACILITY
-  OUT_FOR_DELIVERY
-  DELIVERY_SUCCESS
-  DELIVERY_FAIL
-  RETURN_STARTED
-  EXCEPTION_OCCURRED
-}
+
 
 enum TransferStatus {
   PENDING
@@ -181,12 +171,18 @@ enum OptimizationStatus {
 }
 
 enum TrackingEventType {
+  CREATED
+  DRIVER_ASSIGNED
   PICKED_UP
+  ARRIVED_FACILITY
+  DEPARTED_FACILITY
   ARRIVED_HUB
   DEPARTED_HUB
   OUT_FOR_DELIVERY
-  DELIVERED
-  FAILED
+  DELIVERY_SUCCESS
+  DELIVERY_FAIL
+  RETURN_STARTED
+  EXCEPTION_OCCURRED
   RETURNED
   CANCELLED
 }
@@ -284,7 +280,6 @@ model User {
   trackingEvents        TrackingEvent[]
   barcodeScans          BarcodeScan[]
   systemSettings        SystemSetting[]
-  shipmentEvents        ShipmentEvent[]
 
   @@map("users")
 }
@@ -410,6 +405,7 @@ model Facility {
   facilityTypeId   String         @map("facility_type_id") @db.Uuid
   parentFacilityId String?        @map("parent_facility_id") @db.Uuid
   managerUserId    String?        @map("manager_user_id") @db.Uuid
+  provinceCode     String?        @map("province_code") @db.VarChar(20)
   addressId        String?        @map("address_id") @db.Uuid
   operatingStatus  FacilityStatus @map("operating_status")
   openedAt         DateTime       @map("opened_at") @db.Date
@@ -419,6 +415,7 @@ model Facility {
   facilityType      FacilityType      @relation(fields: [facilityTypeId], references: [id], onDelete: Restrict)
   parentFacility    Facility?         @relation("FacilityHierarchy", fields: [parentFacilityId], references: [id], onDelete: SetNull)
   childFacilities   Facility[]        @relation("FacilityHierarchy")
+  province          Province?         @relation(fields: [provinceCode], references: [code], onDelete: SetNull)
   manager           User?             @relation("FacilityManager", fields: [managerUserId], references: [id], onDelete: SetNull)
   address           Address?          @relation(fields: [addressId], references: [id], onDelete: SetNull)
   facilityZones     FacilityZone[]
@@ -429,7 +426,6 @@ model Facility {
   startRoutes       Route[]           @relation("RouteStartFacility")
   endRoutes         Route[]           @relation("RouteEndFacility")
   routeStops        RouteStop[]
-  shipmentEvents    ShipmentEvent[]
   barcodeScans      BarcodeScan[]
   originOrders      Order[]           @relation("OrderOriginFacility")
   destinationOrders Order[]           @relation("OrderDestinationFacility")
@@ -438,6 +434,7 @@ model Facility {
   destShipments     Shipment[]        @relation("ShipmentDestFacility")
 
   @@index([parentFacilityId], name: "idx_facilities_parent")
+  @@index([provinceCode], name: "idx_facilities_province")
   @@index([operatingStatus], name: "idx_facilities_status")
   @@map("facilities")
 }
@@ -630,7 +627,6 @@ model Shipment {
   creator               User?          @relation("ShipmentCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   updater               User?          @relation("ShipmentUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
   shipmentPackages      ShipmentPackage[]
-  shipmentEvents        ShipmentEvent[]
   shipmentTransfers     ShipmentTransfer[]
   routeStops            RouteStop[]
   trackingEvents        TrackingEvent[]
@@ -654,24 +650,6 @@ model ShipmentPackage {
 
   @@unique([shipmentId, packageId])
   @@map("shipment_packages")
-}
-
-model ShipmentEvent {
-  id          String            @id @default(uuid()) @db.Uuid
-  shipmentId  String            @map("shipment_id") @db.Uuid
-  eventType   ShipmentEventType @map("event_type")
-  facilityId  String?           @map("facility_id") @db.Uuid
-  latitude    Float?            @db.DoublePrecision
-  longitude   Float?            @db.DoublePrecision
-  eventTime   DateTime          @map("event_time") @db.Timestamptz
-  createdBy   String?           @map("created_by") @db.Uuid
-
-  shipment    Shipment          @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  facility    Facility?         @relation(fields: [facilityId], references: [id], onDelete: SetNull)
-  creator     User?             @relation(fields: [createdBy], references: [id], onDelete: SetNull)
-
-  @@index([shipmentId], name: "idx_shipment_events_ship")
-  @@map("shipment_events")
 }
 
 model ShipmentTransfer {
@@ -711,7 +689,6 @@ model Staff {
   // Thông tin mở rộng cho Tài xế (NULL nếu là Staff văn phòng/kho)
   driverLicenseNumber  String?                 @unique @map("driver_license_number") @db.VarChar(50)
   driverLicenseClass   String?                 @map("driver_license_class") @db.VarChar(10)
-  driverType           DriverType?             @map("driver_type")
   employmentStatus     DriverEmploymentStatus? @default(ACTIVE) @map("employment_status")
   hireDate             DateTime?               @map("hire_date") @db.Date
 
@@ -719,10 +696,10 @@ model Staff {
 
   user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignedFacility     Facility?               @relation(fields: [assignedFacilityId], references: [id], onDelete: SetNull)
+  driverTypes          StaffDriverType[]
   assignments          DriverVehicleAssignment[]
   location             DriverLocation?
   dispatchTasks        DispatchTask[]
-  checkIns             DriverCheckIn[]
   routes               Route[]
 
   @@index([employmentStatus], name: "idx_staff_status")
@@ -730,6 +707,20 @@ model Staff {
   @@index([phone], name: "idx_staff_phone")
   @@index([email], name: "idx_staff_email")
   @@map("staff")
+}
+
+model StaffDriverType {
+  id         String     @id @default(uuid()) @db.Uuid
+  staffId    String     @map("staff_id") @db.Uuid
+  driverType DriverType @map("driver_type")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  staff      Staff      @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, driverType])
+  @@index([staffId], name: "idx_staff_driver_types_staff")
+  @@index([driverType], name: "idx_staff_driver_types_type")
+  @@map("staff_driver_types")
 }
 
 model Vehicle {
@@ -850,6 +841,8 @@ model RouteStop {
   latitude           Float            @db.DoublePrecision
   longitude          Float            @db.DoublePrecision
   status             RouteStopStatus  @default(PENDING)
+  arrivedAt          DateTime?        @map("arrived_at") @db.Timestamptz
+  departedAt         DateTime?        @map("departed_at") @db.Timestamptz
 
   route              Route            @relation(fields: [routeId], references: [id], onDelete: Cascade)
   shipment           Shipment?        @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
@@ -858,7 +851,6 @@ model RouteStop {
   trackingEvents     TrackingEvent[]
   barcodeScans       BarcodeScan[]
   deliveryProof      DeliveryProof?
-  driverCheckIn      DriverCheckIn?
 
   @@unique([routeId, sequence])
   @@map("route_stops")
@@ -990,21 +982,7 @@ model DeliveryProof {
   @@map("delivery_proofs")
 }
 
-model DriverCheckIn {
-  id         String    @id @default(uuid()) @db.Uuid
-  routeStopId String    @unique @map("route_stop_id") @db.Uuid
-  driverId   String    @map("driver_id") @db.Uuid
-  checkInAt  DateTime  @default(now()) @map("check_in_at") @db.Timestamptz
-  checkOutAt DateTime? @map("check_out_at") @db.Timestamptz
-  latitude   Float     @db.DoublePrecision
-  longitude  Float     @db.DoublePrecision
-  note       String?   @db.Text
 
-  routeStop  RouteStop @relation(fields: [routeStopId], references: [id], onDelete: Cascade)
-  driver     Staff     @relation(fields: [driverId], references: [id], onDelete: Restrict)
-
-  @@map("driver_check_ins")
-}
 
 model TrackingAttachment {
   id              String             @id @default(uuid()) @db.Uuid
@@ -1046,11 +1024,12 @@ model SystemSetting {
 // ==========================================
 
 model AdministrativeRegion {
-  id           Int      @id
-  name         String   @db.VarChar(255)
-  nameEn       String   @map("name_en") @db.VarChar(255)
-  codeName     String?  @map("code_name") @db.VarChar(255)
-  codeNameEn   String?  @map("code_name_en") @db.VarChar(255)
+  id           Int        @id
+  name         String     @db.VarChar(255)
+  nameEn       String     @map("name_en") @db.VarChar(255)
+  codeName     String?    @map("code_name") @db.VarChar(255)
+  codeNameEn   String?    @map("code_name_en") @db.VarChar(255)
+  provinces    Province[]
 
   @@map("administrative_regions")
 }
@@ -1070,15 +1049,18 @@ model AdministrativeUnit {
 }
 
 model Province {
-  code                 String              @id @db.VarChar(20)
-  name                 String              @db.VarChar(255)
-  nameEn               String?             @map("name_en") @db.VarChar(255)
-  fullName             String              @map("full_name") @db.VarChar(255)
-  fullNameEn           String?             @map("full_name_en") @db.VarChar(255)
-  codeName             String?             @map("code_name") @db.VarChar(255)
-  administrativeUnitId Int?                @map("administrative_unit_id")
-  administrativeUnit   AdministrativeUnit? @relation(fields: [administrativeUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  wards                Ward[]
+  code                   String                @id @db.VarChar(20)
+  name                   String                @db.VarChar(255)
+  nameEn                 String?               @map("name_en") @db.VarChar(255)
+  fullName               String                @map("full_name") @db.VarChar(255)
+  fullNameEn             String?               @map("full_name_en") @db.VarChar(255)
+  codeName               String?               @map("code_name") @db.VarChar(255)
+  administrativeUnitId   Int?                  @map("administrative_unit_id")
+  administrativeRegionId Int?                  @map("administrative_region_id")
+  administrativeUnit     AdministrativeUnit?   @relation(fields: [administrativeUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  administrativeRegion   AdministrativeRegion? @relation(fields: [administrativeRegionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  wards                  Ward[]
+  facilities             Facility[]
 
   @@map("provinces")
 }

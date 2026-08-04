@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsUUID, IsEnum, IsNotEmpty, IsDateString, IsBoolean, IsEmail, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsEnum, IsNotEmpty, IsDateString, IsBoolean, IsEmail, IsNumber, IsArray } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { DriverEmploymentStatus, DriverType } from '@prisma/client';
 
 export class CreateDriverDto {
@@ -41,7 +42,17 @@ export class CreateDriverDto {
   @IsOptional()
   homeFacilityId?: string;
 
-  @IsEnum(DriverType, { message: 'Loại tài xế không hợp lệ' })
+  @IsArray({ message: 'Loại hình giao hàng phải là một mảng' })
+  @IsEnum(DriverType, { each: true, message: 'Loại tài xế không hợp lệ' })
+  @IsOptional()
+  @Transform(({ value, obj }) => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') return [value];
+    if (obj.driverType) return Array.isArray(obj.driverType) ? obj.driverType : [obj.driverType];
+    return value;
+  })
+  driverTypes?: DriverType[];
+
   @IsOptional()
   driverType?: DriverType;
 }
@@ -83,7 +94,17 @@ export class UpdateDriverDto {
   @IsOptional()
   homeFacilityId?: string;
 
-  @IsEnum(DriverType, { message: 'Loại tài xế không hợp lệ' })
+  @IsArray({ message: 'Loại hình giao hàng phải là một mảng' })
+  @IsEnum(DriverType, { each: true, message: 'Loại tài xế không hợp lệ' })
+  @IsOptional()
+  @Transform(({ value, obj }) => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') return [value];
+    if (obj.driverType) return Array.isArray(obj.driverType) ? obj.driverType : [obj.driverType];
+    return value;
+  })
+  driverTypes?: DriverType[];
+
   @IsOptional()
   driverType?: DriverType;
 }

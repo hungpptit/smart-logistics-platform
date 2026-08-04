@@ -3,6 +3,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
 import { Search, RefreshCw, Plus, Edit2, Trash2, Shield, Mail, Phone, Calendar, Building, X, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { STAFF_STATUS_MAP } from '../../../constants/enumLabels';
 
 interface Facility {
   id: string;
@@ -438,7 +439,7 @@ export const StaffTab: React.FC = () => {
                           ? 'bg-green-50 text-green-700 border border-green-200'
                           : 'bg-red-50 text-red-700 border border-red-200'
                       }`}>
-                        {staff.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm khóa'}
+                        {STAFF_STATUS_MAP[staff.status]?.label || staff.status}
                       </span>
                     </td>
                     <td className="p-3 text-gray-500">
@@ -763,7 +764,7 @@ export const StaffTab: React.FC = () => {
                       ? 'bg-green-50 text-green-700 border border-green-200'
                       : 'bg-red-50 text-red-700 border border-red-200'
                   }`}>
-                    {selectedStaffDetail.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm khóa'}
+                    {STAFF_STATUS_MAP[selectedStaffDetail.status]?.label || selectedStaffDetail.status}
                   </span>
                 </div>
               </div>

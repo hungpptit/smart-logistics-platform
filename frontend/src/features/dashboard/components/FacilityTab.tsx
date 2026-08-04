@@ -6,6 +6,7 @@ import { FacilityTable } from './facility/FacilityTable';
 import { FacilityDetailPanel } from './facility/FacilityDetailPanel';
 import { FacilityModal } from './facility/FacilityModal';
 import { CargoZoneModal } from './facility/CargoZoneModal';
+import { FACILITY_TYPE_MAP } from '../../../constants/enumLabels';
 
 interface FacilityType {
   id: string;
@@ -210,9 +211,10 @@ export const FacilityTab: React.FC = () => {
   };
 
   const handleOpenCreateModal = () => {
+    const wardStationType = facilityTypes.find(t => t.typeCode === 'WARD_STATION' || t.typeCode === 'LAST_MILE_STATION' || t.typeCode === 'MICRO_HUB');
     setFormData({
       facilityName: '',
-      facilityTypeId: facilityTypes[0]?.id || '',
+      facilityTypeId: wardStationType?.id || (facilityTypes[0]?.id || ''),
       parentFacilityId: '',
       managerUserId: '',
       operatingStatus: 'ACTIVE',
@@ -459,9 +461,14 @@ export const FacilityTab: React.FC = () => {
               className="px-3 py-2 border border-[#e2e8f0] rounded-md text-xs focus:border-[#bc0100] outline-none"
             >
               <option value="">Tất cả loại kho bãi</option>
-              {facilityTypes.map(t => (
-                <option key={t.id} value={t.id}>{t.typeName}</option>
-              ))}
+              {facilityTypes.map(t => {
+                const meta = FACILITY_TYPE_MAP[t.typeCode];
+                return (
+                  <option key={t.id} value={t.id}>
+                    {meta?.label || t.typeName}
+                  </option>
+                );
+              })}
             </select>
 
             <select

@@ -3,7 +3,7 @@ import { GeocodingService } from './geocoding.service';
 import { PricingService } from './pricing/pricing.service';
 import { CreateOrderDto, UpdateOrderStatusDto } from '../dtos/order.dto';
 import { BadRequestException, NotFoundException, ForbiddenException } from '../middlewares/error.middleware';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { resolveAddressDetails } from '../utils/address-resolver';
 
 export class OrderService {
@@ -221,7 +221,7 @@ export class OrderService {
           pickupAddressId: resolvedPickupAddressId,
           deliveryAddressId: resolvedDeliveryAddressId,
           orderCode,
-          status: 'CREATED',
+          status: OrderStatus.CREATED,
           pickupType: dto.pickupType || 'PICKUP',
           scheduledPickupAt: dto.scheduledPickupAt ? new Date(dto.scheduledPickupAt) : null,
           originFacilityId,
@@ -287,7 +287,7 @@ export class OrderService {
       await tx.orderStatusHistory.create({
         data: {
           orderId: order.id,
-          status: 'CREATED',
+          status: OrderStatus.CREATED,
           changedByUserId: creatorId,
           reason: 'Đơn hàng được khởi tạo thành công trên hệ thống',
         },
@@ -672,7 +672,7 @@ export class OrderService {
     }
 
     // Business rule: Only cancel when status is CREATED or READY_FOR_PICKUP
-    const allowedCancelStates: OrderStatus[] = ['CREATED', 'READY_FOR_PICKUP'];
+    const allowedCancelStates: OrderStatus[] = [OrderStatus.CREATED, OrderStatus.READY_FOR_PICKUP];
     if (!allowedCancelStates.includes(order.status)) {
       throw new BadRequestException(`Không thể hủy đơn hàng đang ở trạng thái: ${order.status}`);
     }
@@ -681,13 +681,13 @@ export class OrderService {
       // Mark as cancelled
       const cancelledOrder = await tx.order.update({
         where: { id },
-        data: { status: 'CANCELLED' },
+        data: { status: OrderStatus.CANCELLED },
       });
 
       // Update payment to REFUNDED or leave as is
       await tx.orderPayment.update({
         where: { orderId: id },
-        data: { paymentStatus: 'REFUNDED' },
+        data: { paymentStatus: PaymentStatus.REFUNDED },
       });
 
       // Log status history
