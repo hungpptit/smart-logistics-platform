@@ -297,7 +297,7 @@ export class OrderService {
       return await tx.order.findUnique({
         where: { id: order.id },
         include: {
-          packages: true,
+          package: true,
           payment: true,
           statusHistory: true,
         },
@@ -419,7 +419,7 @@ export class OrderService {
         include: {
           customer: true,
           service: true,
-          packages: true,
+          package: true,
           payment: true,
           originFacility: true,
           destinationFacility: true,
@@ -447,7 +447,7 @@ export class OrderService {
       include: {
         customer: true,
         service: true,
-        packages: true,
+        package: true,
         payment: true,
         originFacility: true,
         destinationFacility: true,

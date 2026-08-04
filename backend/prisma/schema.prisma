@@ -524,7 +524,7 @@ model Order {
   originFacility        Facility?     @relation("OrderOriginFacility", fields: [originFacilityId], references: [id], onDelete: SetNull)
   destinationFacility   Facility?     @relation("OrderDestinationFacility", fields: [destinationFacilityId], references: [id], onDelete: SetNull)
   payment               OrderPayment?
-  packages              Package[]
+  package               Package?
   statusHistory         OrderStatusHistory[]
   routeStops            RouteStop[]
 
@@ -535,7 +535,7 @@ model Order {
 
 model Package {
   id                     String            @id @default(uuid()) @db.Uuid
-  orderId                String            @map("order_id") @db.Uuid
+  orderId                String            @unique @map("order_id") @db.Uuid
   packageCode            String            @unique @map("package_code") @db.VarChar(30)
   
   // FIX LỖI 15: Thêm Mô tả hàng hóa & Giá trị khai giá phục vụ tính Phí bảo hiểm

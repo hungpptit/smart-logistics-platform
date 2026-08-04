@@ -27,7 +27,7 @@ export class TrackingController {
           deliveryAddress: true,
           originFacility: { include: { address: true } },
           destinationFacility: { include: { address: true } },
-          packages: true,
+          package: true,
           payment: true,
           service: true,
           statusHistory: {

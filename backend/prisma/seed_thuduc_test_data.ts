@@ -26,6 +26,19 @@ async function main() {
     throw new Error('Chưa seed master lookup data (Roles, FacilityType, VehicleType, Service). Vui lòng chạy npx prisma db seed trước!');
   }
 
+  // 1.5 Helper tự động gán wardCode theo địa chỉ
+  const defaultHcmWard = await prisma.ward.findFirst({ where: { provinceCode: '79' } });
+  const getWardCode = async (text: string) => {
+    const textLower = text.toLowerCase();
+    const allHcmWards = await prisma.ward.findMany({ where: { provinceCode: '79' } });
+    for (const w of allHcmWards) {
+      if (w.name.length > 2 && (textLower.includes((w.fullName || '').toLowerCase()) || textLower.includes(w.name.toLowerCase()))) {
+        return w.code;
+      }
+    }
+    return defaultHcmWard?.code || null;
+  };
+
   // 2. Tạo Cây Phân cấp Mạng lưới 3 Cấp Kho
   console.log('📍 Tạo Cây Phân cấp Mạng lưới 3 Cấp Kho (Sorting Center -> Provincial Hub -> Last Mile Stations)...');
 
@@ -33,6 +46,7 @@ async function main() {
   const addrSC = await prisma.address.create({
     data: {
       addressLine1: 'Km 19 Quốc Lộ 1A, Phường Trung Mỹ Tây, Quận 12',
+      wardCode: await getWardCode('Phường Trung Mỹ Tây'),
       country: 'Vietnam',
       latitude: 10.8520,
       longitude: 106.6200,
@@ -58,6 +72,7 @@ async function main() {
   const addrHubHCM = await prisma.address.create({
     data: {
       addressLine1: '102 Trường Chinh, Phường 12, Quận Tân Bình, TP. Hồ Chí Minh',
+      wardCode: await getWardCode('Phường 12'),
       country: 'Vietnam',
       latitude: 10.8050,
       longitude: 106.6500,
@@ -87,6 +102,7 @@ async function main() {
   const addrHub1 = await prisma.address.create({
     data: {
       addressLine1: '180 Đặng Văn Bi, Phường Bình Thọ, TP. Thủ Đức, TP. Hồ Chí Minh',
+      wardCode: await getWardCode('Phường Bình Thọ'),
       country: 'Vietnam',
       latitude: 10.8495,
       longitude: 106.7625,
@@ -96,6 +112,7 @@ async function main() {
   const addrHub2 = await prisma.address.create({
     data: {
       addressLine1: '250 Đường Linh Trung, Phường Linh Trung, TP. Thủ Đức, TP. Hồ Chí Minh',
+      wardCode: await getWardCode('Phường Linh Trung'),
       country: 'Vietnam',
       latitude: 10.8580,
       longitude: 106.7750,
@@ -105,6 +122,7 @@ async function main() {
   const addrHub3 = await prisma.address.create({
     data: {
       addressLine1: '85 Đỗ Xuân Hợp, Phường Phước Long B, TP. Thủ Đức, TP. Hồ Chí Minh',
+      wardCode: await getWardCode('Phường Phước Long B'),
       country: 'Vietnam',
       latitude: 10.8250,
       longitude: 106.7600,
@@ -114,6 +132,7 @@ async function main() {
   const addrHub4 = await prisma.address.create({
     data: {
       addressLine1: '25 Song Hành, Phường An Phú, TP. Thủ Đức, TP. Hồ Chí Minh',
+      wardCode: await getWardCode('Phường An Phú'),
       country: 'Vietnam',
       latitude: 10.8010,
       longitude: 106.7420,
@@ -426,6 +445,7 @@ async function main() {
     const pickupAddress = await prisma.address.create({
       data: {
         addressLine1: meta.pickupAddr.split(',')[0],
+        wardCode: await getWardCode(meta.pickupAddr),
         country: 'Vietnam',
         latitude: meta.lat,
         longitude: meta.lng,
@@ -436,6 +456,7 @@ async function main() {
     const deliveryAddress = await prisma.address.create({
       data: {
         addressLine1: loc.addr.split(',')[0],
+        wardCode: await getWardCode(loc.addr),
         country: 'Vietnam',
         latitude: loc.lat,
         longitude: loc.lng,

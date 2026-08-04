@@ -712,7 +712,7 @@ export class RoutingService {
         where: {
           OR: [
             { originFacilityId: route.startFacilityId },
-            { packages: { some: { currentFacilityId: route.startFacilityId } } },
+            { package: { currentFacilityId: route.startFacilityId } },
           ],
           status: { in: [OrderStatus.READY_FOR_DISPATCH, OrderStatus.PICKUP_ASSIGNED] },
         },

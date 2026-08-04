@@ -510,16 +510,27 @@ async function main() {
       6: { code: 'FAC-SC-REGION6', name: 'Tổng Kho Miền 6 (Đồng bằng sông Cửu Long - Cần Thơ)', provCode: '92', address: 'Khu Công Nghiệp Trà Nóc 1, Phường Trà Nóc, Quận Bình Thủy, TP. Cần Thơ', lat: 10.0825, lng: 105.7483 },
     };
 
+    const findWardInProvince = async (provCode: string, addressText: string) => {
+      const wardsInProv = await prisma.ward.findMany({ where: { provinceCode: provCode } });
+      const textLower = addressText.toLowerCase();
+      for (const w of wardsInProv) {
+        if (w.name.length > 2 && (textLower.includes((w.fullName || '').toLowerCase()) || textLower.includes(w.name.toLowerCase()))) {
+          return w.code;
+        }
+      }
+      return wardsInProv[0]?.code || null;
+    };
+
     const createdSCMap: Record<number, string> = {};
 
     for (const [regionId, sc] of Object.entries(scDataMap)) {
       const regIdNum = parseInt(regionId, 10);
-      const scWard = await prisma.ward.findFirst({ where: { provinceCode: sc.provCode } });
+      const scWardCode = await findWardInProvince(sc.provCode, sc.address);
 
       const addr = await prisma.address.create({
         data: {
           addressLine1: sc.address,
-          wardCode: scWard?.code || null,
+          wardCode: scWardCode,
           country: 'Vietnam',
           latitude: sc.lat,
           longitude: sc.lng,
@@ -590,17 +601,18 @@ async function main() {
       const hubCode = `FAC-HUB-PROV-${prov.code}`;
       const hubName = `Kho Tổng ${prov.fullName} (Provincial Hub)`;
 
-      const provWard = await prisma.ward.findFirst({ where: { provinceCode: prov.code } });
       const realInfo = realProvAddressMap[prov.code] || {
-        address: `Số 1 Đường Trung Tâm Vận Chuyển Hành Chính, ${provWard?.fullName || 'Phường Trung Tâm'}, ${prov.fullName}`,
+        address: `Số 1 Đường Trung Tâm Vận Chuyển Hành Chính, Phường Trung Tâm, ${prov.fullName}`,
         lat: 10.8 + (parseInt(prov.code, 10) % 10) * 0.05,
         lng: 106.6 + (parseInt(prov.code, 10) % 10) * 0.05,
       };
 
+      const provWardCode = await findWardInProvince(prov.code, realInfo.address);
+
       const addrHub = await prisma.address.create({
         data: {
           addressLine1: realInfo.address,
-          wardCode: provWard?.code || null,
+          wardCode: provWardCode,
           country: 'Vietnam',
           latitude: realInfo.lat,
           longitude: realInfo.lng,

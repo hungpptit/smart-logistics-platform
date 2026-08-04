@@ -54,7 +54,7 @@ interface FacilityModalProps {
   onSubmit: (e: React.FormEvent) => void;
   actionLoading: boolean;
   facilityTypes: FacilityType[];
-  facilities: Facility[];
+  facilities?: Facility[];
 }
 
 export const FacilityModal: React.FC<FacilityModalProps> = ({
@@ -66,7 +66,6 @@ export const FacilityModal: React.FC<FacilityModalProps> = ({
   onSubmit,
   actionLoading,
   facilityTypes,
-  facilities
 }) => {
   const { token } = useAuth();
   const [selectedProvinceCode, setSelectedProvinceCode] = useState<string>('');
@@ -127,53 +126,7 @@ export const FacilityModal: React.FC<FacilityModalProps> = ({
             </div>
           </div>
 
-          {!isEditing && (
-            <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-md text-[10px] text-blue-800 flex items-start gap-2">
-              <span className="font-bold">📌 Hạ tầng cố định:</span> 6 Kho Tổng Miền (Cấp 1) & 34 Kho Tổng Tỉnh (Cấp 2) đã được hệ thống nạp tự động cố định. Bạn đang tạo Trạm Bưu cục Phường/Xã (Cấp 3).
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
-              <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Kho bãi cấp cha (Theo 3 Cấp Kho)</label>
-              {(() => {
-                const currentTypeObj = facilityTypes.find(t => t.id === formData.facilityTypeId);
-                const currentTypeCode = currentTypeObj?.typeCode.toUpperCase();
-                
-                let filteredParents = facilities;
-                let hintText = 'Chọn kho cấp trên hợp lệ';
-                let isTopLevel = false;
-
-                if (currentTypeCode === 'SORTING_CENTER') {
-                  isTopLevel = true;
-                  hintText = 'Kho Cấp 1 (Gốc - Không có kho mẹ)';
-                } else if (currentTypeCode === 'PROVINCIAL_HUB') {
-                  filteredParents = facilities.filter(f => f.facilityType?.typeCode.toUpperCase() === 'SORTING_CENTER');
-                  hintText = 'Hệ thống tự động gán Kho Tổng Miền đại diện cho Vùng Kinh tế của Tỉnh';
-                } else if (currentTypeCode === 'WARD_STATION' || currentTypeCode === 'LAST_MILE_STATION' || currentTypeCode === 'MICRO_HUB') {
-                  filteredParents = facilities.filter(f => f.facilityType?.typeCode.toUpperCase() === 'PROVINCIAL_HUB');
-                  hintText = 'Hệ thống tự động gán Kho Tổng Tỉnh tương ứng với địa chỉ Tỉnh/Thành';
-                }
-
-                return (
-                  <div>
-                    <select
-                      disabled={isTopLevel}
-                      value={isTopLevel ? '' : formData.parentFacilityId}
-                      onChange={(e) => setFormData((prev: any) => ({ ...prev, parentFacilityId: e.target.value }))}
-                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none focus:border-[#bc0100] disabled:bg-gray-100 font-medium"
-                    >
-                      <option value="">{isTopLevel ? '-- Cấp cao nhất (NULL) --' : '🤖 -- Tự động gán theo địa lý (Hệ thống tự tính) --'}</option>
-                      {filteredParents.map(f => (
-                        <option key={f.id} value={f.id}>{f.facilityName} ({f.facilityCode})</option>
-                      ))}
-                    </select>
-                    <span className="text-[9px] text-[#bc0100] font-bold mt-0.5 block">{hintText}</span>
-                  </div>
-                );
-              })()}
-            </div>
-
             <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
               <label className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">ID Người quản lý (UUID - Tùy chọn)</label>
               <input
