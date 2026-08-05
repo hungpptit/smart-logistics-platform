@@ -69,31 +69,6 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({ menuItems, onBac
               {currentTabItem.label}
             </h2>
           </div>
-
-          {/* Quick Metrics Summary Bar */}
-          <div className="flex flex-wrap gap-4 text-xs">
-            <div className="bg-[#F4F4F4] px-4 py-2.5 rounded border border-[#e8e8e8] flex items-center gap-2">
-              <Package size={14} className="text-[#bc0100]" />
-              <div>
-                <span className="text-gray-400 block text-[9px] font-bold uppercase tracking-wider">Tổng Đơn</span>
-                <span className="font-bold text-[#161D25] text-sm">--</span>
-              </div>
-            </div>
-            <div className="bg-[#F4F4F4] px-4 py-2.5 rounded border border-[#e8e8e8] flex items-center gap-2">
-              <Clock size={14} className="text-amber-500" />
-              <div>
-                <span className="text-gray-400 block text-[9px] font-bold uppercase tracking-wider">Đang Xử Lý</span>
-                <span className="font-bold text-[#161D25] text-sm">--</span>
-              </div>
-            </div>
-            <div className="bg-[#F4F4F4] px-4 py-2.5 rounded border border-[#e8e8e8] flex items-center gap-2">
-              <CheckCircle2 size={14} className="text-green-600" />
-              <div>
-                <span className="text-gray-400 block text-[9px] font-bold uppercase tracking-wider">Hoàn Thành</span>
-                <span className="font-bold text-[#161D25] text-sm">--</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Dynamic Tab Body */}

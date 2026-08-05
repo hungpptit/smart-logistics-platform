@@ -288,6 +288,7 @@ async function main() {
         position: 'DRIVER',
         assignedFacilityId: sh.facilityId,
         driverLicenseNumber: `GPLX-TD-99${sh.code.slice(-2)}`,
+        driverLicenseClass: 'A1',
         driverTypes: {
           create: [{ driverType: 'HUB_DELIVERY' }],
         },

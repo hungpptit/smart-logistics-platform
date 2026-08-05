@@ -115,8 +115,6 @@ Lưu trữ chi tiết mỗi lần quét mã vạch/QR của nhân viên kho ho�
 | `scanned_by` | UUID | ❌ | | FK → `Users(id)`. Tài khoản thực hiện quét mã. |
 | `scan_type` | `scan_type_enum` | ❌ | | Phân loại thao tác (`INBOUND` - nhập kho, `OUTBOUND` - xuất kho, `DELIVERY` - giao khách, `INVENTORY` - kiểm kê). |
 | `barcode_value` | VARCHAR(100) | ❌ | | Giá trị thực tế của chuỗi mã vạch quét được. |
-| `latitude` | DOUBLE PRECISION| ✅ | | Tọa độ GPS khi quét mã vạch ngoài kho. |
-| `longitude` | DOUBLE PRECISION| ✅ | | Tọa độ GPS khi quét mã vạch ngoài kho. |
 | `scanned_at` | TIMESTAMPTZ | ❌ | `NOW()` | Thời điểm quét mã vạch. |
 
 * **Định nghĩa ENUMs:**

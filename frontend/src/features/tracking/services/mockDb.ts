@@ -45,3 +45,15 @@ export const TRACKING_DATABASE: Record<string, TrackingData> = {
     }
   }
 };
+
+export const formatMockTimeline = (timestamps: any) => {
+  if (Array.isArray(timestamps)) return timestamps;
+  if (!timestamps) return [];
+  return [
+    { status: 'CREATED', title: 'ĐÃ TẠO ĐƠN HÀNG', subtitle: 'Khách hàng tạo đơn trên hệ thống', timestamp: timestamps.created || '-', isCompleted: true },
+    { status: 'IN_FACILITY', title: 'ĐÃ NHẬP KHO GOM', subtitle: 'Đã lưu kho bưu cục xuất phát', timestamp: timestamps.hub || '-', isCompleted: timestamps.hub !== '-' },
+    { status: 'IN_TRANSIT', title: 'ĐANG TRUNG CHUYỂN GIỮA KHO', subtitle: 'Đơn hàng trên đường di chuyển đến bưu cục giao', timestamp: timestamps.transit || '-', isCompleted: timestamps.transit !== '-' },
+    { status: 'OUT_FOR_DELIVERY', title: 'SHIPPER ĐANG GIAO HÀNG (XE MÁY 🏍️)', subtitle: 'Shipper đang chở sọt hàng đi giao', timestamp: timestamps.out || '-', isCompleted: timestamps.out !== '-' },
+    { status: 'DELIVERED', title: 'GIAO HÀNG THÀNH CÔNG', subtitle: 'Đã bàn giao cho người nhận', timestamp: timestamps.delivered || '-', isCompleted: timestamps.delivered !== '-' },
+  ];
+};

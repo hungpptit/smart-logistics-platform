@@ -1,15 +1,105 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart3, DollarSign, PackageCheck, Truck, Clock,
-  ArrowUpRight, Award, PieChart, LineChart, Sparkles
+  ArrowUpRight, Award, PieChart, LineChart, Sparkles, Loader2, RefreshCw
 } from 'lucide-react';
+import { useAuth } from '../../../../context/AuthContext';
+import { CONFIG } from '../../../../config';
+
+interface AnalyticsData {
+  timeRange: string;
+  facilityId: string;
+  kpis: {
+    totalRevenueVnd: number;
+    totalRevenueMillion: number;
+    totalOrdersCount: number;
+    completedOrdersCount: number;
+    inProgressOrdersCount: number;
+    failedOrdersCount: number;
+    deliverySuccessRate: number;
+    totalDistanceKm: number;
+    vrptwOnTimeRate: number;
+  };
+  revenueChartData: Array<{
+    label: string;
+    revenue: number;
+    cost: number;
+    orders: number;
+  }>;
+  orderStatusDistribution: Array<{
+    label: string;
+    count: number;
+    percentage: number;
+    color: string;
+  }>;
+  topDrivers: Array<{
+    rank: number;
+    name: string;
+    code: string;
+    completed: number;
+    distance: string;
+    rating: number;
+    onTime: string;
+  }>;
+}
 
 export const AnalyticsTab: React.FC = () => {
+  const { token } = useAuth();
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | 'year'>('30d');
   const [facilityFilter, setFacilityFilter] = useState<string>('ALL');
 
-  // Mock analytics data for interactive charts
-  const revenueData = [
+  const [facilities, setFacilities] = useState<Array<{ id: string; facilityCode: string; facilityName: string }>>([]);
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${CONFIG.API_BASE_URL}/facilities?limit=100`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          setFacilities(res.data);
+        }
+      })
+      .catch(err => console.error('Error fetching facilities for analytics:', err));
+  }, [token]);
+
+  const fetchAnalytics = async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `${CONFIG.API_BASE_URL}/analytics/overview?timeRange=${timeRange}&facilityId=${facilityFilter}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setData(result.data);
+      } else {
+        setError(result.message || 'Không thể tải dữ liệu thống kê.');
+      }
+    } catch (err) {
+      console.error('Error fetching analytics:', err);
+      setError('Lỗi kết nối máy chủ khi lấy dữ liệu báo cáo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [token, timeRange, facilityFilter]);
+
+  const revenueData = data?.revenueChartData || [
     { label: 'Thứ 2', revenue: 142.5, cost: 42.0, orders: 420 },
     { label: 'Thứ 3', revenue: 168.0, cost: 48.5, orders: 510 },
     { label: 'Thứ 4', revenue: 195.2, cost: 52.0, orders: 630 },
@@ -19,7 +109,7 @@ export const AnalyticsTab: React.FC = () => {
     { label: 'Chủ Nhật', revenue: 185.0, cost: 49.0, orders: 580 },
   ];
 
-  const maxRevenue = Math.max(...revenueData.map(d => d.revenue));
+  const maxRevenue = Math.max(...revenueData.map(d => d.revenue), 10);
 
   const vrptwHourlyData = [
     { hour: '07:00 - 09:00', onTime: 98.4, total: 320 },
@@ -30,36 +120,75 @@ export const AnalyticsTab: React.FC = () => {
     { hour: '17:00 - 19:00', onTime: 93.6, total: 410 },
   ];
 
-  const topDrivers = [
+  const topDrivers = data?.topDrivers || [
     { rank: 1, name: 'Nguyễn Văn Mạnh', code: 'DRV_1001', completed: 342, distance: '640 km', rating: 4.95, onTime: '99.1%' },
     { rank: 2, name: 'Trần Quốc Bảo', code: 'DRV_1002', completed: 318, distance: '590 km', rating: 4.92, onTime: '98.5%' },
     { rank: 3, name: 'Lê Hoàng Nam', code: 'DRV_1003', completed: 295, distance: '540 km', rating: 4.88, onTime: '97.8%' },
     { rank: 4, name: 'Phạm Minh Tuấn', code: 'DRV_1004', completed: 276, distance: '510 km', rating: 4.85, onTime: '96.9%' },
   ];
 
+  const kpis: AnalyticsData['kpis'] = data?.kpis || {
+    totalRevenueVnd: 1425800000,
+    totalRevenueMillion: 1425.80,
+    totalOrdersCount: 10235,
+    completedOrdersCount: 8420,
+    inProgressOrdersCount: 1210,
+    failedOrdersCount: 605,
+    deliverySuccessRate: 98.2,
+    totalDistanceKm: 14850,
+    vrptwOnTimeRate: 96.8,
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-8">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-4">
-        <div>
-          <h2 className="text-lg font-bold text-[#161D25] uppercase tracking-wider flex items-center gap-2">
-            <BarChart3 size={20} className="text-[#bc0100]" /> Thống kê Báo cáo (Analytics Dashboard)
-          </h2>
-          <p className="text-xs text-gray-500 mt-1">
-            Theo dõi hiệu suất vận hành AI Routing, tỷ lệ hoàn thành VRPTW, doanh thu và năng suất tài xế real-time.
-          </p>
+      {/* Filter & Control Toolbar Card */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-red-50 text-[#bc0100] flex items-center justify-center font-bold shrink-0">
+            <BarChart3 size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Bộ lọc chỉ số vận hành AI</span>
+              {loading && (
+                <span className="inline-flex items-center gap-1 text-[11px] text-red-600 font-semibold bg-red-50 px-2 py-0.5 rounded-full">
+                  <Loader2 size={12} className="animate-spin" /> Đang cập nhật...
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Theo dõi hiệu suất AI Routing, VRPTW đúng hạn và doanh thu real-time từ CSDL
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Time Range Filter */}
-          <div className="bg-gray-100 p-1 rounded-lg flex items-center gap-1 text-xs font-semibold">
+        <div className="flex items-center gap-2.5 flex-wrap w-full xl:w-auto justify-start xl:justify-end">
+          {/* Facility Dropdown */}
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 shadow-xs">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Kho/Bưu cục:</span>
+            <select
+              value={facilityFilter}
+              onChange={(e) => setFacilityFilter(e.target.value)}
+              className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[200px] truncate"
+            >
+              <option value="ALL">Tất cả Kho/Bưu cục</option>
+              {facilities.map((fac) => (
+                <option key={fac.id} value={fac.id}>
+                  {fac.facilityName} ({fac.facilityCode})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Time Range Pills */}
+          <div className="bg-slate-100 p-1 rounded-lg flex items-center gap-1 text-xs font-semibold">
             {(['7d', '30d', '90d', 'year'] as const).map(range => (
               <button
                 key={range}
                 onClick={() => setTimeRange(range)}
-                className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${timeRange === range
-                    ? 'bg-white text-[#bc0100] shadow-sm font-bold'
-                    : 'text-gray-600 hover:text-gray-900'
+                className={`px-3 py-1.5 rounded-md transition-all cursor-pointer text-xs ${timeRange === range
+                    ? 'bg-white text-[#bc0100] shadow-sm font-black'
+                    : 'text-slate-600 hover:text-slate-900 font-semibold'
                   }`}
               >
                 {range === '7d' ? '7 Ngày' : range === '30d' ? '30 Ngày' : range === '90d' ? 'Quý này' : 'Năm nay'}
@@ -67,19 +196,22 @@ export const AnalyticsTab: React.FC = () => {
             ))}
           </div>
 
-          {/* Facility Filter */}
-          <select
-            value={facilityFilter}
-            onChange={(e) => setFacilityFilter(e.target.value)}
-            className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 focus:outline-none focus:border-[#bc0100]"
+          {/* Refresh Button */}
+          <button
+            onClick={fetchAnalytics}
+            className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center transition-all cursor-pointer shadow-xs"
+            title="Tải lại dữ liệu"
           >
-            <option value="ALL">Tất cả Kho/Bưu cục</option>
-            <option value="FAC_101">Kho Bưu cục Velocity 1 (Hà Nội)</option>
-            <option value="FAC_102">Kho Bưu cục Velocity 2 (TP.HCM)</option>
-            <option value="FAC_103">Kho Bưu cục Velocity 3 (Đà Nẵng)</option>
-          </select>
+            <RefreshCw size={15} className={loading ? 'animate-spin text-[#bc0100]' : ''} />
+          </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-semibold">
+          ⚠️ {error}
+        </div>
+      )}
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -93,10 +225,12 @@ export const AnalyticsTab: React.FC = () => {
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-black tracking-tight text-white">1,425.80 Tr.đ</h3>
+            <h3 className="text-2xl font-black tracking-tight text-white">
+              {kpis.totalRevenueMillion.toLocaleString('vi-VN', { minimumFractionDigits: 2 })} Tr.đ
+            </h3>
             <div className="flex items-center gap-1.5 mt-2 text-[11px] text-emerald-400 font-semibold">
               <ArrowUpRight size={14} />
-              <span>+18.4% so với tháng trước</span>
+              <span>+18.4% so với kỳ trước</span>
             </div>
           </div>
         </div>
@@ -110,9 +244,11 @@ export const AnalyticsTab: React.FC = () => {
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-black text-slate-800">8,420 Đơn</h3>
+            <h3 className="text-2xl font-black text-slate-800">
+              {kpis.completedOrdersCount.toLocaleString('vi-VN')} Đơn
+            </h3>
             <div className="flex items-center gap-1.5 mt-2 text-[11px] text-emerald-600 font-semibold">
-              <span>✓ Tỷ lệ giao thành công: <strong>98.2%</strong></span>
+              <span>✓ Tỷ lệ giao thành công: <strong>{kpis.deliverySuccessRate}%</strong></span>
             </div>
           </div>
         </div>
@@ -126,7 +262,9 @@ export const AnalyticsTab: React.FC = () => {
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-black text-slate-800">14,850 KM</h3>
+            <h3 className="text-2xl font-black text-slate-800">
+              {kpis.totalDistanceKm.toLocaleString('vi-VN')} KM
+            </h3>
             <div className="flex items-center gap-1.5 mt-2 text-[11px] text-blue-600 font-semibold">
               <Sparkles size={12} />
               <span>Tiết kiệm <strong>+15.8%</strong> nhờ AI GA</span>
@@ -143,7 +281,7 @@ export const AnalyticsTab: React.FC = () => {
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-black text-slate-800">96.8%</h3>
+            <h3 className="text-2xl font-black text-slate-800">{kpis.vrptwOnTimeRate}%</h3>
             <div className="flex items-center gap-1.5 mt-2 text-[11px] text-amber-600 font-semibold">
               <ArrowUpRight size={14} />
               <span>Đạt chuẩn khung giờ hẹn (Time-Window)</span>
@@ -172,8 +310,8 @@ export const AnalyticsTab: React.FC = () => {
           {/* SVG/HTML Bar Chart Representation */}
           <div className="h-64 flex items-end justify-between gap-3 pt-6 pb-2 px-2 border-b border-gray-100">
             {revenueData.map((d, i) => {
-              const revHeight = (d.revenue / maxRevenue) * 100;
-              const costHeight = (d.cost / maxRevenue) * 100;
+              const revHeight = Math.min((d.revenue / maxRevenue) * 100, 100);
+              const costHeight = Math.min((d.cost / maxRevenue) * 100, 100);
 
               return (
                 <div key={i} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
@@ -186,13 +324,13 @@ export const AnalyticsTab: React.FC = () => {
 
                     {/* Revenue Bar */}
                     <div
-                      style={{ height: `${revHeight}%` }}
+                      style={{ height: `${Math.max(revHeight, 8)}%` }}
                       className="w-1/2 bg-gradient-to-t from-[#bc0100] to-red-500 rounded-t-md transition-all group-hover:brightness-110 shadow-sm"
                     ></div>
 
                     {/* Cost Bar */}
                     <div
-                      style={{ height: `${costHeight}%` }}
+                      style={{ height: `${Math.max(costHeight, 4)}%` }}
                       className="w-1/2 bg-slate-300 rounded-t-md transition-all group-hover:bg-slate-400"
                     ></div>
                   </div>
@@ -202,8 +340,8 @@ export const AnalyticsTab: React.FC = () => {
             })}
           </div>
           <div className="flex justify-between items-center text-[11px] text-gray-400 font-mono pt-1">
-            <span>Trung bình: 204 Tr.đ/ngày</span>
-            <span>Tổng tuần: 1,429.9 Tr.đ</span>
+            <span>Tính toán trực tiếp từ cơ sở dữ liệu PostgreSQL</span>
+            <span>Tổng cộng: {kpis.totalRevenueMillion.toLocaleString('vi-VN')} Tr.đ</span>
           </div>
         </div>
 
@@ -229,27 +367,7 @@ export const AnalyticsTab: React.FC = () => {
                 />
                 <path
                   className="text-emerald-500"
-                  strokeDasharray="82, 100"
-                  strokeWidth="3.8"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-amber-500"
-                  strokeDasharray="12, 100"
-                  strokeDashoffset="-82"
-                  strokeWidth="3.8"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-red-500"
-                  strokeDasharray="6, 100"
-                  strokeDashoffset="-94"
+                  strokeDasharray={`${kpis.deliverySuccessRate}, 100`}
                   strokeWidth="3.8"
                   strokeLinecap="round"
                   stroke="currentColor"
@@ -258,7 +376,7 @@ export const AnalyticsTab: React.FC = () => {
                 />
               </svg>
               <div className="absolute flex flex-col items-center justify-center text-center">
-                <span className="text-2xl font-black text-slate-800">98.2%</span>
+                <span className="text-2xl font-black text-slate-800">{kpis.deliverySuccessRate}%</span>
                 <span className="text-[10px] font-bold text-emerald-600 uppercase">Thành công</span>
               </div>
             </div>
@@ -269,19 +387,19 @@ export const AnalyticsTab: React.FC = () => {
                 <span className="flex items-center gap-2 text-slate-700 font-semibold">
                   <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span> Giao thành công
                 </span>
-                <span className="font-bold text-slate-800">8,268 (82%)</span>
+                <span className="font-bold text-slate-800">{kpis.completedOrdersCount} đơn</span>
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="flex items-center gap-2 text-slate-700 font-semibold">
                   <span className="w-2.5 h-2.5 bg-amber-500 rounded-full"></span> Đang xử lý / Giao lại
                 </span>
-                <span className="font-bold text-slate-800">1,210 (12%)</span>
+                <span className="font-bold text-slate-800">{kpis.inProgressOrdersCount} đơn</span>
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="flex items-center gap-2 text-slate-700 font-semibold">
                   <span className="w-2.5 h-2.5 bg-red-500 rounded-full"></span> Giao thất bại / Hủy
                 </span>
-                <span className="font-bold text-slate-800">605 (6%)</span>
+                <span className="font-bold text-slate-800">{kpis.failedOrdersCount} đơn</span>
               </div>
             </div>
           </div>

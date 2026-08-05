@@ -27,6 +27,7 @@ interface Vehicle {
   vehicleCode: string;
   licensePlate: string;
   vehicleTypeId: string;
+  assignedFacilityId?: string | null;
   homeFacilityId?: string | null;
   maxWeight: number;
   maxVolume: number;
@@ -35,6 +36,11 @@ interface Vehicle {
   gpsDeviceId?: string | null;
   operatingStatus: 'ACTIVE' | 'MAINTENANCE' | 'RETIRED';
   vehicleType: VehicleType;
+  assignedFacility?: {
+    id: string;
+    facilityCode: string;
+    facilityName: string;
+  } | null;
   homeFacility?: {
     id: string;
     facilityCode: string;
@@ -276,7 +282,7 @@ export const VehicleTab: React.FC = () => {
       vehicleCode: vehicle.vehicleCode,
       licensePlate: vehicle.licensePlate,
       vehicleTypeId: vehicle.vehicleTypeId,
-      homeFacilityId: vehicle.homeFacilityId || '',
+      homeFacilityId: vehicle.assignedFacilityId || vehicle.homeFacilityId || '',
       maxWeight: vehicle.maxWeight,
       maxVolume: vehicle.maxVolume,
       maxLength: vehicle.maxLength || 0,
@@ -304,6 +310,7 @@ export const VehicleTab: React.FC = () => {
 
     const payload = {
       ...formData,
+      assignedFacilityId: formData.homeFacilityId === '' ? undefined : formData.homeFacilityId,
       homeFacilityId: formData.homeFacilityId === '' ? undefined : formData.homeFacilityId,
       maxLength: formData.maxLength ? Number(formData.maxLength) : undefined,
       maxWeight: Number(formData.maxWeight),
@@ -655,7 +662,9 @@ export const VehicleTab: React.FC = () => {
                               {activeAssign.driver.fullName}
                             </span>
                             <span className="text-[9px] text-gray-500 font-mono">{activeAssign.driver.employeeCode}</span>
-                            <span className="text-[9px] text-[#bc0100] font-bold">Bằng: {activeAssign.driver.driverLicenseClass}</span>
+                            <span className="text-[9px] text-[#bc0100] font-bold">
+                              Bằng: {activeAssign.driver.driverLicenseClass || (isMotorcycle ? 'A1' : 'B2')}
+                            </span>
                             {canManage && !isMotorcycle && (
                               <button
                                 type="button"
@@ -684,12 +693,12 @@ export const VehicleTab: React.FC = () => {
                         )}
                       </td>
 
-                      {/* Home Facility */}
+                      {/* Home / Assigned Facility */}
                       <td className="p-4">
-                        {vh.homeFacility ? (
+                        {(vh.assignedFacility || vh.homeFacility) ? (
                           <div className="flex flex-col">
-                            <span className="font-bold text-gray-700">{vh.homeFacility.facilityName}</span>
-                            <span className="text-[10px] text-gray-400 font-mono">{vh.homeFacility.facilityCode}</span>
+                            <span className="font-bold text-gray-700">{(vh.assignedFacility || vh.homeFacility)?.facilityName}</span>
+                            <span className="text-[10px] text-gray-400 font-mono">{(vh.assignedFacility || vh.homeFacility)?.facilityCode}</span>
                           </div>
                         ) : (
                           <span className="text-gray-400 italic">Chưa gán kho bãi</span>
@@ -1016,30 +1025,31 @@ export const VehicleTab: React.FC = () => {
                   <span className="text-gray-500 font-bold uppercase text-[10px]">Loại phương tiện:</span>
                   <span className="font-semibold text-gray-700 bg-white px-2 py-0.5 rounded border border-gray-200">{selectedVehicleForAssign.vehicleType.typeName}</span>
                 </div>
-                {selectedVehicleForAssign.homeFacility && (
+                {(selectedVehicleForAssign.assignedFacility || selectedVehicleForAssign.homeFacility) && (
                   <div className="flex justify-between items-center">
                     <span className="text-gray-500 font-bold uppercase text-[10px]">Trực thuộc bưu cục:</span>
-                    <span className="font-bold text-[#bc0100]">{selectedVehicleForAssign.homeFacility.facilityName}</span>
+                    <span className="font-bold text-[#bc0100]">{(selectedVehicleForAssign.assignedFacility || selectedVehicleForAssign.homeFacility)?.facilityName}</span>
                   </div>
                 )}
               </div>
 
               {/* Driver Select Filtered by Facility & Compatible License */}
               {(() => {
-                const vehicleFacilityId = selectedVehicleForAssign.homeFacilityId;
+                const vehicleFacilityId = selectedVehicleForAssign.assignedFacilityId || selectedVehicleForAssign.homeFacilityId || selectedVehicleForAssign.assignedFacility?.id || selectedVehicleForAssign.homeFacility?.id;
                 
                 // Only drivers belonging to the SAME facility (or unassigned), and with compatible license class
                 const availableDrivers = drivers.filter((drv) => {
-                  if (vehicleFacilityId && drv.homeFacilityId && drv.homeFacilityId !== vehicleFacilityId) {
+                  const drvFacId = drv.assignedFacilityId || (drv as any).assignedFacility?.id || drv.homeFacilityId;
+                  if (vehicleFacilityId && drvFacId && drvFacId !== vehicleFacilityId) {
                     return false;
                   }
-                  const isCompatible = isLicenseCompatible(drv.driverLicenseClass, selectedVehicleForAssign.vehicleType.typeCode);
+                  const isCompatible = isLicenseCompatible(drv.driverLicenseClass || 'A1', selectedVehicleForAssign.vehicleType.typeCode);
                   return isCompatible;
                 });
 
                 const selectOptions = availableDrivers.map((drv) => {
                   const isAssigned = activeAssignments.some((a) => a.driverId === drv.id);
-                  let label = `${drv.fullName} (${drv.employeeCode}) - Bằng ${drv.driverLicenseClass}`;
+                  let label = `${drv.fullName} (${drv.employeeCode}) - Bằng ${drv.driverLicenseClass || 'A1'}`;
                   if (isAssigned) {
                     const prevAssign = activeAssignments.find((a) => a.driverId === drv.id);
                     label += ` [Đang gán xe ${prevAssign?.vehicle.licensePlate}]`;
@@ -1066,7 +1076,7 @@ export const VehicleTab: React.FC = () => {
                       />
                     ) : (
                       <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs">
-                        ⚠️ Không tìm thấy tài xế nào có bằng lái hợp lệ thuộc <strong>{selectedVehicleForAssign.homeFacility?.facilityName || 'bưu cục này'}</strong>. Vui lòng thêm tài xế mới hoặc đổi bưu cục trực thuộc.
+                        ⚠️ Không tìm thấy tài xế nào có bằng lái hợp lệ thuộc <strong>{(selectedVehicleForAssign.assignedFacility || selectedVehicleForAssign.homeFacility)?.facilityName || 'bưu cục này'}</strong>. Vui lòng thêm tài xế mới hoặc đổi bưu cục trực thuộc.
                       </div>
                     )}
 

@@ -211,8 +211,6 @@ Lưu trữ kết quả đầu ra của thuật toán AI Routing. Dữ liệu nà
 | `algorithm_version`| VARCHAR(20) | ✅ | | Phiên bản mã nguồn thuật toán để theo vết cập nhật. |
 | `input_shipment_count`| INTEGER | ❌ | | Số lượng chuyến hàng đầu vào cần xử lý tối ưu. |
 | `output_route_count`| INTEGER | ❌ | | Số lượng tuyến tối ưu được động cơ sinh ra thành công. |
-| `total_distance_km` | NUMERIC(10,2) | ❌ | | Tổng quãng đường tối ưu hóa của tất cả các tuyến (km). |
-| `estimated_duration_min`| INTEGER| ❌ | | Tổng thời gian di chuyển dự kiến tối ưu hóa (phút). |
 | `execution_time_ms` | INTEGER | ❌ | | Thời gian xử lý tính toán của thuật toán (mili giây). |
 | `fitness_score` | NUMERIC(8,4) | ✅ | | Điểm đánh giá lời giải của thuật toán Genetic (nếu áp dụng). |
 | `optimization_status`| `optimization_status_enum`| ❌| `'SUCCESS'` | Kết quả chạy giải thuật (`SUCCESS`, `FAILED`). |

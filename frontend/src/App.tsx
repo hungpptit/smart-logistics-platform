@@ -1,29 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthModal } from './features/auth/components/AuthModal';
-import { TimelineStepper } from './features/tracking/components/TimelineStepper';
-import { MapcnMap } from './features/tracking/components/MapcnMap';
+import { PublicTrackingResult } from './features/tracking/components/PublicTrackingResult';
 import { ServicesGrid } from './features/pricing/components/ServicesGrid';
 import { PricingCalculator } from './features/pricing/components/PricingCalculator';
 import { AdminDashboard } from './features/dashboard/components/AdminDashboard';
 import { Toast } from './components/ui/Toast';
-import { TRACKING_DATABASE } from './features/tracking/services/mockDb';
-import { Search, Earth } from 'lucide-react';
+import { TRACKING_DATABASE, formatMockTimeline } from './features/tracking/services/mockDb';
+import { Search } from 'lucide-react';
 import { Header } from './components/Header';
 import { CONFIG } from './config';
 import { io as socketIoClient } from 'socket.io-client';
-
-const formatMockTimeline = (timestamps: any) => {
-  if (Array.isArray(timestamps)) return timestamps;
-  if (!timestamps) return [];
-  return [
-    { status: 'CREATED', title: 'ĐÃ TẠO ĐƠN HÀNG', subtitle: 'Khách hàng tạo đơn trên hệ thống', timestamp: timestamps.created || '-', isCompleted: true },
-    { status: 'IN_FACILITY', title: 'ĐÃ NHẬP KHO GOM', subtitle: 'Đã lưu kho bưu cục xuất phát', timestamp: timestamps.hub || '-', isCompleted: timestamps.hub !== '-' },
-    { status: 'IN_TRANSIT', title: 'ĐANG TRUNG CHUYỂN GIỮA KHO', subtitle: 'Đơn hàng trên đường di chuyển đến bưu cục giao', timestamp: timestamps.transit || '-', isCompleted: timestamps.transit !== '-' },
-    { status: 'OUT_FOR_DELIVERY', title: 'SHIPPER ĐANG GIAO HÀNG (XE MÁY 🏍️)', subtitle: 'Shipper đang chở sọt hàng đi giao', timestamp: timestamps.out || '-', isCompleted: timestamps.out !== '-' },
-    { status: 'DELIVERED', title: 'GIAO HÀNG THÀNH CÔNG', subtitle: 'Đã bàn giao cho người nhận', timestamp: timestamps.delivered || '-', isCompleted: timestamps.delivered !== '-' },
-  ];
-};
 
 const AppContent: React.FC = () => {
   const { user } = useAuth();
@@ -226,79 +213,11 @@ const AppContent: React.FC = () => {
             </div>
           </section>
 
-          {/* Tracking Results Area */}
-          {currentTracking && (
-            <section className="tracking-results-section" id="tracking-results">
-              <div className="container">
-                <div className="results-grid">
-
-                  {/* Timeline Stepper Card */}
-                  <div className="card timeline-card">
-                    <div className="card-header flex justify-between items-start border-b pb-3 mb-2">
-                      <div className="flex flex-col gap-1">
-                        <span className="inline-block bg-red-100 text-[#bc0100] px-2.5 py-1 rounded font-extrabold text-[11px] uppercase tracking-wider w-fit">
-                          {currentTracking.statusLabel || currentTracking.status}
-                        </span>
-                        <h3 className="card-title font-mono text-base font-extrabold text-slate-800 mt-1">{currentTracking.code}</h3>
-                        {currentTracking.driverName && (
-                          <div className="text-xs text-slate-500 font-medium">
-                            🏍️ Shipper phụ trách: <strong className="text-slate-800">{currentTracking.driverName}</strong> ({currentTracking.vehiclePlate || 'Xe máy'})
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold">Thời gian giao dự kiến</span>
-                        <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100 mt-0.5 inline-block">{currentTracking.eta}</span>
-                      </div>
-                    </div>
-
-                    <div className="card-body">
-                      <TimelineStepper
-                        status={currentTracking.status}
-                        timestamps={currentTracking.timeline ? currentTracking.timeline.map((t: any) => ({
-                          status: t.status,
-                          label: t.title,
-                          time: t.timestamp,
-                          completed: t.isCompleted,
-                          detail: t.subtitle,
-                        })) : currentTracking.timestamps || []}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Geospatial Map with Real-time Motorbike GPS Marker */}
-                  <div className="card map-card">
-                    <div className="card-header flex justify-between items-center">
-                      <h3 className="card-title flex items-center gap-2">
-                        <Earth className="map-icon" size={18} style={{ color: 'var(--color-primary)' }} />
-                        <span>{currentTracking.status === 'OUT_FOR_DELIVERY' ? 'Định vị trực tiếp Shipper Xe Máy 🏍️' : 'Định vị vị trí Bưu cục & Người nhận 🏢'}</span>
-                      </h3>
-                      {liveDriverPos && currentTracking.status === 'OUT_FOR_DELIVERY' && (
-                        <span className="map-coordinates font-mono text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-bold">
-                          GPS: {liveDriverPos[0].toFixed(5)}, {liveDriverPos[1].toFixed(5)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="card-body map-body">
-                      <MapcnMap
-                        route={currentTracking.route}
-                        currentPos={liveDriverPos || [currentTracking.coordinates?.currentDriver?.lat || 10.824, currentTracking.coordinates?.currentDriver?.lng || 106.759]}
-                        destination={currentTracking.receiverAddress || currentTracking.destination || 'Điểm giao hàng'}
-                        receiverPos={currentTracking.coordinates?.receiver ? [currentTracking.coordinates.receiver.lat, currentTracking.coordinates.receiver.lng] : undefined}
-                        facilityPos={currentTracking.coordinates?.currentFacility ? [currentTracking.coordinates.currentFacility.lat, currentTracking.coordinates.currentFacility.lng] : undefined}
-                        facilityName={currentTracking.destinationFacilityName || currentTracking.originFacilityName || 'Bưu cục Phước Long'}
-                        shipperName={currentTracking.driverName}
-                        vehiclePlate={currentTracking.vehiclePlate}
-                        statusLabel={currentTracking.statusLabel}
-                        isOutForDelivery={currentTracking.status === 'OUT_FOR_DELIVERY'}
-                      />
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            </section>
-          )}
+          {/* Tracking Results Area (Modularized Component) */}
+          <PublicTrackingResult
+            currentTracking={currentTracking}
+            liveDriverPos={liveDriverPos}
+          />
 
           {/* Services offerings */}
           <ServicesGrid />

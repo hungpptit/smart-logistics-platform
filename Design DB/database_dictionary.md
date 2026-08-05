@@ -436,8 +436,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `id` | Uuid | **Khóa chính (PK)** | Mã lộ trình tối ưu. VD: `rt-01`, `rt-02` |
 | `route_code` | VarChar(30) | Khóa duy nhất (Unique), Bắt buộc | Mã tuyến đường. VD: `RT-20260724-001` |
 | `driver_vehicle_assignment_id`| Uuid | **Khóa ngoại (FK ➔ bảng driver_vehicle_assignments)**| Phân công Shipper+Xe (Nullable cho phép AI sinh Route trước). VD: `dva-01` |
-| `driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng drivers)** | Tài xế được gán chính. VD: `drv-01` |
-| `vehicle_id` | Uuid | **Khóa ngoại (FK ➔ bảng vehicles)** | Phương tiện xe được gán chính. VD: `veh-01` |
 | `start_facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục điểm xuất phát tuyến. VD: `fac-01` |
 | `end_facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục điểm kết thúc tuyến. VD: `fac-01` |
 | `optimization_id` | Uuid | **Khóa ngoại (FK ➔ bảng route_optimizations)** | Kết nối lượt chạy tối ưu AI. VD: `ro-01` |
@@ -492,7 +490,7 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 ---
 
 ### 32. Bảng `route_optimizations` (Nhật ký Thuật toán AI Routing)
-📌 **Chức năng của bảng:** Nhật ký đánh giá hiệu năng thuật toán AI. Lưu vết mỗi lượt kích hoạt AI Gom Cụm, bao gồm số lượng đơn đầu vào, số lượng tuyến đầu ra, tổng quãng đường tối ưu (km) và tổng thời gian dự kiến (phút).
+📌 **Chức năng của bảng:** Nhật ký đánh giá hiệu năng thuật toán AI. Lưu vết mỗi lượt kích hoạt AI Gom Cụm, bao gồm số lượng đơn đầu vào, số lượng tuyến đầu ra và trạng thái xử lý.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
@@ -500,8 +498,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `algorithm_name` | VarChar(50) | Bắt buộc | Thuật toán áp dụng: `K-Means + Hungarian + GeneticAlgorithm` |
 | `input_shipment_count`| Int | Bắt buộc | Số lượng đơn/vận đơn đầu vào cần phân tuyến. VD: `50` đơn |
 | `output_route_count` | Int | Bắt buộc | Số lượng Tuyến đường tối ưu sinh ra. VD: `3` tuyến |
-| `total_distance_km` | Decimal(10,2) | Bắt buộc | Tổng khoảng cách tuyến (km) |
-| `estimated_duration_min` | Integer | Bắt buộc | Tổng thời gian tuyến (phút) |
 | `optimization_status` | Enum | Bắt buộc | Trạng thái tối ưu AI (`SUCCESS` / `FAILED`) |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 
@@ -556,8 +552,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `scanned_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người thực hiện quét mã (User ID). VD: `usr-03` |
 | `barcode_value` | VarChar(100) | Bắt buộc | Giá trị chuỗi mã vạch vừa quét. VD: `PKG-8891-01` |
 | `scan_type` | Enum | Bắt buộc | Tác vụ quét: `INBOUND` (Nhập kho), `OUTBOUND` (Xuất kho), `SORTING`, `DELIVERY` |
-| `latitude` | Double | Tùy chọn | Tọa độ Vĩ độ GPS. VD: `10.7721` |
-| `longitude` | Double | Tùy chọn | Tọa độ Kinh độ GPS. VD: `106.6578` |
 | `scanned_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm quét barcode |
 
 ---

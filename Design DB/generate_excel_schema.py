@@ -352,13 +352,13 @@ def build_excel():
         # 28. routes
         {
             "name": "routes (Tuyến đường Lộ trình tối ưu bởi AI)",
-            "headers": ["id", "route_code", "driver_vehicle_assignment_id", "driver_id", "vehicle_id", "start_facility_id", "end_facility_id", "optimization_id", "planned_distance_km", "actual_distance_km", "planned_duration_min", "actual_duration_min", "total_stops", "status", "planned_start_at", "actual_start_at", "completed_at", "created_at", "updated_at"],
+            "headers": ["id", "route_code", "driver_vehicle_assignment_id", "start_facility_id", "end_facility_id", "optimization_id", "planned_distance_km", "actual_distance_km", "planned_duration_min", "actual_duration_min", "total_stops", "status", "planned_start_at", "actual_start_at", "completed_at", "created_at", "updated_at"],
             "rows": [
-                ["rt-01", "RT-20260724-001", "dva-01", "drv-01", "veh-01", "fac-01", "fac-01", "ro-01", 14.85, None, 125, None, 5, "IN_PROGRESS", "2026-07-24 08:00:00", "2026-07-24 08:05:00", None, "2026-07-24 07:50:00", "2026-07-24 08:05:00"],
-                ["rt-02", "RT-20260724-002", "dva-02", "drv-02", "veh-02", "fac-01", "fac-01", "ro-01", 8.20, None, 75, None, 3, "ASSIGNED", "2026-07-24 08:30:00", None, None, "2026-07-24 07:50:00", "2026-07-24 07:50:00"],
-                ["rt-03", "RT-20260724-003", "dva-03", "drv-03", "veh-03", "fac-02", "fac-02", "ro-02", 22.40, 23.10, 180, 175, 8, "COMPLETED", "2026-07-24 07:00:00", "2026-07-24 07:02:00", "2026-07-24 09:57:00", "2026-07-24 06:45:00", "2026-07-24 09:57:00"],
-                ["rt-04", "RT-20260724-004", "dva-04", "drv-04", "veh-04", "fac-03", "fac-03", "ro-03", 35.00, None, 210, None, 10, "PLANNED", "2026-07-24 10:00:00", None, None, "2026-07-24 09:00:00", "2026-07-24 09:00:00"],
-                ["rt-05", "RT-20260724-005", "dva-05", "drv-05", "veh-05", "fac-04", "fac-04", "ro-04", 12.00, None, 90, None, 4, "IN_PROGRESS", "2026-07-24 09:00:00", "2026-07-24 09:05:00", None, "2026-07-24 08:45:00", "2026-07-24 09:05:00"]
+                ["rt-01", "RT-20260724-001", "dva-01", "fac-01", "fac-01", "ro-01", 14.85, None, 125, None, 5, "IN_PROGRESS", "2026-07-24 08:00:00", "2026-07-24 08:05:00", None, "2026-07-24 07:50:00", "2026-07-24 08:05:00"],
+                ["rt-02", "RT-20260724-002", "dva-02", "fac-01", "fac-01", "ro-01", 8.20, None, 75, None, 3, "ASSIGNED", "2026-07-24 08:30:00", None, None, "2026-07-24 07:50:00", "2026-07-24 07:50:00"],
+                ["rt-03", "RT-20260724-003", "dva-03", "fac-02", "fac-02", "ro-02", 22.40, 23.10, 180, 175, 8, "COMPLETED", "2026-07-24 07:00:00", "2026-07-24 07:02:00", "2026-07-24 09:57:00", "2026-07-24 06:45:00", "2026-07-24 09:57:00"],
+                ["rt-04", "RT-20260724-004", "dva-04", "fac-03", "fac-03", "ro-03", 35.00, None, 210, None, 10, "PLANNED", "2026-07-24 10:00:00", None, None, "2026-07-24 09:00:00", "2026-07-24 09:00:00"],
+                ["rt-05", "RT-20260724-005", "dva-05", "fac-04", "fac-04", "ro-04", 12.00, None, 90, None, 4, "IN_PROGRESS", "2026-07-24 09:00:00", "2026-07-24 09:05:00", None, "2026-07-24 08:45:00", "2026-07-24 09:05:00"]
             ]
         },
         # 29. route_stops
@@ -400,13 +400,13 @@ def build_excel():
         # 32. route_optimizations
         {
             "name": "route_optimizations (Nhật ký Thuật toán AI Routing)",
-            "headers": ["id", "algorithm_name", "algorithm_version", "parameters_json", "input_shipment_count", "output_route_count", "total_distance_km", "estimated_duration_min", "execution_time_ms", "fitness_score", "optimization_status", "created_at"],
+            "headers": ["id", "algorithm_name", "algorithm_version", "parameters_json", "input_shipment_count", "output_route_count", "execution_time_ms", "fitness_score", "optimization_status", "created_at"],
             "rows": [
-                ["ro-01", "KMeans + GA", "v1.2.0", '{"kmeans_radius_km": 5.0, "ga_pop_size": 100, "max_gen": 500, "mutation_rate": 0.05}', 45, 3, 42.50, 310, 850, 0.9850, "SUCCESS", "2026-07-24 07:49:00"],
-                ["ro-02", "KMeans + GA", "v1.2.0", '{"kmeans_radius_km": 5.0, "ga_pop_size": 100, "max_gen": 500, "mutation_rate": 0.05}', 30, 2, 28.10, 210, 620, 0.9910, "SUCCESS", "2026-07-24 06:40:00"],
-                ["ro-03", "KMeans + GA", "v1.2.0", '{"kmeans_radius_km": 10.0, "ga_pop_size": 150, "max_gen": 600, "mutation_rate": 0.08}', 60, 4, 78.40, 450, 1200, 0.9780, "SUCCESS", "2026-07-24 08:55:00"],
-                ["ro-04", "KMeans + GA", "v1.2.0", '{"kmeans_radius_km": 5.0, "ga_pop_size": 100, "max_gen": 500, "mutation_rate": 0.05}', 18, 1, 12.00, 90, 410, 0.9950, "SUCCESS", "2026-07-24 08:40:00"],
-                ["ro-05", "KMeans + GA", "v1.2.0", '{"kmeans_radius_km": 5.0, "ga_pop_size": 100, "max_gen": 500, "mutation_rate": 0.05}', 25, 2, 22.00, 160, 540, 0.9880, "SUCCESS", "2026-07-24 09:50:00"]
+                ["ro-01", "KMeans + GA", "v1.2.0", '{"kmeans_radius_km": 5.0, "ga_pop_size": 100, "max_gen": 500, "mutation_rate": 0.05}', 45, 3, 850, 0.9850, "SUCCESS", "2026-07-24 07:49:00"],
+                ["ro-02", "KMeans + GA", "v1.2.0", '{"kmeans_radius_km": 5.0, "ga_pop_size": 100, "max_gen": 500, "mutation_rate": 0.05}', 30, 2, 620, 0.9910, "SUCCESS", "2026-07-24 06:40:00"],
+                ["ro-03", "KMeans + GA", "v1.2.0", '{"kmeans_radius_km": 10.0, "ga_pop_size": 150, "max_gen": 600, "mutation_rate": 0.08}', 60, 4, 1200, 0.9780, "SUCCESS", "2026-07-24 08:55:00"],
+                ["ro-04", "KMeans + GA", "v1.2.0", '{"kmeans_radius_km": 5.0, "ga_pop_size": 100, "max_gen": 500, "mutation_rate": 0.05}', 18, 1, 410, 0.9950, "SUCCESS", "2026-07-24 08:40:00"],
+                ["ro-05", "KMeans + GA", "v1.2.0", '{"kmeans_radius_km": 5.0, "ga_pop_size": 100, "max_gen": 500, "mutation_rate": 0.05}', 25, 2, 540, 0.9880, "SUCCESS", "2026-07-24 09:50:00"]
             ]
         },
         # 33. route_adjustment_logs
@@ -436,13 +436,13 @@ def build_excel():
         # 35. barcode_scans
         {
             "name": "barcode_scans (Nhật ký Quét mã vạch kiểm hàng)",
-            "headers": ["id", "shipment_id", "package_id", "route_stop_id", "facility_id", "scanned_by", "scan_type", "barcode_value", "latitude", "longitude", "scanned_at"],
+            "headers": ["id", "shipment_id", "package_id", "route_stop_id", "facility_id", "scanned_by", "scan_type", "barcode_value", "scanned_at"],
             "rows": [
-                ["bs-01", "spm-01", "pkg-01", "rs-01", "fac-01", "usr-03", "DELIVERY", "PKG-8891-01", 10.7740, 106.7030, "2026-07-24 09:44:00"],
-                ["bs-02", "spm-02", "pkg-02", "rs-03", "fac-01", "usr-02", "OUTBOUND", "PKG-8892-01", 10.7725, 106.6580, "2026-07-24 09:05:00"],
-                ["bs-03", "spm-03", "pkg-03", "rs-04", "fac-04", "usr-03", "INBOUND", "PKG-8893-01", 16.0680, 108.2210, "2026-07-24 08:00:00"],
-                ["bs-04", "spm-04", "pkg-04", "rs-05", "fac-04", "usr-05", "SORTING", "PKG-8894-01", 16.0685, 108.2215, "2026-07-24 09:20:00"],
-                ["bs-05", "spm-05", "pkg-05", "rs-02", "fac-05", "usr-01", "INBOUND", "PKG-8895-01", 10.8231, 106.6297, "2026-07-24 10:02:00"]
+                ["bs-01", "spm-01", "pkg-01", "rs-01", "fac-01", "usr-03", "DELIVERY", "PKG-8891-01", "2026-07-24 09:44:00"],
+                ["bs-02", "spm-02", "pkg-02", "rs-03", "fac-01", "usr-02", "OUTBOUND", "PKG-8892-01", "2026-07-24 09:05:00"],
+                ["bs-03", "spm-03", "pkg-03", "rs-04", "fac-04", "usr-03", "INBOUND", "PKG-8893-01", "2026-07-24 08:00:00"],
+                ["bs-04", "spm-04", "pkg-04", "rs-05", "fac-04", "usr-05", "SORTING", "PKG-8894-01", "2026-07-24 09:20:00"],
+                ["bs-05", "spm-05", "pkg-05", "rs-02", "fac-05", "usr-01", "INBOUND", "PKG-8895-01", "2026-07-24 10:02:00"]
             ]
         },
         # 36. driver_check_ins

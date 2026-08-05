@@ -422,7 +422,7 @@ model Facility {
   transfersFrom     ShipmentTransfer[] @relation("TransferFromFacility")
   transfersTo       ShipmentTransfer[] @relation("TransferToFacility")
   staffMembers      Staff[]
-  vehicles          Vehicle[]
+  vehicles          Vehicle[]         @relation("VehicleAssignedFacility")
   startRoutes       Route[]           @relation("RouteStartFacility")
   endRoutes         Route[]           @relation("RouteEndFacility")
   routeStops        RouteStop[]
@@ -700,7 +700,6 @@ model Staff {
   assignments          DriverVehicleAssignment[]
   location             DriverLocation?
   dispatchTasks        DispatchTask[]
-  routes               Route[]
 
   @@index([employmentStatus], name: "idx_staff_status")
   @@index([assignedFacilityId], name: "idx_staff_facility")
@@ -737,9 +736,8 @@ model Vehicle {
   createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz
 
   vehicleType        VehicleType            @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict)
-  assignedFacility   Facility?              @relation(fields: [assignedFacilityId], references: [id], onDelete: SetNull)
+  assignedFacility   Facility?              @relation("VehicleAssignedFacility", fields: [assignedFacilityId], references: [id], onDelete: SetNull)
   assignments        DriverVehicleAssignment[]
-  routes             Route[]
 
   @@index([vehicleTypeId], name: "idx_vehicles_type")
   @@map("vehicles")
@@ -796,8 +794,6 @@ model Route {
   
   // FIX LỖI 2: driverVehicleAssignmentId Nullable cho phép AI sinh Route trước
   driverVehicleAssignmentId  String?        @map("driver_vehicle_assignment_id") @db.Uuid
-  driverId                   String?        @map("driver_id") @db.Uuid
-  vehicleId                  String?        @map("vehicle_id") @db.Uuid
   
   startFacilityId            String         @map("start_facility_id") @db.Uuid
   endFacilityId              String?        @map("end_facility_id") @db.Uuid
@@ -812,8 +808,6 @@ model Route {
   updatedAt                  DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
   driverVehicleAssignment    DriverVehicleAssignment? @relation(fields: [driverVehicleAssignmentId], references: [id], onDelete: SetNull)
-  driver                     Staff?                   @relation(fields: [driverId], references: [id], onDelete: SetNull)
-  vehicle                    Vehicle?                 @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   startFacility              Facility                 @relation("RouteStartFacility", fields: [startFacilityId], references: [id], onDelete: Restrict)
   endFacility                Facility?                @relation("RouteEndFacility", fields: [endFacilityId], references: [id], onDelete: Restrict)
   optimization               RouteOptimization?       @relation(fields: [optimizationId], references: [id], onDelete: SetNull)
@@ -878,16 +872,14 @@ model DispatchTask {
 }
 
 model RouteOptimization {
-  id                    String             @id @default(uuid()) @db.Uuid
-  algorithmName         String             @map("algorithm_name") @db.VarChar(50)
-  inputShipmentCount    Int                @map("input_shipment_count")
-  outputRouteCount      Int                @map("output_route_count")
-  totalDistanceKm       Decimal            @map("total_distance_km") @db.Decimal(10, 2)
-  estimatedDurationMin  Int                @map("estimated_duration_min")
-  optimizationStatus    OptimizationStatus @map("optimization_status")
-  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  id                  String             @id @default(uuid()) @db.Uuid
+  algorithmName       String             @map("algorithm_name") @db.VarChar(50)
+  inputShipmentCount  Int                @map("input_shipment_count")
+  outputRouteCount    Int                @map("output_route_count")
+  optimizationStatus  OptimizationStatus @map("optimization_status")
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz
 
-  routes                Route[]
+  routes              Route[]
 
   @@map("route_optimizations")
 }
@@ -943,8 +935,6 @@ model BarcodeScan {
   scannedBy     String       @map("scanned_by") @db.Uuid
   scanType      ScanType     @map("scan_type")
   barcodeValue  String       @map("barcode_value") @db.VarChar(100)
-  latitude      Float?       @db.DoublePrecision
-  longitude     Float?       @db.DoublePrecision
   scannedAt     DateTime     @default(now()) @map("scanned_at") @db.Timestamptz
 
   shipment      Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)

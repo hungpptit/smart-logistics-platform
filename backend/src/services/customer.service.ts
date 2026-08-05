@@ -124,7 +124,7 @@ export class CustomerService {
     const limit = parseInt(query.limit || '10', 10);
     const skip = (page - 1) * limit;
 
-    const where: any = { status: { not: 'DISABLED' } };
+    const where: any = {};
 
     if (query.search) {
       where.OR = [
@@ -142,7 +142,9 @@ export class CustomerService {
     }
 
     if (query.status) {
-      where.status = query.status;
+      where.user = { status: query.status };
+    } else {
+      where.user = { status: { not: 'DISABLED' } };
     }
 
     const [total, customers] = await prisma.$transaction([
