@@ -2253,9 +2253,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             final bool isCheckedIn = stop['isCheckedIn'] == true;
-            final bool hasSignature = stop['signature'] != null;
             final bool hasPhoto = stop['photo'] != null;
-            final bool canComplete = isCheckedIn && hasSignature && hasPhoto;
+            final bool canComplete = isCheckedIn && hasPhoto;
 
             return Dialog(
               backgroundColor: AppColors.pureWhite,
@@ -2436,62 +2435,13 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     Row(
                       children: [
                         Icon(
-                          hasSignature ? Icons.check_circle : Icons.radio_button_unchecked,
-                          color: hasSignature ? Colors.green : AppColors.secondary,
-                        ),
-                        const SizedBox(width: 12.0),
-                        Expanded(
-                          child: Text(
-                            '2. Chữ ký người nhận hàng',
-                            style: TextStyle(
-                              fontWeight: hasSignature ? FontWeight.bold : FontWeight.normal,
-                              color: hasSignature ? AppColors.deepOnyx : AppColors.secondary,
-                            ),
-                          ),
-                        ),
-                        if (isCheckedIn && !hasSignature)
-                          ElevatedButton(
-                            onPressed: () {
-                              _showSignaturePadDialog(stop, () {
-                                setDialogState(() {});
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.deepOnyx,
-                              foregroundColor: AppColors.pureWhite,
-                            ),
-                            child: const Text('Ký tên'),
-                          ),
-                      ],
-                    ),
-                    if (hasSignature) ...[
-                      const SizedBox(height: 8.0),
-                      Container(
-                        width: double.infinity,
-                        height: 60.0,
-                        decoration: BoxDecoration(
-                          color: AppColors.cloudGray,
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          '✍️ Đã ký tên thành công',
-                          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.green, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                    const Divider(height: 24.0),
-
-                    Row(
-                      children: [
-                        Icon(
                           hasPhoto ? Icons.check_circle : Icons.radio_button_unchecked,
                           color: hasPhoto ? Colors.green : AppColors.secondary,
                         ),
                         const SizedBox(width: 12.0),
                         Expanded(
                           child: Text(
-                            '3. Chụp hình bằng chứng giao nhận',
+                            '2. Chụp hình bằng chứng giao nhận',
                             style: TextStyle(
                               fontWeight: hasPhoto ? FontWeight.bold : FontWeight.normal,
                               color: hasPhoto ? AppColors.deepOnyx : AppColors.secondary,

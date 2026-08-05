@@ -387,6 +387,7 @@ erDiagram
         uuid shipment_id FK
         uuid route_stop_id FK
         delivery_result_enum delivery_result
+        varchar file_url
         delivery_failure_reason_enum failure_reason
         text failure_note
         timestamptz created_at
@@ -402,13 +403,6 @@ erDiagram
         timestamptz check_in_at
         timestamptz check_out_at
     }
-    TrackingAttachments {
-        uuid id PK
-        uuid delivery_proof_id FK
-        attachment_file_type_enum file_type
-        varchar file_url
-        timestamptz uploaded_at
-    }
 
     Shipments ||--o{ TrackingEvents : "logs_timeline"
     RouteStops ||--o{ TrackingEvents : "happened_at"
@@ -422,7 +416,6 @@ erDiagram
 
     Shipments ||--o| DeliveryProofs : "receipt"
     RouteStops ||--o| DeliveryProofs : "proof_location"
-    DeliveryProofs ||--o{ TrackingAttachments : "files"
     
     RouteStops ||--o| DriverCheckIns : "arrival_audit"
     Drivers ||--o{ DriverCheckIns : "completed_by"

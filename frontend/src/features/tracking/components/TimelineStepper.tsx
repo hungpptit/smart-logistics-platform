@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Truck, CircleDot, Warehouse, Package, Clock, ShieldCheck, Building2 } from 'lucide-react';
+import { Check, Truck, CircleDot, Warehouse, Package, Clock, ShieldCheck } from 'lucide-react';
 
 interface TimelineStepperProps {
   status: string;
@@ -84,7 +84,62 @@ export const TimelineStepper: React.FC<TimelineStepperProps> = ({ status, timest
     },
   ];
 
-  // Map steps with actual DB history events if available
+  // If dynamic timestamps from DB tracking_events are passed, render them directly (newest on top)
+  if (Array.isArray(timestamps) && timestamps.length > 0 && timestamps.some((t) => t.detail || t.label)) {
+    const eventsReversed = [...timestamps].reverse();
+    return (
+      <div className="flex flex-col gap-4 relative pl-6 before:absolute before:left-3 before:top-3 before:bottom-3 before:w-0.5 before:bg-red-200">
+        {eventsReversed.map((event: any, index: number) => {
+          const isLatest = index === 0;
+          return (
+            <div key={event.id || index} className="relative flex items-start gap-3">
+              {/* Step Icon Badge */}
+              <div
+                className={`absolute -left-6 top-0.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all z-10 ${
+                  isLatest
+                    ? 'bg-[#bc0100] text-white ring-4 ring-red-100 shadow-md scale-110'
+                    : 'bg-emerald-600 text-white shadow-xs'
+                }`}
+              >
+                {isLatest ? <Truck size={13} /> : <Check size={13} strokeWidth={3} />}
+              </div>
+
+              {/* Step Content Box */}
+              <div
+                className={`flex-1 p-3 rounded-lg border transition-all ${
+                  isLatest
+                    ? 'bg-red-50/70 border-red-300 ring-1 ring-red-200 shadow-xs'
+                    : 'bg-white border-slate-200'
+                }`}
+              >
+                <div className="flex justify-between items-start gap-2">
+                  <h4 className={`font-bold text-xs ${isLatest ? 'text-red-700' : 'text-slate-800'}`}>
+                    {event.label || event.status}
+                  </h4>
+                  {isLatest && (
+                    <span className="bg-red-600 text-white text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded tracking-wider animate-pulse shrink-0">
+                      MỚI NHẤT
+                    </span>
+                  )}
+                </div>
+                {event.detail && (
+                  <p className="text-[11px] text-slate-600 mt-1 leading-snug font-medium italic">
+                    "{event.detail}"
+                  </p>
+                )}
+                <div className="mt-1.5 text-[10px] font-medium text-slate-400 font-mono flex items-center gap-1">
+                  <Clock size={11} className="text-slate-400" />
+                  <span>{event.time || event.timestamp}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Fallback: Hardcoded 5-step progress bar
   const displayTimeline = defaultSteps.map((ds) => {
     const state = getStepState(ds.key);
 
@@ -143,7 +198,7 @@ export const TimelineStepper: React.FC<TimelineStepperProps> = ({ status, timest
 
             {/* Step Content Box */}
             <div
-              className={`flex-1 p-3 rounded-lg border transition-all ${
+              className={`flex-1 p-[#0.75rem] rounded-lg border transition-all ${
                 isActive
                   ? 'bg-red-50/60 border-red-300 ring-1 ring-red-200 shadow-xs'
                   : isCompleted

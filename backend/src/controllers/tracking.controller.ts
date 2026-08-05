@@ -19,7 +19,7 @@ export class TrackingController {
       const orderCodeClean = code.trim().toUpperCase();
 
       // 1. Query order from Prisma DB with exact relation names
-      const order = await prisma.order.findUnique({
+      let order = await prisma.order.findUnique({
         where: { orderCode: orderCodeClean },
         include: {
           customer: true,
@@ -27,7 +27,15 @@ export class TrackingController {
           deliveryAddress: true,
           originFacility: { include: { address: true } },
           destinationFacility: { include: { address: true } },
-          package: true,
+          package: {
+            include: {
+              shipmentPackages: {
+                include: {
+                  shipment: true,
+                },
+              },
+            },
+          },
           payment: true,
           service: true,
           statusHistory: {
@@ -37,12 +45,16 @@ export class TrackingController {
             include: {
               route: {
                 include: {
-                  driver: {
+                  driverVehicleAssignment: {
                     include: {
-                      user: true,
+                      driver: {
+                        include: {
+                          user: true,
+                        },
+                      },
+                      vehicle: true,
                     },
                   },
-                  vehicle: true,
                 },
               },
             },
@@ -50,10 +62,66 @@ export class TrackingController {
         },
       });
 
+      // Fallback: If not found by orderCode, search by shipmentCode in shipments table
+      if (!order) {
+        const shipment = await prisma.shipment.findUnique({
+          where: { shipmentCode: orderCodeClean },
+          include: {
+            shipmentPackages: {
+              include: {
+                package: {
+                  include: {
+                    order: {
+                      include: {
+                        customer: true,
+                        pickupAddress: true,
+                        deliveryAddress: true,
+                        originFacility: { include: { address: true } },
+                        destinationFacility: { include: { address: true } },
+                        package: {
+                          include: {
+                            shipmentPackages: {
+                              include: {
+                                shipment: true,
+                              },
+                            },
+                          },
+                        },
+                        payment: true,
+                        service: true,
+                        statusHistory: { orderBy: { createdAt: 'asc' } },
+                        routeStops: {
+                          include: {
+                            route: {
+                              include: {
+                                driverVehicleAssignment: {
+                                  include: {
+                                    driver: { include: { user: true } },
+                                    vehicle: true,
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (shipment && shipment.shipmentPackages?.[0]?.package?.order) {
+          order = shipment.shipmentPackages[0].package.order;
+        }
+      }
+
       if (!order) {
         res.status(404).json({
           success: false,
-          message: `Không tìm thấy mã vận đơn ${orderCodeClean} trên hệ thống.`,
+          message: `Không tìm thấy mã đơn/mã vận đơn ${orderCodeClean} trên hệ thống.`,
         });
         return;
       }
@@ -70,14 +138,15 @@ export class TrackingController {
         for (const rs of order.routeStops) {
           if (rs.route) {
             activeRouteId = rs.route.id;
-            const driverStaff = rs.route.driver;
+            const dva = rs.route.driverVehicleAssignment;
+            const driverStaff = dva?.driver;
             if (driverStaff && driverStaff.fullName) {
               driverName = driverStaff.fullName;
             } else if (driverStaff && driverStaff.user) {
               driverName = driverStaff.user.username;
             }
-            if (rs.route.vehicle) {
-              vehiclePlate = rs.route.vehicle.plateNumber || vehiclePlate;
+            if (dva?.vehicle) {
+              vehiclePlate = dva.vehicle.plateNumber || vehiclePlate;
             }
             break;
           }
@@ -134,6 +203,37 @@ export class TrackingController {
         };
       });
 
+      // 5b. Fetch events directly from tracking_events table for this order's package shipment
+      const dbTrackingEvents = await prisma.trackingEvent.findMany({
+        where: {
+          shipment: {
+            shipmentPackages: {
+              some: {
+                package: {
+                  orderId: order.id,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      const formattedTrackingEvents = dbTrackingEvents.map((te) => ({
+        id: te.id,
+        eventType: te.eventType,
+        description: te.description,
+        latitude: te.latitude,
+        longitude: te.longitude,
+        timestamp: new Date(te.createdAt).toLocaleString('vi-VN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }),
+      }));
+
       // Coordinates setup
       const senderLat = Number(order.pickupLatitude) || Number(order.pickupAddress?.latitude) || 10.857;
       const senderLng = Number(order.pickupLongitude) || Number(order.pickupAddress?.longitude) || 106.774;
@@ -154,8 +254,11 @@ export class TrackingController {
       const currentDriverLat = liveGps?.latitude || (order.status === 'OUT_FOR_DELIVERY' ? destFacilityLat : currentFacilityLat);
       const currentDriverLng = liveGps?.longitude || (order.status === 'OUT_FOR_DELIVERY' ? destFacilityLng : currentFacilityLng);
 
+      const shipmentCode = order.package?.shipmentPackages?.[0]?.shipment?.shipmentCode || null;
+
       const trackingPayload = {
         code: order.orderCode,
+        shipmentCode: shipmentCode,
         status: order.status,
         statusLabel: currentStatusInfo.label,
         eta: order.scheduledPickupAt ? new Date(order.scheduledPickupAt).toLocaleDateString('vi-VN') : 'Dự kiến hôm nay',
@@ -180,6 +283,7 @@ export class TrackingController {
           currentDriver: { lat: currentDriverLat, lng: currentDriverLng },
         },
         timeline: timelineEvents,
+        trackingEvents: formattedTrackingEvents,
       };
 
       res.status(200).json({

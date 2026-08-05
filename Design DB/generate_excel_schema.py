@@ -424,13 +424,13 @@ def build_excel():
         # 34. delivery_proofs
         {
             "name": "delivery_proofs (Bằng chứng Giao hàng POD & COD Thực thu)",
-            "headers": ["id", "shipment_id", "route_stop_id", "proof_type", "delivery_result", "actual_cod_collected", "receiver_name", "receiver_phone", "failure_reason", "verified_latitude", "verified_longitude", "created_at"],
+            "headers": ["id", "shipment_id", "route_stop_id", "delivery_result", "actual_cod_collected", "file_url", "receiver_name", "receiver_phone", "failure_reason", "verified_latitude", "verified_longitude", "created_at"],
             "rows": [
-                ["dp-01", "spm-01", "rs-01", "PHOTO", "SUCCESS", 500000.00, "Trần Thị B", "0918888999", None, 10.7740, 106.7030, "2026-07-24 09:45:00"],
-                ["dp-02", "spm-02", "rs-03", "SIGNATURE", "SUCCESS", 1200000.00, "Lê Văn C", "0933445566", None, 21.0331, 105.8524, "2026-07-24 09:10:00"],
-                ["dp-03", "spm-03", "rs-04", "OTP", "SUCCESS", 300000.00, "Nguyễn Văn D", "0944556677", None, 16.0680, 108.2210, "2026-07-24 08:08:00"],
-                ["dp-04", "spm-04", "rs-05", "PHOTO", "FAILED", 0.00, "Phạm Văn E", "0955667788", "RECIPIENT_UNAVAILABLE", 10.0342, 105.7885, "2026-07-24 09:38:00"],
-                ["dp-05", "spm-05", "rs-02", "PHOTO", "SUCCESS", 150000.00, "Hoàng Văn F", "0966778899", None, 10.7721, 106.6578, "2026-07-24 10:10:00"]
+                ["dp-01", "spm-01", "rs-01", "SUCCESS", 500000.00, "https://storage.goong.io/pod/proof_dp01.jpg", "Trần Thị B", "0918888999", None, 10.7740, 106.7030, "2026-07-24 09:45:00"],
+                ["dp-02", "spm-02", "rs-03", "SUCCESS", 1200000.00, "https://storage.goong.io/pod/proof_dp02.jpg", "Lê Văn C", "0933445566", None, 21.0331, 105.8524, "2026-07-24 09:10:00"],
+                ["dp-03", "spm-03", "rs-04", "SUCCESS", 300000.00, "https://storage.goong.io/pod/proof_dp03.jpg", "Nguyễn Văn D", "0944556677", None, 16.0680, 108.2210, "2026-07-24 08:08:00"],
+                ["dp-04", "spm-04", "rs-05", "FAILED", 0.00, "https://storage.goong.io/pod/fail_dp04.jpg", "Phạm Văn E", "0955667788", "RECIPIENT_UNAVAILABLE", 10.0342, 105.7885, "2026-07-24 09:38:00"],
+                ["dp-05", "spm-05", "rs-02", "SUCCESS", 150000.00, "https://storage.goong.io/pod/proof_dp05.jpg", "Hoàng Văn F", "0966778899", None, 10.7721, 106.6578, "2026-07-24 10:10:00"]
             ]
         },
         # 35. barcode_scans
@@ -445,40 +445,16 @@ def build_excel():
                 ["bs-05", "spm-05", "pkg-05", "rs-02", "fac-05", "usr-01", "INBOUND", "PKG-8895-01", "2026-07-24 10:02:00"]
             ]
         },
-        # 36. driver_check_ins
-        {
-            "name": "driver_check_ins (Nhật ký Check-in Điểm dừng)",
-            "headers": ["id", "route_stop_id", "driver_id", "check_in_at", "check_out_at", "latitude", "longitude", "note"],
-            "rows": [
-                ["dci-01", "rs-01", "drv-01", "2026-07-24 09:40:00", "2026-07-24 09:45:00", 10.7740, 106.7030, "Đã giao hàng thành công và thu tiền COD"],
-                ["dci-02", "rs-02", "drv-02", "2026-07-24 09:05:00", "2026-07-24 09:10:00", 21.0331, 105.8524, "Khách hàng nhận hàng vui vẻ"],
-                ["dci-03", "rs-03", "drv-03", "2026-07-24 08:02:00", "2026-07-24 08:08:00", 16.0680, 108.2210, "Đã xác thực mã OTP giao hàng thành công"],
-                ["dci-04", "rs-04", "drv-04", "2026-07-24 09:35:00", "2026-07-24 09:38:00", 10.0342, 105.7885, "Khách không nghe máy, hẹn giao lại ca sau"],
-                ["dci-05", "rs-05", "drv-05", "2026-07-24 10:08:00", "2026-07-24 10:10:00", 10.7721, 106.6578, "Đã thu tiền mặt 150k cước phí"]
-            ]
-        },
-        # 37. tracking_attachments
-        {
-            "name": "tracking_attachments (Tệp đính kèm Chứng từ POD)",
-            "headers": ["id", "delivery_proof_id", "file_type", "storage_provider", "object_key", "mime_type", "file_size_bytes", "uploaded_at"],
-            "rows": [
-                ["ta-01", "dp-01", "PHOTO", "S3", "pod/2026/07/proof_dp01.jpg", "image/jpeg", 245100, "2026-07-24 09:45:05"],
-                ["ta-02", "dp-02", "SIGNATURE", "S3", "pod/2026/07/sign_dp02.png", "image/png", 85200, "2026-07-24 09:10:05"],
-                ["ta-03", "dp-03", "PHOTO", "S3", "pod/2026/07/proof_dp03.jpg", "image/jpeg", 312000, "2026-07-24 08:08:05"],
-                ["ta-04", "dp-04", "PHOTO", "S3", "pod/2026/07/fail_dp04.jpg", "image/jpeg", 198000, "2026-07-24 09:38:05"],
-                ["ta-05", "dp-05", "PHOTO", "S3", "pod/2026/07/proof_dp05.jpg", "image/jpeg", 267000, "2026-07-24 10:10:05"]
-            ]
-        },
         # 38. tracking_events
         {
             "name": "tracking_events (Nhật ký Theo dõi Hành trình)",
-            "headers": ["id", "shipment_id", "route_stop_id", "event_type", "event_source", "description", "latitude", "longitude", "created_by", "occurred_at", "created_at"],
+            "headers": ["id", "shipment_id", "route_stop_id", "event_type", "description", "latitude", "longitude", "created_by", "created_at"],
             "rows": [
-                ["te-01", "spm-01", "rs-01", "DELIVERED", "DRIVER_APP", "Đơn hàng đã được giao thành công cho người nhận", 10.7740, 106.7030, "usr-03", "2026-07-24 09:45:00", "2026-07-24 09:45:00"],
-                ["te-02", "spm-02", "rs-03", "DELIVERED", "DRIVER_APP", "Đã ký nhận đơn hàng thành công", 21.0331, 105.8524, "usr-05", "2026-07-24 09:10:00", "2026-07-24 09:10:00"],
-                ["te-03", "spm-03", "rs-04", "DELIVERED", "DRIVER_APP", "Giao hàng qua mã OTP xác thực", 16.0680, 108.2210, "usr-03", "2026-07-24 08:08:00", "2026-07-24 08:08:00"],
-                ["te-04", "spm-04", "rs-05", "FAILED", "DRIVER_APP", "Khách hàng không bắt máy khi shipper gọi giao", 10.0342, 105.7885, "usr-05", "2026-07-24 09:38:00", "2026-07-24 09:38:00"],
-                ["te-05", "spm-05", "rs-02", "DELIVERED", "DRIVER_APP", "Giao hàng thành công chặng cuối", 10.7721, 106.6578, "usr-01", "2026-07-24 10:10:00", "2026-07-24 10:10:00"]
+                ["te-01", "spm-01", "rs-01", "DELIVERED", "Đơn hàng đã được giao thành công cho người nhận", 10.7740, 106.7030, "usr-03", "2026-07-24 09:45:00"],
+                ["te-02", "spm-02", "rs-03", "DELIVERED", "Đã nhận đơn hàng thành công", 21.0331, 105.8524, "usr-05", "2026-07-24 09:10:00"],
+                ["te-03", "spm-03", "rs-04", "DELIVERED", "Giao hàng thành công chặng cuối", 16.0680, 108.2210, "usr-03", "2026-07-24 08:08:00"],
+                ["te-04", "spm-04", "rs-05", "FAILED", "Khách hàng không bắt máy khi shipper gọi giao", 10.0342, 105.7885, "usr-05", "2026-07-24 09:38:00"],
+                ["te-05", "spm-05", "rs-02", "DELIVERED", "Giao hàng thành công chặng cuối", 10.7721, 106.6578, "usr-01", "2026-07-24 10:10:00"]
             ]
         },
         # 39. system_settings

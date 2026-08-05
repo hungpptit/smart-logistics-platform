@@ -111,11 +111,20 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
               </div>
             </div>
 
-            <div className="card-body p-5 pt-3">
+            <div className="card-body p-5 pt-3 max-h-[480px] overflow-y-auto pr-2">
               <TimelineStepper
                 status={currentTracking.status}
                 timestamps={
-                  currentTracking.timeline
+                  currentTracking.trackingEvents && currentTracking.trackingEvents.length > 0
+                    ? currentTracking.trackingEvents.map((te: any) => ({
+                        id: te.id,
+                        status: te.eventType,
+                        label: te.eventType === 'DRIVER_ASSIGNED' ? 'Phân tuyến cho tài xế' : te.eventType,
+                        time: te.timestamp,
+                        completed: true,
+                        detail: te.description,
+                      }))
+                    : currentTracking.timeline
                     ? currentTracking.timeline.map((t: any) => ({
                         status: t.status,
                         label: t.title,

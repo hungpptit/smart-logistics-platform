@@ -157,13 +157,10 @@ export const OrderTab: React.FC = () => {
   // Detail & Update Status states
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
-  const [showStatusModal, setShowStatusModal] = useState<boolean>(false);
   const [showPrintLabel, setShowPrintLabel] = useState<boolean>(false);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState<boolean>(false);
   const [isOptimizationModalOpen, setIsOptimizationModalOpen] = useState<boolean>(false);
-  const [newStatus, setNewStatus] = useState<string>('');
-  const [statusReason, setStatusReason] = useState<string>('');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [optimizing] = useState<boolean>(false);
   const isAdminOrStaff = user?.roles.includes('ADMIN') || user?.roles.includes('STAFF');
@@ -355,41 +352,6 @@ export const OrderTab: React.FC = () => {
       alert('Không thể kết nối máy chủ để xem chi tiết.');
     } finally {
       setDetailLoading(false);
-    }
-  };
-
-  const handleUpdateStatus = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token || !selectedOrder || !newStatus) return;
-    setActionLoading(true);
-    try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}/orders/${selectedOrder.id}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          status: newStatus,
-          reason: statusReason || undefined
-        })
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        alert('Cập nhật trạng thái đơn hàng thành công!');
-        setShowStatusModal(false);
-        setStatusReason('');
-        // Refresh detail view and list
-        await fetchOrderDetail(selectedOrder.id);
-        fetchOrders(currentPage);
-      } else {
-        alert(data.message || 'Cập nhật trạng thái thất bại.');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Lỗi kết nối máy chủ khi cập nhật.');
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -866,6 +828,24 @@ export const OrderTab: React.FC = () => {
             <>
               {/* Detail Body */}
               <div className="p-5 flex-1 overflow-y-auto flex flex-col gap-6 text-xs text-gray-600">
+                {/* Tracking Code Banner */}
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider block">Mã Tra cứu Hành trình</span>
+                    <span className="font-mono font-bold text-sm text-[#bc0100]">{selectedOrder.orderCode}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedOrder.orderCode);
+                      alert(`Đã sao chép mã tra cứu ${selectedOrder.orderCode}!`);
+                    }}
+                    className="bg-white hover:bg-gray-100 text-gray-700 text-[10px] font-bold px-2.5 py-1.5 rounded border border-gray-300 shadow-xs flex items-center gap-1 cursor-pointer transition-all"
+                    title="Sao chép mã tra cứu"
+                  >
+                    <span>Sao chép mã</span>
+                  </button>
+                </div>
+
                 {/* Quick Summary Row */}
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                   <div>
@@ -987,7 +967,7 @@ export const OrderTab: React.FC = () => {
                     Lịch sử hành trình đơn hàng
                   </h4>
                   <div className="flex flex-col gap-4 pl-2 relative border-l border-gray-200 ml-1.5">
-                    {selectedOrder.statusHistory?.map((hist) => {
+                    {(selectedOrder.statusHistory ? [...selectedOrder.statusHistory].reverse() : []).map((hist) => {
                       const statusInfo = STATUS_MAP[hist.status] || { label: hist.status, color: '#374151', bg: '#f3f4f6' };
                       return (
                         <div key={hist.id} className="relative pl-4">
@@ -1013,81 +993,8 @@ export const OrderTab: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Footer for Staff/Admin */}
-              {isAdminOrStaff && (
-                <div className="p-4 border-t border-gray-100 bg-[#F4F4F4] flex gap-2 shrink-0">
-                  <button
-                    onClick={() => {
-                      setNewStatus(selectedOrder.status);
-                      setShowStatusModal(true);
-                    }}
-                    disabled={actionLoading}
-                    className="flex-1 bg-[#bc0100] hover:bg-[#bc0100]/90 text-white py-2 rounded text-xs font-bold uppercase tracking-wider text-center transition-colors disabled:opacity-50"
-                  >
-                    Cập nhật trạng thái
-                  </button>
-                </div>
-              )}
             </>
           ) : null}
-        </div>
-      )}
-
-      {/* Update Status Popup Modal */}
-      {showStatusModal && selectedOrder && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg border border-[#e2e8f0] shadow-soft max-w-md w-full overflow-hidden font-montserrat">
-            <div className="bg-[#161D25] text-white p-4 flex justify-between items-center">
-              <h3 className="text-xs font-bold uppercase tracking-wider">Cập Nhật Trạng Thái Đơn Hàng</h3>
-              <button onClick={() => setShowStatusModal(false)} className="text-gray-400 hover:text-white">
-                Đóng
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateStatus} className="p-5 flex flex-col gap-4 text-xs">
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-gray-600">Trạng thái mới</label>
-                <select
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#e2e8f0] rounded focus:outline-none focus:border-[#bc0100] bg-white font-medium"
-                  required
-                >
-                  {Object.entries(STATUS_MAP).map(([key, val]) => (
-                    <option key={key} value={key}>{val.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-gray-600">Lý do thay đổi / Ghi chú lịch trình</label>
-                <textarea
-                  placeholder="Nhập lý do thay đổi trạng thái (ví dụ: Tài xế đã lấy hàng, Đang chuyển giao nội bộ...)"
-                  value={statusReason}
-                  onChange={(e) => setStatusReason(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-[#e2e8f0] rounded focus:outline-none focus:border-[#bc0100] resize-none font-medium"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setShowStatusModal(false)}
-                  className="px-4 py-2 border border-[#e2e8f0] rounded font-bold uppercase tracking-wider text-gray-500 hover:bg-gray-50 transition-colors"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="bg-[#bc0100] hover:bg-[#bc0100]/90 text-white px-4 py-2 rounded font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
-                >
-                  {actionLoading ? 'Đang cập nhật...' : 'Xác nhận'}
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
 

@@ -529,9 +529,9 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `id` | Uuid | **Khóa chính (PK)** | Mã chứng từ giao hàng. VD: `dp-01` |
 | `route_stop_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng route_stops)**| Điểm dừng duy nhất phát sinh chứng từ này (Trỏ `route_stops.id`). VD: `rs-01` |
 | `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Vận đơn được giao (Không Unique để hỗ trợ lưu nhiều chứng từ giao lại khi thất bại). VD: `spm-01` |
-| `proof_type` | Enum | Bắt buộc | Dạng bằng chứng: `PHOTO` (Chụp ảnh), `SIGNATURE` (Ký tên), `OTP` |
 | `delivery_result` | Enum | Bắt buộc | Kết quả: `SUCCESS` (Thành công), `FAILED` (Thất bại), `PARTIAL` |
 | `actual_cod_collected`| Decimal(12,2)| Tùy chọn | **Số tiền mặt COD thực tế Shipper đã thu tại chỗ** đối soát tài chính. VD: `500000.00` VNĐ |
+| `file_url` | VarChar(500)| Tùy chọn | Đường dẫn ảnh chụp bằng chứng giao hàng. VD: `https://storage.goong.io/pod/proof_dp01.jpg` |
 | `failure_reason` | Enum | Tùy chọn | Lý do thất bại: `RECIPIENT_UNAVAILABLE` (Khách không bắt máy), `INCORRECT_ADDRESS` |
 | `verified_latitude` | Double | Tùy chọn | Vĩ độ GPS xác minh giao hàng |
 | `verified_longitude` | Double | Tùy chọn | Kinh độ GPS xác minh giao hàng |
@@ -556,21 +556,6 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ---
 
-
-
-### 37. Bảng `tracking_attachments` (Tệp đính kèm Chứng từ POD - Ảnh/Chữ ký)
-📌 **Chức năng của bảng:** Quản lý danh sách các tệp hình ảnh thực tế (ảnh chụp kiện hàng tại cửa nhà khách, hình ảnh chữ ký điện tử của người nhận) liên kết với chứng từ giao hàng `delivery_proofs`. Lưu trữ trực tiếp đường dẫn file `file_url` phục vụ hiển thị.
-
-| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
-| :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã file đính kèm. VD: `ta-01` |
-| `delivery_proof_id`| Uuid | **Khóa ngoại (FK ➔ bảng delivery_proofs)**| Thuộc bằng chứng giao hàng nào (Trỏ `delivery_proofs.id`). VD: `dp-01` |
-| `file_type` | Enum | Bắt buộc | Loại file: `PHOTO` (Ảnh chụp), `SIGNATURE` (Chữ ký điện tử) |
-| `file_url` | VarChar(500)| Bắt buộc | Đường dẫn xem tệp ảnh trực tiếp. VD: `https://storage.goong.io/pod/proof_dp01.jpg` |
-| `uploaded_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm tải tệp đính kèm lên |
-
----
-
 ### 38. Bảng `tracking_events` (Nhật ký Sự kiện Tracking Vận đơn Công khai)
 📌 **Chức năng của bảng:** Lưu trữ dòng thời gian (Timeline) các sự kiện tracking vận đơn công khai cho Khách hàng & Người dùng tra cứu hành trình trực quan trên Web/Mobile (`PICKED_UP` - Đã lấy hàng, `ARRIVED_HUB` - Đến bưu cục, `DEPARTED_HUB` - Rời bưu cục, `OUT_FOR_DELIVERY` - Đang giao, `DELIVERED` - Giao thành công, `FAILED` - Giao thất bại, `RETURNED` - Hoàn hàng, `CANCELLED` - Đã hủy).
 
@@ -580,14 +565,11 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 | `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Thuộc Vận đơn nào (Trỏ `shipments.id`). VD: `spm-01` |
 | `route_stop_id` | Uuid | **Khóa ngoại (FK ➔ bảng route_stops)** | Phát sinh từ điểm dừng nào (nếu có). VD: `rs-01` |
 | `event_type` | Enum | Bắt buộc | Loại sự kiện: `PICKED_UP`, `ARRIVED_HUB`, `DEPARTED_HUB`, `OUT_FOR_DELIVERY`, `DELIVERED`, `FAILED`, `RETURNED`, `CANCELLED` |
-| `event_source` | Enum | Default 'SYSTEM' | Nguồn tạo sự kiện: `SYSTEM`, `DRIVER_APP`, `WAREHOUSE_APP`, `API` |
 | `description` | Text | Bắt buộc | Mô tả chi tiết hành trình. VD: `Đơn hàng đã được giao thành công cho người nhận` |
-| `latitude` / `longitude` | Double | Tùy chọn | Tọa độ GPS phát sinh sự kiện. VD: `10.7740` / `106.7030` |
+| `latitude` | Double | Tùy chọn | Vĩ độ GPS phát sinh sự kiện. VD: `10.7740` |
+| `longitude` | Double | Tùy chọn | Kinh độ GPS phát sinh sự kiện. VD: `106.7030` |
 | `created_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người dùng/Nhân viên ghi nhận sự kiện. VD: `usr-03` |
-| `occurred_at` | Timestamptz | Bắt buộc | Thời điểm thực tế xảy ra sự kiện. VD: `2026-07-24 09:45:00+07` |
-| `created_at` | Timestamptz | Default Now | Thời điểm ghi nhận vào CSDL |
-| `latitude` | Double | Tùy chọn | Tọa độ Vĩ độ GPS. VD: `10.7721` |
-| `longitude` | Double | Tùy chọn | Tọa độ Kinh độ GPS. VD: `106.6578` |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian ghi nhận sự kiện vào CSDL |
 
 ---
 

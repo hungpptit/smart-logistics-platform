@@ -187,26 +187,12 @@ enum TrackingEventType {
   CANCELLED
 }
 
-enum EventSource {
-  SYSTEM
-  DRIVER_APP
-  WAREHOUSE_APP
-  API
-}
-
 enum ScanType {
   INBOUND
   OUTBOUND
   DELIVERY
   INVENTORY
   SORTING
-}
-
-enum ProofType {
-  PHOTO
-  SIGNATURE
-  OTP
-  FAILED_DELIVERY
 }
 
 enum DeliveryResult {
@@ -221,13 +207,6 @@ enum DeliveryFailureReason {
   RECIPIENT_REJECTED
   FORCE_MAJEURE
   OTHER
-}
-
-enum AttachmentFileType {
-  PHOTO
-  SIGNATURE
-  VIDEO
-  DOCUMENT
 }
 
 enum SettingValueType {
@@ -910,19 +889,17 @@ model TrackingEvent {
   shipmentId  String            @map("shipment_id") @db.Uuid
   routeStopId String?           @map("route_stop_id") @db.Uuid
   eventType   TrackingEventType @map("event_type")
-  eventSource EventSource       @default(SYSTEM) @map("event_source")
   description String            @db.Text
   latitude    Float?            @db.DoublePrecision
   longitude   Float?            @db.DoublePrecision
   createdBy   String?           @map("created_by") @db.Uuid
-  occurredAt  DateTime          @map("occurred_at") @db.Timestamptz
   createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
 
   shipment    Shipment          @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   routeStop   RouteStop?        @relation(fields: [routeStopId], references: [id], onDelete: SetNull)
   creator     User?             @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
-  @@index([shipmentId, occurredAt(sort: Desc)], name: "idx_track_events_shipment")
+  @@index([shipmentId, createdAt(sort: Desc)], name: "idx_track_events_shipment")
   @@map("tracking_events")
 }
 
@@ -950,16 +927,11 @@ model BarcodeScan {
 
 model DeliveryProof {
   id                String                @id @default(uuid()) @db.Uuid
-  
-  // FIX LỖI 5: Xóa @unique trên shipmentId để lưu chứng từ nhiều lượt giao thất bại
   shipmentId        String                @map("shipment_id") @db.Uuid
   routeStopId       String                @unique @map("route_stop_id") @db.Uuid
-  proofType         ProofType             @map("proof_type")
   deliveryResult    DeliveryResult        @map("delivery_result")
-  
-  // FIX LỖI 5: Thêm tiền COD thực tế Shipper đã thu
   actualCodCollected Decimal?             @map("actual_cod_collected") @db.Decimal(12, 2)
-  
+  fileUrl           String?               @map("file_url") @db.VarChar(500)
   failureReason     DeliveryFailureReason? @map("failure_reason")
   verifiedLatitude  Float?                @map("verified_latitude") @db.DoublePrecision
   verifiedLongitude Float?                @map("verified_longitude") @db.DoublePrecision
@@ -967,24 +939,8 @@ model DeliveryProof {
 
   shipment          Shipment              @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   routeStop         RouteStop             @relation(fields: [routeStopId], references: [id], onDelete: Restrict)
-  attachments       TrackingAttachment[]
 
   @@map("delivery_proofs")
-}
-
-
-
-model TrackingAttachment {
-  id              String             @id @default(uuid()) @db.Uuid
-  deliveryProofId String             @map("delivery_proof_id") @db.Uuid
-  fileType        AttachmentFileType @map("file_type")
-  fileUrl         String             @map("file_url") @db.VarChar(500)
-  uploadedAt      DateTime           @default(now()) @map("uploaded_at") @db.Timestamptz
-
-  deliveryProof   DeliveryProof      @relation(fields: [deliveryProofId], references: [id], onDelete: Cascade)
-
-  @@index([deliveryProofId], name: "idx_track_attach_proof")
-  @@map("tracking_attachments")
 }
 
 // ==========================================

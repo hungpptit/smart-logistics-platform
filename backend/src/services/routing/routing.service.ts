@@ -61,6 +61,7 @@ export class RoutingService {
       },
       include: {
         location: true,
+        driverTypes: true,
         assignments: {
           where: { isActive: true },
           include: {
@@ -142,8 +143,6 @@ export class RoutingService {
         algorithmName: 'KMeans + Hungarian + GeneticAlgorithm',
         inputShipmentCount: orders.length,
         outputRouteCount: 0,
-        totalDistanceKm: 0,
-        estimatedDurationMin: 0,
         optimizationStatus: 'SUCCESS',
       },
     });
@@ -155,7 +154,36 @@ export class RoutingService {
 
       if (!driver || !cluster || !cluster.orders || cluster.orders.length === 0) continue;
 
-      const activeAssignment = driver.assignments?.find((a) => a.isActive);
+      let activeAssignment = driver.assignments?.find((a) => a.isActive);
+
+      if (!activeAssignment) {
+        let vehicle = await prisma.vehicle.findFirst({
+          where: { assignedFacilityId: facilityId, operatingStatus: 'ACTIVE' },
+        });
+        if (!vehicle) {
+          vehicle = await prisma.vehicle.findFirst({
+            where: { operatingStatus: 'ACTIVE' },
+          });
+        }
+        if (!vehicle) {
+          vehicle = await prisma.vehicle.findFirst();
+        }
+
+        if (vehicle) {
+          activeAssignment = (await prisma.driverVehicleAssignment.create({
+            data: {
+              driverId: driver.id,
+              vehicleId: vehicle.id,
+              assignedFrom: new Date(),
+              isActive: true,
+            },
+            include: {
+              driver: true,
+              vehicle: true,
+            },
+          })) as any;
+        }
+      }
 
       const sortedOrders = cluster.orders;
 
@@ -199,8 +227,6 @@ export class RoutingService {
         data: {
           routeCode,
           driverVehicleAssignmentId: activeAssignment?.id || null,
-          driverId: driver.id,
-          vehicleId: activeAssignment?.vehicleId || null,
           startFacilityId: facilityId,
           endFacilityId: facilityId,
           optimizationId: optimization.id,
@@ -253,11 +279,28 @@ export class RoutingService {
       for (const order of sortedOrders) {
         // Create Shipment record
         const shipmentCode = `SH-${Date.now().toString().slice(-4)}${Math.floor(1000 + Math.random() * 9000)}`;
+        const originFacId = order.originFacilityId || facilityId;
+        const destFacId = order.destinationFacilityId || facilityId;
+
         const shipment = await prisma.shipment.create({
           data: {
             shipmentCode,
             status: 'ASSIGNED',
             routeId: route.id,
+            originFacilityId: originFacId,
+            destinationFacilityId: destFacId,
+            createdBy: creatorId || null,
+          },
+        });
+
+        // Insert initial TrackingEvent log
+        await prisma.trackingEvent.create({
+          data: {
+            shipmentId: shipment.id,
+            eventType: 'DRIVER_ASSIGNED',
+            description: `Vận đơn ${shipmentCode} đã được hệ thống AI phân tuyến cho tài xế`,
+            latitude: facilityLocation.lat,
+            longitude: facilityLocation.lng,
             createdBy: creatorId || null,
           },
         });
@@ -337,13 +380,11 @@ export class RoutingService {
       createdRoutes.push(route);
     }
 
-    // 7. Update the RouteOptimization log with final output route count and aggregated totals
+    // 7. Update the RouteOptimization log with final output route count
     await prisma.routeOptimization.update({
       where: { id: optimization.id },
       data: {
         outputRouteCount: createdRoutes.length,
-        totalDistanceKm: Number(totalOptimizationDistanceKm.toFixed(2)),
-        estimatedDurationMin: totalOptimizationDurationMin,
       },
     });
 
@@ -363,10 +404,7 @@ export class RoutingService {
       where.startFacilityId = filters.facilityId;
     }
     if (filters.driverId) {
-      where.OR = [
-        { driverId: filters.driverId },
-        { driverVehicleAssignment: { driverId: filters.driverId } },
-      ];
+      where.driverVehicleAssignment = { driverId: filters.driverId };
     }
 
     const routes = await prisma.route.findMany({
@@ -378,26 +416,6 @@ export class RoutingService {
             facilityCode: true,
             facilityName: true,
             address: true,
-          },
-        },
-        driver: {
-          select: {
-            id: true,
-            employeeCode: true,
-            fullName: true,
-            phone: true,
-            user: {
-              select: {
-                username: true,
-              },
-            },
-          },
-        },
-        vehicle: {
-          select: {
-            id: true,
-            vehicleCode: true,
-            plateNumber: true,
           },
         },
         driverVehicleAssignment: {

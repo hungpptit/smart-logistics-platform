@@ -352,26 +352,22 @@ export class OrderService {
         { originFacilityId: targetFacilityId },
         { destinationFacilityId: targetFacilityId },
         {
-          packages: {
-            some: {
-              barcodeScans: {
-                some: {
-                  facilityId: targetFacilityId,
-                },
+          package: {
+            barcodeScans: {
+              some: {
+                facilityId: targetFacilityId,
               },
             },
           },
         },
         {
-          packages: {
-            some: {
-              shipmentPackages: {
-                some: {
-                  shipment: {
-                    routeStops: {
-                      some: {
-                        facilityId: targetFacilityId,
-                      },
+          package: {
+            shipmentPackages: {
+              some: {
+                shipment: {
+                  routeStops: {
+                    some: {
+                      facilityId: targetFacilityId,
                     },
                   },
                 },
