@@ -293,10 +293,35 @@ export class RoutingService {
           },
         });
 
-        // Insert initial TrackingEvent log
+        const isPickup = order.status === OrderStatus.READY_FOR_PICKUP;
+        const nextStatus = isPickup ? OrderStatus.PICKUP_ASSIGNED : OrderStatus.READY_FOR_DISPATCH;
+
+        if (isPickup) {
+          pickupOrderIds.push(order.id);
+        } else {
+          deliveryOrderIds.push(order.id);
+        }
+
+        // Create RouteStop record first
+        const routeStop = await prisma.routeStop.create({
+          data: {
+            routeId: route.id,
+            shipmentId: shipment.id,
+            orderId: order.id,
+            stopType: isPickup ? 'PICKUP' : 'DELIVERY',
+            sequence: sequenceIndex++,
+            addressSnapshot: (isPickup ? order.pickupAddressText : order.deliveryAddressText) || 'Unknown Address',
+            latitude: (isPickup ? order.pickupLatitude : order.deliveryLatitude) || facilityLocation.lat,
+            longitude: (isPickup ? order.pickupLongitude : order.deliveryLongitude) || facilityLocation.lng,
+            status: 'PENDING',
+          },
+        });
+
+        // Insert initial TrackingEvent log with routeStopId linked
         await prisma.trackingEvent.create({
           data: {
             shipmentId: shipment.id,
+            routeStopId: routeStop.id,
             eventType: 'DRIVER_ASSIGNED',
             description: `Vận đơn ${shipmentCode} đã được hệ thống AI phân tuyến cho tài xế`,
             latitude: facilityLocation.lat,
@@ -316,30 +341,6 @@ export class RoutingService {
             assignedPkgIds.add(pkg.id);
           }
         }
-
-        const isPickup = order.status === OrderStatus.READY_FOR_PICKUP;
-        const nextStatus = isPickup ? OrderStatus.PICKUP_ASSIGNED : OrderStatus.READY_FOR_DISPATCH;
-
-        if (isPickup) {
-          pickupOrderIds.push(order.id);
-        } else {
-          deliveryOrderIds.push(order.id);
-        }
-
-        // Create RouteStop record
-        await prisma.routeStop.create({
-          data: {
-            routeId: route.id,
-            shipmentId: shipment.id,
-            orderId: order.id,
-            stopType: isPickup ? 'PICKUP' : 'DELIVERY',
-            sequence: sequenceIndex++,
-            addressSnapshot: (isPickup ? order.pickupAddressText : order.deliveryAddressText) || 'Unknown Address',
-            latitude: (isPickup ? order.pickupLatitude : order.deliveryLatitude) || facilityLocation.lat,
-            longitude: (isPickup ? order.pickupLongitude : order.deliveryLongitude) || facilityLocation.lng,
-            status: 'PENDING',
-          },
-        });
 
         // Collect order status history
         historyData.push({
