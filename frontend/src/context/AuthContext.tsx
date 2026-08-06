@@ -34,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return {
       ...userData,
       staffProfile: userData.staffProfile || userData.staff || null,
+      customerProfile: userData.customerProfile || userData.customer || null,
     };
   };
 

@@ -26,6 +26,23 @@ export async function resolveAddressDetails(dto: AddressInput) {
     }
   }
 
+  if (!wardCodeVal && dto.ward) {
+    const wardData = await prisma.ward.findFirst({
+      where: {
+        OR: [
+          { fullName: { contains: dto.ward, mode: 'insensitive' } },
+          { name: { contains: dto.ward, mode: 'insensitive' } },
+        ],
+      },
+      include: { province: true },
+    });
+    if (wardData) {
+      resolvedWard = wardData.fullName || wardData.name;
+      resolvedProvince = wardData.province ? (wardData.province.fullName || wardData.province.name) : dto.province;
+      wardCodeVal = wardData.code;
+    }
+  }
+
   return {
     ward: resolvedWard,
     province: resolvedProvince,

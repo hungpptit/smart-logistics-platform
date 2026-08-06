@@ -124,15 +124,15 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
                         completed: true,
                         detail: te.description,
                       }))
-                    : currentTracking.timeline
+                    : currentTracking.timeline && currentTracking.timeline.length > 0
                     ? currentTracking.timeline.map((t: any) => ({
                         status: t.status,
                         label: t.title,
                         time: t.timestamp,
-                        completed: t.isCompleted,
+                        completed: true,
                         detail: t.subtitle,
                       }))
-                    : currentTracking.timestamps || []
+                    : []
                 }
               />
             </div>

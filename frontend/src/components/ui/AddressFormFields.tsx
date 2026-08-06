@@ -7,6 +7,7 @@ interface AddressFormFieldsProps {
   provinceCode: string;
   provinceName?: string;
   wardCode: string;
+  wardName?: string;
   addressLine1: string;
   onChange: (updates: {
     province: string;
@@ -18,6 +19,7 @@ interface AddressFormFieldsProps {
     longitude?: number;
   }) => void;
   required?: boolean;
+  disabled?: boolean;
   hasErrorProvince?: boolean;
   hasErrorWard?: boolean;
   hasErrorAddressLine1?: boolean;
@@ -28,9 +30,11 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
   provinceCode,
   provinceName,
   wardCode,
+  wardName,
   addressLine1,
   onChange,
   required = true,
+  disabled = false,
   hasErrorProvince,
   hasErrorWard,
   hasErrorAddressLine1,
@@ -44,6 +48,7 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState<boolean>(false);
+  const [isUserTyping, setIsUserTyping] = useState<boolean>(false);
 
   // Fetch all provinces
   useEffect(() => {
@@ -74,19 +79,21 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
       const matched = provinces.find(
         (p) =>
           p.fullName?.toLowerCase() === provinceName.toLowerCase() ||
-          p.name?.toLowerCase() === provinceName.toLowerCase()
+          p.name?.toLowerCase() === provinceName.toLowerCase() ||
+          provinceName.toLowerCase().includes(p.name?.toLowerCase()) ||
+          provinceName.toLowerCase().includes(p.fullName?.toLowerCase())
       );
       if (matched) {
         onChange({
           province: matched.fullName || matched.name,
           provinceCode: matched.code,
-          ward: '', // keep empty as it will be updated by wardCode or wardChange
+          ward: wardName || '',
           wardCode: wardCode,
           addressLine1,
         });
       }
     }
-  }, [provinceCode, provinceName, provinces, wardCode, addressLine1, onChange]);
+  }, [provinceCode, provinceName, provinces, wardCode, wardName, addressLine1, onChange]);
 
   // Fetch wards when province code changes
   useEffect(() => {
@@ -113,18 +120,55 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
     }
   }, [provinceCode, token]);
 
-  // Address suggestions autocomplete query with 500ms debounce
+  // Resolve wardCode from wardName if wardCode is not matched in wards list
   useEffect(() => {
-    if (!addressLine1 || addressLine1.length < 3 || !token) {
+    if (provinceCode && wards.length > 0) {
+      const currentWardMatched = wards.find((w) => w.code === wardCode);
+      if (!currentWardMatched && wardName) {
+        const matchedW = wards.find(
+          (w) =>
+            w.fullName?.toLowerCase() === wardName.toLowerCase() ||
+            w.name?.toLowerCase() === wardName.toLowerCase() ||
+            wardName.toLowerCase().includes(w.name?.toLowerCase()) ||
+            wardName.toLowerCase().includes(w.fullName?.toLowerCase())
+        );
+        if (matchedW) {
+          const currentProvince = provinces.find((p) => p.code === provinceCode)?.fullName || provinceName || '';
+          onChange({
+            province: currentProvince,
+            provinceCode,
+            ward: matchedW.fullName || matchedW.name,
+            wardCode: matchedW.code,
+            addressLine1,
+          });
+        }
+      }
+    }
+  }, [provinceCode, wards, wardCode, wardName, provinces, provinceName, addressLine1, onChange]);
+
+  // Address suggestions autocomplete query with 400ms debounce
+  useEffect(() => {
+    if (!isUserTyping || !addressLine1 || addressLine1.length < 2 || !token) {
       setSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
 
     const timer = setTimeout(async () => {
       setLoadingSuggestions(true);
       try {
-        const res = await fetch(`${CONFIG.API_BASE_URL}/locations/autocomplete?input=${encodeURIComponent(addressLine1)}`, {
-          headers: { Authorization: `Bearer ${token}` }
+        const currentProvince = provinces.find((p) => p.code === provinceCode)?.fullName || '';
+        const currentWard = wards.find((w) => w.code === wardCode);
+        const wardNameStr = currentWard ? currentWard.fullName || currentWard.name : wardName || '';
+
+        // Contextualize search with selected location if available
+        const locationContext = [wardNameStr, currentProvince].filter(Boolean).join(', ');
+        const queryInput = locationContext
+          ? `${addressLine1}, ${locationContext}`
+          : addressLine1;
+
+        const res = await fetch(`${CONFIG.API_BASE_URL}/locations/autocomplete?input=${encodeURIComponent(queryInput)}`, {
+          headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
         if (res.ok && data.success) {
@@ -136,10 +180,10 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
       } finally {
         setLoadingSuggestions(false);
       }
-    }, 500); // 500ms debounce delay
+    }, 400);
 
     return () => clearTimeout(timer);
-  }, [addressLine1, token]);
+  }, [addressLine1, provinceCode, wardCode, wardName, token, isUserTyping]);
 
   const handleProvinceChange = (code: string) => {
     const matched = provinces.find((p) => p.code === code);
@@ -164,86 +208,62 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
   };
 
   const handleAddressLine1Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsUserTyping(true);
     const currentProvince = provinces.find((p) => p.code === provinceCode)?.fullName || '';
     const currentWard = wards.find((w) => w.code === wardCode);
-    const wardName = currentWard ? currentWard.fullName || currentWard.name : '';
+    const wardNameStr = currentWard ? currentWard.fullName || currentWard.name : wardName || '';
     onChange({
       province: currentProvince,
       provinceCode,
-      ward: wardName,
+      ward: wardNameStr,
       wardCode,
       addressLine1: e.target.value,
     });
   };
 
   const handleSelectSuggestion = async (suggestion: any) => {
+    setIsUserTyping(false);
     setShowSuggestions(false);
-    if (!token) return;
 
-    try {
-      const res = await fetch(`${CONFIG.API_BASE_URL}/locations/place-detail?placeId=${suggestion.place_id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok && data.success && data.data) {
-        const detail = data.data;
-        const lat = detail.geometry?.location?.lat;
-        const lng = detail.geometry?.location?.lng;
-        const formattedAddress = detail.formatted_address || suggestion.description;
-
-        let matchedProvinceCode = provinceCode;
-        let matchedProvinceName = provinces.find(p => p.code === provinceCode)?.fullName || '';
-        let matchedWardCode = wardCode;
-        let matchedWardName = wards.find(w => w.code === wardCode)?.fullName || '';
-
-        if (detail.compound) {
-          const comp = detail.compound;
-          if (comp.province) {
-            const matchedP = provinces.find(
-              p => p.fullName?.toLowerCase().includes(comp.province.toLowerCase()) || 
-                   comp.province.toLowerCase().includes(p.fullName?.toLowerCase())
-            );
-            if (matchedP) {
-              matchedProvinceCode = matchedP.code;
-              matchedProvinceName = matchedP.fullName || matchedP.name;
-            }
-          }
-
-          if (matchedProvinceCode && comp.commune) {
-            try {
-              const wardsRes = await fetch(`${CONFIG.API_BASE_URL}/locations/provinces/${matchedProvinceCode}/wards`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              const wardsData = await wardsRes.json();
-              if (wardsRes.ok && wardsData.success) {
-                const matchedW = (wardsData.data || []).find(
-                  (w: any) => w.fullName?.toLowerCase().includes(comp.commune.toLowerCase()) ||
-                              comp.commune.toLowerCase().includes(w.fullName?.toLowerCase())
-                );
-                if (matchedW) {
-                  matchedWardCode = matchedW.code;
-                  matchedWardName = matchedW.fullName || matchedW.name;
-                }
-              }
-            } catch (err) {
-              console.error('Error matching ward:', err);
-            }
-          }
-        }
-
-        onChange({
-          province: matchedProvinceName,
-          provinceCode: matchedProvinceCode,
-          ward: matchedWardName,
-          wardCode: matchedWardCode,
-          addressLine1: formattedAddress,
-          latitude: lat,
-          longitude: lng
-        });
-      }
-    } catch (err) {
-      console.error('Error fetching place detail:', err);
+    // Extract ONLY the street/house main text, ignoring province/ward in the string
+    let streetAddress = suggestion.structured_formatting?.main_text || suggestion.description;
+    if (!suggestion.structured_formatting?.main_text && suggestion.description?.includes(',')) {
+      streetAddress = suggestion.description.split(',')[0].trim();
     }
+
+    const currentProvince = provinces.find((p) => p.code === provinceCode)?.fullName || '';
+    const currentWard = wards.find((w) => w.code === wardCode);
+    const wardName = currentWard ? currentWard.fullName || currentWard.name : '';
+
+    let lat: number | undefined;
+    let lng: number | undefined;
+
+    if (token && suggestion.place_id) {
+      try {
+        const res = await fetch(`${CONFIG.API_BASE_URL}/locations/place-detail?placeId=${suggestion.place_id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok && data.success && data.data) {
+          const detail = data.data;
+          lat = detail.geometry?.location?.lat;
+          lng = detail.geometry?.location?.lng;
+        }
+      } catch (err) {
+        console.error('Error fetching place detail:', err);
+      }
+    }
+
+    // Keep user's selected provinceCode and wardCode untouched!
+    onChange({
+      province: currentProvince,
+      provinceCode,
+      ward: wardName,
+      wardCode,
+      addressLine1: streetAddress,
+      latitude: lat,
+      longitude: lng,
+    });
   };
 
   return (
@@ -256,6 +276,7 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
             value={provinceCode}
             onChange={handleProvinceChange}
             placeholder="-- Chọn Tỉnh/TP --"
+            disabled={disabled}
             loading={loadingProvinces}
             required={required}
           />
@@ -267,7 +288,7 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
             value={wardCode}
             onChange={handleWardChange}
             placeholder="-- Chọn Phường/Xã --"
-            disabled={!provinceCode}
+            disabled={disabled || !provinceCode}
             loading={loadingWards}
             required={required}
           />
@@ -280,12 +301,13 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
         <input
           type="text"
           required={required}
+          disabled={disabled}
           placeholder="Ví dụ: 123 Nguyễn Trãi"
           value={addressLine1}
           onChange={handleAddressLine1Change}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-          onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-          className={`w-full px-3 py-2 border rounded outline-none transition-colors ${hasErrorAddressLine1 ? 'border-red-500 bg-red-50/50 ring-1 ring-red-500' : 'border-[#e2e8f0] focus:border-[#bc0100]'}`}
+          onFocus={() => { if (!disabled && suggestions.length > 0) setShowSuggestions(true); }}
+          className={`w-full px-3 py-2 border rounded outline-none transition-colors ${disabled ? 'bg-slate-100/80 cursor-not-allowed text-slate-700 font-medium' : hasErrorAddressLine1 ? 'border-red-500 bg-red-50/50 ring-1 ring-red-500' : 'border-[#e2e8f0] focus:border-[#bc0100]'}`}
         />
         {showSuggestions && suggestions.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#e2e8f0] rounded shadow-lg z-50 max-h-48 overflow-y-auto">
@@ -293,9 +315,14 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
               <div
                 key={idx}
                 onClick={() => handleSelectSuggestion(s)}
-                className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 text-[10px] text-gray-700 leading-snug"
+                className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 text-[10px] text-gray-700 leading-snug flex flex-col gap-0.5"
               >
-                {s.description}
+                <span className="font-bold text-[#161D25]">
+                  {s.structured_formatting?.main_text || s.description.split(',')[0]}
+                </span>
+                <span className="text-[9px] text-gray-400">
+                  {s.structured_formatting?.secondary_text || s.description}
+                </span>
               </div>
             ))}
           </div>

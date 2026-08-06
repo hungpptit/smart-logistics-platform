@@ -206,15 +206,29 @@ export class TrackingController {
       // 5b. Fetch events directly from tracking_events table for this order's package shipment
       const dbTrackingEvents = await prisma.trackingEvent.findMany({
         where: {
-          shipment: {
-            shipmentPackages: {
-              some: {
-                package: {
-                  orderId: order.id,
+          OR: [
+            { routeStop: { orderId: order.id } },
+            {
+              shipment: {
+                shipmentPackages: {
+                  some: {
+                    package: {
+                      orderId: order.id,
+                    },
+                  },
                 },
               },
             },
-          },
+            {
+              shipment: {
+                routeStops: {
+                  some: {
+                    orderId: order.id,
+                  },
+                },
+              },
+            },
+          ],
         },
         orderBy: { createdAt: 'asc' },
       });

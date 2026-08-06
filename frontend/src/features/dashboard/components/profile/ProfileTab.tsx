@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
 import { Modal } from '../../../../components/ui/Modal';
-import { KeyRound, Eye, EyeOff } from 'lucide-react';
+import { KeyRound, Eye, EyeOff, MapPin, Plus, Pencil, Trash2 } from 'lucide-react';
+import { CONFIG } from '../../../../config';
+import { AddressModal } from '../customer/AddressModal';
 
 export const ProfileTab: React.FC = () => {
   const { user, changePassword } = useAuth();
 
-  // Modal Open State
+  // Modal Open State (Password)
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Change Password Form State
@@ -17,7 +19,64 @@ export const ProfileTab: React.FC = () => {
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [alert, setAlert] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [passwordAlert, setPasswordAlert] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Addresses State for Customer
+  const [customerAddresses, setCustomerAddresses] = useState<any[]>([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
+
+  // Address Modal State
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const initialAddressForm = {
+    id: '',
+    addressLine1: '',
+    addressLine2: '',
+    ward: '',
+    province: '',
+    provinceCode: '',
+    country: 'Vietnam',
+    latitude: 10.8231,
+    longitude: 106.6297,
+    addressType: 'HOME' as const,
+    isDefault: false,
+    wardCode: '',
+    contactName: '',
+    contactPhone: '',
+  };
+
+  const [addressFormData, setAddressFormData] = useState(initialAddressForm);
+
+  const fetchAddresses = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setLoadingAddresses(true);
+    try {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/customers/me/addresses`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.data)) {
+        setCustomerAddresses(data.data);
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải sổ địa chỉ khách hàng:', err);
+    } finally {
+      setLoadingAddresses(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.customerProfile?.addresses && user.customerProfile.addresses.length > 0) {
+      setCustomerAddresses(user.customerProfile.addresses);
+    }
+    fetchAddresses();
+  }, [user]);
 
   if (!user) {
     return <div className="p-6 text-gray-400">Không tìm thấy thông tin tài khoản.</div>;
@@ -31,25 +90,25 @@ export const ProfileTab: React.FC = () => {
     setShowOldPass(false);
     setShowNewPass(false);
     setShowConfirmPass(false);
-    setAlert(null);
+    setPasswordAlert(null);
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAlert(null);
+    setPasswordAlert(null);
 
     if (!oldPassword || !newPassword || !confirmPassword) {
-      setAlert({ message: 'Vui lòng nhập đầy đủ thông tin mật khẩu', type: 'error' });
+      setPasswordAlert({ message: 'Vui lòng nhập đầy đủ thông tin mật khẩu', type: 'error' });
       return;
     }
 
     if (newPassword.length < 6) {
-      setAlert({ message: 'Mật khẩu mới phải có ít nhất 6 ký tự', type: 'error' });
+      setPasswordAlert({ message: 'Mật khẩu mới phải có ít nhất 6 ký tự', type: 'error' });
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setAlert({ message: 'Mật khẩu xác nhận không trùng khớp', type: 'error' });
+      setPasswordAlert({ message: 'Mật khẩu xác nhận không trùng khớp', type: 'error' });
       return;
     }
 
@@ -57,17 +116,150 @@ export const ProfileTab: React.FC = () => {
     try {
       const result = await changePassword(oldPassword, newPassword);
       if (result.success) {
-        setAlert({ message: 'Đổi mật khẩu thành công!', type: 'success' });
+        setPasswordAlert({ message: 'Đổi mật khẩu thành công!', type: 'success' });
         setTimeout(() => {
           handleCloseModal();
         }, 1500);
       } else {
-        setAlert({ message: result.message, type: 'error' });
+        setPasswordAlert({ message: result.message, type: 'error' });
       }
     } catch (err) {
-      setAlert({ message: 'Có lỗi kết nối xảy ra. Vui lòng thử lại.', type: 'error' });
+      setPasswordAlert({ message: 'Có lỗi kết nối xảy ra. Vui lòng thử lại.', type: 'error' });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOpenAddAddress = () => {
+    setIsEditingAddress(false);
+    setAddressFormData({
+      ...initialAddressForm,
+      contactName: (user as any).fullName || user.customerProfile?.fullName || user.username || '',
+      contactPhone: user.phone || user.customerProfile?.phone || '',
+    });
+    setShowAddressModal(true);
+  };
+
+  const cleanStreetAddress = (rawAddress: string, wardName?: string, provinceName?: string) => {
+    if (!rawAddress) return '';
+    let cleaned = rawAddress;
+    
+    if (wardName) {
+      const escapedWard = wardName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      cleaned = cleaned.replace(new RegExp(`,\\s*${escapedWard}`, 'gi'), '');
+      const shortWard = wardName.replace(/^(Phường|Xã|Thị trấn)\s+/i, '').trim();
+      if (shortWard) {
+        cleaned = cleaned.replace(new RegExp(`,\\s*(Phường|Xã|Thị trấn)?\\s*${shortWard}`, 'gi'), '');
+      }
+    }
+
+    if (provinceName) {
+      const escapedProv = provinceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      cleaned = cleaned.replace(new RegExp(`,\\s*${escapedProv}`, 'gi'), '');
+      const shortProv = provinceName.replace(/^(Thành phố|Tỉnh)\s+/i, '').trim();
+      if (shortProv) {
+        cleaned = cleaned.replace(new RegExp(`,\\s*(Thành phố|Tỉnh)?\\s*${shortProv}`, 'gi'), '');
+      }
+    }
+
+    return cleaned.trim();
+  };
+
+  const handleOpenEditAddress = (item: any) => {
+    const addr = item.address || item;
+    const wardCode = addr.wardCode || addr.wardRelation?.code || '';
+    const provinceCode = addr.wardRelation?.provinceCode || addr.wardRelation?.province?.code || addr.provinceCode || '';
+    const wardName = addr.wardRelation?.fullName || addr.wardRelation?.name || addr.wardName || '';
+    const provinceName = addr.wardRelation?.province?.fullName || addr.wardRelation?.province?.name || addr.provinceName || '';
+
+    const cleanedAddressLine1 = cleanStreetAddress(addr.addressLine1 || '', wardName, provinceName);
+
+    setIsEditingAddress(true);
+    setAddressFormData({
+      id: item.addressId || addr.id || item.id,
+      addressLine1: cleanedAddressLine1,
+      addressLine2: addr.addressLine2 || '',
+      ward: wardName,
+      province: provinceName,
+      provinceCode: provinceCode,
+      wardCode: wardCode,
+      country: addr.country || 'Vietnam',
+      latitude: addr.latitude || 10.8231,
+      longitude: addr.longitude || 106.6297,
+      addressType: item.addressType || 'HOME',
+      isDefault: item.isDefault || false,
+      contactName: item.contactName || '',
+      contactPhone: item.contactPhone || '',
+    });
+    setShowAddressModal(true);
+  };
+
+  const handleSaveAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const customerId = user.customerProfile?.id;
+
+    setActionLoading(true);
+    try {
+      let url = `${CONFIG.API_BASE_URL}/customers/me/addresses`;
+      let method = 'POST';
+
+      if (isEditingAddress && customerId && addressFormData.id) {
+        url = `${CONFIG.API_BASE_URL}/customers/${customerId}/addresses/${addressFormData.id}`;
+        method = 'PUT';
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(addressFormData),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setShowAddressModal(false);
+        fetchAddresses();
+      } else {
+        window.alert(data.message || 'Lỗi khi lưu địa chỉ.');
+      }
+    } catch (err) {
+      console.error(err);
+      window.alert('Không thể kết nối tới máy chủ.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteAddress = async (addressId: string) => {
+    const customerId = user.customerProfile?.id;
+    if (!customerId) return;
+    if (!window.confirm('Bạn có chắc chắn muốn xóa địa chỉ này khỏi sổ địa chỉ?')) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/customers/${customerId}/addresses/${addressId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        fetchAddresses();
+      } else {
+        window.alert(data.message || 'Lỗi khi xóa địa chỉ.');
+      }
+    } catch (err) {
+      console.error(err);
+      window.alert('Không thể kết nối tới máy chủ.');
     }
   };
 
@@ -111,8 +303,24 @@ export const ProfileTab: React.FC = () => {
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-gray-400 font-medium">Số điện thoại</span>
-              <span className="font-bold text-[#161D25] bg-[#F4F4F4] p-2 rounded border border-[#e2e8f0]">{user.phone || 'Chưa cập nhật'}</span>
+              <span className="font-bold text-[#161D25] bg-[#F4F4F4] p-2 rounded border border-[#e2e8f0]">{user.phone || user.customerProfile?.phone || 'Chưa cập nhật'}</span>
             </div>
+            {user.customerProfile?.customerCode && (
+              <div className="flex flex-col gap-1">
+                <span className="text-gray-400 font-medium">Mã khách hàng</span>
+                <span className="font-bold text-[#bc0100] font-mono bg-[#F4F4F4] p-2 rounded border border-[#e2e8f0]">
+                  {user.customerProfile.customerCode}
+                </span>
+              </div>
+            )}
+            {user.customerProfile?.customerType && (
+              <div className="flex flex-col gap-1">
+                <span className="text-gray-400 font-medium">Loại tài khoản</span>
+                <span className="font-bold text-[#161D25] bg-[#F4F4F4] p-2 rounded border border-[#e2e8f0]">
+                  {user.customerProfile.customerType === 'BUSINESS' ? 'Doanh nghiệp' : 'Cá nhân'}
+                </span>
+              </div>
+            )}
             {user.roles.includes('STAFF') && (
               <div className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-gray-400 font-medium">Kho được phân công</span>
@@ -130,17 +338,126 @@ export const ProfileTab: React.FC = () => {
           </div>
         </div>
 
+        {/* Khối hiển thị Địa chỉ Khách hàng */}
         <div>
-          <h3 className="text-sm font-bold text-[#161D25] uppercase tracking-wider border-b border-[#e8e8e8] pb-2">Danh sách quyền hạn được cấp (RBAC)</h3>
-          <div className="flex flex-wrap gap-2 mt-3">
-            {user.permissions.length === 0 ? (
-              <span className="text-xs text-gray-400 italic">Không có quyền hạn đặc biệt</span>
-            ) : (
-              user.permissions.map((p) => (
-                <span key={p} className="text-[10px] font-bold font-mono bg-gray-100 text-gray-700 border border-gray-200 px-2.5 py-1 rounded">
-                  {p}
+          <div className="flex items-center justify-between border-b border-[#e8e8e8] pb-2">
+            <h3 className="text-sm font-bold text-[#161D25] uppercase tracking-wider flex items-center gap-2">
+              <MapPin size={16} className="text-[#bc0100]" />
+              Sổ địa chỉ nhận / gửi hàng
+            </h3>
+            <div className="flex items-center gap-2.5">
+              {customerAddresses.length > 0 && (
+                <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
+                  {customerAddresses.length} địa chỉ
                 </span>
-              ))
+              )}
+              <button
+                type="button"
+                onClick={handleOpenAddAddress}
+                className="flex items-center gap-1 text-xs font-bold bg-[#bc0100] text-white hover:bg-[#a00100] transition-colors px-3 py-1.5 rounded-md shadow-sm"
+              >
+                <Plus size={14} />
+                Thêm địa chỉ
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3">
+            {loadingAddresses && customerAddresses.length === 0 ? (
+              <div className="text-xs text-gray-400 py-4 text-center">Đang tải sổ địa chỉ...</div>
+            ) : customerAddresses.length === 0 ? (
+              <div className="bg-[#F8FAFC] border border-dashed border-[#cbd5e1] rounded-lg p-5 text-center flex flex-col items-center gap-2">
+                <MapPin size={24} className="text-gray-300" />
+                <p className="text-xs text-gray-600 font-semibold">Chưa có địa chỉ nào trong sổ địa chỉ</p>
+                <p className="text-[11px] text-gray-400 max-w-sm">Bấm nút "Thêm địa chỉ" ở trên hoặc các địa chỉ lấy/giao hàng sẽ được tự động lưu lại khi bạn tạo đơn hàng mới.</p>
+                <button
+                  type="button"
+                  onClick={handleOpenAddAddress}
+                  className="mt-1 flex items-center gap-1.5 text-xs font-bold bg-[#161D25] text-white hover:bg-[#bc0100] transition-colors px-4 py-2 rounded-md"
+                >
+                  <Plus size={14} />
+                  Thêm địa chỉ ngay
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {customerAddresses.map((item: any, idx: number) => {
+                  const addr = item.address || item;
+                  const ward = addr.wardRelation?.fullName || addr.wardRelation?.name || addr.wardName || addr.ward || item.ward || '';
+                  const province = addr.wardRelation?.province?.fullName || addr.wardRelation?.province?.name || addr.provinceName || addr.province || item.province || '';
+
+                  const addressParts = [
+                    addr.addressLine1,
+                    ward,
+                    province,
+                  ].filter(Boolean);
+
+                  const fullAddressStr = addressParts.join(', ') || addr.fullAddress || 'Chi tiết địa chỉ chưa cập nhật';
+
+                  const typeLabel =
+                    item.addressType === 'HOME' ? 'Nhà riêng' :
+                    item.addressType === 'OFFICE' ? 'Văn phòng' :
+                    item.addressType === 'WAREHOUSE' ? 'Kho hàng' :
+                    item.addressType === 'RETURN' ? 'Trả hàng' :
+                    item.addressType || 'Địa chỉ';
+
+                  return (
+                    <div
+                      key={item.id || idx}
+                      className={`p-3.5 rounded-md border transition-all duration-200 ${
+                        item.isDefault
+                          ? 'border-[#bc0100]/40 bg-[#bc0100]/[0.02] shadow-sm'
+                          : 'border-[#e2e8f0] bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-gray-100 text-gray-700 border border-gray-200">
+                            {typeLabel}
+                          </span>
+                          {item.isDefault && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-[#bc0100] text-white">
+                              Mặc định
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {(item.contactName || item.contactPhone) && (
+                            <span className="text-xs font-semibold text-[#161D25]">
+                              {item.contactName} {item.contactPhone ? <span className="text-gray-500 font-normal">({item.contactPhone})</span> : ''}
+                            </span>
+                          )}
+
+                          <div className="flex items-center gap-1 border-l border-gray-200 pl-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditAddress(item)}
+                              className="p-1 text-gray-400 hover:text-[#161D25] transition-colors rounded"
+                              title="Chỉnh sửa địa chỉ"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAddress(item.addressId || item.id)}
+                              className="p-1 text-gray-400 hover:text-[#bc0100] transition-colors rounded"
+                              title="Xóa địa chỉ"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2 text-xs text-[#2d3748] mt-1 font-medium">
+                        <MapPin size={14} className="text-[#bc0100] shrink-0 mt-0.5" />
+                        <span className="leading-relaxed">{fullAddressStr}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
@@ -222,11 +539,11 @@ export const ProfileTab: React.FC = () => {
             </div>
 
             {/* Alert Banner */}
-            {alert && (
+            {passwordAlert && (
               <div className={`text-xs font-semibold mt-1 p-2 rounded ${
-                alert.type === 'success' ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'
+                passwordAlert.type === 'success' ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'
               }`}>
-                {alert.message}
+                {passwordAlert.message}
               </div>
             )}
 
@@ -250,6 +567,17 @@ export const ProfileTab: React.FC = () => {
           </form>
         </div>
       </Modal>
+
+      {/* Address Create/Edit Modal */}
+      <AddressModal
+        isOpen={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        isEditing={isEditingAddress}
+        addressFormData={addressFormData}
+        setAddressFormData={setAddressFormData}
+        onSubmit={handleSaveAddress}
+        actionLoading={actionLoading}
+      />
     </div>
   );
 };

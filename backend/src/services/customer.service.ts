@@ -286,10 +286,14 @@ export class CustomerService {
     const resolved = await resolveAddressDetails(dto);
     const formattedAddress = `${dto.addressLine1}, ${resolved.ward}, ${resolved.province}, ${dto.country || 'Vietnam'}`;
 
+    const finalAddressLine1 = dto.addressLine2
+      ? `${dto.addressLine2.trim()}, ${dto.addressLine1.trim()}`
+      : dto.addressLine1;
+
     return await prisma.$transaction(async (tx) => {
       const address = await tx.address.create({
         data: {
-          addressLine1: dto.addressLine1,
+          addressLine1: finalAddressLine1,
           country: dto.country || 'Vietnam',
           latitude: dto.latitude,
           longitude: dto.longitude,
@@ -329,7 +333,15 @@ export class CustomerService {
       include: {
         addresses: {
           include: {
-            address: true,
+            address: {
+              include: {
+                wardRelation: {
+                  include: {
+                    province: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -367,11 +379,15 @@ export class CustomerService {
     });
     const formattedAddress = `${dto.addressLine1 || ''}, ${resolved.ward}, ${resolved.province}, ${dto.country || 'Vietnam'}`;
 
+    const finalAddressLine1 = dto.addressLine1 !== undefined
+      ? (dto.addressLine2 ? `${dto.addressLine2.trim()}, ${dto.addressLine1.trim()}` : dto.addressLine1)
+      : undefined;
+
     return await prisma.$transaction(async (tx) => {
       const address = await tx.address.update({
         where: { id: addressId },
         data: {
-          addressLine1: dto.addressLine1 !== undefined ? dto.addressLine1 : undefined,
+          addressLine1: finalAddressLine1,
           country: dto.country !== undefined ? dto.country : undefined,
           latitude: dto.latitude !== undefined ? dto.latitude : undefined,
           longitude: dto.longitude !== undefined ? dto.longitude : undefined,

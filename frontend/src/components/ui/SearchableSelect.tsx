@@ -56,7 +56,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     }
   }, [isOpen]);
 
-  const selectedOption = options.find(opt => opt.value === value);
+  const selectedOption = options.find(opt => String(opt.value) === String(value));
 
   // Simple, instantaneous client-side filtering
   const filteredOptions = options.filter(opt =>

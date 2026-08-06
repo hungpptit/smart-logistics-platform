@@ -51,6 +51,17 @@ export const MapPicker: React.FC<MapPickerProps> = ({
   useEffect(() => {
     if (latitude && longitude) {
       setMapCenter([longitude, latitude]);
+      if (mapRef.current) {
+        try {
+          mapRef.current.flyTo({
+            center: [longitude, latitude],
+            zoom: 14,
+            duration: 0
+          });
+        } catch (e) {
+          mapRef.current.setCenter([longitude, latitude]);
+        }
+      }
     } else {
       setMapCenter([105.8542, 21.0285]); // Hanoi default
     }
@@ -68,10 +79,13 @@ export const MapPicker: React.FC<MapPickerProps> = ({
 
     setTimeout(() => {
       mapInstance.resize();
+      if (latitude && longitude) {
+        mapInstance.setCenter([longitude, latitude]);
+      }
     }, 300);
 
     mapInstance.on('click', onMapClick);
-  }, [onMapClick]);
+  }, [onMapClick, latitude, longitude]);
 
   const handleAutoLocate = async () => {
     if (!province && !ward && !addressLine1) return;
@@ -108,14 +122,6 @@ export const MapPicker: React.FC<MapPickerProps> = ({
       <div className="flex flex-col gap-1">
         <div className="flex justify-between items-center text-gray-400 font-bold uppercase tracking-wider text-[9px]">
           <span>Bản đồ định vị</span>
-          <button
-            type="button"
-            onClick={handleAutoLocate}
-            disabled={geocodingLoading || !addressLine1}
-            className="text-[#bc0100] hover:text-[#900000] font-bold lowercase tracking-normal text-[10px] flex items-center gap-1 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
-          >
-            {geocodingLoading ? 'Đang định vị...' : '🔍 [Nhấn để định vị tự động]'}
-          </button>
         </div>
 
         <div className="w-full h-72 rounded-md border border-[#e2e8f0] overflow-hidden relative mt-0.5 bg-gray-50">

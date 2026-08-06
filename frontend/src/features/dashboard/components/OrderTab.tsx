@@ -392,6 +392,21 @@ export const OrderTab: React.FC = () => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
   };
 
+  const getOrderTotalAmount = (ord: any) => {
+    if (!ord) return 25000;
+    if (ord.payment?.totalAmount && Number(ord.payment.totalAmount) > 0) {
+      return Number(ord.payment.totalAmount);
+    }
+    if (ord.totalAmount && Number(ord.totalAmount) > 0) {
+      return Number(ord.totalAmount);
+    }
+    const shipping = Number(ord.estimatedShippingFee ?? ord.shippingFee ?? 25000);
+    const cod = Number(ord.estimatedCodAmount ?? ord.codAmount ?? 0);
+    const insurance = Number(ord.estimatedInsuranceFee ?? ord.insuranceFee ?? 0);
+    const sum = shipping + cod + insurance;
+    return sum > 0 ? sum : 25000;
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return '--';
     const date = new Date(dateString);
@@ -663,7 +678,7 @@ export const OrderTab: React.FC = () => {
                               {order.deliveryAddressText}
                             </td>
                             <td className="px-6 py-4 font-bold text-[#bc0100]">
-                              {formatCurrency(order.totalAmount ?? (order as any).estimatedTotalAmount)}
+                              {formatPrice(getOrderTotalAmount(order))}
                             </td>
                             <td className="px-6 py-4">
                               <span
@@ -929,7 +944,7 @@ export const OrderTab: React.FC = () => {
                   <div className="border-b border-gray-300/40 my-1"></div>
                   <div className="flex justify-between font-bold text-[#bc0100] text-sm">
                     <span>Tổng chi phí đơn</span>
-                    <span>{formatPrice(selectedOrder.totalAmount ?? (selectedOrder as any).estimatedTotalAmount)}</span>
+                    <span>{formatPrice(getOrderTotalAmount(selectedOrder))}</span>
                   </div>
                   <div className="text-[9px] text-gray-400 mt-1 uppercase font-bold tracking-wider">
                     Thanh toán bởi: {selectedOrder.payment?.feePayer === 'SENDER' ? 'Người gửi' : 'Người nhận'} ({selectedOrder.payment?.paymentMethod})

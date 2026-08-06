@@ -34,6 +34,38 @@ export interface User {
     } | null;
     employmentStatus?: 'ACTIVE' | 'OFFLINE' | 'SUSPENDED' | 'DISABLED' | string | null;
   } | null;
+  customerProfile?: {
+    id: string;
+    customerCode: string;
+    fullName: string;
+    phone?: string;
+    email?: string;
+    customerType?: string;
+    companyName?: string;
+    taxCode?: string;
+    addresses?: Array<{
+      id: string;
+      addressType: string;
+      isDefault: boolean;
+      contactName?: string;
+      contactPhone?: string;
+      address?: {
+        id: string;
+        addressLine1: string;
+        wardCode?: string;
+        wardRelation?: {
+          name: string;
+          district?: {
+            name: string;
+            province?: {
+              name: string;
+            };
+          };
+        };
+      };
+    }>;
+  } | null;
+  customer?: any;
 }
 
 export interface AuthResponse {

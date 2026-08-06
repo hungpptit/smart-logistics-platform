@@ -11,36 +11,92 @@ export class AuthService {
    * Register a new Customer user
    */
   public async register(dto: RegisterDto) {
-    // 1. Check if email or phone already exists in Customer
-    const existingCustomer = await prisma.customer.findFirst({
+    let username = dto.username?.trim();
+
+    // 1. Check if explicit username is already taken by an active/locked user, or by another email
+    if (username) {
+      const existingUser = await prisma.user.findUnique({
+        where: { username },
+        include: { customer: true },
+      });
+
+      if (existingUser) {
+        if (existingUser.status !== 'DISABLED' || existingUser.customer?.email !== dto.email) {
+          throw new BadRequestException('Tên đăng nhập đã được sử dụng. Vui lòng chọn tên khác.');
+        }
+      }
+    }
+
+    // 2. Check if email or phone already exists in Customer
+    const existingCustomers = await prisma.customer.findMany({
       where: {
         OR: [
           { email: dto.email },
-          { phone: dto.phone },
+          ...(dto.phone ? [{ phone: dto.phone }] : []),
         ],
-        user: { status: 'ACTIVE' },
       },
+      include: { user: true },
     });
 
-    if (existingCustomer) {
+    const activeCustomer = existingCustomers.find(
+      (c) => c.user && (c.user.status === 'ACTIVE' || c.user.status === 'LOCKED')
+    );
+
+    if (activeCustomer) {
       throw new BadRequestException('Email hoặc số điện thoại đã được đăng ký tài khoản');
     }
 
-    // Generate unique username from Full Name or email
-    let slug = (dto.fullName || dto.email.split('@')[0]).toLowerCase();
-    slug = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    slug = slug.replace(/[đĐ]/g, "d");
-    slug = slug.replace(/\s+/g, "");
-    slug = slug.replace(/[^a-z0-9_]/g, "");
-    const usernamePrefix = slug.substring(0, 20) || 'cust';
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const username = dto.username?.trim() || `${usernamePrefix}_${randomSuffix}`;
+    // 3. Clean up stale unverified (DISABLED) user/customer records for this email/phone or username
+    const unverifiedUserIds = existingCustomers
+      .filter((c) => c.user && c.user.status === 'DISABLED')
+      .map((c) => c.userId);
 
-    // 2. Hash password
+    if (username) {
+      const unverifiedUserByUsername = await prisma.user.findFirst({
+        where: { username, status: 'DISABLED' },
+      });
+      if (unverifiedUserByUsername && !unverifiedUserIds.includes(unverifiedUserByUsername.id)) {
+        unverifiedUserIds.push(unverifiedUserByUsername.id);
+      }
+    }
+
+    if (unverifiedUserIds.length > 0) {
+      await prisma.user.deleteMany({
+        where: { id: { in: unverifiedUserIds } },
+      });
+    }
+
+    // 4. Generate unique username if not provided
+    if (!username) {
+      let slug = (dto.fullName || dto.email.split('@')[0]).toLowerCase();
+      slug = slug.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      slug = slug.replace(/[đĐ]/g, 'd');
+      slug = slug.replace(/\s+/g, '');
+      slug = slug.replace(/[^a-z0-9_]/g, '');
+      const usernamePrefix = slug.substring(0, 20) || 'cust';
+
+      let attempts = 0;
+      do {
+        const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+        const candidate = `${usernamePrefix}_${randomSuffix}`;
+        const existing = await prisma.user.findUnique({ where: { username: candidate } });
+        if (!existing) {
+          username = candidate;
+          break;
+        }
+        attempts++;
+      } while (attempts < 10);
+
+      if (!username) {
+        username = `${usernamePrefix}_${Date.now()}`;
+      }
+    }
+
+    // 5. Hash password
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(dto.password, saltRounds);
 
-    // 3. Find default CUSTOMER role
+    // 6. Find default CUSTOMER role
     const customerRole = await prisma.role.findUnique({
       where: { roleCode: 'CUSTOMER' },
     });
@@ -52,38 +108,64 @@ export class AuthService {
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // 4. Create User and Customer in a transaction
-    const count = await prisma.customer.count();
-    const customerCode = `CUST-${String(count + 1).padStart(6, '0')}`;
+    // 7. Generate guaranteed unique customer code
+    let customerCode = '';
+    let isCodeUnique = false;
+    let codeCounter = (await prisma.customer.count()) + 1;
+    while (!isCodeUnique) {
+      customerCode = `CUST-${String(codeCounter).padStart(6, '0')}`;
+      const existingCust = await prisma.customer.findUnique({ where: { customerCode } });
+      if (!existingCust) {
+        isCodeUnique = true;
+      } else {
+        codeCounter++;
+      }
+    }
 
-    const user = await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: {
-          username,
-          passwordHash,
-          status: 'DISABLED',
-          roleId: customerRole.id,
-        },
+    // 8. Create User and Customer in a transaction with Prisma error catching
+    let user;
+    try {
+      user = await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            username,
+            passwordHash,
+            status: 'DISABLED',
+            roleId: customerRole.id,
+          },
+        });
+
+        await tx.customer.create({
+          data: {
+            userId: newUser.id,
+            customerCode,
+            fullName: dto.fullName || dto.username || 'Khách hàng',
+            phone: dto.phone || '',
+            email: dto.email,
+            customerType: 'INDIVIDUAL',
+          },
+        });
+
+        return newUser;
       });
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        const target = error.meta?.target;
+        if (Array.isArray(target) && target.includes('username')) {
+          throw new BadRequestException('Tên đăng nhập đã được sử dụng. Vui lòng chọn tên khác.');
+        }
+        if (Array.isArray(target) && target.includes('customer_code')) {
+          throw new BadRequestException('Mã khách hàng đã tồn tại. Vui lòng thử lại.');
+        }
+        throw new BadRequestException('Thông tin đăng ký đã được sử dụng trong hệ thống.');
+      }
+      throw error;
+    }
 
-      await tx.customer.create({
-        data: {
-          userId: newUser.id,
-          customerCode,
-          fullName: dto.fullName || dto.username || 'Khách hàng',
-          phone: dto.phone || '',
-          email: dto.email,
-          customerType: 'INDIVIDUAL',
-        },
-      });
-
-      return newUser;
-    });
-
-    // 5. Save OTP in Redis (Expires in 10 minutes)
+    // 9. Save OTP in Redis (Expires in 10 minutes)
     await redis.setEx(`otp:email:${dto.email}`, 600, otp);
 
-    // 6. Publish to RabbitMQ mail_queue
+    // 10. Publish to RabbitMQ mail_queue
     await rabbitMQService.publishToQueue('mail_queue', {
       type: 'REGISTER_OTP',
       email: dto.email,
@@ -209,7 +291,23 @@ export class AuthService {
             assignedFacility: true,
           },
         },
-        customer: true,
+        customer: {
+          include: {
+            addresses: {
+              include: {
+                address: {
+                  include: {
+                    wardRelation: {
+                      include: {
+                        province: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         role: {
           include: {
             rolePermissions: {
@@ -277,6 +375,7 @@ export class AuthService {
       user: {
         ...userWithoutPassword,
         staffProfile: user.staff,
+        customerProfile: user.customer,
         fullName: profileFullName,
         email: profileEmail,
         phone: profilePhone,
@@ -358,7 +457,23 @@ export class AuthService {
             assignedFacility: true,
           },
         },
-        customer: true,
+        customer: {
+          include: {
+            addresses: {
+              include: {
+                address: {
+                  include: {
+                    wardRelation: {
+                      include: {
+                        province: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         role: {
           include: {
             rolePermissions: {
@@ -390,6 +505,7 @@ export class AuthService {
     return {
       ...userWithoutPassword,
       staffProfile: user.staff,
+      customerProfile: user.customer,
       fullName: profileFullName,
       email: profileEmail,
       phone: profilePhone,

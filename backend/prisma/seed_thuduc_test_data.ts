@@ -553,9 +553,312 @@ async function main() {
         packageId: pkg.id,
       },
     });
+
+    // 6. Tạo Lịch sử Trạng thái Đơn hàng (Order Status History)
+    await prisma.orderStatusHistory.createMany({
+      data: [
+        {
+          orderId: order.id,
+          status: OrderStatus.CREATED,
+          changedByUserId: customer.userId,
+          reason: `Đơn hàng ${orderCode} được khởi tạo thành công trên hệ thống.`,
+        },
+        {
+          orderId: order.id,
+          status: OrderStatus.AT_HUB,
+          changedByUserId: customer.userId,
+          reason: `Hàng hóa đã được nhập kho Bưu cục Đặng Văn Bi và sẵn sàng gom cụm AI.`,
+        },
+      ],
+      skipDuplicates: true,
+    });
+
+    // 7. Tạo Nhật ký Sự kiện Vận chuyển ban đầu (Tracking Events)
+    await prisma.trackingEvent.createMany({
+      data: [
+        {
+          shipmentId: shipment.id,
+          eventType: 'CREATED',
+          description: `Vận đơn ${shipmentCode} đã được tạo cho đơn hàng ${orderCode}.`,
+          latitude: meta.lat,
+          longitude: meta.lng,
+          createdBy: customer.userId,
+        },
+        {
+          shipmentId: shipment.id,
+          eventType: 'ARRIVED_FACILITY',
+          description: `Vận đơn ${shipmentCode} đã nhập kho Bưu cục Đặng Văn Bi (TP. Thủ Đức).`,
+          latitude: 10.8495,
+          longitude: 106.7625,
+          createdBy: customer.userId,
+        },
+      ],
+      skipDuplicates: true,
+    });
   }
 
-  console.log('🎉 Hoàn tất nạp lại dữ liệu Test 50 Đơn hàng TP. Thủ Đức chuẩn nghiệp vụ PICKUP & CHUYỂN KHO!');
+  // ==========================================
+  // 3. TẠO ĐƠN HÀNG LIÊN MIỀN 3 CẤP KHO (HÀ NỘI ➔ TPHCM)
+  // Quy trình: Ward (HN) -> Provincial Hub (HN) -> Sorter (HN) -> Sorter (HCM) -> Provincial Hub (HCM) -> Ward (Đặng Văn Bi)
+  // ==========================================
+  console.log('✈️ Tạo Đơn hàng liên miền Hà Nội ➔ TP.HCM quy trình Vận chuyển 3 Cấp Kho (ORD-INTER-001)...');
+
+  // Địa chỉ kho Hà Nội
+  const addrSCHN = await prisma.address.create({
+    data: {
+      addressLine1: 'Số 1 Đường Nguyễn Văn Linh, Phường Gia Thụy, Quận Long Biên, Hà Nội',
+      country: 'Vietnam',
+      latitude: 21.0500,
+      longitude: 105.9000,
+    },
+  });
+
+  const sortingCenterHN = await prisma.facility.upsert({
+    where: { facilityCode: 'FAC-SC-NORTH' },
+    update: {},
+    create: {
+      facilityCode: 'FAC-SC-NORTH',
+      facilityName: 'Tổng Kho Miền Bắc (Sorting Center Long Biên, Hà Nội)',
+      facilityTypeId: sortingCenterType.id,
+      parentFacilityId: null,
+      provinceCode: '01',
+      addressId: addrSCHN.id,
+      operatingStatus: FacilityStatus.ACTIVE,
+      openedAt: new Date('2025-01-01'),
+    },
+  });
+
+  const addrHubHN = await prisma.address.create({
+    data: {
+      addressLine1: 'Số 68 Cầu Giấy, Phường Quan Hoa, Quận Cầu Giấy, Hà Nội',
+      country: 'Vietnam',
+      latitude: 21.0300,
+      longitude: 105.7800,
+    },
+  });
+
+  const provincialHubHN = await prisma.facility.upsert({
+    where: { facilityCode: 'FAC-HUB-HN' },
+    update: {},
+    create: {
+      facilityCode: 'FAC-HUB-HN',
+      facilityName: 'Kho Tổng Hà Nội (Provincial Hub Cầu Giấy)',
+      facilityTypeId: provincialHubType.id,
+      parentFacilityId: sortingCenterHN.id,
+      provinceCode: '01',
+      addressId: addrHubHN.id,
+      operatingStatus: FacilityStatus.ACTIVE,
+      openedAt: new Date('2025-01-01'),
+    },
+  });
+
+  const addrStationHN = await prisma.address.create({
+    data: {
+      addressLine1: '25 Hàng Bạc, Phường Hàng Bạc, Quận Hoàn Kiếm, Hà Nội',
+      country: 'Vietnam',
+      latitude: 21.0335,
+      longitude: 105.8525,
+    },
+  });
+
+  const wardStationHN = await prisma.facility.upsert({
+    where: { facilityCode: 'FAC-WM-HOANKIEM' },
+    update: {},
+    create: {
+      facilityCode: 'FAC-WM-HOANKIEM',
+      facilityName: 'Bưu cục Hoàn Kiếm (Ward Station Hà Nội)',
+      facilityTypeId: lastMileFacilityType.id,
+      parentFacilityId: provincialHubHN.id,
+      provinceCode: '01',
+      addressId: addrStationHN.id,
+      operatingStatus: FacilityStatus.ACTIVE,
+      openedAt: new Date('2025-01-01'),
+    },
+  });
+
+  // Tạo địa chỉ nhận tại Đặng Văn Bi Thủ Đức
+  const interOrderCode = 'ORD-INTER-001';
+  const interPackageCode = 'PKG-INTER-001';
+  const interShipmentCode = 'SPM-INTER-001';
+  const customerHN = createdCustomers[0];
+
+  const interOrder = await prisma.order.upsert({
+    where: { orderCode: interOrderCode },
+    update: {
+      status: OrderStatus.AT_HUB,
+    },
+    create: {
+      orderCode: interOrderCode,
+      customerId: customerHN.id,
+      serviceId: expressService.id,
+      pickupAddressId: addrStationHN.id,
+      pickupAddressText: '25 Hàng Bạc, Phường Hàng Bạc, Quận Hoàn Kiếm, Hà Nội',
+      pickupLatitude: 21.0335,
+      pickupLongitude: 105.8525,
+      deliveryAddressId: addrHub1.id,
+      receiverName: 'Anh Phạm Văn Nam',
+      receiverPhone: '0909998877',
+      deliveryAddressText: '180 Đặng Văn Bi, Phường Bình Thọ, TP. Thủ Đức, TP. Hồ Chí Minh',
+      deliveryLatitude: 10.8495,
+      deliveryLongitude: 106.7625,
+      estimatedShippingFee: 55000,
+      estimatedInsuranceFee: 5000,
+      estimatedCodAmount: 350000,
+      estimatedDistance: 1720,
+      estimatedDuration: 2880,
+      status: OrderStatus.AT_HUB,
+      pickupType: PickupType.PICKUP,
+      originFacilityId: wardStationHN.id,
+      destinationFacilityId: hub1.id,
+      createdBy: customerHN.userId,
+    },
+  });
+
+  const interPkg = await prisma.package.upsert({
+    where: { packageCode: interPackageCode },
+    update: { currentFacilityId: hub1.id },
+    create: {
+      orderId: interOrder.id,
+      packageCode: interPackageCode,
+      weight: 2.5,
+      length: 30,
+      width: 20,
+      height: 15,
+      volume: 0.009,
+      currentFacilityId: hub1.id,
+    },
+  });
+
+  const interShipment = await prisma.shipment.upsert({
+    where: { shipmentCode: interShipmentCode },
+    update: { status: ShipmentStatus.AT_HUB },
+    create: {
+      shipmentCode: interShipmentCode,
+      originFacilityId: wardStationHN.id,
+      destinationFacilityId: hub1.id,
+      status: ShipmentStatus.AT_HUB,
+      createdBy: customerHN.userId,
+    },
+  });
+
+  await prisma.shipmentPackage.upsert({
+    where: { shipmentId_packageId: { shipmentId: interShipment.id, packageId: interPkg.id } },
+    update: {},
+    create: { shipmentId: interShipment.id, packageId: interPkg.id },
+  });
+
+  // Tạo 13 Mốc Sự kiện Vận chuyển Luân chuyển Liên miền 3 Cấp Kho
+  await prisma.trackingEvent.deleteMany({ where: { shipmentId: interShipment.id } });
+  await prisma.trackingEvent.createMany({
+    data: [
+      {
+        shipmentId: interShipment.id,
+        eventType: 'CREATED',
+        description: 'Vận đơn SPM-INTER-001 đã được tạo cho đơn hàng liên miền ORD-INTER-001 tại Quận Hoàn Kiếm, Hà Nội.',
+        latitude: 21.0335,
+        longitude: 105.8525,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'PICKED_UP',
+        description: 'Tài xế đã tiếp nhận thành công kiện hàng tại 25 Hàng Bạc, Hoàn Kiếm, Hà Nội.',
+        latitude: 21.0335,
+        longitude: 105.8525,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'ARRIVED_FACILITY',
+        description: 'Đã nhập kho Bưu cục Hoàn Kiếm (Hà Nội).',
+        latitude: 21.0330,
+        longitude: 105.8520,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'DEPARTED_FACILITY',
+        description: 'Xuất kho Bưu cục Hoàn Kiếm luân chuyển lên Kho Tổng Hà Nội.',
+        latitude: 21.0330,
+        longitude: 105.8520,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'ARRIVED_HUB',
+        description: 'Đã nhập kho Kho Tổng Hà Nội (Provincial Hub Cầu Giấy).',
+        latitude: 21.0300,
+        longitude: 105.7800,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'DEPARTED_HUB',
+        description: 'Xe tải trung chuyển xuất Kho Tổng Hà Nội lên Tổng Kho Miền Bắc.',
+        latitude: 21.0300,
+        longitude: 105.7800,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'ARRIVED_HUB',
+        description: 'Đã nhập Tổng Kho Miền Bắc (Sorting Center Long Biên, Hà Nội) - Đang phân loại liên miền.',
+        latitude: 21.0500,
+        longitude: 105.9000,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'DEPARTED_HUB',
+        description: 'Xuất Tổng Kho Miền Bắc vận chuyển đường dài vào TP. Hồ Chí Minh.',
+        latitude: 21.0500,
+        longitude: 105.9000,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'ARRIVED_HUB',
+        description: 'Đã cập bến và nhập kho Tổng Kho Miền Nam (Sorting Center Q.12, TP.HCM).',
+        latitude: 10.8520,
+        longitude: 106.6200,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'DEPARTED_HUB',
+        description: 'Phân loại xong, xe tải trung chuyển xuất kho Tổng Kho Miền Nam về Kho Tổng TP.HCM.',
+        latitude: 10.8520,
+        longitude: 106.6200,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'ARRIVED_HUB',
+        description: 'Đã nhập kho Kho Tổng TP. Hồ Chí Minh (Provincial Hub Tân Bình).',
+        latitude: 10.8050,
+        longitude: 106.6500,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'DEPARTED_FACILITY',
+        description: 'Xuất kho Kho Tổng TP.HCM về bưu cục phát chặng cuối Đặng Văn Bi.',
+        latitude: 10.8050,
+        longitude: 106.6500,
+        createdBy: customerHN.userId,
+      },
+      {
+        shipmentId: interShipment.id,
+        eventType: 'ARRIVED_FACILITY',
+        description: 'Đã cập bến Bưu cục Đặng Văn Bi - TP. Thủ Đức. Sẵn sàng cho AI phân tuyến Shipper phát tận nhà!',
+        latitude: 10.8495,
+        longitude: 106.7625,
+        createdBy: customerHN.userId,
+      },
+    ],
+  });
+
+  console.log('🎉 Hoàn tất nạp lại dữ liệu Test 50 Đơn hàng TP. Thủ Đức + 1 Đơn liên miền 3 Cấp Kho (ORD-INTER-001)!');
 }
 
 main()

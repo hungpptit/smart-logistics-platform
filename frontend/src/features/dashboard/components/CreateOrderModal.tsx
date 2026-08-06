@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Package, MapPin, Truck, User, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, HelpCircle, ShieldCheck } from 'lucide-react';
+import { X, Package, MapPin, Truck, User, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, HelpCircle, ShieldCheck, BookMarked, Plus, Pencil } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
+import { AddressModal } from './customer/AddressModal';
 import { CONFIG } from '../../../config';
 import { geocodeAddress } from '../../../lib/geocoding';
 import { Map, MapMarker, MarkerContent, MapControls } from '../../../components/ui/map';
@@ -62,6 +64,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [loadingServices, setLoadingServices] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
+  const { user } = useAuth();
+
   // Form States
   const [customerId, setCustomerId] = useState('');
   const [serviceCode, setServiceCode] = useState('STANDARD');
@@ -69,6 +73,209 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'BANK_TRANSFER' | 'E_WALLET' | 'COD'>('CASH');
   const [codAmount, setCodAmount] = useState<number>(0);
   const [pickupType, setPickupType] = useState<'PICKUP' | 'DROP_OFF'>('PICKUP');
+
+  // Saved Addresses Quick Selector States (Shopee Style)
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [loadingSavedAddresses, setLoadingSavedAddresses] = useState(false);
+  const [selectedSenderAddressId, setSelectedSenderAddressId] = useState<string | null>(null);
+
+  const applySavedAddressToSender = (item: any) => {
+    setSelectedSenderAddressId(item.addressId || item.id);
+    const addr = item.address || item;
+    const wardCode = addr.wardCode || addr.wardRelation?.code || '';
+    const provinceCode = addr.wardRelation?.provinceCode || addr.wardRelation?.province?.code || addr.provinceCode || '';
+    const wardName = addr.wardRelation?.fullName || addr.wardRelation?.name || addr.wardName || '';
+    const provinceName = addr.wardRelation?.province?.fullName || addr.wardRelation?.province?.name || addr.provinceName || '';
+
+    let cleanedAddressLine1 = addr.addressLine1 || '';
+    if (wardName) {
+      cleanedAddressLine1 = cleanedAddressLine1.replace(new RegExp(`,\\s*${wardName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), '');
+    }
+    if (provinceName) {
+      cleanedAddressLine1 = cleanedAddressLine1.replace(new RegExp(`,\\s*${provinceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), '');
+    }
+
+    setSenderName(item.contactName || (user?.customerProfile?.fullName || user?.username || ''));
+    setSenderPhone(item.contactPhone || (user?.customerProfile?.phone || user?.phone || ''));
+    setSenderProvince(provinceName);
+    setSenderProvinceCode(provinceCode);
+    setSenderWard(wardName);
+    setSenderWardCode(wardCode);
+    setSenderAddressLine1(cleanedAddressLine1.trim());
+
+    if (addr.latitude && addr.longitude) {
+      setSenderLatitude(addr.latitude);
+      setSenderLongitude(addr.longitude);
+      setSenderTempLat(addr.latitude);
+      setSenderTempLng(addr.longitude);
+      setSenderMapCenter([addr.longitude, addr.latitude]);
+      if (senderMapRef.current) {
+        try {
+          senderMapRef.current.flyTo({ center: [addr.longitude, addr.latitude], zoom: 15 });
+        } catch (e) { }
+      }
+    }
+  };
+
+
+
+  const fetchCustomerAddresses = async () => {
+    setLoadingSavedAddresses(true);
+    try {
+      const url = isAdminOrStaff && customerId
+        ? `${CONFIG.API_BASE_URL}/customers/${customerId}/addresses`
+        : `${CONFIG.API_BASE_URL}/customers/me/addresses`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.data)) {
+        setSavedAddresses(data.data);
+        return data.data;
+      }
+    } catch (err) {
+      console.error('Error fetching customer addresses for order modal:', err);
+    } finally {
+      setLoadingSavedAddresses(false);
+    }
+    return [];
+  };
+
+  useEffect(() => {
+    if (!isOpen || !token) return;
+
+    fetchCustomerAddresses().then((dataList) => {
+      if (Array.isArray(dataList) && dataList.length > 0) {
+        const defaultAddr = dataList.find((item: any) => item.isDefault) || dataList[0];
+        if (defaultAddr && !senderAddressLine1 && !senderName) {
+          applySavedAddressToSender(defaultAddr);
+        }
+      }
+    });
+  }, [isOpen, token, customerId, isAdminOrStaff]);
+
+  // AddressModal State (from Profile)
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [isEditingAddressModal, setIsEditingAddressModal] = useState(false);
+  const [addressModalActionLoading, setAddressModalActionLoading] = useState(false);
+  const [addressModalTarget, setAddressModalTarget] = useState<'sender' | 'receiver'>('sender');
+
+  const initialAddressModalForm = {
+    id: '',
+    addressLine1: '',
+    addressLine2: '',
+    ward: '',
+    province: '',
+    provinceCode: '',
+    wardCode: '',
+    country: 'Vietnam',
+    latitude: 10.8231,
+    longitude: 106.6297,
+    addressType: 'HOME' as const,
+    isDefault: false,
+    contactName: '',
+    contactPhone: '',
+  };
+
+  const [addressModalFormData, setAddressModalFormData] = useState(initialAddressModalForm);
+
+  const handleOpenAddAddressModal = (target: 'sender' | 'receiver') => {
+    setAddressModalTarget(target);
+    setIsEditingAddressModal(false);
+    setAddressModalFormData({
+      ...initialAddressModalForm,
+      contactName: (user as any)?.fullName || user?.customerProfile?.fullName || user?.username || '',
+      contactPhone: user?.phone || user?.customerProfile?.phone || '',
+    });
+    setShowAddressModal(true);
+  };
+
+  const handleOpenEditAddressModal = (item: any, target: 'sender' | 'receiver', e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAddressModalTarget(target);
+    const addr = item.address || item;
+    const wardCode = addr.wardCode || addr.wardRelation?.code || '';
+    const provinceCode = addr.wardRelation?.provinceCode || addr.wardRelation?.province?.code || addr.provinceCode || '';
+    const wardName = addr.wardRelation?.fullName || addr.wardRelation?.name || addr.wardName || '';
+    const provinceName = addr.wardRelation?.province?.fullName || addr.wardRelation?.province?.name || addr.provinceName || '';
+
+    let cleanedAddressLine1 = addr.addressLine1 || '';
+    if (wardName) {
+      cleanedAddressLine1 = cleanedAddressLine1.replace(new RegExp(`,\\s*${wardName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), '');
+    }
+    if (provinceName) {
+      cleanedAddressLine1 = cleanedAddressLine1.replace(new RegExp(`,\\s*${provinceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), '');
+    }
+
+    setIsEditingAddressModal(true);
+    setAddressModalFormData({
+      id: item.addressId || addr.id || item.id,
+      addressLine1: cleanedAddressLine1.trim(),
+      addressLine2: addr.addressLine2 || '',
+      ward: wardName,
+      province: provinceName,
+      provinceCode: provinceCode,
+      wardCode: wardCode,
+      country: addr.country || 'Vietnam',
+      latitude: addr.latitude || 10.8231,
+      longitude: addr.longitude || 106.6297,
+      addressType: item.addressType || 'HOME',
+      isDefault: item.isDefault || false,
+      contactName: item.contactName || '',
+      contactPhone: item.contactPhone || '',
+    });
+    setShowAddressModal(true);
+  };
+
+  const handleSaveAddressFromModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+
+    const targetCustId = isAdminOrStaff && customerId ? customerId : user?.customerProfile?.id;
+    setAddressModalActionLoading(true);
+
+    try {
+      let url = `${CONFIG.API_BASE_URL}/customers/me/addresses`;
+      let method = 'POST';
+
+      if (isEditingAddressModal && addressModalFormData.id) {
+        url = `${CONFIG.API_BASE_URL}/customers/${targetCustId || 'me'}/addresses/${addressModalFormData.id}`;
+        method = 'PUT';
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(addressModalFormData),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setShowAddressModal(false);
+        const updated = await fetchCustomerAddresses();
+        const targetId = addressModalFormData.id || data.data?.addressId || data.data?.id;
+        const matched = (updated || []).find((a: any) => (a.addressId || a.id) === targetId) || (updated || [])[0];
+        if (matched) {
+          if (addressModalTarget === 'sender') {
+            applySavedAddressToSender(matched);
+          } else {
+            applySavedAddressToReceiver(matched);
+          }
+        }
+      } else {
+        alert(data.message || 'Lỗi khi lưu địa chỉ.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Không thể kết nối tới máy chủ.');
+    } finally {
+      setAddressModalActionLoading(false);
+    }
+  };
 
   // Sender States
   const [senderName, setSenderName] = useState('');
@@ -83,7 +290,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [senderLatitude, setSenderLatitude] = useState<number>(0);
   const [senderLongitude, setSenderLongitude] = useState<number>(0);
   const [senderMapCenter, setSenderMapCenter] = useState<[number, number]>([105.8542, 21.0285]);
-  const [senderGeocodingLoading, setSenderGeocodingLoading] = useState<boolean>(false);
   const senderMapRef = useRef<any>(null);
 
   const {
@@ -114,7 +320,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [receiverLatitude, setReceiverLatitude] = useState<number>(0);
   const [receiverLongitude, setReceiverLongitude] = useState<number>(0);
   const [receiverMapCenter, setReceiverMapCenter] = useState<[number, number]>([105.8542, 21.0285]);
-  const [receiverGeocodingLoading, setReceiverGeocodingLoading] = useState<boolean>(false);
   const receiverMapRef = useRef<any>(null);
 
   const {
@@ -198,61 +403,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     mapInstance.on('click', onReceiverMapClick);
   }, [onReceiverMapClick]);
 
-  const handleSenderAutoLocate = async () => {
-    if (!senderAddressLine1 && !senderWard && !senderProvince) return;
-    setSenderGeocodingLoading(true);
-    const fullAddress = [senderAddressLine1, senderWard, senderProvince].filter(Boolean).join(', ');
 
-    try {
-      const coords = await geocodeAddress(fullAddress, token || '');
-      if (coords) {
-        const lat = parseFloat(coords.latitude.toFixed(6));
-        const lng = parseFloat(coords.longitude.toFixed(6));
-        setSenderLatitude(lat);
-        setSenderLongitude(lng);
-        setSenderTempLat(lat);
-        setSenderTempLng(lng);
-        setSenderMapCenter([lng, lat]);
-        senderMapRef.current?.flyTo({
-          center: [lng, lat],
-          zoom: 15,
-          duration: 1000
-        });
-      }
-    } catch (err) {
-      console.error('Error auto-locating sender address:', err);
-    } finally {
-      setSenderGeocodingLoading(false);
-    }
-  };
-
-  const handleReceiverAutoLocate = async () => {
-    if (!receiverAddressLine1 && !receiverWard && !receiverProvince) return;
-    setReceiverGeocodingLoading(true);
-    const fullAddress = [receiverAddressLine1, receiverWard, receiverProvince].filter(Boolean).join(', ');
-
-    try {
-      const coords = await geocodeAddress(fullAddress, token || '');
-      if (coords) {
-        const lat = parseFloat(coords.latitude.toFixed(6));
-        const lng = parseFloat(coords.longitude.toFixed(6));
-        setReceiverLatitude(lat);
-        setReceiverLongitude(lng);
-        setReceiverTempLat(lat);
-        setReceiverTempLng(lng);
-        setReceiverMapCenter([lng, lat]);
-        receiverMapRef.current?.flyTo({
-          center: [lng, lat],
-          zoom: 15,
-          duration: 1000
-        });
-      }
-    } catch (err) {
-      console.error('Error auto-locating receiver address:', err);
-    } finally {
-      setReceiverGeocodingLoading(false);
-    }
-  };
 
   // Helper to calculate distance in Km between two coordinates
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -712,13 +863,12 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 key={item.step}
                 type="button"
                 onClick={() => handleSelectTab(item.step as any)}
-                className={`flex-1 min-w-[140px] px-3 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all text-xs font-bold cursor-pointer ${
-                  isActive
-                    ? 'bg-white text-[#161D25] shadow-sm border border-slate-300 ring-2 ring-[#bc0100]/20'
-                    : stepHasErrors
+                className={`flex-1 min-w-[140px] px-3 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all text-xs font-bold cursor-pointer ${isActive
+                  ? 'bg-white text-[#161D25] shadow-sm border border-slate-300 ring-2 ring-[#bc0100]/20'
+                  : stepHasErrors
                     ? 'bg-red-100/70 text-red-700 border border-red-300 hover:bg-red-100'
                     : 'text-slate-600 hover:bg-slate-200/60'
-                }`}
+                  }`}
               >
                 {stepHasErrors ? (
                   <AlertCircle size={16} className="text-red-600 shrink-0" />
@@ -735,9 +885,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         <div className="flex-1 overflow-y-auto p-6 flex flex-col text-xs text-gray-600">
           {/* Customer Selection for admin/staff */}
           {isAdminOrStaff && activeStep === 1 && (
-            <div className={`p-3.5 mb-4 rounded-lg border flex flex-col gap-1.5 transition-all ${
-              showErrors && errors.customerId ? 'bg-red-50/60 border-red-400 ring-1 ring-red-400' : 'bg-slate-50 border-slate-200'
-            }`}>
+            <div className={`p-3.5 mb-4 rounded-lg border flex flex-col gap-1.5 transition-all ${showErrors && errors.customerId ? 'bg-red-50/60 border-red-400 ring-1 ring-red-400' : 'bg-slate-50 border-slate-200'
+              }`}>
               <div className="flex items-center gap-1.5 font-bold text-[#161D25] uppercase tracking-wider text-[10px]">
                 <User size={14} className="text-[#bc0100]" />
                 <span>Khách hàng thanh toán *</span>
@@ -781,6 +930,99 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   )}
                 </div>
 
+                {/* Sổ địa chỉ đã lưu cho Người gửi (Shopee Style Quick Selector) */}
+                {(loadingSavedAddresses || savedAddresses.length > 0) && (
+                  <div className="flex flex-col gap-2 p-3 bg-red-50/40 border border-red-100 rounded-xl mb-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#bc0100] flex items-center gap-1.5">
+                        <BookMarked size={14} />
+                        {loadingSavedAddresses ? 'Đang tải sổ địa chỉ...' : `Chọn nhanh địa chỉ lấy hàng đã lưu (${savedAddresses.length})`}
+                      </span>
+                      {selectedSenderAddressId && (
+                        <span className="text-[9px] text-gray-400 italic">
+                          (Đã chọn & có thể chỉnh sửa tùy ý bên dưới)
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                      {savedAddresses.map((item: any) => {
+                        const addr = item.address || item;
+                        const isSelected = selectedSenderAddressId === (item.addressId || item.id);
+                        const wardStr = addr.wardRelation?.fullName || addr.wardRelation?.name || addr.wardName || addr.ward || item.ward || '';
+                        const provStr = addr.wardRelation?.province?.fullName || addr.wardRelation?.province?.name || addr.provinceName || addr.province || item.province || '';
+                        const fullAddrStr = [addr.addressLine1, wardStr, provStr].filter(Boolean).join(', ');
+
+                        return (
+                          <div
+                            key={item.id || item.addressId}
+                            onClick={() => applySavedAddressToSender(item)}
+                            className={`p-3 rounded-xl border text-left cursor-pointer transition-all duration-200 flex items-center gap-3 relative ${
+                              isSelected
+                                ? 'border-[#bc0100] bg-white ring-2 ring-[#bc0100]/20 shadow-xs'
+                                : 'border-[#e2e8f0] bg-white hover:border-[#bc0100]/50 hover:bg-gray-50'
+                            }`}
+                          >
+                            {/* Radio/Check Indicator on Left (Centered Vertically) */}
+                            <div className="shrink-0 flex items-center justify-center">
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                                isSelected
+                                  ? 'border-[#bc0100] bg-[#bc0100] text-white shadow-xs'
+                                  : 'border-gray-300 bg-white'
+                              }`}>
+                                {isSelected && <CheckCircle2 size={12} strokeWidth={3} className="text-white" />}
+                              </div>
+                            </div>
+
+                            {/* Main Info (Middle) */}
+                            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1.5 overflow-hidden">
+                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                                  item.isDefault ? 'bg-[#bc0100] text-white' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {item.isDefault ? 'Mặc định' : item.addressType || 'Địa chỉ'}
+                                </span>
+                                <span className="font-bold text-gray-800 text-[11px] truncate">
+                                  {item.contactName || 'Địa chỉ'}
+                                </span>
+                              </div>
+
+                              <p className="text-[10px] text-gray-500 line-clamp-2 leading-tight">
+                                {fullAddrStr}
+                              </p>
+
+                              {item.contactPhone && (
+                                <span className="text-[9px] text-gray-400">
+                                  SĐT: {item.contactPhone}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Pencil Edit Button on Right */}
+                            <button
+                              type="button"
+                              title="Chỉnh sửa địa chỉ này"
+                              onClick={(e) => handleOpenEditAddressModal(item, 'sender', e)}
+                              className="p-1.5 text-gray-400 hover:text-[#bc0100] hover:bg-red-50 rounded-full transition-colors cursor-pointer shrink-0 self-center"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          </div>
+                        );
+                      })}
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAddAddressModal('sender')}
+                        className="p-2.5 rounded-lg border border-dashed border-[#bc0100]/40 bg-white hover:bg-red-50/50 text-left flex items-center justify-center gap-1.5 text-xs font-bold text-[#bc0100] cursor-pointer shadow-xs transition-colors"
+                      >
+                        <Plus size={14} />
+                        Thêm địa chỉ mới
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <label className="font-bold text-gray-500 uppercase text-[9px] tracking-wider">
@@ -789,13 +1031,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <input
                       type="text"
                       required
+                      readOnly={!!selectedSenderAddressId}
                       placeholder="Nguyễn Văn A"
                       value={senderName}
                       onChange={(e) => {
                         setSenderName(e.target.value);
                         if (errors.senderName) setErrors(prev => ({ ...prev, senderName: false }));
                       }}
-                      className={`w-full px-3 py-2 border rounded outline-none transition-colors ${getFieldErrorClass('senderName')}`}
+                      className={`w-full px-3 py-2 border rounded outline-none transition-colors ${selectedSenderAddressId ? 'bg-slate-100/80 cursor-not-allowed text-slate-700 font-medium border-slate-200' : getFieldErrorClass('senderName')}`}
                     />
                     {showErrors && errorMessages.senderName && (
                       <span className="text-[10px] text-red-600 font-medium">{errorMessages.senderName}</span>
@@ -808,13 +1051,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <input
                       type="text"
                       required
+                      readOnly={!!selectedSenderAddressId}
                       placeholder="0901234567"
                       value={senderPhone}
                       onChange={(e) => {
                         setSenderPhone(e.target.value);
                         if (errors.senderPhone) setErrors(prev => ({ ...prev, senderPhone: false }));
                       }}
-                      className={`w-full px-3 py-2 border rounded outline-none transition-colors ${getFieldErrorClass('senderPhone')}`}
+                      className={`w-full px-3 py-2 border rounded outline-none transition-colors ${selectedSenderAddressId ? 'bg-slate-100/80 cursor-not-allowed text-slate-700 font-medium border-slate-200' : getFieldErrorClass('senderPhone')}`}
                     />
                     {showErrors && errorMessages.senderPhone && (
                       <span className="text-[10px] text-red-600 font-medium">{errorMessages.senderPhone}</span>
@@ -824,6 +1068,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
                 <AddressFormFields
                   token={token}
+                  disabled={!!selectedSenderAddressId}
                   provinceCode={senderProvinceCode}
                   wardCode={senderWardCode}
                   addressLine1={senderAddressLine1}
@@ -856,14 +1101,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 <div className="flex flex-col gap-1 mt-2 border-t border-gray-100 pt-3">
                   <div className="flex justify-between items-center text-gray-500 font-bold uppercase tracking-wider text-[9px]">
                     <span>Bản đồ định vị điểm lấy hàng</span>
-                    <button
-                      type="button"
-                      onClick={handleSenderAutoLocate}
-                      disabled={senderGeocodingLoading || (!senderAddressLine1 && !senderWard && !senderProvince)}
-                      className="text-[#bc0100] hover:text-[#900000] font-bold lowercase tracking-normal text-[10px] flex items-center gap-1 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
-                    >
-                      {senderGeocodingLoading ? 'Đang định vị...' : '🔍 [Nhấn để định vị tự động]'}
-                    </button>
                   </div>
 
                   <div className="w-full h-64 rounded-lg border border-[#e2e8f0] overflow-hidden relative mt-1 bg-gray-50">
@@ -1011,14 +1248,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 <div className="flex flex-col gap-1 mt-2 border-t border-gray-100 pt-3">
                   <div className="flex justify-between items-center text-gray-500 font-bold uppercase tracking-wider text-[9px]">
                     <span>Bản đồ định vị điểm giao hàng</span>
-                    <button
-                      type="button"
-                      onClick={handleReceiverAutoLocate}
-                      disabled={receiverGeocodingLoading || (!receiverAddressLine1 && !receiverWard && !receiverProvince)}
-                      className="text-blue-600 hover:text-blue-800 font-bold lowercase tracking-normal text-[10px] flex items-center gap-1 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
-                    >
-                      {receiverGeocodingLoading ? 'Đang định vị...' : '🔍 [Nhấn để định vị tự động]'}
-                    </button>
                   </div>
 
                   <div className="w-full h-64 rounded-lg border border-[#e2e8f0] overflow-hidden relative mt-1 bg-gray-50">
@@ -1539,9 +1768,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     onClose();
                   }
                 }}
-                className={`w-full py-2.5 rounded-lg text-xs font-bold text-white transition-colors cursor-pointer shadow ${
-                  notificationState.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
-                }`}
+                className={`w-full py-2.5 rounded-lg text-xs font-bold text-white transition-colors cursor-pointer shadow ${notificationState.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                  }`}
               >
                 {notificationState.type === 'success' ? 'Hoàn tất' : 'Đóng'}
               </button>
@@ -1549,6 +1777,17 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Address Create/Edit Modal */}
+      <AddressModal
+        isOpen={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        isEditing={isEditingAddressModal}
+        addressFormData={addressModalFormData}
+        setAddressFormData={setAddressModalFormData}
+        onSubmit={handleSaveAddressFromModal}
+        actionLoading={addressModalActionLoading}
+      />
     </div>
   );
 };
