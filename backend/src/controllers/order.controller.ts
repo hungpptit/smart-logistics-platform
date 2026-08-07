@@ -61,11 +61,16 @@ export class OrderController {
         throw new UnauthorizedException('Yêu cầu xác thực tài khoản');
       }
       const { code } = req.params;
+      const cleanCode = (code || '').trim();
+      const baseCode = cleanCode.includes('-PKG-') ? cleanCode.split('-PKG-')[0] : cleanCode;
+
       const order = await prisma.order.findFirst({
         where: {
           OR: [
-            { orderCode: code },
-            { package: { packageCode: code } },
+            { orderCode: cleanCode },
+            { orderCode: baseCode },
+            { package: { packageCode: cleanCode } },
+            { package: { packageCode: baseCode } },
           ],
         },
         select: { id: true },
@@ -160,14 +165,18 @@ export class OrderController {
 
   public assignZone = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { code } = req.params;
-      const { zoneId } = req.body;
+      const code = req.body?.code || req.params?.code;
+      const { zoneId, toteCode } = req.body;
       const userId = req.user?.id!;
+      if (!code) {
+        res.status(400).json({ success: false, message: 'Thiếu mã bưu kiện (code).' });
+        return;
+      }
       if (!zoneId) {
         res.status(400).json({ success: false, message: 'Thiếu mã Phân Khu Kho (zoneId).' });
         return;
       }
-      const result = await this.orderService.assignPackageToZone(code, zoneId, userId);
+      const result = await this.orderService.assignPackageToZone(code, zoneId, userId, toteCode);
       res.status(200).json({
         success: true,
         message: 'Phân loại bưu kiện vào Phân Khu Kho thành công',
@@ -185,6 +194,47 @@ export class OrderController {
       res.status(200).json({
         success: true,
         message: 'Lấy lịch sử phân loại bưu kiện thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public getZoneTotes = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.orderService.getZoneTotes();
+      res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách sọt hàng theo phân khu thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public getTotePackages = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { toteCode } = req.params;
+      const result = await this.orderService.getTotePackages(toteCode);
+      res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách bưu kiện trong sọt thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public sealTote = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { toteCode } = req.body;
+      const result = await this.orderService.sealToteBag(toteCode);
+      res.status(200).json({
+        success: true,
+        message: 'Chốt niêm phong Sọt Hàng thành công',
         data: result,
       });
     } catch (error) {

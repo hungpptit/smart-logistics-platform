@@ -187,6 +187,21 @@ router.get(
 );
 
 router.get(
+  '/zone-totes',
+  orderController.getZoneTotes
+);
+
+router.get(
+  '/tote/:toteCode/packages',
+  orderController.getTotePackages
+);
+
+router.post(
+  '/seal-tote',
+  orderController.sealTote
+);
+
+router.get(
   '/by-code/:code',
   orderController.getByCode
 );
@@ -352,6 +367,11 @@ router.post(
 router.post(
   '/calculate-pricing',
   orderController.calculatePricing
+);
+
+router.post(
+  '/assign-zone',
+  orderController.assignZone
 );
 
 router.post(

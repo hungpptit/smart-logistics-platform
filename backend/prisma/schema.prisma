@@ -195,6 +195,12 @@ enum ScanType {
   SORTING
 }
 
+enum ToteStatus {
+  OPEN
+  SEALED
+  LOADED
+}
+
 enum DeliveryResult {
   SUCCESS
   FAILED
@@ -257,7 +263,7 @@ model User {
   receivedTransfers     ShipmentTransfer[]
   assignedDispatchTasks DispatchTask[]
   trackingEvents        TrackingEvent[]
-  barcodeScans          BarcodeScan[]
+  warehouseScans        WarehouseScan[]
   systemSettings        SystemSetting[]
 
   @@map("users")
@@ -398,6 +404,7 @@ model Facility {
   manager           User?             @relation("FacilityManager", fields: [managerUserId], references: [id], onDelete: SetNull)
   address           Address?          @relation(fields: [addressId], references: [id], onDelete: SetNull)
   facilityZones     FacilityZone[]
+  toteBags          ToteBag[]
   transfersFrom     ShipmentTransfer[] @relation("TransferFromFacility")
   transfersTo       ShipmentTransfer[] @relation("TransferToFacility")
   staffMembers      Staff[]
@@ -405,7 +412,7 @@ model Facility {
   startRoutes       Route[]           @relation("RouteStartFacility")
   endRoutes         Route[]           @relation("RouteEndFacility")
   routeStops        RouteStop[]
-  barcodeScans      BarcodeScan[]
+  warehouseScans    WarehouseScan[]
   originOrders      Order[]           @relation("OrderOriginFacility")
   destinationOrders Order[]           @relation("OrderDestinationFacility")
   packages          Package[]         @relation("PackageCurrentFacility")
@@ -542,7 +549,7 @@ model Package {
   currentFacility        Facility?         @relation("PackageCurrentFacility", fields: [currentFacilityId], references: [id], onDelete: SetNull)
   currentZone            FacilityZone?     @relation(fields: [currentZoneId], references: [id], onDelete: SetNull)
   shipmentPackages       ShipmentPackage[]
-  barcodeScans           BarcodeScan[]
+  warehouseScans         WarehouseScan[]
 
   @@index([orderId], name: "idx_packages_order")
   @@index([currentFacilityId, currentZoneId], name: "idx_packages_location")
@@ -609,7 +616,7 @@ model Shipment {
   shipmentTransfers     ShipmentTransfer[]
   routeStops            RouteStop[]
   trackingEvents        TrackingEvent[]
-  barcodeScans          BarcodeScan[]
+  warehouseScans        WarehouseScan[]
   deliveryProofs        DeliveryProof[]
 
   @@index([status], name: "idx_shipments_status")
@@ -822,7 +829,6 @@ model RouteStop {
   order              Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
   facility           Facility?        @relation(fields: [facilityId], references: [id], onDelete: SetNull)
   trackingEvents     TrackingEvent[]
-  barcodeScans       BarcodeScan[]
   deliveryProof      DeliveryProof?
 
   @@unique([routeId, sequence])
@@ -903,26 +909,42 @@ model TrackingEvent {
   @@map("tracking_events")
 }
 
-model BarcodeScan {
+model WarehouseScan {
   id            String       @id @default(uuid()) @db.Uuid
-  shipmentId    String       @map("shipment_id") @db.Uuid
-  packageId     String?      @map("package_id") @db.Uuid
-  routeStopId   String?      @map("route_stop_id") @db.Uuid
   facilityId    String?      @map("facility_id") @db.Uuid
+  shipmentId    String?      @map("shipment_id") @db.Uuid
+  packageId     String?      @map("package_id") @db.Uuid
   scannedBy     String       @map("scanned_by") @db.Uuid
-  scanType      ScanType     @map("scan_type")
   toteCode      String?      @map("tote_code") @db.VarChar(100)
   scannedAt     DateTime     @default(now()) @map("scanned_at") @db.Timestamptz
 
-  shipment      Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  package       Package?     @relation(fields: [packageId], references: [id], onDelete: SetNull)
-  routeStop     RouteStop?   @relation(fields: [routeStopId], references: [id], onDelete: SetNull)
   facility      Facility?    @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  shipment      Shipment?    @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  package       Package?     @relation(fields: [packageId], references: [id], onDelete: SetNull)
   scanner       User         @relation(fields: [scannedBy], references: [id], onDelete: Restrict)
+  toteBag       ToteBag?     @relation(fields: [toteCode], references: [toteCode], onDelete: SetNull)
 
-  @@index([toteCode], name: "idx_barcode_scans_tote")
-  @@index([shipmentId], name: "idx_barcode_scans_shipment")
-  @@map("barcode_scans")
+  @@index([toteCode], name: "idx_warehouse_scans_tote")
+  @@index([shipmentId], name: "idx_warehouse_scans_shipment")
+  @@map("warehouse_scans")
+}
+
+model ToteBag {
+  id             String          @id @default(uuid()) @db.Uuid
+  toteCode       String          @unique @map("tote_code") @db.VarChar(100)
+  zoneCode       String          @map("zone_code") @db.VarChar(50)
+  facilityId     String?         @map("facility_id") @db.Uuid
+  status         ToteStatus      @default(OPEN)
+  sealedAt       DateTime?       @map("sealed_at") @db.Timestamptz
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  facility       Facility?       @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  warehouseScans WarehouseScan[]
+
+  @@index([toteCode], name: "idx_tote_bags_code")
+  @@index([facilityId, zoneCode], name: "idx_tote_bags_facility_zone")
+  @@map("tote_bags")
 }
 
 model DeliveryProof {

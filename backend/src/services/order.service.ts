@@ -353,7 +353,7 @@ export class OrderService {
         { destinationFacilityId: targetFacilityId },
         {
           package: {
-            barcodeScans: {
+            warehouseScans: {
               some: {
                 facilityId: targetFacilityId,
               },
@@ -452,7 +452,14 @@ export class OrderService {
       include: {
         customer: true,
         service: true,
-        package: true,
+        package: {
+          include: {
+            warehouseScans: {
+              orderBy: { scannedAt: 'desc' },
+              take: 10,
+            },
+          },
+        },
         payment: true,
         originFacility: true,
         destinationFacility: true,
@@ -493,7 +500,7 @@ export class OrderService {
           throw new ForbiddenException('Bạn không có quyền xem chi tiết đơn hàng này do chưa được gán kho');
         }
 
-        const hasScan = await prisma.barcodeScan.findFirst({
+        const hasScan = await prisma.warehouseScan.findFirst({
           where: {
             facilityId,
             package: {
@@ -567,7 +574,7 @@ export class OrderService {
           throw new ForbiddenException('Bạn không có quyền cập nhật đơn hàng này do chưa được gán kho');
         }
 
-        const hasScan = await prisma.barcodeScan.findFirst({
+        const hasScan = await prisma.warehouseScan.findFirst({
           where: {
             facilityId: staffFacilityId,
             package: {
@@ -600,7 +607,7 @@ export class OrderService {
     }
 
     return await prisma.$transaction(async (tx) => {
-      const updateData: any = { status: dto.status };
+      const updateData: any = { status: dto.status, updatedBy: userId };
       if (staffFacilityId && (order.pickupType === 'DROP_OFF' || dto.status === 'ARRIVED_ORIGIN_FACILITY')) {
         updateData.originFacilityId = staffFacilityId;
       }
@@ -657,7 +664,7 @@ export class OrderService {
           throw new ForbiddenException('Bạn không có quyền hủy đơn hàng này do chưa được gán kho');
         }
 
-        const hasScan = await prisma.barcodeScan.findFirst({
+        const hasScan = await prisma.warehouseScan.findFirst({
           where: {
             facilityId,
             package: {
@@ -699,7 +706,10 @@ export class OrderService {
       // Mark as cancelled
       const cancelledOrder = await tx.order.update({
         where: { id },
-        data: { status: OrderStatus.CANCELLED },
+        data: {
+          status: OrderStatus.CANCELLED,
+          updatedBy: userId,
+        },
       });
 
       // Update payment to REFUNDED or leave as is
@@ -814,14 +824,19 @@ export class OrderService {
    * Assign package to a facility zone and record BarcodeScan
    */
   public async assignPackageToZone(orderCode: string, zoneId: string, userId: string, toteCode?: string) {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderCode);
+    const cleanCode = orderCode.trim();
+    const baseCode = cleanCode.includes('-PKG-') ? cleanCode.split('-PKG-')[0] : cleanCode;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanCode);
+
     const order = await prisma.order.findFirst({
       where: isUuid
-        ? { OR: [{ id: orderCode }, { orderCode: orderCode }, { package: { id: orderCode } }] }
+        ? { OR: [{ id: cleanCode }, { orderCode: cleanCode }, { orderCode: baseCode }, { package: { id: cleanCode } }] }
         : {
             OR: [
-              { orderCode: orderCode },
-              { package: { packageCode: orderCode } },
+              { orderCode: cleanCode },
+              { orderCode: baseCode },
+              { package: { packageCode: cleanCode } },
+              { package: { packageCode: baseCode } },
             ],
           },
       include: {
@@ -834,7 +849,7 @@ export class OrderService {
     });
 
     if (!order) {
-      throw new NotFoundException('Không tìm thấy đơn hàng');
+      throw new NotFoundException(`Không tìm thấy đơn hàng với mã [${orderCode}]`);
     }
 
     const zone = await prisma.facilityZone.findUnique({
@@ -848,65 +863,112 @@ export class OrderService {
 
     const activeToteCode = toteCode || `TOTE-${zone.zoneCode}-001`;
 
-    if (order.package) {
+    await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        updatedBy: userId || undefined,
+        status: 'ARRIVED_ORIGIN_FACILITY',
+        ...(zone.facilityId ? { originFacilityId: zone.facilityId } : {}),
+      },
+    });
+
+    let pkgId = order.package?.id;
+    if (!pkgId) {
+      const newPkg = await prisma.package.create({
+        data: {
+          orderId: order.id,
+          packageCode: `PKG-${order.orderCode.replace(/^ORD-/, '')}`,
+          weight: 1.0,
+          length: 10,
+          width: 10,
+          height: 10,
+          volume: 0.001,
+          currentZoneId: zone.id,
+          currentFacilityId: zone.facilityId,
+        },
+      });
+      pkgId = newPkg.id;
+    } else {
       await prisma.package.update({
-        where: { id: order.package.id },
+        where: { id: pkgId },
         data: {
           currentZoneId: zone.id,
           currentFacilityId: zone.facilityId,
         },
       });
+    }
 
-      let targetShipmentId: string | undefined = order.package.shipmentPackages?.[0]?.shipmentId;
-      if (!targetShipmentId) {
-        const firstShipment = await prisma.shipment.findFirst();
-        if (firstShipment) {
-          targetShipmentId = firstShipment.id;
-        }
-      }
-
-      if (targetShipmentId) {
-        const existingScan = await prisma.barcodeScan.findFirst({
-          where: {
-            packageId: order.package.id,
-            scanType: 'SORTING',
-          },
-        });
-
-        if (existingScan) {
-          await prisma.barcodeScan.update({
-            where: { id: existingScan.id },
-            data: {
-              shipmentId: targetShipmentId,
-              facilityId: zone.facilityId,
-              scannedBy: userId || order.customerId,
-              toteCode: activeToteCode,
-              scannedAt: new Date(),
-            },
-          });
-        } else {
-          await prisma.barcodeScan.create({
-            data: {
-              packageId: order.package.id,
-              shipmentId: targetShipmentId,
-              facilityId: zone.facilityId,
-              scannedBy: userId || order.customerId,
-              scanType: 'SORTING',
-              toteCode: activeToteCode,
-            },
-          });
-        }
+    let targetShipmentId: string | undefined = order.package?.shipmentPackages?.[0]?.shipmentId;
+    if (!targetShipmentId) {
+      const firstShipment = await prisma.shipment.findFirst();
+      if (firstShipment) {
+        targetShipmentId = firstShipment.id;
       }
     }
 
-    await prisma.orderStatusHistory.create({
-      data: {
-        orderId: order.id,
-        status: order.status,
-        changedByUserId: userId,
-        reason: `Xác nhận phân loại bưu kiện vào ${zone.zoneName} (${zone.zoneCode}) - Sọt: ${activeToteCode}`,
+    if (activeToteCode) {
+      await prisma.toteBag.upsert({
+        where: { toteCode: activeToteCode },
+        update: {
+          facilityId: zone.facilityId,
+          zoneCode: zone.zoneCode,
+        },
+        create: {
+          toteCode: activeToteCode,
+          zoneCode: zone.zoneCode,
+          facilityId: zone.facilityId,
+          status: 'OPEN',
+        },
+      });
+    }
+
+    const existingScan = await prisma.warehouseScan.findFirst({
+      where: {
+        packageId: pkgId,
+        toteCode: activeToteCode,
       },
     });
+
+    if (existingScan) {
+      await prisma.warehouseScan.update({
+        where: { id: existingScan.id },
+        data: {
+          shipmentId: targetShipmentId,
+          facilityId: zone.facilityId,
+          scannedBy: userId || order.customerId,
+          toteCode: activeToteCode,
+          scannedAt: new Date(),
+        },
+      });
+    } else {
+      await prisma.warehouseScan.create({
+        data: {
+          packageId: pkgId,
+          shipmentId: targetShipmentId,
+          facilityId: zone.facilityId,
+          scannedBy: userId || order.customerId,
+          toteCode: activeToteCode,
+        },
+      });
+    }
+
+    const existingHistory = await prisma.orderStatusHistory.findFirst({
+      where: {
+        orderId: order.id,
+        reason: { contains: activeToteCode },
+      },
+    });
+
+    if (!existingHistory) {
+      await prisma.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          status: OrderStatus.ARRIVED_ORIGIN_FACILITY,
+          changedByUserId: userId,
+          reason: `Hàng hóa đã phân loại và lưu kho tại ${zone.facility?.facilityName || 'Bưu cục phân phối'}`,
+        },
+      });
+    }
 
     return {
       orderCode: order.orderCode,
@@ -921,9 +983,9 @@ export class OrderService {
    * Get recent sorting scans for current facility / staff with active toteCode
    */
   public async getSortingHistory(userId: string) {
-    const scans = await prisma.barcodeScan.findMany({
+    const scans = await prisma.warehouseScan.findMany({
       where: {
-        scanType: 'SORTING',
+        toteCode: { not: null },
       },
       take: 50,
       orderBy: { scannedAt: 'desc' },
@@ -954,5 +1016,183 @@ export class OrderService {
     }
 
     return Array.from(uniqueMap.values()).slice(0, 20);
+  }
+
+  /**
+   * Seal a tote bag and update DB status to SEALED in tote_bags table, then auto-create next OPEN tote
+   */
+  public async sealToteBag(toteCode: string) {
+    const cleanCode = toteCode.trim();
+    const existing = await prisma.toteBag.findUnique({
+      where: { toteCode: cleanCode },
+    });
+
+    const zoneCode = existing?.zoneCode || (cleanCode.includes('ZONE') ? cleanCode.split('-').slice(1, -1).join('-') : 'ZONE-W-LOCAL');
+
+    const sealedTote = await prisma.toteBag.upsert({
+      where: { toteCode: cleanCode },
+      update: {
+        status: 'SEALED',
+        sealedAt: new Date(),
+      },
+      create: {
+        toteCode: cleanCode,
+        zoneCode,
+        status: 'SEALED',
+        sealedAt: new Date(),
+      },
+    });
+
+    // Auto-create next OPEN tote
+    const parts = cleanCode.split('-');
+    const currentNum = parseInt(parts[parts.length - 1], 10) || 1;
+    const nextNum = currentNum + 1;
+    const prefix = parts.slice(0, -1).join('-');
+    const nextToteCode = `${prefix}-${String(nextNum).padStart(3, '0')}`;
+
+    await prisma.toteBag.upsert({
+      where: { toteCode: nextToteCode },
+      update: {},
+      create: {
+        toteCode: nextToteCode,
+        zoneCode,
+        facilityId: existing?.facilityId || null,
+        status: 'OPEN',
+      },
+    });
+
+    return { sealedTote, nextToteCode };
+  }
+
+  /**
+   * Get all active and sealed totes grouped by zoneCode for facility
+   */
+  public async getZoneTotes(facilityId?: string) {
+    // 1. Truy vấn động danh sách Phân Khu từ bảng facility_zones trong CSDL DB
+    const dbZones = await prisma.facilityZone.findMany({
+      where: facilityId ? { facilityId } : {},
+      select: { zoneCode: true, zoneName: true },
+    });
+
+    const activeZoneCodes = dbZones.map((z) => z.zoneCode);
+
+    const dbTotes = await prisma.toteBag.findMany({
+      where: facilityId ? { facilityId } : {},
+      orderBy: { createdAt: 'desc' },
+    });
+
+    for (const zCode of activeZoneCodes) {
+      const hasTote = dbTotes.some((t) => t.zoneCode === zCode);
+      if (!hasTote) {
+        const firstToteCode = `TOTE-${zCode}-001`;
+        const newTote = await prisma.toteBag.upsert({
+          where: { toteCode: firstToteCode },
+          update: {},
+          create: {
+            toteCode: firstToteCode,
+            zoneCode: zCode,
+            facilityId: facilityId || null,
+            status: 'OPEN',
+          },
+        });
+        dbTotes.push(newTote);
+      }
+    }
+
+    const scans = await prisma.warehouseScan.findMany({
+      where: { toteCode: { not: null } },
+      select: { toteCode: true, scannedAt: true },
+    });
+
+    const countMap = new Map<string, number>();
+    for (const s of scans) {
+      if (s.toteCode) {
+        countMap.set(s.toteCode, (countMap.get(s.toteCode) || 0) + 1);
+      }
+    }
+
+    const zoneTotesMap = new Map<string, any[]>();
+    for (const zCode of activeZoneCodes) {
+      zoneTotesMap.set(zCode, []);
+    }
+
+    for (const tote of dbTotes) {
+      const zoneCode = tote.zoneCode;
+      if (!zoneTotesMap.has(zoneCode)) {
+        zoneTotesMap.set(zoneCode, []);
+      }
+      zoneTotesMap.get(zoneCode)!.push({
+        toteCode: tote.toteCode,
+        status: tote.status,
+        packageCount: countMap.get(tote.toteCode) || 0,
+        sealedAt: tote.sealedAt ? new Date(tote.sealedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : null,
+        createdAt: new Date(tote.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      });
+    }
+
+    const result: Array<{ zoneCode: string; totes: any[] }> = [];
+    for (const [zoneCode, totes] of zoneTotesMap.entries()) {
+      result.push({ zoneCode, totes });
+    }
+
+    return result;
+  }
+
+  /**
+   * Get all packages/orders contained in a specific toteCode
+   */
+  public async getTotePackages(toteCode: string) {
+    const cleanCode = toteCode.trim();
+    const toteObj = await prisma.toteBag.findUnique({
+      where: { toteCode: cleanCode },
+    });
+
+    const scans = await prisma.warehouseScan.findMany({
+      where: {
+        toteCode: cleanCode,
+      },
+      orderBy: { scannedAt: 'desc' },
+      include: {
+        package: {
+          include: {
+            order: {
+              include: {
+                destinationFacility: true,
+                customer: true,
+              },
+            },
+            currentZone: true,
+          },
+        },
+      },
+    });
+
+    const uniquePackages = new Map<string, any>();
+
+    for (const s of scans) {
+      if (!s.package) continue;
+      const pkgCode = s.package.packageCode || s.package.order?.orderCode || 'N/A';
+      if (!uniquePackages.has(pkgCode)) {
+        uniquePackages.set(pkgCode, {
+          id: s.package.id,
+          packageCode: s.package.packageCode,
+          orderCode: s.package.order?.orderCode || 'N/A',
+          receiverName: s.package.order?.receiverName || 'N/A',
+          receiverPhone: s.package.order?.receiverPhone || 'N/A',
+          destinationFacilityName: s.package.order?.destinationFacility?.facilityName || 'Bưu cục đích',
+          weight: s.package.weight,
+          scannedAt: new Date(s.scannedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        });
+      }
+    }
+
+    return {
+      toteCode: cleanCode,
+      zoneCode: toteObj?.zoneCode || 'ZONE-W-LOCAL',
+      status: toteObj?.status || 'OPEN',
+      sealedAt: toteObj?.sealedAt ? new Date(toteObj.sealedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : null,
+      totalPackages: uniquePackages.size,
+      packages: Array.from(uniquePackages.values()),
+    };
   }
 }

@@ -184,13 +184,17 @@ export class TrackingController {
       // 5. Construct Status History Timeline Events from DB Status History
       const timelineEvents = (order.statusHistory || []).map((h: any) => {
         const title = PUBLIC_ORDER_STATUS_MAP[h.status]?.label || h.status;
+        const currentFacName = ['ARRIVED_ORIGIN_FACILITY', 'SORTED_AT_ORIGIN_FACILITY'].includes(h.status)
+          ? (order.originFacility?.facilityName || order.destinationFacility?.facilityName)
+          : (order.destinationFacility?.facilityName || order.originFacility?.facilityName);
+
         const subtitle = getOrderStatusSubtitle(h.status, {
           senderName,
-          facilityName: order.destinationFacility?.facilityName || order.originFacility?.facilityName || 'Bưu cục phân phối',
+          facilityName: currentFacName || 'Bưu cục phân phối',
           driverName,
           vehiclePlate,
           receiverName: order.receiverName || '',
-          defaultReason: h.note
+          defaultReason: h.reason,
         });
 
         return {
