@@ -166,6 +166,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     }
                     firstOrder ??= shipment['order'];
                   }
+                  firstOrder ??= stop['order'];
                 } catch (_) {}
 
                 final String orderCode = firstOrder?['orderCode']?.toString() ??
@@ -173,16 +174,47 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     stop['shipment']?['shipmentCode']?.toString() ??
                     (shipmentId != null ? 'ORD-${shipmentId.toString().substring(0, 8).toUpperCase()}' : 'ORD-66266482-0${i + 1}');
 
-                final String receiverName = firstOrder?['receiverName']?.toString() ?? 'Khách nhận';
-                final String receiverPhone = firstOrder?['receiverPhone']?.toString() ?? '';
+                final String receiverName = firstOrder?['receiverName']?.toString() ?? stop['receiverName']?.toString() ?? 'Khách nhận';
+                final String receiverPhone = firstOrder?['receiverPhone']?.toString() ?? stop['receiverPhone']?.toString() ?? '';
                 
                 final paymentInfo = firstOrder?['payment'];
-                final String feePayer = (paymentInfo?['feePayer'] ?? firstOrder?['feePayer'] ?? 'SENDER').toString();
-                final num codAmount = num.tryParse(paymentInfo?['finalCodAmount']?.toString() ?? firstOrder?['estimatedCodAmount']?.toString() ?? firstOrder?['codAmount']?.toString() ?? '0') ?? 0;
-                final num shippingFee = num.tryParse(paymentInfo?['finalShippingFee']?.toString() ?? firstOrder?['estimatedTotalAmount']?.toString() ?? firstOrder?['totalAmount']?.toString() ?? '0') ?? 0;
+                final String feePayer = (paymentInfo?['feePayer'] ?? firstOrder?['feePayer'] ?? stop['feePayer'] ?? 'SENDER').toString();
+                
+                final num codAmount = num.tryParse(
+                  paymentInfo?['finalCodAmount']?.toString() ??
+                  firstOrder?['estimatedCodAmount']?.toString() ??
+                  firstOrder?['codAmount']?.toString() ??
+                  stop['estimatedCodAmount']?.toString() ??
+                  stop['codAmount']?.toString() ??
+                  '0'
+                ) ?? 0;
+
+                final num baseFee = num.tryParse(
+                  paymentInfo?['finalShippingFee']?.toString() ??
+                  firstOrder?['estimatedShippingFee']?.toString() ??
+                  firstOrder?['estimatedTotalAmount']?.toString() ??
+                  firstOrder?['shippingFee']?.toString() ??
+                  stop['estimatedShippingFee']?.toString() ??
+                  stop['shippingFee']?.toString() ??
+                  '0'
+                ) ?? 0;
+
+                final num insuranceFee = num.tryParse(
+                  paymentInfo?['finalInsuranceFee']?.toString() ??
+                  firstOrder?['estimatedInsuranceFee']?.toString() ??
+                  firstOrder?['insuranceFee']?.toString() ??
+                  stop['estimatedInsuranceFee']?.toString() ??
+                  stop['insuranceFee']?.toString() ??
+                  '0'
+                ) ?? 0;
+
+                final num shippingFee = (baseFee + insuranceFee) > 0 ? (baseFee + insuranceFee) : (baseFee > 0 ? baseFee : 31000);
 
                 final bool isReceiverPayFee = (feePayer == 'RECEIVER');
-                final num totalToCollect = stopType == 'DELIVERY' ? (codAmount + (isReceiverPayFee ? shippingFee : 0)) : 0;
+                final bool isSenderPayFee = (feePayer == 'SENDER');
+                final num totalToCollect = (stopType == 'PICKUP')
+                    ? (isSenderPayFee ? shippingFee : 0)
+                    : (codAmount + (isReceiverPayFee ? shippingFee : 0));
 
                 mappedStops.add({
                   'index': i + 1,
@@ -195,6 +227,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   'feePayer': feePayer,
                   'isReceiverPayFee': isReceiverPayFee,
                   'totalToCollect': totalToCollect,
+                  'stopType': stopType,
+                  'isPickup': (stopType == 'PICKUP'),
                   'title': stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng',
                   'address': address,
                   'latitude': lat,
@@ -2230,7 +2264,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.logisticsRed,
                           foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
+                          padding: const EdgeInsets.symmetric(vertical: 12.0),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
                           textStyle: const TextStyle(fontWeight: FontWeight.bold),
                         ),
@@ -2255,16 +2289,23 @@ class _DriverDashboardState extends State<DriverDashboard> {
             final bool isCheckedIn = stop['isCheckedIn'] == true;
             final bool hasPhoto = stop['photo'] != null;
             final bool canComplete = isCheckedIn && hasPhoto;
+            final bool isPickupStop = stop['isPickup'] == true ||
+                stop['stopType'] == 'PICKUP' ||
+                stop['title']?.toString().contains('lấy hàng') == true ||
+                stop['status'] == 'PICKING' ||
+                stop['status'] == 'READY_FOR_PICKUP' ||
+                stop['status'] == 'PICKUP_ASSIGNED';
 
             return Dialog(
               backgroundColor: AppColors.pureWhite,
               shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -2366,15 +2407,21 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      (stop['totalToCollect'] as num? ?? 0) > 0 ? '💵 TỔNG CẦN THU KHÁCH:' : '✅ ĐÃ THANH TOÁN / KHÔNG THU TIỀN',
-                                      style: TextStyle(
-                                        fontSize: 11.0,
-                                        fontWeight: FontWeight.w800,
-                                        color: (stop['totalToCollect'] as num? ?? 0) > 0 ? const Color(0xFF166534) : const Color(0xFF475569),
+                                    Expanded(
+                                      child: Text(
+                                        (stop['totalToCollect'] as num? ?? 0) > 0
+                                            ? (isPickupStop ? 'CẦN THU NGƯỜI GỬI:' : 'TỔNG CẦN THU NGƯỜI NHẬN:')
+                                            : (isPickupStop ? 'KHÔNG THU TIỀN NGƯỜI GỬI' : 'KHÔNG THU TIỀN NGƯỜI NHẬN'),
+                                        style: TextStyle(
+                                          fontSize: 11.0,
+                                          fontWeight: FontWeight.w800,
+                                          color: (stop['totalToCollect'] as num? ?? 0) > 0 ? const Color(0xFF166534) : const Color(0xFF475569),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    if ((stop['totalToCollect'] as num? ?? 0) > 0)
+                                    if ((stop['totalToCollect'] as num? ?? 0) > 0) ...[
+                                      const SizedBox(width: 8.0),
                                       Text(
                                         _formatCurrency((stop['totalToCollect'] as num? ?? 0)),
                                         style: const TextStyle(
@@ -2383,15 +2430,24 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                           color: Color(0xFF15803D),
                                         ),
                                       ),
+                                    ],
                                   ],
                                 ),
-                                if ((stop['totalToCollect'] as num? ?? 0) > 0) ...[
-                                  const SizedBox(height: 4.0),
-                                  Text(
-                                    '• Tiền COD thu hộ: ${_formatCurrency((stop['codAmount'] as num? ?? 0))}${(stop['isReceiverPayFee'] == true) ? '\n• Phí ship (Người nhận trả): ${_formatCurrency((stop['shippingFee'] as num? ?? 0))}' : ' (Người gửi đã trả cước)'}',
-                                    style: const TextStyle(fontSize: 10.0, color: Color(0xFF166534), height: 1.3),
+                                const SizedBox(height: 4.0),
+                                Text(
+                                  isPickupStop
+                                      ? ((stop['totalToCollect'] as num? ?? 0) > 0
+                                          ? '• Cước gửi hàng: ${_formatCurrency((stop['shippingFee'] as num? ?? (stop['totalToCollect'] as num? ?? 0)))}\n• Tiền COD: ${_formatCurrency((stop['codAmount'] as num? ?? 0))} (Sẽ thu từ Người Nhận khi giao)'
+                                          : '• Người gửi đã trả cước trước hoặc Người Nhận sẽ trả cước khi nhận hàng.\n• Tiền COD: ${_formatCurrency((stop['codAmount'] as num? ?? 0))} (Sẽ thu từ Người Nhận khi giao)')
+                                      : ((stop['isReceiverPayFee'] == true)
+                                          ? '• Tiền COD thu hộ: ${_formatCurrency((stop['codAmount'] as num? ?? 0))}\n• Cước ship (Người nhận trả): ${_formatCurrency((stop['shippingFee'] as num? ?? 0))}'
+                                          : '• Tiền COD thu hộ: ${_formatCurrency((stop['codAmount'] as num? ?? 0))}\n• Cước ship: 0đ (Người gửi đã trả cước)'),
+                                  style: TextStyle(
+                                    fontSize: 10.0,
+                                    color: (stop['totalToCollect'] as num? ?? 0) > 0 ? const Color(0xFF166534) : const Color(0xFF475569),
+                                    height: 1.3,
                                   ),
-                                ],
+                                ),
                               ],
                             ),
                           ),
@@ -2409,7 +2465,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                         const SizedBox(width: 12.0),
                         Expanded(
                           child: Text(
-                            '1. Quét QR Check-in',
+                            isPickupStop ? '1. Quét QR / Barcode Mã Đơn Người Gửi' : '1. Quét QR Check-in',
                             style: TextStyle(
                               fontWeight: isCheckedIn ? FontWeight.bold : FontWeight.normal,
                               color: isCheckedIn ? AppColors.deepOnyx : AppColors.secondary,
@@ -2441,7 +2497,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                         const SizedBox(width: 12.0),
                         Expanded(
                           child: Text(
-                            '2. Chụp hình bằng chứng giao nhận',
+                            isPickupStop ? '2. Chụp hình bưu kiện đã nhận tại Shop' : '2. Chụp hình bằng chứng giao nhận',
                             style: TextStyle(
                               fontWeight: hasPhoto ? FontWeight.bold : FontWeight.normal,
                               color: hasPhoto ? AppColors.deepOnyx : AppColors.secondary,
@@ -2495,22 +2551,24 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           backgroundColor: AppColors.logisticsRed,
                           foregroundColor: AppColors.pureWhite,
                         ),
-                        child: const Text(
-                          'HOÀN THÀNH GIAO HÀNG',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                        child: Text(
+                          isPickupStop ? 'XÁC NHẬN ĐÃ LẤY HÀNG' : 'HOÀN THÀNH GIAO HÀNG',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-            );
+            ),
+          );
           },
         );
       },
     );
   }
 
+  // ignore: unused_element
   void _showSignaturePadDialog(Map<String, dynamic> stop, VoidCallback onSaved) {
     showDialog(
       context: context,
@@ -2563,12 +2621,30 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
   Future<void> _completeStop(Map<String, dynamic> stop) async {
     final shipmentId = stop['shipmentId'];
+    final orderCode = stop['orderCode'];
+    final bool isPickupStop = stop['isPickup'] == true ||
+        stop['stopType'] == 'PICKUP' ||
+        stop['title']?.toString().contains('lấy hàng') == true ||
+        stop['status'] == 'PICKING' ||
+        stop['status'] == 'READY_FOR_PICKUP' ||
+        stop['status'] == 'PICKUP_ASSIGNED';
+
+    final nextStatus = isPickupStop ? 'PICKED_UP' : 'DELIVERED';
+    final reason = isPickupStop
+        ? 'Shipper đã quét mã bưu kiện và xác nhận lấy hàng từ người gửi thành công'
+        : 'Shipper đã hoàn thành giao hàng cho người nhận';
+
+    // 1. Primary: Update Order status by orderCode
+    if (orderCode != null && orderCode.toString().isNotEmpty) {
+      await DriverService.updateOrderStatus(orderCode.toString(), nextStatus, reason: reason);
+    }
+    // 2. Secondary: Update Shipment status if shipmentId exists
     if (shipmentId != null && shipmentId.toString().isNotEmpty) {
-      await DriverService.updateShipmentStatus(shipmentId.toString(), 'DELIVERED');
+      await DriverService.updateShipmentStatus(shipmentId.toString(), nextStatus, notes: reason);
     }
 
     setState(() {
-      stop['status'] = 'ĐÃ GIAO';
+      stop['status'] = isPickupStop ? 'ĐÃ LẤY HÀNG' : 'ĐÃ GIAO';
       stop['isActive'] = false;
 
       final currentIndex = stop['index'] as int;
@@ -2590,14 +2666,21 @@ class _DriverDashboardState extends State<DriverDashboard> {
         return AlertDialog(
           backgroundColor: AppColors.pureWhite,
           shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.green),
-              SizedBox(width: 8.0),
-              Text('Giao hàng thành công', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Icon(Icons.check_circle, color: Colors.green, size: 28),
+              const SizedBox(width: 8.0),
+              Text(
+                isPickupStop ? 'Lấy Hàng Thành Công' : 'Giao Hàng Thành Công',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ],
           ),
-          content: Text('Đã cập nhật trạng thái Điểm dừng ${stop['title']} thành ĐÃ GIAO và truyền thông tin POD lên máy chủ.'),
+          content: Text(
+            isPickupStop
+                ? 'Đã quét mã và xác nhận lấy bưu kiện ${stop['orderCode'] ?? ''} từ địa chỉ người gửi thành công. Trạng thái đơn hàng đã cập nhật sang ĐÃ LẤY HÀNG.'
+                : 'Đã cập nhật trạng thái Điểm dừng ${stop['title']} thành ĐÃ GIAO và truyền thông tin POD lên máy chủ.',
+          ),
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.pop(context),

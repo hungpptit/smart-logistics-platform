@@ -16,7 +16,8 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
 
   const isShipperActive =
     currentTracking.status === 'OUT_FOR_DELIVERY' ||
-    currentTracking.status === 'PICKUP_ASSIGNED';
+    currentTracking.status === 'PICKUP_ASSIGNED' ||
+    currentTracking.status === 'PICKING';
 
   return (
     <section className="tracking-results-section" id="tracking-results">
@@ -94,9 +95,10 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
                         Bưu cục xử lý hiện tại
                       </span>
                       <span className="font-bold text-slate-800 text-xs block leading-snug break-words">
-                        {currentTracking.destinationFacilityName ||
+                        {currentTracking.currentFacilityName ||
                           currentTracking.originFacilityName ||
-                          'Bưu cục Phước Long'}
+                          currentTracking.destinationFacilityName ||
+                          'Bưu cục tiếp nhận'}
                       </span>
                       {currentTracking.driverName &&
                         (currentTracking.status === 'READY_FOR_DISPATCH' ||
@@ -115,24 +117,31 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
               <TimelineStepper
                 status={currentTracking.status}
                 timestamps={
-                  currentTracking.trackingEvents && currentTracking.trackingEvents.length > 0
-                    ? currentTracking.trackingEvents.map((te: any) => ({
+                  (() => {
+                    const timelineItems = (currentTracking.timeline || []).map((t: any) => ({
+                      id: `timeline_${t.status}_${t.timestamp}`,
+                      status: t.status,
+                      label: t.title,
+                      time: t.timestamp,
+                      completed: true,
+                      detail: t.subtitle,
+                      rawDate: t.createdAtRaw ? new Date(t.createdAtRaw).getTime() : 0,
+                    }));
+
+                    const filteredEvents = (currentTracking.trackingEvents || [])
+                      .filter((te: any) => te.eventType !== 'ARRIVED_HUB' && te.eventType !== 'CREATED' && te.eventType !== 'IN_FACILITY')
+                      .map((te: any) => ({
                         id: te.id,
                         status: te.eventType,
-                        label: te.eventType === 'DRIVER_ASSIGNED' ? 'Phân tuyến cho tài xế' : te.eventType,
+                        label: te.eventType === 'DRIVER_ASSIGNED' ? 'Đã phân công tài xế' : te.eventType,
                         time: te.timestamp,
                         completed: true,
                         detail: te.description,
-                      }))
-                    : currentTracking.timeline && currentTracking.timeline.length > 0
-                    ? currentTracking.timeline.map((t: any) => ({
-                        status: t.status,
-                        label: t.title,
-                        time: t.timestamp,
-                        completed: true,
-                        detail: t.subtitle,
-                      }))
-                    : []
+                        rawDate: te.createdAtRaw ? new Date(te.createdAtRaw).getTime() : 0,
+                      }));
+
+                    return [...timelineItems, ...filteredEvents].sort((a, b) => a.rawDate - b.rawDate);
+                  })()
                 }
               />
             </div>
@@ -145,11 +154,13 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
                 <Earth className="map-icon text-[#bc0100]" size={18} />
                 <span>
                   {currentTracking.status === 'OUT_FOR_DELIVERY'
-                    ? 'Định vị trực tiếp Shipper Xe Máy 🏍️'
+                    ? 'Định vị trực tiếp Shipper Giao hàng 🏍️'
+                    : (currentTracking.status === 'PICKING' || currentTracking.status === 'PICKUP_ASSIGNED')
+                    ? 'Định vị Shipper đang đến lấy hàng 🏍️'
                     : 'Định vị vị trí Bưu cục & Người nhận 🏢'}
                 </span>
               </h3>
-              {liveDriverPos && currentTracking.status === 'OUT_FOR_DELIVERY' && (
+              {liveDriverPos && (currentTracking.status === 'OUT_FOR_DELIVERY' || currentTracking.status === 'PICKING' || currentTracking.status === 'PICKUP_ASSIGNED') && (
                 <span className="map-coordinates font-mono text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 font-bold flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   GPS: {liveDriverPos[0].toFixed(5)}, {liveDriverPos[1].toFixed(5)}
@@ -161,8 +172,8 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
                 route={currentTracking.route}
                 currentPos={
                   liveDriverPos || [
-                    currentTracking.coordinates?.currentDriver?.lat || 10.824,
-                    currentTracking.coordinates?.currentDriver?.lng || 106.759,
+                    currentTracking.coordinates?.currentDriver?.lat || currentTracking.coordinates?.sender?.lat || 10.857,
+                    currentTracking.coordinates?.currentDriver?.lng || currentTracking.coordinates?.sender?.lng || 106.774,
                   ]
                 }
                 destination={
@@ -170,31 +181,47 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
                   currentTracking.destination ||
                   'Điểm giao hàng'
                 }
+                senderAddress={currentTracking.senderAddress}
+                senderPos={
+                  currentTracking.coordinates?.sender
+                    ? [
+                      currentTracking.coordinates.sender.lat,
+                      currentTracking.coordinates.sender.lng,
+                    ]
+                    : undefined
+                }
                 receiverPos={
                   currentTracking.coordinates?.receiver
                     ? [
-                        currentTracking.coordinates.receiver.lat,
-                        currentTracking.coordinates.receiver.lng,
-                      ]
+                      currentTracking.coordinates.receiver.lat,
+                      currentTracking.coordinates.receiver.lng,
+                    ]
                     : undefined
                 }
                 facilityPos={
-                  currentTracking.coordinates?.currentFacility
+                  currentTracking.coordinates?.originFacility
                     ? [
+                      currentTracking.coordinates.originFacility.lat,
+                      currentTracking.coordinates.originFacility.lng,
+                    ]
+                    : currentTracking.coordinates?.currentFacility
+                      ? [
                         currentTracking.coordinates.currentFacility.lat,
                         currentTracking.coordinates.currentFacility.lng,
                       ]
-                    : undefined
+                      : undefined
                 }
                 facilityName={
-                  currentTracking.destinationFacilityName ||
+                  currentTracking.currentFacilityName ||
                   currentTracking.originFacilityName ||
-                  'Bưu cục Phước Long'
+                  currentTracking.destinationFacilityName ||
+                  'Bưu cục tiếp nhận'
                 }
                 shipperName={currentTracking.driverName}
                 vehiclePlate={currentTracking.vehiclePlate}
+                status={currentTracking.status}
                 statusLabel={currentTracking.statusLabel}
-                isOutForDelivery={currentTracking.status === 'OUT_FOR_DELIVERY'}
+                isOutForDelivery={currentTracking.status === 'OUT_FOR_DELIVERY' || currentTracking.status === 'PICKING' || currentTracking.status === 'PICKUP_ASSIGNED'}
               />
             </div>
           </div>

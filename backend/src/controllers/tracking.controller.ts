@@ -199,6 +199,7 @@ export class TrackingController {
             month: '2-digit',
             year: 'numeric',
           }),
+          createdAtRaw: h.createdAt.toISOString(),
           isCompleted: true,
         };
       });
@@ -246,6 +247,7 @@ export class TrackingController {
           month: '2-digit',
           year: 'numeric',
         }),
+        createdAtRaw: te.createdAt.toISOString(),
       }));
 
       // Coordinates setup
@@ -259,14 +261,21 @@ export class TrackingController {
       const destFacilityLat = Number(order.destinationFacility?.address?.latitude) || receiverLat;
       const destFacilityLng = Number(order.destinationFacility?.address?.longitude) || receiverLng;
 
-      // Current Facility location (where package is currently stored if not out for delivery)
-      const currentFacilityLat = destFacilityLat || originFacilityLat;
-      const currentFacilityLng = destFacilityLng || originFacilityLng;
-      const currentFacilityName = order.destinationFacility?.facilityName || order.originFacility?.facilityName || 'Bưu cục Phước Long';
+      // Determine whether order is in pickup/origin phase or destination/delivery phase
+      const isAtDestinationPhase = ['ARRIVED_DEST_FACILITY', 'AT_DEST_HUB', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'].includes(order.status);
+
+      const currentFacilityObj = isAtDestinationPhase
+        ? (order.destinationFacility || order.originFacility)
+        : (order.originFacility || order.destinationFacility);
+
+      const currentFacilityName = currentFacilityObj?.facilityName || (isAtDestinationPhase ? 'Bưu cục phân phối' : 'Bưu cục tiếp nhận');
+      const currentFacilityLat = Number(currentFacilityObj?.address?.latitude) || (isAtDestinationPhase ? destFacilityLat : originFacilityLat);
+      const currentFacilityLng = Number(currentFacilityObj?.address?.longitude) || (isAtDestinationPhase ? destFacilityLng : originFacilityLng);
 
       // Determine current driver / motorbike location
-      const currentDriverLat = liveGps?.latitude || (order.status === 'OUT_FOR_DELIVERY' ? destFacilityLat : currentFacilityLat);
-      const currentDriverLng = liveGps?.longitude || (order.status === 'OUT_FOR_DELIVERY' ? destFacilityLng : currentFacilityLng);
+      const isPickupPhase = ['PICKING', 'PICKUP_ASSIGNED', 'READY_FOR_PICKUP'].includes(order.status);
+      const currentDriverLat = liveGps?.latitude || (order.status === 'OUT_FOR_DELIVERY' ? destFacilityLat : isPickupPhase ? senderLat : currentFacilityLat);
+      const currentDriverLng = liveGps?.longitude || (order.status === 'OUT_FOR_DELIVERY' ? destFacilityLng : isPickupPhase ? senderLng : currentFacilityLng);
 
       const shipmentCode = order.package?.shipmentPackages?.[0]?.shipment?.shipmentCode || null;
 
@@ -282,8 +291,9 @@ export class TrackingController {
         receiverName: order.receiverName,
         receiverPhone: order.receiverPhone,
         receiverAddress: order.deliveryAddressText || order.deliveryAddress?.addressLine1 || '',
-        originFacilityName: order.originFacility?.facilityName || 'Bưu cục Linh Trung',
-        destinationFacilityName: currentFacilityName,
+        originFacilityName: order.originFacility?.facilityName || 'Bưu cục tiếp nhận',
+        destinationFacilityName: order.destinationFacility?.facilityName || 'Bưu cục phân phối',
+        currentFacilityName: currentFacilityName,
         driverName,
         vehiclePlate,
         routeId: activeRouteId,

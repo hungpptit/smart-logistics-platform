@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Users, Building2, User, Earth, Truck, BarChart3 } from 'lucide-react';
+import { Package, Users, Building2, User, Earth, Truck, BarChart3, QrCode } from 'lucide-react';
 import { DashboardShell } from '../layouts/DashboardShell';
 import type { MenuItem } from '../layouts/Sidebar';
 import { OrderTab } from '../OrderTab';
@@ -9,6 +9,7 @@ import { LiveTrackingTab } from '../LiveTrackingTab';
 import { AnalyticsTab } from '../admin/AnalyticsTab';
 import { DriverTab } from '../DriverTab';
 import { VehicleTab } from '../VehicleTab';
+import { ToteScanTab } from './ToteScanTab';
 import { useAuth } from '../../../../context/AuthContext';
 
 interface StaffDashboardProps {
@@ -24,6 +25,13 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onBackToHome }) 
       label: 'Thống kê Báo cáo',
       icon: BarChart3,
       component: AnalyticsTab,
+      allowed: true,
+    },
+    {
+      id: 'tote-scan',
+      label: 'Quét Sọt & Nhập Kho',
+      icon: QrCode,
+      component: ToteScanTab,
       allowed: true,
     },
     {

@@ -231,35 +231,75 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
       streetAddress = suggestion.description.split(',')[0].trim();
     }
 
-    const currentProvince = provinces.find((p) => p.code === provinceCode)?.fullName || '';
-    const currentWard = wards.find((w) => w.code === wardCode);
-    const wardName = currentWard ? currentWard.fullName || currentWard.name : '';
+    let targetProvCode = provinceCode;
+    let targetProvName = provinces.find((p) => p.code === provinceCode)?.fullName || provinceName || '';
+    let targetWardCode = wardCode;
+    let targetWardName = wards.find((w) => w.code === wardCode)?.fullName || wardName || '';
+
+    if (suggestion.compound?.province && provinces.length > 0) {
+      const matchedP = provinces.find(
+        (p) =>
+          p.fullName?.toLowerCase() === suggestion.compound.province.toLowerCase() ||
+          p.name?.toLowerCase() === suggestion.compound.province.toLowerCase() ||
+          suggestion.compound.province.toLowerCase().includes(p.name?.toLowerCase())
+      );
+      if (matchedP) {
+        targetProvCode = matchedP.code;
+        targetProvName = matchedP.fullName || matchedP.name;
+      }
+    }
+
+    if (suggestion.compound?.commune && wards.length > 0) {
+      const matchedW = wards.find(
+        (w) =>
+          w.fullName?.toLowerCase() === suggestion.compound.commune.toLowerCase() ||
+          w.name?.toLowerCase() === suggestion.compound.commune.toLowerCase() ||
+          suggestion.compound.commune.toLowerCase().includes(w.name?.toLowerCase())
+      );
+      if (matchedW) {
+        targetWardCode = matchedW.code;
+        targetWardName = matchedW.fullName || matchedW.name;
+      }
+    }
 
     let lat: number | undefined;
     let lng: number | undefined;
 
-    if (token && suggestion.place_id) {
+    if (token) {
       try {
-        const res = await fetch(`${CONFIG.API_BASE_URL}/locations/place-detail?placeId=${suggestion.place_id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (res.ok && data.success && data.data) {
-          const detail = data.data;
-          lat = detail.geometry?.location?.lat;
-          lng = detail.geometry?.location?.lng;
+        if (suggestion.place_id) {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/locations/place-detail?placeId=${suggestion.place_id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (res.ok && data.success && data.data) {
+            const detail = data.data;
+            lat = detail.geometry?.location?.lat || detail.result?.geometry?.location?.lat;
+            lng = detail.geometry?.location?.lng || detail.result?.geometry?.location?.lng;
+          }
+        }
+
+        if (!lat || !lng) {
+          const fullAddrQuery = suggestion.description || [streetAddress, targetWardName, targetProvName].filter(Boolean).join(', ');
+          const resGeo = await fetch(`${CONFIG.API_BASE_URL}/locations/geocode?address=${encodeURIComponent(fullAddrQuery)}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const dataGeo = await resGeo.json();
+          if (resGeo.ok && dataGeo.success && dataGeo.data) {
+            lat = dataGeo.data.latitude;
+            lng = dataGeo.data.longitude;
+          }
         }
       } catch (err) {
-        console.error('Error fetching place detail:', err);
+        console.error('Error fetching place detail / geocode:', err);
       }
     }
 
-    // Keep user's selected provinceCode and wardCode untouched!
     onChange({
-      province: currentProvince,
-      provinceCode,
-      ward: wardName,
-      wardCode,
+      province: targetProvName,
+      provinceCode: targetProvCode,
+      ward: targetWardName,
+      wardCode: targetWardCode,
       addressLine1: streetAddress,
       latitude: lat,
       longitude: lng,
@@ -314,7 +354,10 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
             {suggestions.map((s, idx) => (
               <div
                 key={idx}
-                onClick={() => handleSelectSuggestion(s)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelectSuggestion(s);
+                }}
                 className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 text-[10px] text-gray-700 leading-snug flex flex-col gap-0.5"
               >
                 <span className="font-bold text-[#161D25]">

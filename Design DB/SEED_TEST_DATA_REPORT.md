@@ -9,9 +9,10 @@
 | Mã Bưu cục | Tên Bưu cục | Địa chỉ Thực tế | Vai trò trong Đơn Test | Số Staff | Số Shipper |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `FAC-TD-DANGBI` | **Bưu cục Đặng Văn Bi** | 180 Đặng Văn Bi, Phường Bình Thọ, TP. Thủ Đức | **Bưu cục Nhận Chặng cuối** (Tập kết 50 đơn sẵn sàng AI Routing) | 2 Staff | **3 Shipper** |
-| `FAC-TD-LINHTRUNG` | **Bưu cục Linh Trung** | 250 Đường Linh Trung, Phường Linh Trung, TP. Thủ Đức | Kho xuất phát gửi (Cust 1 & 2) | 1 Staff | **2 Shipper** |
-| `FAC-TD-PHUOCLONG` | **Bưu cục Phước Long** | 85 Đỗ Xuân Hợp, Phường Phước Long B, TP. Thủ Đức | Kho xuất phát gửi (Cust 3 & 4) | 1 Staff | **2 Shipper** |
-| `FAC-TD-ANPHU` | **Bưu cục An Phú (Kho xa)** | 25 Song Hành, Phường An Phú, TP. Thủ Đức | Kho xuất phát gửi xa xa (Cust 5) | - | - |
+| `FAC-TD-LINHTRUNG` | **Bưu cục Linh Trung** | 250 Đường Linh Trung, Phường Linh Trung, TP. Thủ Đức | Kho xuất phát gửi (Cust 1 & 2) | 1 Staff (`stf_linhtrung_1`) | **2 Shipper** |
+| `FAC-TD-PHUOCLONG` | **Bưu cục Phước Long** | 85 Đỗ Xuân Hợp, Phường Phước Long B, TP. Thủ Đức | Kho xuất phát gửi (Cust 3 & 4) | 1 Staff (`stf_phuoclong_1`) | **2 Shipper** |
+| `FAC-TD-ANPHU` | **Bưu cục An Phú (Kho xa)** | 25 Song Hành, Phường An Phú, TP. Thủ Đức | Kho xuất phát gửi xa (Cust 5) | - | - |
+| `FAC-000050` | **Bưu Cục Xuân Sơn** | UBND xã Xuân Sơn, Xã Xuân Sơn, Châu Đức, Bà Rịa - Vũng Tàu | Kho nhận chặng cuối (Giao khu vực Châu Đức / BR-VT) | - | - |
 
 ---
 

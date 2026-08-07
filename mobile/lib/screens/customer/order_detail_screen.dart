@@ -18,6 +18,58 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _isLoading = true;
   String? _error;
   bool _isCancelling = false;
+  bool _isUpdatingStatus = false;
+
+  void _handleUpdateStatus(String newStatus) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Xác nhận sẵn sàng lấy hàng',
+          style: AppTypography.headlineMd.copyWith(fontWeight: FontWeight.bold),
+        ),
+        content: const Text('Bạn có chắc chắn hàng đã chuẩn bị xong và sẵn sàng cho shipper/tài xế đến lấy không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF16A34A),
+              foregroundColor: AppColors.pureWhite,
+            ),
+            child: const Text('Xác nhận'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isUpdatingStatus = true);
+    final res = await OrderService.updateOrderStatus(_orderId, newStatus);
+    setState(() => _isUpdatingStatus = false);
+
+    if (!mounted) return;
+    if (res['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res['message'] ?? 'Đã xác nhận sẵn sàng lấy hàng!'),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+      _loadOrderDetail();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res['message'] ?? 'Không thể cập nhật trạng thái.'),
+          backgroundColor: AppColors.logisticsRed,
+        ),
+      );
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -157,6 +209,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final status = _order!['status'] ?? 'CREATED';
     final code = _order!['orderCode'] ?? '';
     final canCancel = status == 'CREATED' || status == 'READY_FOR_PICKUP' || status == 'PENDING' || status == 'DRAFT';
+    final canMarkReady = status == 'CREATED' || status == 'PENDING' || status == 'DRAFT';
 
     return SafeArea(
       child: Column(
@@ -186,36 +239,69 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
           ),
-          if (canCancel)
+          if (canCancel || canMarkReady)
             Container(
               padding: const EdgeInsets.all(AppStyles.marginMobile),
               decoration: const BoxDecoration(
                 color: AppColors.pureWhite,
                 border: Border(top: BorderSide(color: AppColors.surfaceContainerHighest)),
               ),
-              child: SizedBox(
-                width: double.infinity,
-                height: 50.0,
-                child: ElevatedButton(
-                  onPressed: _isCancelling ? null : _handleCancelOrder,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.logisticsRed,
-                    foregroundColor: AppColors.pureWhite,
-                    disabledBackgroundColor: AppColors.logisticsRed.withValues(alpha: 0.5),
-                    shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                    elevation: 0,
-                  ),
-                  child: _isCancelling
-                      ? const SizedBox(
-                          width: 20.0,
-                          height: 20.0,
-                          child: CircularProgressIndicator(color: AppColors.pureWhite, strokeWidth: 2.0),
-                        )
-                      : Text(
-                          'HỦY ĐƠN HÀNG',
-                          style: AppTypography.button.copyWith(fontWeight: FontWeight.bold),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (canMarkReady) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48.0,
+                      child: ElevatedButton.icon(
+                        onPressed: (_isCancelling || _isUpdatingStatus) ? null : () => _handleUpdateStatus('READY_FOR_PICKUP'),
+                        icon: const Icon(Icons.check_circle_outline, color: AppColors.pureWhite),
+                        label: _isUpdatingStatus
+                            ? const SizedBox(
+                                width: 20.0,
+                                height: 20.0,
+                                child: CircularProgressIndicator(color: AppColors.pureWhite, strokeWidth: 2.0),
+                              )
+                            : Text(
+                                'SẴN SÀNG LẤY HÀNG',
+                                style: AppTypography.button.copyWith(fontWeight: FontWeight.bold, color: AppColors.pureWhite),
+                              ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          foregroundColor: AppColors.pureWhite,
+                          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                          elevation: 0,
                         ),
-                ),
+                      ),
+                    ),
+                    const SizedBox(height: 8.0),
+                  ],
+                  if (canCancel)
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44.0,
+                      child: ElevatedButton(
+                        onPressed: (_isCancelling || _isUpdatingStatus) ? null : _handleCancelOrder,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.logisticsRed,
+                          foregroundColor: AppColors.pureWhite,
+                          disabledBackgroundColor: AppColors.logisticsRed.withValues(alpha: 0.5),
+                          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                          elevation: 0,
+                        ),
+                        child: _isCancelling
+                            ? const SizedBox(
+                                width: 20.0,
+                                height: 20.0,
+                                child: CircularProgressIndicator(color: AppColors.pureWhite, strokeWidth: 2.0),
+                              )
+                            : Text(
+                                'HỦY ĐƠN HÀNG',
+                                style: AppTypography.button.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                    ),
+                ],
               ),
             ),
         ],
@@ -421,16 +507,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildCostBreakdownCard() {
-    final rawTotal = _order!['estimatedTotalAmount'] ?? _order!['totalAmount'];
-    final rawShipping = _order!['estimatedShippingFee'] ?? _order!['shippingFee'];
-    final rawInsurance = _order!['estimatedInsuranceFee'] ?? _order!['insuranceFee'];
+    final rawShipping = _order!['estimatedShippingFee'] ?? _order!['shippingFee'] ?? _order!['payment']?['shippingFee'] ?? _order!['payment']?['finalShippingFee'];
+    final rawInsurance = _order!['estimatedInsuranceFee'] ?? _order!['insuranceFee'] ?? _order!['payment']?['insuranceFee'] ?? _order!['payment']?['finalInsuranceFee'];
+    final rawCod = _order!['estimatedCodAmount'] ?? _order!['codAmount'] ?? _order!['payment']?['codAmount'] ?? _order!['payment']?['finalCodAmount'];
 
-    final totalAmount = rawTotal != null ? double.tryParse(rawTotal.toString()) ?? 0.0 : 0.0;
-    final shippingFee = rawShipping != null ? double.tryParse(rawShipping.toString()) ?? 0.0 : 0.0;
-    final insuranceFee = rawInsurance != null ? double.tryParse(rawInsurance.toString()) ?? 0.0 : 0.0;
+    final double shippingFee = rawShipping != null ? (double.tryParse(rawShipping.toString()) ?? 0.0) : 0.0;
+    final double insuranceFee = rawInsurance != null ? (double.tryParse(rawInsurance.toString()) ?? 0.0) : 0.0;
+    final double codAmount = rawCod != null ? (double.tryParse(rawCod.toString()) ?? 0.0) : 0.0;
 
-    final paymentMethod = _order!['payment'] != null ? _order!['payment']['paymentMethod'] ?? 'CASH' : 'CASH';
-    final paymentStatus = _order!['payment'] != null ? _order!['payment']['status'] ?? 'UNPAID' : 'UNPAID';
+    final paymentInfo = _order!['payment'];
+    final String feePayer = (paymentInfo?['feePayer'] ?? _order!['feePayer'] ?? 'SENDER').toString();
+    final String feePayerText = feePayer == 'RECEIVER' ? 'NGƯỜI NHẬN' : 'NGƯỜI GỬI';
+
+    final rawPaymentAmount = paymentInfo?['amount'];
+    final rawTotal = rawPaymentAmount ?? _order!['estimatedTotalAmount'] ?? _order!['totalAmount'];
+    final parsedTotal = rawTotal != null ? (double.tryParse(rawTotal.toString()) ?? 0.0) : 0.0;
+    final double totalAmount = parsedTotal > 0 ? parsedTotal : (shippingFee + insuranceFee + codAmount);
+
+    final paymentMethod = paymentInfo != null ? (paymentInfo['paymentMethod'] ?? 'CASH') : 'CASH';
+    final paymentStatus = paymentInfo != null ? (paymentInfo['status'] ?? 'UNPAID') : 'UNPAID';
 
     return Container(
       width: double.infinity,
@@ -445,23 +540,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Chi tiết thanh toán',
+            'Mục thanh toán',
             style: AppTypography.headlineMd.copyWith(
               fontWeight: FontWeight.bold,
               color: AppColors.deepOnyx,
             ),
           ),
           const SizedBox(height: 16.0),
-          _buildPriceRow('Cước vận chuyển:', formatCurrency(shippingFee)),
+          _buildPriceRow('Cước vận chuyển gốc:', formatCurrency(shippingFee)),
           if (insuranceFee > 0)
-            _buildPriceRow('Phí thu hộ/bảo hiểm:', formatCurrency(insuranceFee)),
+            _buildPriceRow('Phí bảo hiểm khai giá:', formatCurrency(insuranceFee)),
+          if (codAmount > 0)
+            _buildPriceRow('Tiền thu hộ COD:', formatCurrency(codAmount), isHighlight: true),
           const Divider(),
           const SizedBox(height: 8.0),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Tổng tiền:',
+                'Tổng chi phí đơn:',
                 style: AppTypography.bodyMd.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.deepOnyx,
@@ -477,31 +574,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16.0),
-          const Divider(),
+          const SizedBox(height: 12.0),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10.0),
+            decoration: BoxDecoration(
+              color: AppColors.cloudGray,
+              borderRadius: BorderRadius.circular(8.0),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Thanh toán bởi:',
+                  style: AppTypography.labelLg.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  '$feePayerText ($paymentMethod)',
+                  style: AppTypography.labelLg.copyWith(color: AppColors.deepOnyx, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 12.0),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Phương thức:',
-                style: AppTypography.labelLg.copyWith(color: AppColors.secondary),
-              ),
-              Text(
-                paymentMethod == 'COD' ? 'Thu hộ COD' : (paymentMethod == 'BANK_TRANSFER' ? 'Chuyển khoản' : 'Tiền mặt'),
-                style: AppTypography.bodyMd.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.deepOnyx,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8.0),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Trạng thái:',
+                'Trạng thái cước:',
                 style: AppTypography.labelLg.copyWith(color: AppColors.secondary),
               ),
               _buildPaymentStatusChip(paymentStatus),
@@ -512,14 +612,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _buildPriceRow(String label, String value) {
+  Widget _buildPriceRow(String label, String value, {bool isHighlight = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTypography.bodyMd.copyWith(color: AppColors.secondary)),
-          Text(value, style: AppTypography.bodyMd.copyWith(color: AppColors.deepOnyx, fontWeight: FontWeight.w600)),
+          Text(label, style: AppTypography.bodyMd.copyWith(color: isHighlight ? const Color(0xFFD97706) : AppColors.secondary, fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal)),
+          Text(value, style: AppTypography.bodyMd.copyWith(color: isHighlight ? const Color(0xFFD97706) : AppColors.deepOnyx, fontWeight: isHighlight ? FontWeight.w800 : FontWeight.w600)),
         ],
       ),
     );

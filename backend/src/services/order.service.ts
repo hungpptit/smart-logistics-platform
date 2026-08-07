@@ -522,13 +522,26 @@ export class OrderService {
   /**
    * Update order status (Admin/Staff only)
    */
-  public async updateStatus(id: string, dto: UpdateOrderStatusDto, userId: string, userRoles: string[]) {
-    const order = await prisma.order.findUnique({
-      where: { id },
+  public async updateStatus(idOrCode: string, dto: UpdateOrderStatusDto, userId: string, userRoles: string[]) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrCode);
+    const order = await prisma.order.findFirst({
+      where: isUuid
+        ? { id: idOrCode }
+        : { orderCode: idOrCode },
     });
 
     if (!order) {
       throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    if (userRoles.includes('CUSTOMER') && !userRoles.includes('ADMIN') && !userRoles.includes('STAFF')) {
+      const customerId = await this.getCustomerIdByUserId(userId);
+      if (order.customerId !== customerId) {
+        throw new ForbiddenException('Bạn không có quyền cập nhật đơn hàng này');
+      }
+      if (dto.status !== OrderStatus.READY_FOR_PICKUP && dto.status !== OrderStatus.CANCELLED) {
+        throw new ForbiddenException('Khách hàng chỉ có quyền cập nhật trạng thái Sẵn sàng lấy hàng hoặc Hủy đơn');
+      }
     }
 
     let staffFacilityId: string | null = null;
@@ -585,14 +598,14 @@ export class OrderService {
 
       // Update order status
       const updatedOrder = await tx.order.update({
-        where: { id },
+        where: { id: order.id },
         data: updateData,
       });
 
       // Write status history
       await tx.orderStatusHistory.create({
         data: {
-          orderId: id,
+          orderId: order.id,
           status: dto.status,
           changedByUserId: userId,
           reason: dto.reason || `Cập nhật trạng thái đơn hàng sang ${dto.status}`,

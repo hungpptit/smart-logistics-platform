@@ -232,4 +232,51 @@ class OrderService {
       };
     }
   }
+
+  /// Gọi API PUT /orders/:id/status để cập nhật trạng thái đơn hàng (ví dụ: READY_FOR_PICKUP)
+  static Future<Map<String, dynamic>> updateOrderStatus(String orderId, String status) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || token.isEmpty) {
+        return {
+          'success': false,
+          'message': 'Phiên đăng nhập đã hết hạn.',
+        };
+      }
+
+      final url = Uri.parse('${AppConfig.baseUrl}/orders/$orderId/status');
+      debugPrint('📦 [OrderService] Đang gửi PUT $url ($status)');
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'status': status,
+          'reason': 'Xác nhận sẵn sàng lấy hàng'
+        }),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return {
+          'success': true,
+          'message': body['message'] ?? 'Cập nhật trạng thái thành công!',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': body['message'] ?? 'Không thể cập nhật trạng thái.',
+        };
+      }
+    } catch (e) {
+      debugPrint('❌ [OrderService] Lỗi updateOrderStatus: $e');
+      return {
+        'success': false,
+        'message': 'Lỗi kết nối máy chủ.',
+      };
+    }
+  }
 }

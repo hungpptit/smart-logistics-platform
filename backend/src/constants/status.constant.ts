@@ -50,13 +50,13 @@ export const PUBLIC_ORDER_STATUS_MAP: Record<string, PublicStatusInfo> = {
   [OrderStatus.CREATED]: { label: 'ĐÃ TẠO ĐƠN HÀNG', chipClass: 'created' },
   [OrderStatus.READY_FOR_PICKUP]: { label: 'CHỜ LẤY HÀNG', chipClass: 'ready' },
   [OrderStatus.PICKUP_ASSIGNED]: { label: 'ĐÃ PHÂN CÔNG SHIPPER LẤY', chipClass: 'assigned' },
-  [OrderStatus.PICKING]: { label: 'SHIPPER ĐANG ĐẾN LẤY HÀNG', chipClass: 'picking_up' },
+  [OrderStatus.PICKING]: { label: 'SHIPPER ĐANG ĐẾN LẤY HÀNG (XE MÁY 🏍️)', chipClass: 'picking_up' },
   [OrderStatus.PICKED_UP]: { label: 'ĐÃ LẤY HÀNG THÀNH CÔNG', chipClass: 'picked_up' },
   [OrderStatus.ARRIVED_ORIGIN_FACILITY]: { label: 'ĐÃ LƯU KHO BƯU CỤC', chipClass: 'in_facility' },
   [OrderStatus.READY_FOR_DISPATCH]: { label: 'ĐÃ NHẬP KHO - SẴN SÀNG GIAO HÀNG', chipClass: 'ready' },
   [OrderStatus.IN_TRANSIT]: { label: 'ĐANG TRUNG CHUYỂN GIỮA KHO', chipClass: 'in_transit' },
   [OrderStatus.AT_HUB]: { label: 'TẠI KHO TRUNG CHUYỂN', chipClass: 'in_facility' },
-  [OrderStatus.OUT_FOR_DELIVERY]: { label: 'SHIPPER ĐANG GIAO HÀNG (XE MÁY 🏍️)', chipClass: 'out_for_delivery' },
+  [OrderStatus.OUT_FOR_DELIVERY]: { label: 'SHIPPER ĐANG GIAO HÀNG (XE MÁY)', chipClass: 'out_for_delivery' },
   [OrderStatus.DELIVERED]: { label: 'GIAO HÀNG THÀNH CÔNG', chipClass: 'delivered' },
   [OrderStatus.DELIVERY_FAILED]: { label: 'GIAO HÀNG THẤT BẠI', chipClass: 'failed' },
   [OrderStatus.RETURNING]: { label: 'ĐANG CHUYỂN HOÀN', chipClass: 'returning' },
@@ -75,6 +75,12 @@ export function getOrderStatusSubtitle(
   switch (status) {
     case OrderStatus.CREATED:
       return `Đơn hàng đã được tạo thành công bởi ${context.senderName || 'Người gửi'}`;
+    case OrderStatus.PICKUP_ASSIGNED:
+      return `Đã phân công Shipper ${context.driverName || 'Tài xế'} (${context.vehiclePlate || 'Xe máy'}) chuẩn bị đến lấy hàng`;
+    case OrderStatus.PICKING:
+      return `Shipper ${context.driverName || 'Tài xế'} (${context.vehiclePlate || 'Xe máy'}) đang di chuyển đến địa chỉ người gửi để lấy hàng`;
+    case OrderStatus.PICKED_UP:
+      return `Shipper ${context.driverName || 'Tài xế'} đã lấy hàng thành công từ người gửi và đang chuyển về bưu cục`;
     case OrderStatus.ARRIVED_ORIGIN_FACILITY:
     case OrderStatus.READY_FOR_DISPATCH:
     case OrderStatus.AT_HUB:

@@ -102,7 +102,7 @@ export class ShipmentService {
           shipmentId: shipment.id,
           eventType: 'CREATED' as any,
           description: eventMeta?.defaultDesc || 'Vận đơn mới đã được khởi tạo thành công',
-          occurredAt: new Date(),
+          createdAt: new Date(),
           createdBy: creatorId,
         },
       });
@@ -206,7 +206,7 @@ export class ShipmentService {
           },
         },
         trackingEvents: {
-          orderBy: { occurredAt: 'desc' },
+          orderBy: { createdAt: 'desc' },
           include: {
             creator: {
               select: {
@@ -228,13 +228,16 @@ export class ShipmentService {
   /**
    * Update shipment status and log events
    */
-  public async updateShipmentStatus(id: string, userId: string, dto: UpdateShipmentStatusDto) {
+  public async updateShipmentStatus(idOrCode: string, userId: string, dto: UpdateShipmentStatusDto) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrCode);
     const shipment = await prisma.shipment.findFirst({
-      where: { id, status: { not: ShipmentStatus.CANCELLED } },
+      where: isUuid
+        ? { id: idOrCode, status: { not: ShipmentStatus.CANCELLED } }
+        : { shipmentCode: idOrCode, status: { not: ShipmentStatus.CANCELLED } },
     });
 
     if (!shipment) {
-      throw new NotFoundException('Không tìm thấy vận đơn để cập nhật');
+      throw new NotFoundException(`Không tìm thấy vận đơn gom ${idOrCode} để cập nhật`);
     }
 
     // Lookup TrackingEventType and Meta from Centralized Map Constants
@@ -245,7 +248,7 @@ export class ShipmentService {
     return await prisma.$transaction(async (tx) => {
       // 1. Update Shipment status
       const updatedShipment = await tx.shipment.update({
-        where: { id },
+        where: { id: shipment.id },
         data: {
           status: dto.status,
           updatedBy: userId,
@@ -255,19 +258,19 @@ export class ShipmentService {
       // 2. Create TrackingEvent
       await tx.trackingEvent.create({
         data: {
-          shipmentId: id,
+          shipmentId: shipment.id,
           eventType,
           description,
           latitude: dto.latitude || null,
           longitude: dto.longitude || null,
-          occurredAt: new Date(),
+          createdAt: new Date(),
           createdBy: userId,
         },
       });
 
       // 3. Update all packages parent Order status based on shipment transitions
       const shipmentPackages = await tx.shipmentPackage.findMany({
-        where: { shipmentId: id },
+        where: { shipmentId: shipment.id },
         include: {
           package: true,
         },

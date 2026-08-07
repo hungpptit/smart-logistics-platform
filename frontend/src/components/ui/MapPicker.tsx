@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin } from 'lucide-react';
 import { Map, MapMarker, MarkerContent, MapControls } from './map';
 import { useMapConfirmation } from '../../hooks/useMapConfirmation';
-import { geocodeAddress } from '../../lib/geocoding';
 
 interface MapPickerProps {
   latitude: number;
@@ -19,21 +18,14 @@ export const MapPicker: React.FC<MapPickerProps> = ({
   latitude,
   longitude,
   onChange,
-  addressLine1 = '',
-  ward = '',
-  province = '',
-  token = '',
   className = ''
 }) => {
   const [mapCenter, setMapCenter] = useState<[number, number]>([105.8542, 21.0285]);
-  const [geocodingLoading, setGeocodingLoading] = useState<boolean>(false);
   const mapRef = useRef<any>(null);
 
   const {
     tempLatitude,
     tempLongitude,
-    setTempLatitude,
-    setTempLongitude,
     onMapClick,
     onMarkerDragEnd,
     onLocate,
@@ -49,27 +41,36 @@ export const MapPicker: React.FC<MapPickerProps> = ({
 
   // Sync map center if coordinates exist on load or change externally
   useEffect(() => {
-    if (latitude && longitude) {
+    if (latitude && longitude && latitude !== 0 && longitude !== 0) {
       setMapCenter([longitude, latitude]);
-      if (mapRef.current) {
-        try {
-          mapRef.current.flyTo({
-            center: [longitude, latitude],
-            zoom: 14,
-            duration: 0
-          });
-        } catch (e) {
-          mapRef.current.setCenter([longitude, latitude]);
+
+      const moveMap = () => {
+        if (mapRef.current) {
+          try {
+            mapRef.current.flyTo({
+              center: [longitude, latitude],
+              zoom: 15,
+              duration: 1800,
+              speed: 1.1,
+              curve: 1.42,
+              essential: true
+            });
+          } catch (e) {
+            try {
+              mapRef.current.setCenter([longitude, latitude]);
+            } catch (err) {}
+          }
+          try {
+            mapRef.current.resize();
+          } catch (err) {}
         }
-      }
+      };
+
+      moveMap();
+      const timer = setTimeout(moveMap, 200);
+      return () => clearTimeout(timer);
     } else {
       setMapCenter([105.8542, 21.0285]); // Hanoi default
-    }
-
-    if (mapRef.current) {
-      setTimeout(() => {
-        mapRef.current.resize();
-      }, 300);
     }
   }, [latitude, longitude]);
 
@@ -87,35 +88,7 @@ export const MapPicker: React.FC<MapPickerProps> = ({
     mapInstance.on('click', onMapClick);
   }, [onMapClick, latitude, longitude]);
 
-  const handleAutoLocate = async () => {
-    if (!province && !ward && !addressLine1) return;
 
-    setGeocodingLoading(true);
-    const fullAddress = [addressLine1, ward, province].filter(Boolean).join(', ');
-
-    try {
-      const coords = await geocodeAddress(fullAddress, token);
-      if (coords) {
-        const lat = parseFloat(coords.latitude.toFixed(6));
-        const lng = parseFloat(coords.longitude.toFixed(6));
-        
-        // Update temp coordinates and call onChange
-        setTempLatitude(lat);
-        setTempLongitude(lng);
-        onChange(lat, lng);
-        setMapCenter([lng, lat]);
-        mapRef.current?.flyTo({
-          center: [lng, lat],
-          zoom: 15,
-          duration: 1000
-        });
-      }
-    } catch (err) {
-      console.error('Error auto-locating address:', err);
-    } finally {
-      setGeocodingLoading(false);
-    }
-  };
 
   return (
     <div className={`flex flex-col gap-3 ${className}`}>

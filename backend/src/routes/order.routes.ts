@@ -258,7 +258,7 @@ router.post(
  */
 router.put(
   '/:id/status',
-  requireRoles(['ADMIN', 'STAFF']),
+  requireRoles(['ADMIN', 'STAFF', 'CUSTOMER', 'SHIPPER', 'DRIVER']),
   validationMiddleware(UpdateOrderStatusDto),
   orderController.updateStatus
 );

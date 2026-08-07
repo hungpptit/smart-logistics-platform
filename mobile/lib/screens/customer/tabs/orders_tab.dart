@@ -46,20 +46,25 @@ class _OrdersTabState extends State<OrdersTab> {
         final deliveryAddr = item['deliveryAddressText'] ?? item['deliveryAddressSnapshot'] ?? item['deliveryAddress']?['formattedAddress'] ?? 'Việt Nam';
         final statusRaw = item['status'] ?? 'PENDING';
         
-        final totalFeeRaw = item['totalAmount'] ?? item['shippingFee'] ?? item['totalFee'] ?? item['subtotal'] ?? 0;
-        final double totalFee = double.tryParse(totalFeeRaw.toString()) ?? 0.0;
+        final double shipping = double.tryParse(item['estimatedShippingFee']?.toString() ?? '0') ?? 0.0;
+        final double insurance = double.tryParse(item['estimatedInsuranceFee']?.toString() ?? '0') ?? 0.0;
+        final double rawPay = double.tryParse(item['payment']?['amount']?.toString() ?? item['totalAmount']?.toString() ?? '0') ?? 0.0;
+        final double totalFee = rawPay > 0 ? rawPay : (shipping + insurance);
 
         final createdAt = item['createdAt'] != null ? DateTime.tryParse(item['createdAt']) : DateTime.now();
 
-        String statusStr = 'Chờ xử lý';
+        String statusStr = 'Mới tạo';
         IconData icon = Icons.hourglass_top;
-        if (statusRaw == 'DELIVERED' || statusRaw == 'COMPLETED') {
+        if (statusRaw == 'READY_FOR_PICKUP') {
+          statusStr = 'Sẵn sàng lấy';
+          icon = Icons.inventory;
+        } else if (statusRaw == 'DELIVERED' || statusRaw == 'COMPLETED') {
           statusStr = 'Đã giao';
           icon = Icons.inventory_2;
         } else if (statusRaw == 'CANCELLED') {
           statusStr = 'Đã hủy';
           icon = Icons.cancel;
-        } else if (statusRaw == 'IN_TRANSIT' || statusRaw == 'DISPATCHED' || statusRaw == 'PICKED_UP' || statusRaw == 'AT_HUB' || statusRaw == 'READY_FOR_PICKUP' || statusRaw == 'ASSIGNED') {
+        } else if (statusRaw == 'IN_TRANSIT' || statusRaw == 'DISPATCHED' || statusRaw == 'PICKED_UP' || statusRaw == 'AT_HUB' || statusRaw == 'ASSIGNED') {
           statusStr = 'Đang xử lý';
           icon = Icons.local_shipping;
         }

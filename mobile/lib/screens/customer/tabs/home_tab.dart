@@ -369,7 +369,10 @@ class _HomeTabState extends State<HomeTab> {
     final code = order['orderCode'] ?? '';
     final receiverName = order['receiverName'] ?? '';
     final destination = order['receiverAddressLine1'] ?? '';
-    final totalAmount = order['totalAmount'] != null ? double.parse(order['totalAmount'].toString()) : 0.0;
+    final double shippingFee = double.tryParse(order['estimatedShippingFee']?.toString() ?? '0') ?? 0.0;
+    final double insuranceFee = double.tryParse(order['estimatedInsuranceFee']?.toString() ?? '0') ?? 0.0;
+    final double rawPay = double.tryParse(order['payment']?['amount']?.toString() ?? order['totalAmount']?.toString() ?? '0') ?? 0.0;
+    final double totalAmount = rawPay > 0 ? rawPay : (shippingFee + insuranceFee);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10.0),

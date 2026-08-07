@@ -440,6 +440,17 @@ export class RoutingService {
         },
         stops: {
           include: {
+            order: {
+              select: {
+                id: true,
+                orderCode: true,
+                receiverName: true,
+                receiverPhone: true,
+                estimatedCodAmount: true,
+                estimatedShippingFee: true,
+                estimatedInsuranceFee: true,
+              },
+            },
             shipment: {
               include: {
                 shipmentPackages: {
@@ -772,22 +783,68 @@ export class RoutingService {
       },
     });
 
-    // Update all related orders status to OUT_FOR_DELIVERY
+    // Update related orders status: PICKING for pickup orders, OUT_FOR_DELIVERY for delivery orders
     if (orderIds.length > 0) {
       const uniqueOrderIds = Array.from(new Set(orderIds));
-      await prisma.order.updateMany({
+      const ordersToUpdate = await prisma.order.findMany({
         where: { id: { in: uniqueOrderIds } },
-        data: { status: 'OUT_FOR_DELIVERY' },
+        select: { id: true, status: true },
       });
 
-      // Insert OrderStatusHistory logs
-      const historyLogs = uniqueOrderIds.map(orderId => ({
-        orderId,
-        status: 'OUT_FOR_DELIVERY',
-        changedByUserId: userId || null,
-        reason: `Tài xế đã quét mã QR Sọt ${route.routeCode || route.id} và bắt đầu di chuyển đi giao hàng`,
-      }));
-      await prisma.orderStatusHistory.createMany({ data: historyLogs as any });
+      const pickupOrderIds: string[] = [];
+      const deliveryOrderIds: string[] = [];
+
+      ordersToUpdate.forEach((o) => {
+        if (
+          o.status === OrderStatus.READY_FOR_PICKUP ||
+          o.status === OrderStatus.PICKUP_ASSIGNED ||
+          o.status === OrderStatus.PICKING
+        ) {
+          pickupOrderIds.push(o.id);
+        } else {
+          deliveryOrderIds.push(o.id);
+        }
+      });
+
+      const historyLogs: any[] = [];
+
+      // Update Pickup Orders to OrderStatus.PICKING ("SHIPPER ĐANG ĐẾN LẤY HÀNG")
+      if (pickupOrderIds.length > 0) {
+        await prisma.order.updateMany({
+          where: { id: { in: pickupOrderIds } },
+          data: { status: OrderStatus.PICKING },
+        });
+
+        pickupOrderIds.forEach((orderId) => {
+          historyLogs.push({
+            orderId,
+            status: OrderStatus.PICKING,
+            changedByUserId: userId || null,
+            reason: `Tài xế đã nhận tuyến Sọt ${route.routeCode || route.id} và đang di chuyển đến địa chỉ người gửi để lấy hàng`,
+          });
+        });
+      }
+
+      // Update Delivery Orders to OrderStatus.OUT_FOR_DELIVERY ("SHIPPER ĐANG GIAO HÀNG")
+      if (deliveryOrderIds.length > 0) {
+        await prisma.order.updateMany({
+          where: { id: { in: deliveryOrderIds } },
+          data: { status: OrderStatus.OUT_FOR_DELIVERY },
+        });
+
+        deliveryOrderIds.forEach((orderId) => {
+          historyLogs.push({
+            orderId,
+            status: OrderStatus.OUT_FOR_DELIVERY,
+            changedByUserId: userId || null,
+            reason: `Tài xế đã quét mã QR Sọt ${route.routeCode || route.id} và đang di chuyển đi giao hàng cho người nhận`,
+          });
+        });
+      }
+
+      if (historyLogs.length > 0) {
+        await prisma.orderStatusHistory.createMany({ data: historyLogs as any });
+      }
     }
 
     getTrackingGateway()?.broadcastRoutesUpdated();

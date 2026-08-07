@@ -113,6 +113,40 @@ class DriverService {
     return false;
   }
 
+  /// Update order status directly by orderId or orderCode
+  static Future<bool> updateOrderStatus(String orderIdOrCode, String status, {String? reason}) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || token.isEmpty) return false;
+
+      final url = Uri.parse('${AppConfig.baseUrl}/orders/$orderIdOrCode/status');
+      final Map<String, dynamic> payload = {
+        'status': status,
+        if (reason != null) 'reason': reason,
+      };
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('✅ [DriverService] Đã cập nhật trạng thái Đơn hàng $orderIdOrCode -> $status');
+        return true;
+      } else {
+        debugPrint('⚠️ [DriverService] Lỗi response updateOrderStatus: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('💥 [DriverService] Lỗi updateOrderStatus: $e');
+    }
+    return false;
+  }
+
   /// Update driver duty status (ACTIVE / OFFLINE)
   static Future<bool> updateDutyStatus(String status) async {
     try {

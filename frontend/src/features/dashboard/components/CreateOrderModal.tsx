@@ -159,7 +159,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [isEditingAddressModal, setIsEditingAddressModal] = useState(false);
   const [addressModalActionLoading, setAddressModalActionLoading] = useState(false);
-  const [addressModalTarget, setAddressModalTarget] = useState<'sender' | 'receiver'>('sender');
+  const [, setAddressModalTarget] = useState<'sender' | 'receiver'>('sender');
 
   const initialAddressModalForm = {
     id: '',
@@ -260,11 +260,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         const targetId = addressModalFormData.id || data.data?.addressId || data.data?.id;
         const matched = (updated || []).find((a: any) => (a.addressId || a.id) === targetId) || (updated || [])[0];
         if (matched) {
-          if (addressModalTarget === 'sender') {
-            applySavedAddressToSender(matched);
-          } else {
-            applySavedAddressToReceiver(matched);
-          }
+          applySavedAddressToSender(matched);
         }
       } else {
         alert(data.message || 'Lỗi khi lưu địa chỉ.');
@@ -1086,12 +1082,26 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     if (ward) setErrors(prev => ({ ...prev, senderWard: false }));
                     if (addressLine1) setErrors(prev => ({ ...prev, senderAddressLine1: false }));
 
-                    if (latitude !== undefined && longitude !== undefined) {
+                    if (latitude !== undefined && longitude !== undefined && latitude !== 0 && longitude !== 0) {
                       setSenderLatitude(latitude);
                       setSenderLongitude(longitude);
                       setSenderTempLat(latitude);
                       setSenderTempLng(longitude);
                       setSenderMapCenter([longitude, latitude]);
+                      if (senderMapRef.current) {
+                        try {
+                          senderMapRef.current.flyTo({
+                            center: [longitude, latitude],
+                            zoom: 15,
+                            duration: 1800,
+                            speed: 1.1,
+                            curve: 1.42,
+                            essential: true
+                          });
+                        } catch (e) {
+                          senderMapRef.current.setCenter([longitude, latitude]);
+                        }
+                      }
                     }
                   }}
                   required
@@ -1233,12 +1243,26 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     if (ward) setErrors(prev => ({ ...prev, receiverWard: false }));
                     if (addressLine1) setErrors(prev => ({ ...prev, receiverAddressLine1: false }));
 
-                    if (latitude !== undefined && longitude !== undefined) {
+                    if (latitude !== undefined && longitude !== undefined && latitude !== 0 && longitude !== 0) {
                       setReceiverLatitude(latitude);
                       setReceiverLongitude(longitude);
                       setReceiverTempLat(latitude);
                       setReceiverTempLng(longitude);
                       setReceiverMapCenter([longitude, latitude]);
+                      if (receiverMapRef.current) {
+                        try {
+                          receiverMapRef.current.flyTo({
+                            center: [longitude, latitude],
+                            zoom: 15,
+                            duration: 1800,
+                            speed: 1.1,
+                            curve: 1.42,
+                            essential: true
+                          });
+                        } catch (e) {
+                          receiverMapRef.current.setCenter([longitude, latitude]);
+                        }
+                      }
                     }
                   }}
                   required
