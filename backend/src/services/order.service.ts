@@ -138,7 +138,7 @@ export class OrderService {
 
     // 3. Calculate distance & duration
     const distanceKm = this.geocodingService.calculateDistance(pickupLat, pickupLon, deliveryLat, deliveryLon);
-    
+
     // Validate distance for EXPRESS service (maximum 20km limit)
     if (dto.serviceCode === 'EXPRESS' && distanceKm > 20) {
       throw new BadRequestException(
@@ -437,9 +437,18 @@ export class OrderService {
   /**
    * Get order detail by ID
    */
-  public async getOrderById(id: string, userId: string, userRoles: string[]) {
-    const order = await prisma.order.findUnique({
-      where: { id },
+  public async getOrderById(idOrCode: string, userId: string, userRoles: string[]) {
+    const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(idOrCode);
+
+    const order = await prisma.order.findFirst({
+      where: isUuid
+        ? { OR: [{ id: idOrCode }, { orderCode: idOrCode }, { package: { id: idOrCode } }] }
+        : {
+            OR: [
+              { orderCode: idOrCode },
+              { package: { packageCode: idOrCode } },
+            ],
+          },
       include: {
         customer: true,
         service: true,
@@ -799,5 +808,151 @@ export class OrderService {
       shippingFee: updatedPayment.finalShippingFee,
       codAmount: updatedPayment.finalCodAmount,
     };
+  }
+
+  /**
+   * Assign package to a facility zone and record BarcodeScan
+   */
+  public async assignPackageToZone(orderCode: string, zoneId: string, userId: string, toteCode?: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderCode);
+    const order = await prisma.order.findFirst({
+      where: isUuid
+        ? { OR: [{ id: orderCode }, { orderCode: orderCode }, { package: { id: orderCode } }] }
+        : {
+            OR: [
+              { orderCode: orderCode },
+              { package: { packageCode: orderCode } },
+            ],
+          },
+      include: {
+        package: {
+          include: {
+            shipmentPackages: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    const zone = await prisma.facilityZone.findUnique({
+      where: { id: zoneId },
+      include: { facility: true },
+    });
+
+    if (!zone) {
+      throw new NotFoundException('Không tìm thấy Phân Khu Kho');
+    }
+
+    const activeToteCode = toteCode || `TOTE-${zone.zoneCode}-001`;
+
+    if (order.package) {
+      await prisma.package.update({
+        where: { id: order.package.id },
+        data: {
+          currentZoneId: zone.id,
+          currentFacilityId: zone.facilityId,
+        },
+      });
+
+      let targetShipmentId: string | undefined = order.package.shipmentPackages?.[0]?.shipmentId;
+      if (!targetShipmentId) {
+        const firstShipment = await prisma.shipment.findFirst();
+        if (firstShipment) {
+          targetShipmentId = firstShipment.id;
+        }
+      }
+
+      if (targetShipmentId) {
+        const existingScan = await prisma.barcodeScan.findFirst({
+          where: {
+            packageId: order.package.id,
+            scanType: 'SORTING',
+          },
+        });
+
+        if (existingScan) {
+          await prisma.barcodeScan.update({
+            where: { id: existingScan.id },
+            data: {
+              shipmentId: targetShipmentId,
+              facilityId: zone.facilityId,
+              scannedBy: userId || order.customerId,
+              toteCode: activeToteCode,
+              scannedAt: new Date(),
+            },
+          });
+        } else {
+          await prisma.barcodeScan.create({
+            data: {
+              packageId: order.package.id,
+              shipmentId: targetShipmentId,
+              facilityId: zone.facilityId,
+              scannedBy: userId || order.customerId,
+              scanType: 'SORTING',
+              toteCode: activeToteCode,
+            },
+          });
+        }
+      }
+    }
+
+    await prisma.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        status: order.status,
+        changedByUserId: userId,
+        reason: `Xác nhận phân loại bưu kiện vào ${zone.zoneName} (${zone.zoneCode}) - Sọt: ${activeToteCode}`,
+      },
+    });
+
+    return {
+      orderCode: order.orderCode,
+      zoneCode: zone.zoneCode,
+      zoneName: zone.zoneName,
+      facilityName: zone.facility.facilityName,
+      toteCode: activeToteCode,
+    };
+  }
+
+  /**
+   * Get recent sorting scans for current facility / staff with active toteCode
+   */
+  public async getSortingHistory(userId: string) {
+    const scans = await prisma.barcodeScan.findMany({
+      where: {
+        scanType: 'SORTING',
+      },
+      take: 50,
+      orderBy: { scannedAt: 'desc' },
+      include: {
+        package: {
+          include: {
+            order: true,
+            currentZone: true,
+          },
+        },
+      },
+    });
+
+    const uniqueMap = new Map<string, any>();
+    for (const s of scans) {
+      const code = s.package?.order?.orderCode || s.package?.packageCode || 'N/A';
+      if (!uniqueMap.has(code)) {
+        uniqueMap.set(code, {
+          id: s.id,
+          packageCode: code,
+          zoneCode: s.package?.currentZone?.zoneCode || 'ZONE-W-LOCAL',
+          zoneName: s.package?.currentZone?.zoneName || 'Khu Giao Hàng Nội Phường',
+          toteCode: s.toteCode || `TOTE-${s.package?.currentZone?.zoneCode || 'LOCAL'}-001`,
+          sortedAt: new Date(s.scannedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          status: 'SUCCESS',
+        });
+      }
+    }
+
+    return Array.from(uniqueMap.values()).slice(0, 20);
   }
 }

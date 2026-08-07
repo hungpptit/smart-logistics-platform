@@ -61,8 +61,13 @@ export class OrderController {
         throw new UnauthorizedException('Yêu cầu xác thực tài khoản');
       }
       const { code } = req.params;
-      const order = await prisma.order.findUnique({
-        where: { orderCode: code },
+      const order = await prisma.order.findFirst({
+        where: {
+          OR: [
+            { orderCode: code },
+            { package: { packageCode: code } },
+          ],
+        },
         select: { id: true },
       });
       if (!order) {
@@ -146,6 +151,40 @@ export class OrderController {
       res.status(200).json({
         success: true,
         message: 'Tính cước phí thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public assignZone = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { code } = req.params;
+      const { zoneId } = req.body;
+      const userId = req.user?.id!;
+      if (!zoneId) {
+        res.status(400).json({ success: false, message: 'Thiếu mã Phân Khu Kho (zoneId).' });
+        return;
+      }
+      const result = await this.orderService.assignPackageToZone(code, zoneId, userId);
+      res.status(200).json({
+        success: true,
+        message: 'Phân loại bưu kiện vào Phân Khu Kho thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public getSortingHistory = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.id!;
+      const result = await this.orderService.getSortingHistory(userId);
+      res.status(200).json({
+        success: true,
+        message: 'Lấy lịch sử phân loại bưu kiện thành công',
         data: result,
       });
     } catch (error) {

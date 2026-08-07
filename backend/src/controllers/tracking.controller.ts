@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/prisma';
 import { redis } from '../config/redis';
-import { PUBLIC_ORDER_STATUS_MAP, getOrderStatusSubtitle } from '../constants/status.constant';
+import { PUBLIC_ORDER_STATUS_MAP, getOrderStatusSubtitle, IGNORED_PUBLIC_TRACKING_EVENTS } from '../constants/status.constant';
 
 export class TrackingController {
   /**
@@ -19,8 +19,13 @@ export class TrackingController {
       const orderCodeClean = code.trim().toUpperCase();
 
       // 1. Query order from Prisma DB with exact relation names
-      let order = await prisma.order.findUnique({
-        where: { orderCode: orderCodeClean },
+      let order = await prisma.order.findFirst({
+        where: {
+          OR: [
+            { orderCode: orderCodeClean },
+            { package: { packageCode: orderCodeClean } },
+          ],
+        },
         include: {
           customer: true,
           pickupAddress: true,
@@ -234,21 +239,23 @@ export class TrackingController {
         orderBy: { createdAt: 'asc' },
       });
 
-      const formattedTrackingEvents = dbTrackingEvents.map((te) => ({
-        id: te.id,
-        eventType: te.eventType,
-        description: te.description,
-        latitude: te.latitude,
-        longitude: te.longitude,
-        timestamp: new Date(te.createdAt).toLocaleString('vi-VN', {
-          hour: '2-digit',
-          minute: '2-digit',
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        }),
-        createdAtRaw: te.createdAt.toISOString(),
-      }));
+      const formattedTrackingEvents = dbTrackingEvents
+        .filter((te) => !IGNORED_PUBLIC_TRACKING_EVENTS.includes(te.eventType))
+        .map((te) => ({
+          id: te.id,
+          eventType: te.eventType,
+          description: te.description,
+          latitude: te.latitude,
+          longitude: te.longitude,
+          timestamp: new Date(te.createdAt).toLocaleString('vi-VN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          }),
+          createdAtRaw: te.createdAt.toISOString(),
+        }));
 
       // Coordinates setup
       const senderLat = Number(order.pickupLatitude) || Number(order.pickupAddress?.latitude) || 10.857;

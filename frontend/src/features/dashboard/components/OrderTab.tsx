@@ -1059,20 +1059,32 @@ export const OrderTab: React.FC = () => {
               </div>
 
               {/* 2D QR Code */}
-              <div className="flex items-center justify-center gap-4 bg-white p-3 border border-slate-200 rounded">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${selectedOrder.orderCode}`}
-                  alt="2D QR Code"
-                  className="w-28 h-28 object-contain"
-                />
-                <div className="text-left text-[10px] space-y-1 text-slate-600">
-                  <p><strong className="text-slate-800">Từ:</strong> {selectedOrder.senderName}</p>
-                  <p><strong className="text-slate-800">Đến:</strong> {selectedOrder.receiverName}</p>
-                  <p><strong className="text-slate-800">Kho nhận:</strong> {selectedOrder.destinationFacility?.facilityCode || 'N/A'}</p>
-                  <p><strong className="text-slate-800">Số kiện:</strong> {selectedOrder.packages?.length || 1} kiện</p>
-                  <p className="text-red-600 font-bold">COD: {formatCurrency(selectedOrder.codAmount ?? (selectedOrder as any).estimatedCodAmount)}</p>
-                </div>
-              </div>
+              {(() => {
+                const packageCode =
+                  selectedOrder.packages?.[0]?.packageCode ||
+                  (selectedOrder as any).package?.packageCode ||
+                  selectedOrder.orderCode.replace('ORD-', 'PKG-');
+                return (
+                  <div className="flex items-center justify-center gap-4 bg-white p-3 border border-slate-200 rounded">
+                    <div className="flex flex-col items-center">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${packageCode}`}
+                        alt="2D QR Code Package"
+                        className="w-28 h-28 object-contain"
+                      />
+                      <span className="font-mono text-[9px] font-extrabold text-amber-700 mt-1">{packageCode}</span>
+                    </div>
+                    <div className="text-left text-[10px] space-y-1 text-slate-600">
+                      <p><strong className="text-slate-800">Mã kiện hàng (QR):</strong> <span className="font-mono text-amber-800 font-bold">{packageCode}</span></p>
+                      <p><strong className="text-slate-800">Từ:</strong> {selectedOrder.senderName}</p>
+                      <p><strong className="text-slate-800">Đến:</strong> {selectedOrder.receiverName}</p>
+                      <p><strong className="text-slate-800">Kho nhận:</strong> {selectedOrder.destinationFacility?.facilityCode || 'N/A'}</p>
+                      <p><strong className="text-slate-800">Số kiện:</strong> {selectedOrder.packages?.length || 1} kiện</p>
+                      <p className="text-red-600 font-bold">COD: {formatCurrency(selectedOrder.codAmount ?? (selectedOrder as any).estimatedCodAmount)}</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Actions */}

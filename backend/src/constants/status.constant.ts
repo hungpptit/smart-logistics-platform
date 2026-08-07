@@ -20,8 +20,8 @@ export interface OrderSyncMeta {
 
 export const SHIPMENT_TO_ORDER_SYNC_MAP: Partial<Record<ShipmentStatus, OrderSyncMeta>> = {
   [ShipmentStatus.IN_TRANSIT]: {
-    orderStatus: OrderStatus.PICKED_UP,
-    getReason: (code) => `Đơn hàng đã được lấy và đang trong quá trình luân chuyển qua vận đơn ${code}`,
+    orderStatus: OrderStatus.IN_TRANSIT,
+    getReason: (code) => `Đơn hàng đang xuất kho và trong quá trình luân chuyển qua vận đơn ${code}`,
   },
   [ShipmentStatus.AT_HUB]: {
     orderStatus: OrderStatus.ARRIVED_ORIGIN_FACILITY,
@@ -96,3 +96,14 @@ export function getOrderStatusSubtitle(
       return 'Trạng thái được cập nhật trên hệ thống SLP';
   }
 }
+
+export const IGNORED_PUBLIC_TRACKING_EVENTS = [
+  'ARRIVED_HUB',
+  'DEPARTED_HUB',
+  'ARRIVED_FACILITY',
+  'DEPARTED_FACILITY',
+  'CREATED',
+  'IN_FACILITY',
+  'DRIVER_ASSIGNED',
+];
+

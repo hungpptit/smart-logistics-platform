@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Building2, User, Settings, Package, Truck, UserCheck, Earth, BarChart3, QrCode } from 'lucide-react';
+import { Users, Building2, User, Settings, Package, Truck, UserCheck, Earth, BarChart3, QrCode, Layers } from 'lucide-react';
 import { DashboardShell } from '../layouts/DashboardShell';
 import type { MenuItem } from '../layouts/Sidebar';
 import { OrderTab } from '../OrderTab';
@@ -12,6 +12,7 @@ import { VehicleTab } from '../VehicleTab';
 import { StaffTab } from '../StaffTab';
 import { LiveTrackingTab } from '../LiveTrackingTab';
 import { ToteScanTab } from '../staff/ToteScanTab';
+import { ZoneSortingTab } from '../staff/ZoneSortingTab';
 
 interface AdminRoleDashboardProps {
   onBackToHome?: () => void;
@@ -28,9 +29,16 @@ export const AdminRoleDashboard: React.FC<AdminRoleDashboardProps> = ({ onBackTo
     },
     {
       id: 'tote-scan',
-      label: 'Quét Sọt & Nhập Kho',
+      label: 'Quét Nhập / Xuất Kho',
       icon: QrCode,
       component: ToteScanTab,
+      allowed: true,
+    },
+    {
+      id: 'zone-sorting',
+      label: 'Phân Loại Hàng Vào Zone',
+      icon: Layers,
+      component: ZoneSortingTab,
       allowed: true,
     },
     {

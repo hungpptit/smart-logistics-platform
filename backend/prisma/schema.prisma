@@ -911,7 +911,7 @@ model BarcodeScan {
   facilityId    String?      @map("facility_id") @db.Uuid
   scannedBy     String       @map("scanned_by") @db.Uuid
   scanType      ScanType     @map("scan_type")
-  barcodeValue  String       @map("barcode_value") @db.VarChar(100)
+  toteCode      String?      @map("tote_code") @db.VarChar(100)
   scannedAt     DateTime     @default(now()) @map("scanned_at") @db.Timestamptz
 
   shipment      Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
@@ -920,7 +920,7 @@ model BarcodeScan {
   facility      Facility?    @relation(fields: [facilityId], references: [id], onDelete: SetNull)
   scanner       User         @relation(fields: [scannedBy], references: [id], onDelete: Restrict)
 
-  @@index([barcodeValue], name: "idx_barcode_scans_value")
+  @@index([toteCode], name: "idx_barcode_scans_tote")
   @@index([shipmentId], name: "idx_barcode_scans_shipment")
   @@map("barcode_scans")
 }

@@ -182,6 +182,11 @@ router.get(
  *         description: Chi tiết đơn hàng
  */
 router.get(
+  '/sorting-history',
+  orderController.getSortingHistory
+);
+
+router.get(
   '/by-code/:code',
   orderController.getByCode
 );
@@ -347,6 +352,11 @@ router.post(
 router.post(
   '/calculate-pricing',
   orderController.calculatePricing
+);
+
+router.post(
+  '/:code/sort-zone',
+  orderController.assignZone
 );
 
 export default router;

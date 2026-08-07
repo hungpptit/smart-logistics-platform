@@ -173,20 +173,20 @@ export class AnalyticsService {
       },
       take: 5,
       include: {
-        routes: {
+        dispatchTasks: {
           where: { status: 'COMPLETED' },
         },
       },
     });
 
-    const topDrivers = topDriverStaff.map((drv, idx) => {
-      const completedRoutes = drv.routes.length;
-      const totalKm = drv.routes.reduce((acc, r) => acc + Number(r.plannedDistanceKm || 0), 0);
+    const topDrivers = topDriverStaff.map((drv: any, idx: number) => {
+      const completedTasks = drv.dispatchTasks?.length || 0;
+      const totalKm = (drv.dispatchTasks || []).reduce((acc: number, t: any) => acc + Number(t.distanceKm || 0), 0);
       return {
         rank: idx + 1,
         name: drv.fullName,
         code: drv.employeeCode,
-        completed: completedRoutes > 0 ? completedRoutes * 15 + Math.floor(Math.random() * 50) : Math.floor(Math.random() * 100 + 200),
+        completed: completedTasks > 0 ? completedTasks * 15 + Math.floor(Math.random() * 50) : Math.floor(Math.random() * 100 + 200),
         distance: `${totalKm > 0 ? Math.round(totalKm) : Math.floor(Math.random() * 200 + 400)} km`,
         rating: Number((4.8 + Math.random() * 0.18).toFixed(2)),
         onTime: `${Number((96 + Math.random() * 3.5).toFixed(1))}%`,

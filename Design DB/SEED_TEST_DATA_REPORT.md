@@ -62,9 +62,32 @@
 
 ---
 
-## 🧹 6. Lệnh Dọn Dẹp Dữ Liệu Test (Clear Data) Khi Cần
+## 🚛 6. Danh Sách Tài Khoản & Phương Tiện Trung Chuyển Liên Kho (Linehaul Heavy Trucks & Hub Staff)
+
+> **Mật khẩu dùng chung cho tất cả tài khoản test**: `SlpTest@2026`
+
+### 🏢 6.1. Nhân Viên Kho Trung Chuyển Tỉnh & Mega Sorter (`WAREHOUSE_STAFF`)
+
+| Username | Mật khẩu | Họ và Tên | Mã NV | Kho / Bưu Cục Công Tác |
+| :--- | :--- | :--- | :--- | :--- |
+| `stf_sorter_south_1` | `SlpTest@2026` | Trần Văn Thắng | `STF-HUB-01` | **Tổng Kho Miền Nam (Sorting Center Q.12)** |
+| `stf_hub_hcm_1` | `SlpTest@2026` | Đặng Hoàng Lâm | `STF-HUB-02` | **Kho Tổng TP. Hồ Chí Minh (Provincial Hub Tân Bình)** |
+| `stf_hub_brvt_1` | `SlpTest@2026` | Vũ Đức Anh | `STF-HUB-03` | **Bưu Cục Xuân Sơn (Kho Tỉnh Bà Rịa - Vũng Tàu)** |
+
+### 🚛 6.2. Tài Xế Xe Tải Trung Chuyển Đường Dài (`LINEHAUL_TRANSFER` Driver & Heavy Trucks)
+
+| Username | Mật khẩu | Họ và Tên Tài Xế | Mã Tài Xế | Biển Số Xe Tải | Tải Trọng Max | Kho Quản Lý | Bằng Lái |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `drv_linehaul_hcm` | `SlpTest@2026` | Phạm Quốc Hùng | `DRV-LH-01` | **`50H-888.01`** | **15 Tấn** | Kho Tổng TP. Hồ Chí Minh (Tân Bình) | Bằng C |
+| `drv_linehaul_dongnai` | `SlpTest@2026` | Nguyễn Tấn Đạt | `DRV-LH-02` | **`60C-999.02`** | **10 Tấn** | Tổng Kho Miền Nam (Q.12) | Bằng C |
+| `drv_linehaul_brvt` | `SlpTest@2026` | Trần Hoàng Nam | `DRV-LH-03` | **`72C-777.03`** | **8 Tấn** | Bưu Cục Xuân Sơn (BR-VT) | Bằng C |
+
+---
+
+## 🧹 7. Lệnh Dọn Dẹp Dữ Liệu Test (Clear Data) Khi Cần
 
 ```bash
 cd backend
 npx tsx prisma/clear_test_data.ts
 ```
+

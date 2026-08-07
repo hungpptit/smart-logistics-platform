@@ -16,7 +16,7 @@ async function main() {
   const shipperRole = await prisma.role.findUnique({ where: { roleCode: 'SHIPPER' } });
   const customerRole = await prisma.role.findUnique({ where: { roleCode: 'CUSTOMER' } });
   const motorbikeType = await prisma.vehicleType.findFirst({ where: { typeCode: 'MOTORBIKE' } });
-  
+
   const sortingCenterType = await prisma.facilityType.findFirst({ where: { typeCode: 'SORTING_CENTER' } });
   const provincialHubType = await prisma.facilityType.findFirst({ where: { typeCode: 'PROVINCIAL_HUB' } });
   const lastMileFacilityType = await prisma.facilityType.findFirst({ where: { OR: [{ typeCode: 'WARD_STATION' }, { typeCode: 'LAST_MILE_STATION' }, { typeCode: 'MICRO_HUB' }] } });
@@ -215,13 +215,85 @@ async function main() {
     },
   });
 
-  // 3. Tạo 4 Nhân viên Kho
-  console.log('👤 Tạo 4 Nhân viên kho (Staff)...');
+  // 2.5 Tạo Phân Khu Kho (FacilityZone) Phân Cấp Chuẩn Logistics cho TOÀN BỘ Kho Bãi trong CSDL
+  console.log('📦 Khởi tạo Phân Khu Kho (FacilityZone) 3 Cấp cho TOÀN BỘ Bưu cục & Kho Tổng...');
+  const dbFacilities = await prisma.facility.findMany({
+    include: { facilityType: true },
+  });
+
+  for (const fac of dbFacilities) {
+    const typeCode = fac.facilityType.typeCode;
+    let zonesForFacility: { code: string; name: string; type: string; capacity?: number }[] = [];
+
+    if (typeCode === 'SORTING_CENTER') {
+      // 🏬 CẤP 1: MEGA SORTER CENTER (Tổng Kho Miền)
+      zonesForFacility = [
+        { code: 'ZONE-S-UNLOADING', name: 'Sàn Hạ Bãi Xe Tải Container 15 Tấn', type: 'RECEIVING', capacity: 2000 },
+        { code: 'ZONE-S-AUTOMATED-SORTER', name: 'Phân Khu Băng Chuyền Phân Loại Tự Động Cross-Docking', type: 'SORTING', capacity: 5000 },
+        { code: 'ZONE-S-NORTH-DISPATCH', name: 'Khu Xuất Hàng Tuyến Miền Bắc & Hà Nội', type: 'SHIPPING', capacity: 2000 },
+        { code: 'ZONE-S-CENTRAL-DISPATCH', name: 'Khu Xuất Hàng Tuyến Miền Trung & Đà Nẵng', type: 'SHIPPING', capacity: 2000 },
+        { code: 'ZONE-S-SOUTH-DISPATCH', name: 'Khu Xuất Hàng Tuyến Miền Nam & Miền Tây', type: 'SHIPPING', capacity: 2000 },
+        { code: 'ZONE-S-HOLDING', name: 'Khu Lưu Hàng Tạm Chờ Xe Tải Đêm', type: 'STORAGE', capacity: 1500 },
+      ];
+    } else if (typeCode === 'PROVINCIAL_HUB') {
+      // 🏢 CẤP 2: PROVINCIAL HUB (Kho Tổng Tỉnh / Thành Phố)
+      zonesForFacility = [
+        { code: 'ZONE-P-INBOUND', name: 'Bãi Nhập Hàng Xe Tải Bưu Cục Phường', type: 'RECEIVING', capacity: 1000 },
+        { code: 'ZONE-P-INTRA-PROVINCE', name: 'Khu Phân Loại & Chia Tuyến Nội Tỉnh', type: 'SORTING', capacity: 2000 },
+        { code: 'ZONE-P-INTER-HUB', name: 'Khu Xuất Hàng Đi Sorter Trung Tâm / Liên Tỉnh', type: 'SHIPPING', capacity: 1500 },
+        { code: 'ZONE-P-DISTRICT-HOLD', name: 'Khu Xếp Hàng Phân Theo Quận / Huyện', type: 'STORAGE', capacity: 1000 },
+      ];
+    } else {
+      // 🏬 CẤP 3: WARD STATION / LAST MILE FACILITY (Bưu Cục Phường / Xã)
+      zonesForFacility = [
+        { code: 'ZONE-W-REC', name: 'Khu Tiếp Nhận & Bàn Giao Hàng', type: 'RECEIVING', capacity: 500 },
+        { code: 'ZONE-W-LOCAL', name: 'Khu Giao Hàng Nội Phường (Cùng Bưu Cục)', type: 'SORTING', capacity: 800 },
+        { code: 'ZONE-W-PROVINCE-DISPATCH', name: 'Khu Xuất Hàng Đi Kho Tỉnh / TP', type: 'SHIPPING', capacity: 600 },
+        { code: 'ZONE-W-RETURN', name: 'Khu Lưu Kho & Hàng Cho Chuyển Hoàn', type: 'RETURN', capacity: 300 },
+      ];
+    }
+
+    for (const z of zonesForFacility) {
+      await prisma.facilityZone.upsert({
+        where: {
+          facilityId_zoneCode: {
+            facilityId: fac.id,
+            zoneCode: z.code,
+          },
+        },
+        update: {
+          zoneName: z.name,
+          zoneType: z.type as any,
+          capacity: z.capacity || 500,
+        },
+        create: {
+          facilityId: fac.id,
+          zoneCode: z.code,
+          zoneName: z.name,
+          zoneType: z.type as any,
+          capacity: z.capacity || 500,
+        },
+      });
+    }
+  }
+
+  // 3. Tạo Nhân viên Kho (bao gồm Kho Bưu cục & Kho Trung chuyển Hub/Sorter)
+  console.log('👤 Tạo Nhân viên kho (Staff cho Bưu cục & Kho Trung chuyển)...');
+
+  // Lấy thêm bưu cục Bà Rịa - Vũng Tàu (FAC-000050) nếu có
+  const facBrvt = await prisma.facility.findFirst({
+    where: { OR: [{ facilityCode: 'FAC-000050' }, { facilityName: { contains: 'Xuân Sơn' } }] },
+  });
+
   const staffData = [
     { username: 'stf_dangvanbi_1', name: 'Trần Văn Khoa (Kho Đặng Văn Bi 1)', facilityId: hub1.id, code: 'STF-TD-01' },
     { username: 'stf_dangvanbi_2', name: 'Lê Thị Xuân (Kho Đặng Văn Bi 2)', facilityId: hub1.id, code: 'STF-TD-02' },
     { username: 'stf_linhtrung_1', name: 'Phạm Văn Bình (Kho Linh Trung)', facilityId: hub2.id, code: 'STF-TD-03' },
     { username: 'stf_phuoclong_1', name: 'Nguyễn Văn Minh (Kho Phước Long)', facilityId: hub3.id, code: 'STF-TD-04' },
+    // Nhân viên Kho Trung chuyển Tỉnh/Sorter
+    { username: 'stf_sorter_south_1', name: 'Trần Văn Thắng (Thủ kho Tổng Kho Miền Nam Q.12)', facilityId: sortingCenter.id, code: 'STF-HUB-01' },
+    { username: 'stf_hub_hcm_1', name: 'Đặng Hoàng Lâm (Thủ kho Kho Tổng TP.HCM Tân Bình)', facilityId: provincialHub.id, code: 'STF-HUB-02' },
+    { username: 'stf_hub_brvt_1', name: 'Vũ Đức Anh (Thủ kho Bưu Cục Xuân Sơn BR-VT)', facilityId: facBrvt?.id || hub1.id, code: 'STF-HUB-03' },
   ];
 
   for (const s of staffData) {
@@ -250,19 +322,28 @@ async function main() {
     });
   }
 
-  // 4. Tạo 7 Shipper & Xe máy
-  console.log('🛵 Tạo 7 Shipper & Xe máy gán tuyến...');
+  // 4. Tạo Shipper Chặng Cuối & Tài Xế Xe Tải Trung Chuyển Đường Dài
+  console.log('🛵 Tạo Shipper Xe Máy & 🚛 Tài Xế Xe Tải Trung Chuyển Linehaul...');
+  const truckType = await prisma.vehicleType.findFirst({
+    where: { OR: [{ typeCode: 'TRUCK' }, { typeCode: 'CONTAINER' }, { typeCode: 'HEAVY_TRUCK' }] },
+  });
+
   const shipperData = [
     // Đặng Văn Bi (3 Shipper chặng cuối)
-    { username: 'shp_dangvanbi_1', name: 'Nguyễn Văn Hùng', facilityId: hub1.id, code: 'DRV-TD-01', plate: '59-X1 111.01', lat: 10.8490, lng: 106.7620 },
-    { username: 'shp_dangvanbi_2', name: 'Trần Quốc Bảo', facilityId: hub1.id, code: 'DRV-TD-02', plate: '59-X1 111.02', lat: 10.8480, lng: 106.7640 },
-    { username: 'shp_dangvanbi_3', name: 'Phạm Hoàng Nam', facilityId: hub1.id, code: 'DRV-TD-03', plate: '59-X1 111.03', lat: 10.8510, lng: 106.7610 },
+    { username: 'shp_dangvanbi_1', name: 'Nguyễn Văn Hùng', facilityId: hub1.id, code: 'DRV-TD-01', plate: '59-X1 111.01', isTruck: false, lat: 10.8490, lng: 106.7620 },
+    { username: 'shp_dangvanbi_2', name: 'Trần Quốc Bảo', facilityId: hub1.id, code: 'DRV-TD-02', plate: '59-X1 111.02', isTruck: false, lat: 10.8480, lng: 106.7640 },
+    { username: 'shp_dangvanbi_3', name: 'Phạm Hoàng Nam', facilityId: hub1.id, code: 'DRV-TD-03', plate: '59-X1 111.03', isTruck: false, lat: 10.8510, lng: 106.7610 },
     // Linh Trung (2 Shipper)
-    { username: 'shp_linhtrung_1', name: 'Lê Văn Đức', facilityId: hub2.id, code: 'DRV-TD-04', plate: '59-X1 111.04', lat: 10.8570, lng: 106.7740 },
-    { username: 'shp_linhtrung_2', name: 'Vũ Văn Khải', facilityId: hub2.id, code: 'DRV-TD-05', plate: '59-X1 111.05', lat: 10.8590, lng: 106.7760 },
+    { username: 'shp_linhtrung_1', name: 'Lê Văn Đức', facilityId: hub2.id, code: 'DRV-TD-04', plate: '59-X1 111.04', isTruck: false, lat: 10.8570, lng: 106.7740 },
+    { username: 'shp_linhtrung_2', name: 'Vũ Văn Khải', facilityId: hub2.id, code: 'DRV-TD-05', plate: '59-X1 111.05', isTruck: false, lat: 10.8590, lng: 106.7760 },
     // Phước Long (2 Shipper)
-    { username: 'shp_phuoclong_1', name: 'Bùi Thanh Tùng', facilityId: hub3.id, code: 'DRV-TD-06', plate: '59-X1 111.06', lat: 10.8240, lng: 106.7590 },
-    { username: 'shp_phuoclong_2', name: 'Đặng Quang Huy', facilityId: hub3.id, code: 'DRV-TD-07', plate: '59-X1 111.07', lat: 10.8260, lng: 106.7610 },
+    { username: 'shp_phuoclong_1', name: 'Bùi Thanh Tùng', facilityId: hub3.id, code: 'DRV-TD-06', plate: '59-X1 111.06', isTruck: false, lat: 10.8240, lng: 106.7590 },
+    { username: 'shp_phuoclong_2', name: 'Đặng Quang Huy', facilityId: hub3.id, code: 'DRV-TD-07', plate: '59-X1 111.07', isTruck: false, lat: 10.8260, lng: 106.7610 },
+
+    // 🚛 TÀI XẾ XE TẢI TRUNG CHUYỂN LIÊN KHO (LINEHAUL TRUCK DRIVERS)
+    { username: 'drv_linehaul_hcm', name: 'Phạm Quốc Hùng (Tài xế Xe Tải Kho Tổng TP.HCM)', facilityId: provincialHub.id, code: 'DRV-LH-01', plate: '50H-888.01', isTruck: true, lat: 10.8050, lng: 106.6500 },
+    { username: 'drv_linehaul_dongnai', name: 'Nguyễn Tấn Đạt (Tài xế Xe Tải Tổng Kho Q.12)', facilityId: sortingCenter.id, code: 'DRV-LH-02', plate: '60C-999.02', isTruck: true, lat: 10.8520, lng: 106.6200 },
+    { username: 'drv_linehaul_brvt', name: 'Trần Hoàng Nam (Tài xế Xe Tải Bưu Cục BR-VT)', facilityId: facBrvt?.id || hub1.id, code: 'DRV-LH-03', plate: '72C-777.03', isTruck: true, lat: 10.6470, lng: 107.3291 },
   ];
 
   for (const sh of shipperData) {
@@ -287,10 +368,10 @@ async function main() {
         phone: `09020000${sh.code.slice(-2)}`,
         position: 'DRIVER',
         assignedFacilityId: sh.facilityId,
-        driverLicenseNumber: `GPLX-TD-99${sh.code.slice(-2)}`,
-        driverLicenseClass: 'A1',
+        driverLicenseNumber: sh.isTruck ? `GPLX-LH-88${sh.code.slice(-2)}` : `GPLX-TD-99${sh.code.slice(-2)}`,
+        driverLicenseClass: sh.isTruck ? 'C' : 'A1',
         driverTypes: {
-          create: [{ driverType: 'HUB_DELIVERY' }],
+          create: [{ driverType: sh.isTruck ? 'LINEHAUL_TRANSFER' : 'HUB_DELIVERY' }],
         },
         employmentStatus: DriverEmploymentStatus.ACTIVE,
       } as any,
@@ -303,11 +384,11 @@ async function main() {
       create: {
         vehicleCode: vehCode,
         plateNumber: sh.plate,
-        vehicleTypeId: motorbikeType.id,
+        vehicleTypeId: sh.isTruck ? (truckType?.id || motorbikeType.id) : motorbikeType.id,
         assignedFacilityId: sh.facilityId,
-        maxWeight: 150.0,
-        maxVolume: 0.5,
-        maxLength: 1.2,
+        maxWeight: sh.isTruck ? 15000.0 : 150.0,
+        maxVolume: sh.isTruck ? 45.0 : 0.5,
+        maxLength: sh.isTruck ? 8.5 : 1.2,
         operatingStatus: VehicleOperatingStatus.ACTIVE,
       },
     });

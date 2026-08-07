@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Users, Building2, User, Earth, Truck, BarChart3, QrCode } from 'lucide-react';
+import { Package, Users, Building2, User, Earth, Truck, BarChart3, QrCode, Layers } from 'lucide-react';
 import { DashboardShell } from '../layouts/DashboardShell';
 import type { MenuItem } from '../layouts/Sidebar';
 import { OrderTab } from '../OrderTab';
@@ -10,6 +10,7 @@ import { AnalyticsTab } from '../admin/AnalyticsTab';
 import { DriverTab } from '../DriverTab';
 import { VehicleTab } from '../VehicleTab';
 import { ToteScanTab } from './ToteScanTab';
+import { ZoneSortingTab } from './ZoneSortingTab';
 import { useAuth } from '../../../../context/AuthContext';
 
 interface StaffDashboardProps {
@@ -29,9 +30,16 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onBackToHome }) 
     },
     {
       id: 'tote-scan',
-      label: 'Quét Sọt & Nhập Kho',
+      label: 'Quét Nhập / Xuất Kho',
       icon: QrCode,
       component: ToteScanTab,
+      allowed: true,
+    },
+    {
+      id: 'zone-sorting',
+      label: 'Phân Loại Hàng Vào Zone',
+      icon: Layers,
+      component: ZoneSortingTab,
       allowed: true,
     },
     {

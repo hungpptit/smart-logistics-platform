@@ -128,17 +128,15 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
                       rawDate: t.createdAtRaw ? new Date(t.createdAtRaw).getTime() : 0,
                     }));
 
-                    const filteredEvents = (currentTracking.trackingEvents || [])
-                      .filter((te: any) => te.eventType !== 'ARRIVED_HUB' && te.eventType !== 'CREATED' && te.eventType !== 'IN_FACILITY')
-                      .map((te: any) => ({
-                        id: te.id,
-                        status: te.eventType,
-                        label: te.eventType === 'DRIVER_ASSIGNED' ? 'Đã phân công tài xế' : te.eventType,
-                        time: te.timestamp,
-                        completed: true,
-                        detail: te.description,
-                        rawDate: te.createdAtRaw ? new Date(te.createdAtRaw).getTime() : 0,
-                      }));
+                    const filteredEvents = (currentTracking.trackingEvents || []).map((te: any) => ({
+                      id: te.id,
+                      status: te.eventType,
+                      label: te.eventType === 'DRIVER_ASSIGNED' ? 'Đã phân công tài xế' : te.eventType,
+                      time: te.timestamp,
+                      completed: true,
+                      detail: te.description,
+                      rawDate: te.createdAtRaw ? new Date(te.createdAtRaw).getTime() : 0,
+                    }));
 
                     return [...timelineItems, ...filteredEvents].sort((a, b) => a.rawDate - b.rawDate);
                   })()
