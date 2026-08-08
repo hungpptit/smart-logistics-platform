@@ -197,15 +197,15 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
                     : undefined
                 }
                 facilityPos={
-                  currentTracking.coordinates?.originFacility
+                  currentTracking.coordinates?.currentFacility
                     ? [
-                      currentTracking.coordinates.originFacility.lat,
-                      currentTracking.coordinates.originFacility.lng,
+                      currentTracking.coordinates.currentFacility.lat,
+                      currentTracking.coordinates.currentFacility.lng,
                     ]
-                    : currentTracking.coordinates?.currentFacility
+                    : currentTracking.coordinates?.originFacility
                       ? [
-                        currentTracking.coordinates.currentFacility.lat,
-                        currentTracking.coordinates.currentFacility.lng,
+                        currentTracking.coordinates.originFacility.lat,
+                        currentTracking.coordinates.originFacility.lng,
                       ]
                       : undefined
                 }

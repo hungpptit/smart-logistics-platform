@@ -44,6 +44,11 @@ export const ZoneSortingTab: React.FC = () => {
   const [toteModalLoading, setToteModalLoading] = useState<boolean>(false);
 
   const getActiveToteCode = (zoneCode: string) => {
+    const zoneObj = zoneTotesData.find((z) => z.zoneCode === zoneCode);
+    const openTote = zoneObj?.totes?.find((t: any) => t.status === 'OPEN');
+    if (openTote) {
+      return openTote.toteCode;
+    }
     const counter = toteCounters[zoneCode] || 1;
     const formattedNum = String(counter).padStart(3, '0');
     return `TOTE-${zoneCode}-${formattedNum}`;
@@ -75,10 +80,11 @@ export const ZoneSortingTab: React.FC = () => {
     fetchZoneTotes();
   };
 
-  const fetchZoneTotes = async () => {
+  const fetchZoneTotes = async (facilityId?: string) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${CONFIG.API_BASE_URL}/orders/zone-totes`, {
+      const url = facilityId ? `${CONFIG.API_BASE_URL}/orders/zone-totes?facilityId=${facilityId}` : `${CONFIG.API_BASE_URL}/orders/zone-totes`;
+      const res = await fetch(url, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       const data = await res.json();
@@ -148,11 +154,12 @@ export const ZoneSortingTab: React.FC = () => {
 
   const [sortingHistory, setSortingHistory] = useState<SortingHistoryItem[]>([]);
 
-  const fetchSortingHistory = async () => {
+  const fetchSortingHistory = async (facilityId?: string) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      const res = await fetch(`${CONFIG.API_BASE_URL}/orders/sorting-history`, {
+      const url = facilityId ? `${CONFIG.API_BASE_URL}/orders/sorting-history?facilityId=${facilityId}` : `${CONFIG.API_BASE_URL}/orders/sorting-history`;
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -214,7 +221,7 @@ export const ZoneSortingTab: React.FC = () => {
 
   // Fetch Facility Zones
   useEffect(() => {
-    const fetchZones = async () => {
+    const initZoneSortingData = async () => {
       try {
         const token = localStorage.getItem('token');
         if (!token) return;
@@ -244,13 +251,16 @@ export const ZoneSortingTab: React.FC = () => {
             }
           }
         }
+
+        fetchSortingHistory(facilityId);
+        fetchZoneTotes(facilityId);
       } catch (err) {
         console.log('Sử dụng danh sách Zone mặc định của bưu cục.');
+        fetchSortingHistory();
+        fetchZoneTotes();
       }
     };
-    fetchZones();
-    fetchSortingHistory();
-    fetchZoneTotes();
+    initZoneSortingData();
   }, []);
 
   // Continuous Camera Frame Decoder

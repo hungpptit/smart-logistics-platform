@@ -73,4 +73,23 @@ export class ShipmentController {
       next(error);
     }
   };
+
+  public loadTote = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const driverUserId = req.user?.id!;
+      const { toteCode } = req.body;
+      if (!toteCode) {
+        res.status(400).json({ success: false, message: 'Vui lòng cung cấp mã Sọt Hàng (toteCode).' });
+        return;
+      }
+      const result = await this.shipmentService.loadToteIntoShipment(driverUserId, toteCode);
+      res.status(200).json({
+        success: true,
+        message: 'Tài xế đã tiếp nhận Sọt Hàng và gán vào Chuyến Xe Tải thành công!',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

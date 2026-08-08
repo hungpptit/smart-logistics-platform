@@ -152,6 +152,7 @@ export const OrderTab: React.FC = () => {
   // Filter & Search states
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [filterScope, setFilterScope] = useState<string>('CURRENT');
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Detail & Update Status states
@@ -263,7 +264,8 @@ export const OrderTab: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const url = `${CONFIG.API_BASE_URL}/orders?page=${page}&limit=10&search=${encodeURIComponent(searchTerm)}&status=${statusFilter}&facilityId=${facilityFilter}`;
+      const effectiveFacilityId = facilityFilter || user?.staffProfile?.assignedFacilityId || user?.managedFacilities?.[0]?.id || '';
+      const url = `${CONFIG.API_BASE_URL}/orders?page=${page}&limit=10&search=${encodeURIComponent(searchTerm)}&status=${statusFilter}&facilityId=${effectiveFacilityId}&filterScope=${filterScope}`;
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -290,7 +292,7 @@ export const OrderTab: React.FC = () => {
 
   useEffect(() => {
     fetchOrders(currentPage);
-  }, [currentPage, statusFilter, facilityFilter, token]);
+  }, [currentPage, statusFilter, facilityFilter, filterScope, token, user]);
 
   // Real-time socket & periodic background refresh for Order status changes
   useEffect(() => {
@@ -500,6 +502,18 @@ export const OrderTab: React.FC = () => {
           {/* Filters */}
           <div className="flex items-center gap-2">
             <Filter size={14} className="text-gray-400" />
+            <select
+              value={filterScope}
+              onChange={(e) => {
+                setFilterScope(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border border-[#e2e8f0] rounded text-xs focus:outline-none bg-white font-semibold text-indigo-700 shadow-sm"
+            >
+              <option value="CURRENT">Hàng đang ở trong kho</option>
+              <option value="ALL">Tất cả lịch sử đơn kho</option>
+            </select>
+
             {isAdmin && (
               <select
                 value={facilityFilter}

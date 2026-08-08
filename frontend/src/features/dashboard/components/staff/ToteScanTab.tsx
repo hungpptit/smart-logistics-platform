@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import jsQR from 'jsqr';
 import {
   QrCode,
@@ -33,30 +33,44 @@ export const ToteScanTab: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [lastScannedResult, setLastScannedResult] = useState<any | null>(null);
-  const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([
-    {
-      id: '1',
-      code: 'SH-79257540',
-      type: 'SHIPMENT',
-      status: 'AT_HUB',
-      orderCount: 1,
-      scannedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      message: 'Nhập kho bưu cục Linh Trung thành công',
-    },
-  ]);
+  const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
+  const [currentFacility, setCurrentFacility] = useState<any | null>(null);
+
+  useEffect(() => {
+    const fetchStaffFacility = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch(`${CONFIG.API_BASE_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.success && data.data?.staff?.assignedFacility) {
+          setCurrentFacility(data.data.staff.assignedFacility);
+        }
+      } catch (err) { }
+    };
+    fetchStaffFacility();
+  }, []);
 
   // Camera State
   const [isCameraActive, setIsCameraActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current.getTracks().forEach((track) => {
+        track.stop();
+        track.enabled = false;
+      });
       streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
     setIsCameraActive(false);
-  };
+  }, []);
 
   const startCamera = async () => {
     try {
@@ -79,6 +93,33 @@ export const ToteScanTab: React.FC = () => {
     }
   };
 
+  // Cleanup camera stream whenever component unmounts (e.g. switching tabs)
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  const fetchScanHistory = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const res = await fetch(`${CONFIG.API_BASE_URL}/orders/sorting-history`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+        setScanHistory(data.data);
+      }
+    } catch (err) {
+      console.log('Không thể tải lịch sử quét từ máy chủ.');
+    }
+  };
+
+  useEffect(() => {
+    fetchScanHistory();
+  }, []);
+
   useEffect(() => {
     if (isCameraActive && streamRef.current && videoRef.current) {
       videoRef.current.srcObject = streamRef.current;
@@ -88,6 +129,8 @@ export const ToteScanTab: React.FC = () => {
 
   const lastScannedCodeRef = useRef<string>('');
   const lastScanTimeRef = useRef<number>(0);
+  const lastSubmittedCodeRef = useRef<string>('');
+  const lastSubmittedTimeRef = useRef<number>(0);
 
   const performScanSubmission = async (codeToSubmit: string) => {
     const cleanCode = codeToSubmit.trim();
@@ -95,6 +138,14 @@ export const ToteScanTab: React.FC = () => {
       setError('Vui lòng nhập hoặc quét mã Sọt hàng / Mã đơn hàng');
       return;
     }
+
+    const now = Date.now();
+    if (cleanCode === lastSubmittedCodeRef.current && (now - lastSubmittedTimeRef.current < 6000)) {
+      console.warn(`[ToteScanTab] Blocked duplicate scan submission for code: ${cleanCode}`);
+      return;
+    }
+    lastSubmittedCodeRef.current = cleanCode;
+    lastSubmittedTimeRef.current = now;
 
     setLoading(true);
     setError(null);
@@ -132,19 +183,23 @@ export const ToteScanTab: React.FC = () => {
             details: res.data,
           });
 
-          setScanHistory((prev) => [
-            {
-              id: Date.now().toString(),
-              code: cleanCode,
-              type: 'ORDER',
-              status: targetStatus,
-              orderCount: 1,
-              scannedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-              message: `Cập nhật trạng thái đơn ${cleanCode} sang ĐÃ LƯU KHO BƯU CỤC`,
-            },
-            ...prev,
-          ]);
+          setScanHistory((prev) => {
+            if (prev.length > 0 && prev[0].code === cleanCode) return prev;
+            return [
+              {
+                id: Date.now().toString(),
+                code: cleanCode,
+                type: 'ORDER',
+                status: targetStatus,
+                orderCount: 1,
+                scannedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                message: `Cập nhật trạng thái đơn ${cleanCode} sang ĐÃ LƯU KHO BƯU CỤC`,
+              },
+              ...prev,
+            ];
+          });
           setScanCode('');
+          fetchScanHistory();
         } else {
           throw new Error(res.message || 'Cập nhật trạng thái đơn hàng không thành công');
         }
@@ -171,19 +226,23 @@ export const ToteScanTab: React.FC = () => {
             details: res.data,
           });
 
-          setScanHistory((prev) => [
-            {
-              id: Date.now().toString(),
-              code: cleanCode,
-              type: 'SHIPMENT',
-              status: targetShipmentStatus,
-              orderCount: res.data?.shipmentPackages?.length || 1,
-              scannedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-              message: `Xác nhận ${activeTab === 'IN_TRANSIT' ? 'Xuất kho' : 'Nhập kho'} Sọt hàng ${cleanCode}`,
-            },
-            ...prev,
-          ]);
+          setScanHistory((prev) => {
+            if (prev.length > 0 && prev[0].code === cleanCode) return prev;
+            return [
+              {
+                id: Date.now().toString(),
+                code: cleanCode,
+                type: 'SHIPMENT',
+                status: targetShipmentStatus,
+                orderCount: res.data?.shipmentPackages?.length || 1,
+                scannedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                message: `Xác nhận ${activeTab === 'IN_TRANSIT' ? 'Xuất kho' : 'Nhập kho'} Sọt hàng ${cleanCode}`,
+              },
+              ...prev,
+            ];
+          });
           setScanCode('');
+          fetchScanHistory();
         } else {
           throw new Error(res.message || 'Cập nhật trạng thái sọt hàng không thành công');
         }
@@ -252,13 +311,13 @@ export const ToteScanTab: React.FC = () => {
         }
       }
 
-      // 3. Auto Trigger Scan Submission
+      // 3. Auto Trigger Scan Submission (With Smart Deduplication & 10s Cooldown for exact same barcode)
       if (detectedValue) {
         const now = Date.now();
-        if (
-          detectedValue !== lastScannedCodeRef.current ||
-          now - lastScanTimeRef.current > 2500
-        ) {
+        const isSameCode = detectedValue === lastScannedCodeRef.current;
+        const cooldownMs = isSameCode ? 10000 : 1200; // 10s cooldown for same code, 1.2s for new code
+
+        if (now - lastScanTimeRef.current > cooldownMs) {
           console.log('🎉 TOTE SCANNER DECODED CODE:', detectedValue);
           lastScannedCodeRef.current = detectedValue;
           lastScanTimeRef.current = now;
@@ -472,36 +531,45 @@ export const ToteScanTab: React.FC = () => {
                 </div>
 
                 {/* Smart Facility Zone Sorting Recommendation Banner */}
-                <div className="mt-3 bg-slate-900 rounded-xl p-4 text-white space-y-2.5 border border-slate-800 shadow-md">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles size={14} />
-                      Chỉ Dẫn Phân Loại & Phân Khu Kho (Facility Zone Sorting)
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
-                      ZONE-LOCAL-DELIVERY
-                    </span>
-                  </div>
+                {(() => {
+                  const facCode = currentFacility?.facilityCode?.toUpperCase() || '';
+                  const isProvincialHub = currentFacility?.facilityType === 'PROVINCIAL_HUB' ||
+                    facCode.includes('HUB') ||
+                    facCode === 'FAC-HUB-HCM' ||
+                    facCode === 'FAC_HUB_HCM';
+                  const receivingZoneCode = isProvincialHub ? 'ZONE-P-INBOUND' : 'ZONE-W-REC';
+                  const receivingZoneName = isProvincialHub ? 'Bãi Nhập Hàng Xe Tải Bưu Cục Phường' : 'Khu Tiếp Nhận & Bàn Giao Hàng';
+                  const facCodeClean = facCode ? facCode.replace(/[^a-zA-Z0-9]/g, '_') : 'FAC_HUB_HCM';
+                  const receivingToteCode = `TOTE-${facCodeClean}-${receivingZoneCode}-001`;
 
-                  <p className="text-xs text-slate-200 leading-relaxed bg-slate-800/80 p-2.5 rounded-lg border border-slate-700">
-                    🟢 <strong>Đơn Giao Nội Phường (Cùng Bưu Cục):</strong> Đơn có địa chỉ đích thuộc bưu cục quản lý tại chỗ. <strong>Giữ bưu kiện tại KHU A (Giao Tại Chỗ)</strong> và xếp vào Sọt Phát Chặng Cuối cho Shipper xe máy giao luôn. <em>(Không vận chuyển lên xe tải kho tỉnh)</em>.
-                  </p>
+                  return (
+                    <div className="mt-3 bg-slate-900 rounded-xl p-4 text-white space-y-2.5 border border-slate-800 shadow-md">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Sparkles size={14} />
+                          Phân Khu Lưu Kho Nhập Hàng (Assigned Receiving Zone)
+                        </span>
+                        <span className="px-3 py-1 rounded text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+                          {receivingZoneCode}
+                        </span>
+                      </div>
 
-                  <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
-                    <div className="bg-emerald-950/40 p-2 rounded-lg border border-emerald-500/30">
-                      <span className="text-emerald-400 block text-[9px] uppercase font-bold">🟢 KHU A: NỘI PHƯỜNG</span>
-                      <span className="font-semibold text-slate-200">Giữ bưu cục (Giao tại chỗ)</span>
+                      <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700 space-y-1.5 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-slate-300">📍 Phân khu tiếp nhận:</span>
+                          <span className="font-bold text-emerald-400">{receivingZoneName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-slate-300">📦 Sọt tập kết nhận đơn:</span>
+                          <span className="font-mono font-bold text-amber-400">[{receivingToteCode}]</span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 pt-1.5 border-t border-slate-700/80 mt-1">
+                          👉 <em>Bưu kiện đã được lưu kho thành công tại <strong>{receivingZoneName}</strong>. Chuyển sang tab <strong>"Phân Loại Hàng Vào Zone Kho"</strong> khi chia bưu kiện sang sọt mới.</em>
+                        </p>
+                      </div>
                     </div>
-                    <div className="bg-amber-950/40 p-2 rounded-lg border border-amber-500/30">
-                      <span className="text-amber-400 block text-[9px] uppercase font-bold">🟡 KHU B: KHO TỔNG TP.HCM</span>
-                      <span className="font-semibold text-slate-200">Xe Tải 3.5 Tấn (Tân Bình)</span>
-                    </div>
-                    <div className="bg-rose-950/40 p-2 rounded-lg border border-rose-500/30">
-                      <span className="text-rose-400 block text-[9px] uppercase font-bold">🔴 KHU C: MEGA SORTER Q.12</span>
-                      <span className="font-semibold text-slate-200">Xe Tải 15 Tấn (Chở Liên Tỉnh)</span>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             )}
           </div>

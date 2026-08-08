@@ -57,7 +57,10 @@ export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
           const isSelected = activeExplorerZone === zone.zoneCode;
           const activeToteCode = getActiveToteCode(zone.zoneCode);
           const zoneToteObj = zoneTotesData.find((z) => z.zoneCode === zone.zoneCode);
-          const totesList = zoneToteObj?.totes || [];
+          let totesList = zoneToteObj?.totes || [];
+          if (activeToteCode && !totesList.some((t: any) => t.toteCode === activeToteCode)) {
+            totesList = [{ toteCode: activeToteCode, packageCount: 0 }, ...totesList];
+          }
 
           return (
             <div
@@ -74,7 +77,7 @@ export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
                   {zone.zoneCode}
                 </span>
                 <span className="text-[10px] font-extrabold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
-                  {totesList.length || 1} Sọt
+                  {totesList.length} Sọt
                 </span>
               </div>
               <h4 className="text-xs font-bold text-slate-800 line-clamp-1">{zone.zoneName}</h4>

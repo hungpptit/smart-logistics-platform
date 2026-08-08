@@ -123,7 +123,7 @@ export const MapcnMap: React.FC<MapcnMapProps> = ({
           </MapMarker>
         )}
 
-        {/* 👤 Receiver Marker (Icon Hình Người) */}
+        {/* 👤 Receiver Marker (Icon Hình Người - Chỉ nhấp nháy khi đã giao thành công) */}
         {receiverCoords && (
           <MapMarker longitude={receiverCoords[0]} latitude={receiverCoords[1]}>
             <MarkerContent>
@@ -131,7 +131,7 @@ export const MapcnMap: React.FC<MapcnMapProps> = ({
                 <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-emerald-600 shadow-xl transition-transform duration-200 group-hover:scale-125 z-20">
                   <User className="h-6 w-6 text-white" />
                 </div>
-                <span className="absolute -inset-2 animate-ping rounded-full border-2 border-emerald-500/80 opacity-90 z-10"></span>
+                {status === 'DELIVERED' && <span className="absolute -inset-2 animate-ping rounded-full border-2 border-emerald-500/80 opacity-90 z-10"></span>}
               </div>
             </MarkerContent>
             <MarkerPopup closeButton={false}>
@@ -146,7 +146,7 @@ export const MapcnMap: React.FC<MapcnMapProps> = ({
           </MapMarker>
         )}
 
-        {/* 🏢 Facility Marker (Bưu Cục) */}
+        {/* 🏢 Facility Marker (Bưu Cục - Nhấp nháy khi Đơn hàng đang nằm tại Bưu Cục) */}
         {facilityCoords && (
           <MapMarker longitude={facilityCoords[0]} latitude={facilityCoords[1]}>
             <MarkerContent>
@@ -154,6 +154,9 @@ export const MapcnMap: React.FC<MapcnMapProps> = ({
                 <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-indigo-600 shadow-2xl transition-all duration-300 group-hover:scale-125 z-30">
                   <Building2 className="h-6 w-6 text-white" />
                 </div>
+                {(!isOutForDelivery && !isPickingUp && !isBeforePickup && status !== 'DELIVERED') && (
+                  <span className="absolute -inset-2 animate-ping rounded-full border-2 border-indigo-500/80 opacity-90 z-20"></span>
+                )}
               </div>
             </MarkerContent>
             <MarkerPopup closeButton={false}>

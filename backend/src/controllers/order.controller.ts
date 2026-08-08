@@ -190,7 +190,12 @@ export class OrderController {
   public getSortingHistory = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user?.id!;
-      const result = await this.orderService.getSortingHistory(userId);
+      let facilityId = req.query.facilityId as string | undefined;
+      if (!facilityId) {
+        const staff = await prisma.staff.findUnique({ where: { userId } });
+        facilityId = staff?.assignedFacilityId || undefined;
+      }
+      const result = await this.orderService.getSortingHistory(userId, facilityId);
       res.status(200).json({
         success: true,
         message: 'Lấy lịch sử phân loại bưu kiện thành công',
@@ -203,7 +208,13 @@ export class OrderController {
 
   public getZoneTotes = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.orderService.getZoneTotes();
+      const userId = req.user?.id!;
+      let facilityId = req.query.facilityId as string | undefined;
+      if (!facilityId) {
+        const staff = await prisma.staff.findUnique({ where: { userId } });
+        facilityId = staff?.assignedFacilityId || undefined;
+      }
+      const result = await this.orderService.getZoneTotes(facilityId);
       res.status(200).json({
         success: true,
         message: 'Lấy danh sách sọt hàng theo phân khu thành công',

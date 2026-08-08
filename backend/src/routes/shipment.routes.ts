@@ -10,8 +10,8 @@ const shipmentController = new ShipmentController();
 // Require auth for all shipment operations
 router.use(authMiddleware);
 
-// Only ADMIN and STAFF can manage shipments
-router.use(requireRoles(['ADMIN', 'STAFF']));
+// ADMIN, STAFF, DRIVER, and SHIPPER can manage shipments
+router.use(requireRoles(['ADMIN', 'STAFF', 'DRIVER', 'SHIPPER']));
 
 /**
  * @openapi
@@ -198,5 +198,7 @@ router.patch(
  *         description: Không được xóa vận đơn đã xuất bến/hoạt động
  */
 router.delete('/:id', shipmentController.delete);
+
+router.post('/load-tote', shipmentController.loadTote);
 
 export default router;

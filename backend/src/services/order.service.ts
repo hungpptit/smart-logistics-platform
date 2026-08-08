@@ -329,10 +329,8 @@ export class OrderService {
     // Determine targetFacilityId for filtering
     let targetFacilityId: string | undefined = undefined;
 
-    if (userRoles.includes('ADMIN')) {
-      if (query.facilityId) {
-        targetFacilityId = query.facilityId;
-      }
+    if (query.facilityId) {
+      targetFacilityId = query.facilityId;
     } else if (userRoles.includes('STAFF')) {
       const staffProfile = await prisma.staff.findUnique({
         where: { userId },
@@ -346,36 +344,42 @@ export class OrderService {
       }
     }
 
+    const filterScope = ((query as any).filterScope as string) || (userRoles.includes('STAFF') && !userRoles.includes('ADMIN') ? 'CURRENT' : 'ALL');
+
     // Apply facilityId filter if specified/determined
     if (targetFacilityId) {
-      const facilityOrConditions: any[] = [
-        { originFacilityId: targetFacilityId },
-        { destinationFacilityId: targetFacilityId },
-        {
+      const facilityOrConditions: any[] = [];
+
+      if (filterScope === 'CURRENT') {
+        facilityOrConditions.push({ package: { currentFacilityId: targetFacilityId } });
+        facilityOrConditions.push({
           package: {
             warehouseScans: {
-              some: {
-                facilityId: targetFacilityId,
-              },
+              some: { facilityId: targetFacilityId },
             },
           },
-        },
-        {
+          status: OrderStatus.AT_HUB,
+        });
+        facilityOrConditions.push({
+          originFacilityId: targetFacilityId,
+          status: { in: [OrderStatus.CREATED, OrderStatus.READY_FOR_PICKUP, OrderStatus.PICKING, OrderStatus.PICKUP_ASSIGNED, OrderStatus.PICKED_UP, OrderStatus.ARRIVED_ORIGIN_FACILITY] },
+        });
+        facilityOrConditions.push({
+          destinationFacilityId: targetFacilityId,
+          status: { in: [OrderStatus.AT_HUB, OrderStatus.READY_FOR_DISPATCH, OrderStatus.OUT_FOR_DELIVERY] },
+        });
+      } else {
+        facilityOrConditions.push({ originFacilityId: targetFacilityId });
+        facilityOrConditions.push({ destinationFacilityId: targetFacilityId });
+        facilityOrConditions.push({ package: { currentFacilityId: targetFacilityId } });
+        facilityOrConditions.push({
           package: {
-            shipmentPackages: {
-              some: {
-                shipment: {
-                  routeStops: {
-                    some: {
-                      facilityId: targetFacilityId,
-                    },
-                  },
-                },
-              },
+            warehouseScans: {
+              some: { facilityId: targetFacilityId },
             },
           },
-        },
-      ];
+        });
+      }
 
       // Only show orders created by this user as fallback if they are STAFF
       if (!userRoles.includes('ADMIN')) {
@@ -982,14 +986,21 @@ export class OrderService {
   /**
    * Get recent sorting scans for current facility / staff with active toteCode
    */
-  public async getSortingHistory(userId: string) {
+  public async getSortingHistory(userId: string, facilityId?: string) {
+    const whereCondition: any = {};
+
+    if (facilityId) {
+      whereCondition.facilityId = facilityId;
+    } else {
+      whereCondition.scannedBy = userId;
+    }
+
     const scans = await prisma.warehouseScan.findMany({
-      where: {
-        toteCode: { not: null },
-      },
+      where: whereCondition,
       take: 50,
       orderBy: { scannedAt: 'desc' },
       include: {
+        shipment: true,
         package: {
           include: {
             order: true,
@@ -1001,16 +1012,21 @@ export class OrderService {
 
     const uniqueMap = new Map<string, any>();
     for (const s of scans) {
-      const code = s.package?.order?.orderCode || s.package?.packageCode || 'N/A';
+      const code = s.shipment?.shipmentCode || s.package?.order?.orderCode || s.package?.packageCode || 'N/A';
       if (!uniqueMap.has(code)) {
         uniqueMap.set(code, {
           id: s.id,
+          code: code,
+          type: s.shipment ? 'SHIPMENT' : 'ORDER',
+          status: 'SUCCESS',
+          orderCount: 1,
+          scannedAt: new Date(s.scannedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          message: s.shipment ? `Xác nhận Nhập kho Sọt hàng ${code}` : `Phân loại bưu kiện ${code} thành công`,
           packageCode: code,
           zoneCode: s.package?.currentZone?.zoneCode || 'ZONE-W-LOCAL',
           zoneName: s.package?.currentZone?.zoneName || 'Khu Giao Hàng Nội Phường',
           toteCode: s.toteCode || `TOTE-${s.package?.currentZone?.zoneCode || 'LOCAL'}-001`,
           sortedAt: new Date(s.scannedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          status: 'SUCCESS',
         });
       }
     }
@@ -1068,30 +1084,42 @@ export class OrderService {
    * Get all active and sealed totes grouped by zoneCode for facility
    */
   public async getZoneTotes(facilityId?: string) {
-    // 1. Truy vấn động danh sách Phân Khu từ bảng facility_zones trong CSDL DB
+    let targetFacilityId = facilityId;
+    let facilityCodeClean = '';
+
+    if (targetFacilityId) {
+      const fac = await prisma.facility.findUnique({
+        where: { id: targetFacilityId },
+        select: { facilityCode: true },
+      });
+      if (fac?.facilityCode) {
+        facilityCodeClean = fac.facilityCode.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
+      }
+    }
+
     const dbZones = await prisma.facilityZone.findMany({
-      where: facilityId ? { facilityId } : {},
+      where: targetFacilityId ? { facilityId: targetFacilityId } : {},
       select: { zoneCode: true, zoneName: true },
     });
 
     const activeZoneCodes = dbZones.map((z) => z.zoneCode);
 
     const dbTotes = await prisma.toteBag.findMany({
-      where: facilityId ? { facilityId } : {},
+      where: targetFacilityId ? { facilityId: targetFacilityId } : {},
       orderBy: { createdAt: 'desc' },
     });
 
     for (const zCode of activeZoneCodes) {
       const hasTote = dbTotes.some((t) => t.zoneCode === zCode);
       if (!hasTote) {
-        const firstToteCode = `TOTE-${zCode}-001`;
+        const firstToteCode = facilityCodeClean ? `TOTE-${facilityCodeClean}-${zCode}-001` : `TOTE-${zCode}-001`;
         const newTote = await prisma.toteBag.upsert({
           where: { toteCode: firstToteCode },
-          update: {},
+          update: targetFacilityId ? { facilityId: targetFacilityId } : {},
           create: {
             toteCode: firstToteCode,
             zoneCode: zCode,
-            facilityId: facilityId || null,
+            facilityId: targetFacilityId || null,
             status: 'OPEN',
           },
         });
@@ -1099,15 +1127,23 @@ export class OrderService {
       }
     }
 
+    const scansWhere: any = { toteCode: { not: null } };
+    if (targetFacilityId) {
+      scansWhere.facilityId = targetFacilityId;
+    }
+
     const scans = await prisma.warehouseScan.findMany({
-      where: { toteCode: { not: null } },
-      select: { toteCode: true, scannedAt: true },
+      where: scansWhere,
+      select: { toteCode: true, packageId: true },
     });
 
-    const countMap = new Map<string, number>();
+    const totePackageSetMap = new Map<string, Set<string>>();
     for (const s of scans) {
-      if (s.toteCode) {
-        countMap.set(s.toteCode, (countMap.get(s.toteCode) || 0) + 1);
+      if (s.toteCode && s.packageId) {
+        if (!totePackageSetMap.has(s.toteCode)) {
+          totePackageSetMap.set(s.toteCode, new Set());
+        }
+        totePackageSetMap.get(s.toteCode)!.add(s.packageId);
       }
     }
 
@@ -1124,7 +1160,7 @@ export class OrderService {
       zoneTotesMap.get(zoneCode)!.push({
         toteCode: tote.toteCode,
         status: tote.status,
-        packageCount: countMap.get(tote.toteCode) || 0,
+        packageCount: totePackageSetMap.get(tote.toteCode)?.size || 0,
         sealedAt: tote.sealedAt ? new Date(tote.sealedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : null,
         createdAt: new Date(tote.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       });

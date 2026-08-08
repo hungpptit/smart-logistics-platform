@@ -34,6 +34,7 @@ export class TrackingController {
           destinationFacility: { include: { address: true } },
           package: {
             include: {
+              currentFacility: { include: { address: true } },
               shipmentPackages: {
                 include: {
                   shipment: true,
@@ -85,6 +86,7 @@ export class TrackingController {
                         destinationFacility: { include: { address: true } },
                         package: {
                           include: {
+                            currentFacility: { include: { address: true } },
                             shipmentPackages: {
                               include: {
                                 shipment: true,
@@ -181,8 +183,14 @@ export class TrackingController {
       // 4. Comprehensive DB Status Mapping
       const currentStatusInfo = PUBLIC_ORDER_STATUS_MAP[order.status] || { label: String(order.status), chipClass: 'default' };
 
-      // 5. Construct Status History Timeline Events from DB Status History
-      const timelineEvents = (order.statusHistory || []).map((h: any) => {
+      // 5. Construct Status History Timeline Events from DB Status History (Filtered consecutive duplicate statuses)
+      const rawHistory = order.statusHistory || [];
+      const filteredHistory = rawHistory.filter((h: any, idx: number) => {
+        if (idx === 0) return true;
+        return h.status !== rawHistory[idx - 1].status;
+      });
+
+      const timelineEvents = filteredHistory.map((h: any) => {
         const title = PUBLIC_ORDER_STATUS_MAP[h.status]?.label || h.status;
         const currentFacName = ['ARRIVED_ORIGIN_FACILITY', 'SORTED_AT_ORIGIN_FACILITY'].includes(h.status)
           ? (order.originFacility?.facilityName || order.destinationFacility?.facilityName)
@@ -275,9 +283,10 @@ export class TrackingController {
       // Determine whether order is in pickup/origin phase or destination/delivery phase
       const isAtDestinationPhase = ['ARRIVED_DEST_FACILITY', 'AT_DEST_HUB', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'].includes(order.status);
 
-      const currentFacilityObj = isAtDestinationPhase
+      // Determine current facility object based on package.currentFacility or phase
+      const currentFacilityObj = (order.package as any)?.currentFacility || (isAtDestinationPhase
         ? (order.destinationFacility || order.originFacility)
-        : (order.originFacility || order.destinationFacility);
+        : (order.originFacility || order.destinationFacility));
 
       const currentFacilityName = currentFacilityObj?.facilityName || (isAtDestinationPhase ? 'Bưu cục phân phối' : 'Bưu cục tiếp nhận');
       const currentFacilityLat = Number(currentFacilityObj?.address?.latitude) || (isAtDestinationPhase ? destFacilityLat : originFacilityLat);

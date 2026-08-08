@@ -80,7 +80,7 @@ router.post(
  */
 router.get(
   '/',
-  requireRoles(['ADMIN', 'STAFF', 'SHIPPER']),
+  requireRoles(['ADMIN', 'STAFF', 'SHIPPER', 'DRIVER', 'LINEHAUL_TRANSFER']),
   routingController.getRoutes
 );
 
@@ -106,15 +106,14 @@ router.get(
  */
 router.get(
   '/:id',
-  requireRoles(['ADMIN', 'STAFF', 'SHIPPER']),
+  requireRoles(['ADMIN', 'STAFF', 'SHIPPER', 'DRIVER', 'LINEHAUL_TRANSFER']),
   routingController.getRouteById
 );
 
 router.post(
   '/:id/start',
-  requireRoles(['ADMIN', 'STAFF', 'SHIPPER']),
+  requireRoles(['ADMIN', 'STAFF', 'SHIPPER', 'DRIVER', 'LINEHAUL_TRANSFER']),
   routingController.startRoute
 );
 
 export default router;
-

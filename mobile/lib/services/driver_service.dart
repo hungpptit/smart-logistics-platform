@@ -202,6 +202,36 @@ class DriverService {
     return false;
   }
 
+  /// Load Tote Bag into Shipment and confirm transit (POST /shipments/load-tote)
+  static Future<Map<String, dynamic>?> loadToteIntoShipment(String toteCode) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || token.isEmpty) return null;
+
+      final url = Uri.parse('${AppConfig.baseUrl}/shipments/load-tote');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonEncode({'toteCode': toteCode}),
+      );
+
+      debugPrint('📡 [DriverService] Load tote ($toteCode): ${response.statusCode} - ${response.body}');
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['success'] == true && body['data'] != null) {
+          return Map<String, dynamic>.from(body['data']);
+        }
+      }
+    } catch (e) {
+      debugPrint('💥 [DriverService] Lỗi loadToteIntoShipment: $e');
+    }
+    return null;
+  }
+
   /// Fetch actual road navigation geometry from OSRM connecting all route stops sequentially (matching Web App)
   static Future<List<LatLng>> fetchRouteOSRM({
     required List<LatLng> stops,

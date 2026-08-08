@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_styles.dart';
@@ -959,11 +960,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _showShiftSummary,
-                    icon: const Icon(Icons.summarize, size: 18.0),
-                    label: const Text('Tóm tắt ca'),
+                    onPressed: () {
+                      final activeStop = _driverStops.firstWhere(
+                        (s) => s['isCheckedIn'] != true,
+                        orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
+                      );
+                      _showQRScanner(activeStop);
+                    },
+                    icon: const Icon(Icons.inventory_2, size: 18.0),
+                    label: const Text('Quét Nhận Sọt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.deepOnyx,
+                      backgroundColor: AppColors.logisticsRed,
                       foregroundColor: AppColors.pureWhite,
                       padding: const EdgeInsets.symmetric(vertical: 14.0),
                       shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
@@ -973,33 +980,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 const SizedBox(width: 12.0),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      if (_activeRouteCode == null && _activeRouteId == null && _driverStops.isEmpty) {
-                        ScaffoldMessenger.of(context).clearSnackBars();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Tài xế hiện chưa được phân công sọt hàng / lộ trình nào từ bưu cục.',
-                              style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite),
-                            ),
-                            backgroundColor: AppColors.error,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                            margin: const EdgeInsets.all(16.0),
-                          ),
-                        );
-                        return;
-                      }
-                      final activeStop = _driverStops.firstWhere(
-                        (s) => s['isCheckedIn'] != true,
-                        orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
-                      );
-                      _showQRScanner(activeStop);
-                    },
-                    icon: const Icon(Icons.inventory_2, size: 18.0),
-                    label: const Text('Quét Nhận Sọt'),
+                    onPressed: _showShipmentQRModal,
+                    icon: const Icon(Icons.qr_code_2, size: 18.0),
+                    label: const Text('QR Chuyến Xe', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.logisticsRed,
+                      backgroundColor: Colors.indigo.shade700,
                       foregroundColor: AppColors.pureWhite,
                       padding: const EdgeInsets.symmetric(vertical: 14.0),
                       shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
@@ -1088,7 +1073,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
                               ),
                               const SizedBox(height: 4.0),
                               Text(
-                                '${(_driverStops.length * 1.2).toStringAsFixed(1)} km',
+                                _driverStops.isEmpty
+                                    ? '0.0 km'
+                                    : '${(_driverStops.length * 3.5).toStringAsFixed(1)} km',
                                 style: AppTypography.headlineMd.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.deepOnyx,
@@ -1115,7 +1102,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
                               ),
                               const SizedBox(height: 4.0),
                               Text(
-                                '3.2 phút',
+                                _driverStops.isEmpty
+                                    ? '0.0 phút'
+                                    : '${(12.0 / (_driverStops.isNotEmpty ? _driverStops.length : 1)).toStringAsFixed(1)} phút',
                                 style: AppTypography.headlineMd.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.deepOnyx,
@@ -2022,6 +2011,114 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
+  void _showShipmentQRModal() {
+    final String shipmentCode = (_activeRouteCode != null && _activeRouteCode!.isNotEmpty)
+        ? _activeRouteCode!
+        : ((_activeRouteId != null && _activeRouteId!.isNotEmpty) ? _activeRouteId! : 'SHP-LH-41100053');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.pureWhite,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24.0)),
+          ),
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2.0),
+                ),
+              ),
+              const SizedBox(height: 16.0),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.local_shipping, color: AppColors.logisticsRed, size: 22),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'MÃ QR CHUYẾN XE TẢI TRUNG CHUYỂN',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8.0),
+              Text(
+                'Cho Thủ Kho tại Bưu cục Đích / Kho Tổng quét 1 phát nhập toàn bộ Chuyến xe vào kho',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 20.0),
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16.0),
+                  border: Border.all(color: Colors.indigo.shade200, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: QrImageView(
+                  data: shipmentCode,
+                  version: QrVersions.auto,
+                  size: 220.0,
+                ),
+              ),
+              const SizedBox(height: 16.0),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.shade50,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Mã Vận Đơn Xe Tải: $shipmentCode',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.indigo.shade900,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24.0),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.deepOnyx,
+                    foregroundColor: AppColors.pureWhite,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Đóng'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showQRScanner([Map<String, dynamic>? stop]) {
     final String? targetCode = (_activeRouteCode != null && _activeRouteCode!.isNotEmpty)
         ? _activeRouteCode
@@ -2043,6 +2140,52 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 setScannerState(() {
                   errorMessage = 'Vui lòng đưa camera quét mã QR Sọt / Bưu kiện hoặc nhập mã';
                 });
+                return;
+              }
+
+              // Case 0: Scanned Linehaul Warehouse Tote (TOTE-ZONE-...)
+              if (scannedValue.toUpperCase().startsWith('TOTE-')) {
+                Navigator.pop(context); // Close scanner modal
+                final result = await DriverService.loadToteIntoShipment(scannedValue);
+                if (mounted) {
+                  _initSocketAndFetchRoutes(); // refresh routes
+                  showDialog(
+                    context: this.context,
+                    builder: (BuildContext context) {
+                      final bool isOk = result != null;
+                      return AlertDialog(
+                        backgroundColor: AppColors.pureWhite,
+                        shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+                        title: Row(
+                          children: [
+                            Icon(isOk ? Icons.check_circle : Icons.error, color: isOk ? Colors.green : Colors.red, size: 28),
+                            const SizedBox(width: 8.0),
+                            Text(isOk ? 'Nạp Sọt Xe Tải Thành Công' : 'Thất Bại', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ],
+                        ),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(isOk
+                                ? 'Đã tiếp nhận Sọt [$scannedValue] lên xe tải (${result['shipmentCode'] ?? ''}). Toàn bộ ${result['packageCount'] ?? 1} bưu kiện đã chuyển sang Đang trung chuyển (IN_TRANSIT).'
+                                : 'Không thể nạp sọt $scannedValue lên xe tải. Vui lòng kiểm tra sọt hàng đã niêm phong hoặc còn khả dụng không.'),
+                          ],
+                        ),
+                        actions: [
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.logisticsRed,
+                              foregroundColor: AppColors.pureWhite,
+                            ),
+                            child: const Text('Đóng'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                }
                 return;
               }
 

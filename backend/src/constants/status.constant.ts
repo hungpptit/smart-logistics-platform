@@ -24,8 +24,8 @@ export const SHIPMENT_TO_ORDER_SYNC_MAP: Partial<Record<ShipmentStatus, OrderSyn
     getReason: (code) => `Đơn hàng đang xuất kho và trong quá trình luân chuyển qua vận đơn ${code}`,
   },
   [ShipmentStatus.AT_HUB]: {
-    orderStatus: OrderStatus.ARRIVED_ORIGIN_FACILITY,
-    getReason: () => `Hàng đã cập kho trung chuyển trung tâm`,
+    orderStatus: OrderStatus.AT_HUB,
+    getReason: () => `Đơn hàng đã nhập kho trung chuyển trung tâm`,
   },
   [ShipmentStatus.OUT_FOR_DELIVERY]: {
     orderStatus: OrderStatus.OUT_FOR_DELIVERY,
