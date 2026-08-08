@@ -539,20 +539,34 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ---
 
-### 35. Bảng `barcode_scans` (Nhật ký Quét mã vạch kiểm hàng)
-📌 **Chức năng của bảng:** Quản lý nhật ký quét mã vạch Barcode/QR Code của kiện hàng tại từng công đoạn trong kho và trên đường di chuyển (Nhập kho `INBOUND`, Phân loại chia chọn `SORTING`, Xuất kho `OUTBOUND`, Giao hàng `DELIVERY`). Lưu vết ai quét, thời gian quét và vị trí bưu cục quét mã.
+### 35. Bảng `warehouse_scans` (Nhật ký Quét kho & Sọt hàng Tập kết)
+📌 **Chức năng của bảng:** Quản lý nhật ký vết quét vạch Barcode/QR Code của bưu kiện và sọt hàng tập kết (`tote_code`) tại từng phân khu bưu cục và trên phương tiện trung chuyển. Ghi nhận vết ai quét (`scanned_by`), tại bưu cục nào (`facility_id`), thuộc chuyến xe trung chuyển nào (`shipment_id`) và mã sọt tập kết (`tote_code`).
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã lượt quét barcode. VD: `bs-01` |
-| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Vận đơn được quét mã. VD: `spm-01` |
-| `package_id` | Uuid | **Khóa ngoại (FK ➔ bảng packages)** | Kiện hàng được quét mã. VD: `pkg-01` |
-| `route_stop_id` | Uuid | **Khóa ngoại (FK ➔ bảng route_stops)** | Điểm dừng phát sinh quét mã. VD: `rs-01` |
-| `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Kho/Bưu cục phát sinh quét mã. VD: `fac-01` |
-| `scanned_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người thực hiện quét mã (User ID). VD: `usr-03` |
-| `barcode_value` | VarChar(100) | Bắt buộc | Giá trị chuỗi mã vạch vừa quét. VD: `PKG-8891-01` |
-| `scan_type` | Enum | Bắt buộc | Tác vụ quét: `INBOUND` (Nhập kho), `OUTBOUND` (Xuất kho), `SORTING`, `DELIVERY` |
-| `scanned_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm quét barcode |
+| `id` | Uuid | **Khóa chính (PK)** | Mã lượt quét kho. VD: `ws-01`, `ws-02` |
+| `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục/Kho thực hiện quét mã. VD: `fac-01` |
+| `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Thuộc Chuyến xe trung chuyển nào (Trỏ `shipments.id`). VD: `spm-01` |
+| `package_id` | Uuid | **Khóa ngoại (FK ➔ bảng packages)** | Bưu kiện được quét (Trỏ `packages.id`). VD: `pkg-01` |
+| `scanned_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người dùng/Thủ kho thực hiện quét (Trỏ `users.id`). VD: `usr-03` |
+| `tote_code` | VarChar(100) | **Khóa ngoại (FK ➔ bảng tote_bags)** | Mã sọt gom tập kết bưu kiện. VD: `TOTE-FAC_HUB_HCM-ZONE-P-INBOUND-001` |
+| `scanned_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian thực hiện quét kho |
+
+---
+
+### 35b. Bảng `tote_bags` (Quản lý Sọt gom & Bao gộp Chuyển kho)
+📌 **Chức năng của bảng:** Quản lý danh mục các Sọt gom / Bao gộp bưu kiện (`ToteBag`) được tạo tự động hoặc thủ công tại các phân khu kho (`zone_code`). Theo dõi trạng thái sọt (`OPEN` - Đang gom hàng, `SEALED` - Đã chốt niêm phong, `LOADED` - Đã bốc lên xe tải, `DISPATCHED` - Đã xuất kho), thời điểm chốt niêm phong (`sealed_at`) và liên kết với các lượt quét bưu kiện.
+
+| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
+| :--- | :--- | :--- | :--- |
+| `id` | Uuid | **Khóa chính (PK)** | Mã định danh sọt hàng. VD: `tb-01` |
+| `tote_code` | VarChar(100) | Khóa duy nhất (Unique), Bắt buộc | Mã QR / Barcode sọt gom độc nhất. VD: `TOTE-FAC_HUB_HCM-ZONE-P-INBOUND-001` |
+| `zone_code` | VarChar(50) | Bắt buộc | Mã phân khu tập kết sọt. VD: `ZONE-P-INBOUND`, `ZONE-P-INTER-HUB` |
+| `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Kho/Bưu cục sở hữu sọt (Trỏ `facilities.id`). VD: `fac-01` |
+| `status` | Enum | Bắt buộc (Default OPEN) | Trạng thái sọt: `OPEN` (Đang gom), `SEALED` (Đã niêm phong), `LOADED` (Đã lên xe), `DISPATCHED` (Đã xuất đi) |
+| `sealed_at` | Timestamptz | Tùy chọn | Mốc thời gian thủ kho bấm chốt niêm phong sọt |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm khởi tạo sọt gom |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin sọt gần nhất |
 
 ---
 
