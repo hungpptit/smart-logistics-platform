@@ -89,7 +89,7 @@ class AuthService {
               role = 'ADMIN';
             } else if (roles.contains('STAFF')) {
               role = 'STAFF';
-            } else if (roles.contains('SHIPPER')) {
+            } else if (roles.contains('SHIPPER') || roles.contains('DRIVER')) {
               role = 'SHIPPER';
             }
           }
@@ -201,7 +201,7 @@ class AuthService {
               role = 'ADMIN';
             } else if (roles.contains('STAFF')) {
               role = 'STAFF';
-            } else if (roles.contains('SHIPPER')) {
+            } else if (roles.contains('SHIPPER') || roles.contains('DRIVER')) {
               role = 'SHIPPER';
             }
           }

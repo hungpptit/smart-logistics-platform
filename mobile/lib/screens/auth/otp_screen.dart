@@ -52,7 +52,7 @@ class _OtpScreenState extends State<OtpScreen> {
       final role = result['role'];
       if (role == 'CUSTOMER') {
         Navigator.pushNamedAndRemoveUntil(context, '/customer/dashboard', (route) => false);
-      } else if (role == 'SHIPPER') {
+      } else if (role == 'DRIVER' || role == 'SHIPPER') {
         Navigator.pushNamedAndRemoveUntil(context, '/driver/dashboard', (route) => false);
       } else {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);

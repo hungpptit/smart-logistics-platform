@@ -51,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (result['success'] == true) {
         final role = result['role'];
-        if (role == 'SHIPPER') {
+        if (role == 'DRIVER' || role == 'SHIPPER') {
           Navigator.pushReplacementNamed(context, '/driver/dashboard');
         } else {
           Navigator.pushReplacementNamed(context, '/customer/dashboard');

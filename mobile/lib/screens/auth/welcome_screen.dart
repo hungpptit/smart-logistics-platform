@@ -34,7 +34,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
     if (loggedIn && mounted) {
       final role = await AuthService.getStoredRole();
       if (!mounted) return;
-      if (role == 'SHIPPER') {
+      if (role == 'DRIVER' || role == 'SHIPPER') {
         Navigator.pushReplacementNamed(context, '/driver/dashboard');
       } else {
         Navigator.pushReplacementNamed(context, '/customer/dashboard');

@@ -79,6 +79,7 @@
 | Username | Mật khẩu | Họ và Tên Tài Xế | Mã Tài Xế | Biển Số Xe Tải | Tải Trọng Max | Kho Quản Lý | Bằng Lái |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | `drv_linehaul_hcm` | `SlpTest@2026` | Phạm Quốc Hùng | `DRV-LH-01` | **`50H-888.01`** | **15 Tấn** | Kho Tổng TP. Hồ Chí Minh (Tân Bình) | Bằng C |
+| `drv_linehaul_hcm_2` | `SlpTest@2026` | Nguyễn Văn Minh | `DRV-LH-04` | **`50H-999.88`** | **15 Tấn** | Kho Tổng TP. Hồ Chí Minh (Tân Bình) | Bằng C |
 | `drv_linehaul_dongnai` | `SlpTest@2026` | Nguyễn Tấn Đạt | `DRV-LH-02` | **`60C-999.02`** | **10 Tấn** | Tổng Kho Miền Nam (Q.12) | Bằng C |
 | `drv_linehaul_brvt` | `SlpTest@2026` | Trần Hoàng Nam | `DRV-LH-03` | **`72C-777.03`** | **8 Tấn** | Bưu Cục Xuân Sơn (BR-VT) | Bằng C |
 

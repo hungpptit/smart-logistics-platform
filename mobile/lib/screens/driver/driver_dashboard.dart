@@ -261,8 +261,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
         }
       } else if (mounted) {
         setState(() {
-          _activeRouteId = null;
-          _activeRouteCode = null;
+          if (_activeRouteCode == null || !_activeRouteCode!.startsWith('SHP-')) {
+            _activeRouteId = null;
+            _activeRouteCode = null;
+          }
           _driverStops.clear();
           _roadPolylinePoints.clear();
         });
@@ -2014,7 +2016,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   void _showShipmentQRModal() {
     final String shipmentCode = (_activeRouteCode != null && _activeRouteCode!.isNotEmpty)
         ? _activeRouteCode!
-        : ((_activeRouteId != null && _activeRouteId!.isNotEmpty) ? _activeRouteId! : 'SHP-LH-41100053');
+        : ((_activeRouteId != null && _activeRouteId!.isNotEmpty) ? _activeRouteId! : 'CHUA_CO_CHUYEN_XE');
 
     showModalBottomSheet(
       context: context,
@@ -2148,6 +2150,12 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 Navigator.pop(context); // Close scanner modal
                 final result = await DriverService.loadToteIntoShipment(scannedValue);
                 if (mounted) {
+                  if (result != null && result['shipmentCode'] != null) {
+                    setState(() {
+                      _activeRouteCode = result['shipmentCode'].toString();
+                      _activeRouteId = result['shipmentCode'].toString();
+                    });
+                  }
                   _initSocketAndFetchRoutes(); // refresh routes
                   showDialog(
                     context: this.context,
