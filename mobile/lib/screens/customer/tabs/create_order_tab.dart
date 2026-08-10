@@ -1761,6 +1761,7 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
       ),
     );
   }
+
   Widget _buildTextField(
     String label,
     String hint,

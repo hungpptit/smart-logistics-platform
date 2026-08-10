@@ -1,9 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
-import '../../../../core/theme/app_styles.dart';
 
-/// Tappable card for selecting a shipping service level (EXPRESS, STANDARD, etc.)
+/// Tappable card for selecting a shipping service level.
+/// UI preserved exactly from original _buildServiceOptionCard method.
 class ServiceOptionCard extends StatelessWidget {
   final String code;
   final String title;
@@ -24,64 +23,53 @@ class ServiceOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16.0),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.logisticsRed.withValues(alpha: 0.06)
-              : AppColors.pureWhite,
-          borderRadius: AppStyles.roundedLg,
+          color: isSelected ? Colors.red.shade50 : Colors.white,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppColors.logisticsRed : AppColors.surfaceContainerHighest,
+            color: isSelected ? AppColors.logisticsRed : Colors.grey.shade300,
             width: isSelected ? 2.0 : 1.0,
           ),
         ),
         child: Row(
           children: [
-            Container(
-              width: 20.0,
-              height: 20.0,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isSelected ? AppColors.logisticsRed : Colors.transparent,
-                border: Border.all(
-                  color: isSelected ? AppColors.logisticsRed : AppColors.secondary,
-                  width: 2.0,
-                ),
-              ),
-              child: isSelected
-                  ? const Icon(Icons.check, size: 12.0, color: Colors.white)
-                  : null,
+            Radio<String>(
+              value: code,
+              groupValue: isSelected ? code : '',
+              activeColor: AppColors.logisticsRed,
+              onChanged: (_) => onTap(),
             ),
-            const SizedBox(width: 14.0),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: AppTypography.labelLg.copyWith(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
+                      fontSize: 13,
                       color: isSelected ? AppColors.logisticsRed : AppColors.deepOnyx,
                     ),
                   ),
-                  const SizedBox(height: 4.0),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8.0),
             Text(
               priceText,
-              style: AppTypography.labelLg.copyWith(
-                color: isSelected ? AppColors.logisticsRed : AppColors.deepOnyx,
-                fontWeight: FontWeight.w800,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColors.logisticsRed,
+                fontSize: 12,
               ),
             ),
           ],

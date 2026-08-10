@@ -1,11 +1,14 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_styles.dart';
 
-/// Small interactive map preview used in the address sections of order creation
+/// Small interactive map preview used in the address sections of order creation.
+/// UI preserved exactly from original _buildMapPreviewWidget method:
+/// - height: 180, Stack layout, locate button at bottom-right overlay.
 class AddressMapPreview extends StatelessWidget {
   final bool isSender;
   final double lat;
@@ -26,78 +29,103 @@ class AddressMapPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Container(
+      height: 180.0,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: AppStyles.roundedLg,
+        border: Border.all(color: AppColors.surfaceContainerHighest),
+      ),
+      child: ClipRRect(
+        borderRadius: AppStyles.roundedLg,
+        child: Stack(
           children: [
-            Text(
-              isSender ? 'Vi tri tren ban do (Nguoi gui)' : 'Vi tri tren ban do (Nguoi nhan)',
-              style: AppTypography.labelMd.copyWith(color: AppColors.secondary, fontSize: 11.0),
-            ),
-            InkWell(
-              onTap: isLocating ? null : onLocate,
-              borderRadius: BorderRadius.circular(8.0),
-              child: Padding(
-                padding: const EdgeInsets.all(4.0),
-                child: Row(
-                  children: [
-                    isLocating
-                        ? const SizedBox(
-                            width: 12, height: 12,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.logisticsRed),
-                          )
-                        : const Icon(Icons.my_location, size: 14.0, color: AppColors.logisticsRed),
-                    const SizedBox(width: 4.0),
-                    Text(
-                      isLocating ? 'Dang lay vi tri...' : 'Lay vi tri hien tai',
-                      style: AppTypography.labelMd.copyWith(color: AppColors.logisticsRed, fontSize: 11.0),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8.0),
-        ClipRRect(
-          borderRadius: AppStyles.roundedLg,
-          child: SizedBox(
-            height: 140.0,
-            child: FlutterMap(
+            FlutterMap(
               mapController: mapController,
               options: MapOptions(
                 initialCenter: LatLng(lat, lng),
-                initialZoom: 14.0,
-                interactionOptions: const InteractionOptions(
-                  flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
-                ),
+                initialZoom: 15.0,
               ),
               children: [
                 TileLayer(
-                  urlTemplate: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.velocity.mobile',
+                  urlTemplate: AppConfig.mapTileUrl,
+                  userAgentPackageName: 'com.velocity.slp.velocity_mobile',
                 ),
                 MarkerLayer(
                   markers: [
                     Marker(
                       point: LatLng(lat, lng),
-                      width: 32.0,
-                      height: 32.0,
+                      width: 40.0,
+                      height: 40.0,
                       child: const Icon(
-                        Icons.location_pin,
+                        Icons.location_on,
                         color: AppColors.logisticsRed,
-                        size: 32.0,
+                        size: 38.0,
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-          ),
+            Positioned(
+              bottom: 10,
+              right: 10,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: isLocating ? null : onLocate,
+                  borderRadius: BorderRadius.circular(20.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                    decoration: BoxDecoration(
+                      color: AppColors.pureWhite,
+                      borderRadius: BorderRadius.circular(20.0),
+                      boxShadow: AppStyles.ambientShadow,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isLocating) ...[
+                          const SizedBox(
+                            width: 14.0,
+                            height: 14.0,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.0,
+                              color: AppColors.logisticsRed,
+                            ),
+                          ),
+                          const SizedBox(width: 6.0),
+                          Text(
+                            'Dang dinh vi...',
+                            style: AppTypography.labelMd.copyWith(
+                              color: AppColors.logisticsRed,
+                              fontSize: 11.0,
+                            ),
+                          ),
+                        ] else ...[
+                          const Icon(
+                            Icons.my_location,
+                            size: 16.0,
+                            color: AppColors.logisticsRed,
+                          ),
+                          const SizedBox(width: 6.0),
+                          Text(
+                            'Vi tri hien tai',
+                            style: AppTypography.labelMd.copyWith(
+                              color: AppColors.logisticsRed,
+                              fontSize: 11.0,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

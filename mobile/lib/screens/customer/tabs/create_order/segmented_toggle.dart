@@ -1,8 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 
-/// Generic segmented toggle button for selecting one value from a set
+/// Generic segmented toggle button for selecting one value from a set.
+/// UI preserved exactly from original _buildSegmentedToggle method.
 class SegmentedToggle<T> extends StatelessWidget {
   final T selectedValue;
   final Map<T, String> options;
@@ -21,12 +21,12 @@ class SegmentedToggle<T> extends StatelessWidget {
       padding: const EdgeInsets.all(4.0),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(10.0),
-        border: Border.all(color: AppColors.surfaceContainerHighest),
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(color: AppColors.surfaceContainerHigh),
       ),
       child: Row(
         children: options.entries.map((entry) {
-          final bool isSelected = selectedValue == entry.key;
+          final isSelected = selectedValue == entry.key;
           return Expanded(
             child: GestureDetector(
               onTap: () => onChanged(entry.key),
@@ -40,14 +40,14 @@ class SegmentedToggle<T> extends StatelessWidget {
                 alignment: Alignment.center,
                 child: Text(
                   entry.value,
-                  style: AppTypography.labelMd.copyWith(
-                    color: isSelected ? AppColors.pureWhite : AppColors.secondary,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : AppColors.deepOnyx,
+                    fontWeight: FontWeight.bold,
                     fontSize: 11.5,
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),

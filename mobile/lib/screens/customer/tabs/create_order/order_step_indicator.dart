@@ -1,76 +1,80 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 
-/// Step indicator bar showing current progress through the order form
+/// Step indicator bar showing current progress through the order form.
+/// UI preserved exactly from original _buildStepIndicator/_buildStepItem/_buildStepLine methods.
 class OrderStepIndicator extends StatelessWidget {
   final int currentStep;
-  static const int totalSteps = 3;
 
   const OrderStepIndicator({super.key, required this.currentStep});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _buildStepItem(0, '1', 'Thong tin'),
-        _buildStepLine(0),
-        _buildStepItem(1, '2', 'Kien hang'),
-        _buildStepLine(1),
-        _buildStepItem(2, '3', 'Thanh toan'),
-      ],
-    );
-  }
-
-  Widget _buildStepItem(int stepIndex, String stepNum, String title) {
-    final bool isCompleted = currentStep > stepIndex;
-    final bool isActive = currentStep == stepIndex;
-    return Expanded(
-      child: Column(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16.0),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Container(
-            width: 32.0,
-            height: 32.0,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isCompleted
-                  ? Colors.green
-                  : (isActive ? AppColors.logisticsRed : AppColors.surfaceContainerHighest),
-              border: isActive
-                  ? Border.all(color: AppColors.logisticsRed, width: 2.0)
-                  : null,
-            ),
-            alignment: Alignment.center,
-            child: isCompleted
-                ? const Icon(Icons.check, color: Colors.white, size: 16.0)
-                : Text(
-                    stepNum,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isActive ? AppColors.pureWhite : AppColors.secondary,
-                    ),
-                  ),
-          ),
-          const SizedBox(height: 6.0),
-          Text(
-            title,
-            style: AppTypography.labelMd.copyWith(
-              color: isActive ? AppColors.logisticsRed : AppColors.secondary,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              fontSize: 11.0,
-            ),
-            textAlign: TextAlign.center,
-          ),
+          _buildStepItem(0, '1 & 2', 'Dia chi'),
+          _buildStepLine(0),
+          _buildStepItem(1, '3', 'Hang hoa'),
+          _buildStepLine(1),
+          _buildStepItem(2, '4', 'Thanh toan'),
         ],
       ),
     );
   }
 
+  Widget _buildStepItem(int stepIndex, String stepNum, String title) {
+    final isActive = currentStep == stepIndex;
+    final isDone = currentStep > stepIndex;
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 14.0,
+          backgroundColor: isDone
+              ? const Color(0xFF166534)
+              : isActive
+                  ? AppColors.logisticsRed
+                  : AppColors.surfaceContainerHigh,
+          child: isDone
+              ? const Icon(Icons.check, size: 14.0, color: Colors.white)
+              : Text(
+                  stepNum,
+                  style: TextStyle(
+                    color: isActive ? Colors.white : AppColors.secondary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11.0,
+                  ),
+                ),
+        ),
+        const SizedBox(width: 6.0),
+        Text(
+          title,
+          style: AppTypography.labelMd.copyWith(
+            color: isActive ? AppColors.deepOnyx : AppColors.secondary,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            fontSize: 12.0,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildStepLine(int stepIndex) {
-    return Container(
-      height: 2.0,
-      width: 24.0,
-      color: currentStep > stepIndex ? Colors.green : AppColors.surfaceContainerHighest,
+    final isDone = currentStep > stepIndex;
+    return Expanded(
+      child: Container(
+        height: 2.0,
+        margin: const EdgeInsets.symmetric(horizontal: 4.0),
+        color: isDone ? const Color(0xFF166534) : AppColors.surfaceContainerHigh,
+      ),
     );
   }
 }
