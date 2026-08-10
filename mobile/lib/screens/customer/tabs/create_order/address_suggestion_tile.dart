@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../services/location_service.dart';
 
@@ -29,7 +29,7 @@ class AddressSuggestionTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    item.structuredFormatting?.mainText ?? item.description,
+                    item.mainText,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 13.0,
@@ -38,10 +38,10 @@ class AddressSuggestionTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (item.structuredFormatting?.secondaryText?.isNotEmpty == true) ...[
+                  if (item.secondaryText.isNotEmpty) ...[
                     const SizedBox(height: 2.0),
                     Text(
-                      item.structuredFormatting!.secondaryText!,
+                      item.secondaryText,
                       style: const TextStyle(fontSize: 11.5, color: AppColors.secondary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

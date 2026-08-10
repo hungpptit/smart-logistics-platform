@@ -20,7 +20,6 @@ import 'widgets/navigation_screen.dart';
 import 'widgets/stop_details_dialog.dart';
 import 'widgets/qr_scanner_dialog.dart';
 import 'widgets/shipment_qr_modal.dart';
-import 'widgets/shift_summary_dialog.dart';
 
 /// Driver Dashboard - Main screen for drivers.
 /// All UI widgets extracted to screens/driver/widgets/ directory.

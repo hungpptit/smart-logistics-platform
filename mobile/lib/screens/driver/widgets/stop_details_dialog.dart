@@ -1,9 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_styles.dart';
 import 'report_failure_dialog.dart';
-import 'signature_pad.dart';
 
 class StopDetailsDialog extends StatelessWidget {
   final Map<String, dynamic> stop;
