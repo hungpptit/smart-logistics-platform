@@ -14,6 +14,13 @@ import '../../../core/theme/app_styles.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../services/location_service.dart';
 import '../../../services/order_service.dart';
+import 'create_order/address_suggestion_tile.dart';
+import 'create_order/order_step_indicator.dart';
+import 'create_order/form_section_header.dart';
+import 'create_order/service_option_card.dart';
+import 'create_order/map_preview_widget.dart';
+import 'create_order/segmented_toggle.dart';
+import 'create_order/price_summary_card.dart';
 
 class CreateOrderTab extends StatefulWidget {
   final VoidCallback onOrderCreated;
@@ -1272,18 +1279,18 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildStepIndicator(),
+                  OrderStepIndicator(currentStep: _currentStep),
                   const SizedBox(height: 24.0),
 
                   if (_currentStep == 0) ...[
                     // Section 1: Pickup Info
-                    _buildSectionHeader(1, 'Thông tin người gửi & điểm lấy hàng'),
+                    const FormSectionHeader(num: 1, title: 'Thong tin nguoi gui & diem lay hang'),
                     const SizedBox(height: 12.0),
-                    _buildFormCard(
+                    FormCard(
                       children: [
-                        _buildTextField('Họ tên người gửi', 'Tên đầy đủ hoặc Tên công ty', _senderNameController),
+                        _buildTextField('Ho ten nguoi gui', 'Ten day du hoac Ten cong ty', _senderNameController),
                         const SizedBox(height: 16.0),
-                        _buildTextField('Số điện thoại', '+84 000 000 000', _senderPhoneController, isPhone: true),
+                        _buildTextField('So dien thoai', '+84 000 000 000', _senderPhoneController, isPhone: true),
                         const SizedBox(height: 16.0),
                         _buildAddressFormFieldsGroup(
                           titlePrefix: 'Người gửi',
@@ -1326,24 +1333,26 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
                           },
                         ),
                         const SizedBox(height: 16.0),
-                        _buildMapPreviewWidget(
+                        AddressMapPreview(
                           isSender: true,
                           lat: _senderLat,
                           lng: _senderLng,
                           mapController: _senderMapController,
+                          isLocating: _isLocatingSender,
+                          onLocate: () => _locateCurrentPosition(isSender: true),
                         ),
                       ],
                     ),
                     const SizedBox(height: 28.0),
 
                     // Section 2: Delivery Info
-                    _buildSectionHeader(2, 'Thông tin người nhận & điểm giao hàng'),
+                    const FormSectionHeader(num: 2, title: 'Thong tin nguoi nhan & diem giao hang'),
                     const SizedBox(height: 12.0),
-                    _buildFormCard(
+                    FormCard(
                       children: [
-                        _buildTextField('Họ tên người nhận', 'Tên đầy đủ hoặc Tên công ty', _receiverNameController),
+                        _buildTextField('Ho ten nguoi nhan', 'Ten day du hoac Ten cong ty', _receiverNameController),
                         const SizedBox(height: 16.0),
-                        _buildTextField('Số điện thoại', '+84 000 000 000', _receiverPhoneController, isPhone: true),
+                        _buildTextField('So dien thoai', '+84 000 000 000', _receiverPhoneController, isPhone: true),
                         const SizedBox(height: 16.0),
                         _buildAddressFormFieldsGroup(
                           titlePrefix: 'Người nhận',
@@ -1386,11 +1395,13 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
                           },
                         ),
                         const SizedBox(height: 16.0),
-                        _buildMapPreviewWidget(
+                        AddressMapPreview(
                           isSender: false,
                           lat: _receiverLat,
                           lng: _receiverLng,
                           mapController: _receiverMapController,
+                          isLocating: _isLocatingReceiver,
+                          onLocate: () => _locateCurrentPosition(isSender: false),
                         ),
                       ],
                     ),
@@ -1420,13 +1431,13 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
                     const SizedBox(height: 32.0),
                   ] else if (_currentStep == 1) ...[
                     // Section 3: Package Details
-                    _buildSectionHeader(3, 'Thông tin gói hàng & bảo hiểm'),
+                    const FormSectionHeader(num: 3, title: 'Thong tin goi hang & bao hiem'),
                     const SizedBox(height: 12.0),
-                    _buildFormCard(
+                    FormCard(
                       children: [
                         _buildTextField(
-                          'Mô tả chi tiết danh mục hàng hóa',
-                          'Ví dụ: Quần áo, Điện thoại, Nồi chiên...',
+                          'Mo ta chi tiet danh muc hang hoa',
+                          'Vi du: Quan ao, Dien thoai, Noi chien...',
                           _descriptionController,
                         ),
                         const SizedBox(height: 16.0),
@@ -1486,29 +1497,35 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
                     const SizedBox(height: 28.0),
 
                     // Section 4: Service Options
-                    _buildSectionHeader(4, 'Gói dịch vụ vận chuyển'),
+                    const FormSectionHeader(num: 4, title: 'Goi dich vu van chuyen'),
                     const SizedBox(height: 12.0),
                     Column(
                       children: [
-                        _buildServiceOptionCard(
-                          'EXPRESS',
-                          'Velocity Express (Hỏa Tốc 2h)',
-                          'Giao hàng hỏa tốc trong vòng 2h nội tỉnh.',
-                          '35.000đ',
+                        ServiceOptionCard(
+                          code: 'EXPRESS',
+                          title: 'Velocity Express (Hoa Toc 2h)',
+                          subtitle: 'Giao hang hoa toc trong vong 2h noi tinh.',
+                          priceText: '35.000d',
+                          isSelected: _serviceLevel == 'EXPRESS',
+                          onTap: () => setState(() { _serviceLevel = 'EXPRESS'; _calculatePrice(); }),
                         ),
                         const SizedBox(height: 10.0),
-                        _buildServiceOptionCard(
-                          'STANDARD',
-                          'Velocity Standard (Tiêu Chuẩn 24h)',
-                          'Giao hàng tiêu chuẩn trong vòng 24h.',
-                          '20.000đ',
+                        ServiceOptionCard(
+                          code: 'STANDARD',
+                          title: 'Velocity Standard (Tieu Chuan 24h)',
+                          subtitle: 'Giao hang tieu chuan trong vong 24h.',
+                          priceText: '20.000d',
+                          isSelected: _serviceLevel == 'STANDARD',
+                          onTap: () => setState(() { _serviceLevel = 'STANDARD'; _calculatePrice(); }),
                         ),
                         const SizedBox(height: 10.0),
-                        _buildServiceOptionCard(
-                          'SAVING',
-                          'Velocity Saving (Tiết Kiệm)',
-                          'Cước phí tối ưu, giao từ 3-5 ngày.',
-                          '15.000đ',
+                        ServiceOptionCard(
+                          code: 'SAVING',
+                          title: 'Velocity Saving (Tiet Kiem)',
+                          subtitle: 'Cuoc phi toi uu, giao tu 3-5 ngay.',
+                          priceText: '15.000d',
+                          isSelected: _serviceLevel == 'SAVING',
+                          onTap: () => setState(() { _serviceLevel = 'SAVING'; _calculatePrice(); }),
                         ),
                       ],
                     ),
@@ -1558,22 +1575,20 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
                     const SizedBox(height: 32.0),
                   ] else ...[
                     // Step 4: Logistics Schedule & Payment Options
-                    _buildSectionHeader(4, 'Lịch hẹn lấy hàng & Thanh toán'),
+                    const FormSectionHeader(num: 4, title: 'Lich hen lay hang & Thanh toan'),
                     const SizedBox(height: 12.0),
-                    _buildFormCard(
+                    FormCard(
                       children: [
-                        // Hình thức gửi hàng (PICKUP vs DROP_OFF)
-                        Text('Hình thức gửi hàng', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
+                        // Hinh thuc gui hang
+                        Text('Hinh thuc gui hang', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8.0),
-                        _buildSegmentedToggle<String>(
+                        SegmentedToggle<String>(
                           selectedValue: _pickupType,
                           options: const {
-                            'PICKUP': 'Shipper lấy tận nơi',
-                            'DROP_OFF': 'Tự gửi bưu cục',
+                            'PICKUP': 'Shipper lay tan noi',
+                            'DROP_OFF': 'Tu gui buu cuc',
                           },
-                          onChanged: (val) {
-                            setState(() => _pickupType = val);
-                          },
+                          onChanged: (val) { setState(() => _pickupType = val); },
                         ),
                         const SizedBox(height: 20.0),
 
@@ -1635,18 +1650,16 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
                         ),
                         const SizedBox(height: 20.0),
 
-                        // Người chịu phí (SENDER / RECEIVER)
-                        Text('Người chịu phí ship', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
+                        // Nguoi chiu phi (SENDER / RECEIVER)
+                        Text('Nguoi chiu phi ship', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8.0),
-                        _buildSegmentedToggle<String>(
+                        SegmentedToggle<String>(
                           selectedValue: _feePayer,
                           options: const {
-                            'SENDER': 'Người gửi trả (SENDER)',
-                            'RECEIVER': 'Người nhận trả (RECEIVER)',
+                            'SENDER': 'Nguoi gui tra (SENDER)',
+                            'RECEIVER': 'Nguoi nhan tra (RECEIVER)',
                           },
-                          onChanged: (val) {
-                            setState(() => _feePayer = val);
-                          },
+                          onChanged: (val) { setState(() => _feePayer = val); },
                         ),
                         const SizedBox(height: 20.0),
 
@@ -1689,49 +1702,12 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
                     const SizedBox(height: 28.0),
 
                     // Order Price Summary Card
-                    Container(
-                      padding: const EdgeInsets.all(20.0),
-                      decoration: BoxDecoration(
-                        color: AppColors.deepOnyx,
-                        borderRadius: AppStyles.roundedXl,
-                        boxShadow: AppStyles.ambientShadow,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.receipt_long, color: AppColors.logisticsRed),
-                              const SizedBox(width: 8.0),
-                              Text(
-                                'Chi tiết cước tạm tính',
-                                style: AppTypography.headlineMd.copyWith(color: AppColors.pureWhite, fontSize: 17.0),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14.0),
-                          const Divider(color: Colors.white24),
-                          const SizedBox(height: 10.0),
-                          _buildSummaryRow('Cước cơ bản', formatCurrency(_basePrice)),
-                          const SizedBox(height: 8.0),
-                          _buildSummaryRow('Cước khoảng cách & phụ phí', formatCurrency(_serviceFee)),
-                          const SizedBox(height: 8.0),
-                          _buildSummaryRow('Cước cân nặng & bảo hiểm', formatCurrency(_fuelTax)),
-                          const SizedBox(height: 14.0),
-                          const Divider(color: Colors.white24),
-                          const SizedBox(height: 10.0),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Tổng cước tạm tính', style: AppTypography.headlineMd.copyWith(color: AppColors.pureWhite, fontWeight: FontWeight.bold)),
-                              Text(
-                                formatCurrency(_totalCost),
-                                style: AppTypography.headlineMd.copyWith(color: AppColors.logisticsRed, fontWeight: FontWeight.w900),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                    PriceSummaryCard(
+                      basePrice: _basePrice,
+                      serviceFee: _serviceFee,
+                      fuelTax: _fuelTax,
+                      totalCost: _totalCost,
+                      formatCurrency: formatCurrency,
                     ),
                     const SizedBox(height: 32.0),
 

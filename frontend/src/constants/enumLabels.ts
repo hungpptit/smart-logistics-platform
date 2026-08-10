@@ -86,6 +86,67 @@ export const ROUTE_STOP_STATUS_MAP: Record<string, EnumMeta> = {
   FAILED: { label: 'THẤT BẠI', color: 'danger' },
 };
 
+// 🏢 Facility Zone Type Map (Domain-Driven Zone Types)
+export const FACILITY_ZONE_TYPE_MAP: Record<string, EnumMeta & { defaultCode: string; description: string }> = {
+  SORTING: {
+    label: 'Khu Giao Hàng Nội Phường (Giao Tại Chỗ)',
+    color: 'success',
+    defaultCode: 'ZONE-W-LOCAL',
+    description: 'Bưu kiện giao cùng bưu cục! Giữ tại bưu cục và phân khu Khu A.',
+  },
+  SHIPPING: {
+    label: 'Khu Xuất Hàng Đi Kho Tỉnh / TP & Mega Sorter',
+    color: 'warning',
+    defaultCode: 'ZONE-W-PROVINCE-DISPATCH',
+    description: 'Bưu kiện giao đi xa / liên tỉnh! Ném vào Khu Xuất Hàng Trung Chuyển.',
+  },
+  RECEIVING: {
+    label: 'Khu Tiếp Nhận & Bàn Giao Hàng',
+    color: 'info',
+    defaultCode: 'ZONE-W-REC',
+    description: 'Bưu kiện vừa nhập bưu cục.',
+  },
+  RETURN: {
+    label: 'Khu Lưu Kho & Hàng Cho Chuyển Hoàn',
+    color: 'danger',
+    defaultCode: 'ZONE-W-RETURN',
+    description: 'Hàng trả về hoặc cần lưu trữ.',
+  },
+};
+
+export interface ZoneClassificationResult {
+  targetZoneType: 'SORTING' | 'SHIPPING' | 'RETURN';
+  suggestedZoneName: string;
+  instructionText: string;
+}
+
+export function resolveZoneClassification(
+  isIntraWard: boolean,
+  isIntraProvince: boolean,
+  destFacilityName: string = 'Bưu cục đích',
+  destProvinceName: string = 'Tỉnh / TP đích'
+): ZoneClassificationResult {
+  if (isIntraWard) {
+    return {
+      targetZoneType: 'SORTING',
+      suggestedZoneName: 'Khu A: Khu Giao Hàng Nội Phường (Giao Tại Chỗ)',
+      instructionText: `🟢 Bưu kiện giao cùng bưu cục! Giữ tại bưu cục và ném vào Khu A (Xe máy giao ${destFacilityName}).`,
+    };
+  } else if (isIntraProvince) {
+    return {
+      targetZoneType: 'SHIPPING',
+      suggestedZoneName: `Khu B: Khu Xuất Hàng Đi Kho Tỉnh / TP (${destProvinceName})`,
+      instructionText: `🟡 Bưu kiện giao cùng tỉnh/TP! Ném vào Khu B (Xe Tải 3.5 Tấn đi ${destFacilityName}).`,
+    };
+  } else {
+    return {
+      targetZoneType: 'SHIPPING',
+      suggestedZoneName: `Khu C: Khu Xuất Hàng Mega Sorter (Liên Miền - ${destProvinceName})`,
+      instructionText: `🔴 Bưu kiện giao liên tỉnh! Ném vào Khu C (Container 15 Tấn đi ${destProvinceName}).`,
+    };
+  }
+}
+
 // 🏭 Facility Type Map (3 Cấp Kho)
 export const FACILITY_TYPE_MAP: Record<string, EnumMeta> = {
   SORTING_CENTER: { label: 'Cấp 1 - Kho Tổng Miền', color: 'danger', bgClass: 'bg-rose-50 text-rose-700 border-rose-200' },
@@ -94,4 +155,5 @@ export const FACILITY_TYPE_MAP: Record<string, EnumMeta> = {
   LAST_MILE_STATION: { label: 'Cấp 3 - Bưu Cục Phường/Xã', color: 'info', bgClass: 'bg-blue-50 text-blue-700 border-blue-200' },
   MICRO_HUB: { label: 'Cấp 3 - Bưu Cục Phường/Xã', color: 'info', bgClass: 'bg-blue-50 text-blue-700 border-blue-200' },
 };
+
 

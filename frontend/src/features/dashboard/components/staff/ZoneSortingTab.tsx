@@ -18,6 +18,7 @@ import { TotePackageDetailModal } from './zone-sorting/TotePackageDetailModal';
 import { LiveCameraSortingBoard } from './zone-sorting/LiveCameraSortingBoard';
 import { SortingHistoryPanel } from './zone-sorting/SortingHistoryPanel';
 import type { SortingHistoryItem } from './zone-sorting/SortingHistoryPanel';
+import { resolveZoneClassification } from '../../../../constants/enumLabels';
 
 export const ZoneSortingTab: React.FC = () => {
   const [scanCode, setScanCode] = useState('');
@@ -360,28 +361,27 @@ export const ZoneSortingTab: React.FC = () => {
         const destFacilityName = orderData.destinationFacility?.facilityName || 'Bưu cục đích';
         const destProvinceName = orderData.destinationFacility?.provinceName || 'Tỉnh / TP đích';
 
-        let suggestedZoneCode = 'ZONE-W-LOCAL';
-        let suggestedZoneName = 'Khu A: Khu Giao Hàng Nội Phường (Giao Tại Chỗ)';
-        let instructionText = `🟢 Bưu kiện giao cùng bưu cục! Giữ tại bưu cục và ném vào Khu A (Xe máy giao ${destFacilityName}).`;
+        // Domain Driven Matching using centralized resolveZoneClassification
+        const { targetZoneType, suggestedZoneName, instructionText } = resolveZoneClassification(
+          isIntraWard,
+          isIntraProvince,
+          destFacilityName,
+          destProvinceName
+        );
 
-        if (!isIntraWard && isIntraProvince) {
-          suggestedZoneCode = 'ZONE-W-PROVINCE-DISPATCH';
-          suggestedZoneName = `Khu B: Khu Xuất Hàng Đi Kho Tỉnh / TP (${destProvinceName})`;
-          instructionText = `🟡 Bưu kiện giao cùng tỉnh/TP! Ném vào Khu B (Xe Tải 3.5 Tấn đi ${destFacilityName}).`;
-        } else if (!isIntraWard && !isIntraProvince) {
-          suggestedZoneCode = 'ZONE-W-SORTER-DISPATCH';
-          suggestedZoneName = `Khu C: Khu Xuất Hàng Mega Sorter (Liên Miền - ${destProvinceName})`;
-          instructionText = `🔴 Bưu kiện giao liên tỉnh! Ném vào Khu C (Container 15 Tấn đi ${destProvinceName}).`;
-        }
+        // Dynamically find matched zone from database by zoneType without relying on hardcoded zoneCode strings!
+        const matchedZone = facilityZones.find((z) => z.zoneType === targetZoneType)
+          || facilityZones.find((z) => z.zoneType === 'SHIPPING' || z.zoneType === 'SORTING')
+          || facilityZones[0];
 
-        const matchedZone = facilityZones.find((z) => z.zoneCode === suggestedZoneCode) || facilityZones[0];
-        const activeToteCode = getActiveToteCode(suggestedZoneCode);
+        const targetZoneCode = matchedZone?.zoneCode || (targetZoneType === 'SHIPPING' ? 'ZONE-W-PROVINCE-DISPATCH' : 'ZONE-W-LOCAL');
+        const activeToteCode = getActiveToteCode(targetZoneCode);
 
         setLiveScannedInfo({
           code: cleanCode,
           order: orderData,
-          suggestedZoneCode,
-          suggestedZoneName,
+          suggestedZoneCode: targetZoneCode,
+          suggestedZoneName: matchedZone?.zoneName || suggestedZoneName,
           instructionText,
           toteCode: activeToteCode,
         });
@@ -401,7 +401,7 @@ export const ZoneSortingTab: React.FC = () => {
           fetchZoneTotes();
         }
 
-        setSuccessMsg(`LIVE SCAN: ĐÃ TỰ ĐỘNG LƯU BƯU KIỆN ${cleanCode} VÀO ${suggestedZoneCode} (SỌT: ${activeToteCode})!`);
+        setSuccessMsg(`LIVE SCAN: ĐÃ TỰ ĐỘNG LƯU BƯU KIỆN ${cleanCode} VÀO ${targetZoneCode} (SỌT: ${activeToteCode})!`);
       }
     } catch (err: any) {
       console.error('Lỗi live scan:', err);
@@ -436,31 +436,29 @@ export const ZoneSortingTab: React.FC = () => {
         const destFacilityName = orderData.destinationFacility?.facilityName || 'Bưu cục đích';
         const destProvinceName = orderData.destinationFacility?.provinceName || 'Tỉnh / TP đích';
 
-        let suggestedZoneCode = 'ZONE-W-LOCAL';
-        let suggestedZoneName = 'Khu A: Khu Giao Hàng Nội Phường (Giao Tại Chỗ)';
-        let instructionText = `🟢 Bưu kiện giao cùng bưu cục! Giữ tại bưu cục và ném vào Khu A (Xe máy giao ${destFacilityName}).`;
+        const { targetZoneType, suggestedZoneName, instructionText } = resolveZoneClassification(
+          isIntraWard,
+          isIntraProvince,
+          destFacilityName,
+          destProvinceName
+        );
 
-        if (!isIntraWard && isIntraProvince) {
-          suggestedZoneCode = 'ZONE-W-PROVINCE-DISPATCH';
-          suggestedZoneName = `Khu B: Khu Xuất Hàng Đi Kho Tỉnh / TP (${destProvinceName})`;
-          instructionText = `🟡 Bưu kiện giao cùng tỉnh/TP! Ném vào Khu B (Xe Tải 3.5 Tấn đi ${destFacilityName}).`;
-        } else if (!isIntraWard && !isIntraProvince) {
-          suggestedZoneCode = 'ZONE-W-SORTER-DISPATCH';
-          suggestedZoneName = `Khu C: Khu Xuất Hàng Mega Sorter (Liên Miền - ${destProvinceName})`;
-          instructionText = `🔴 Bưu kiện giao liên tỉnh! Ném vào Khu C (Container 15 Tấn đi ${destProvinceName}).`;
-        }
+        const matchedZone = facilityZones.find((z) => z.zoneType === targetZoneType)
+          || facilityZones.find((z) => z.zoneType === 'SHIPPING' || z.zoneType === 'SORTING')
+          || facilityZones[0];
 
-        const matchedZone = facilityZones.find((z) => z.zoneCode === suggestedZoneCode) || facilityZones[0];
         if (matchedZone) {
           setSelectedZoneId(matchedZone.id);
         }
+
+        const targetZoneCode = matchedZone?.zoneCode || (targetZoneType === 'SHIPPING' ? 'ZONE-W-PROVINCE-DISPATCH' : 'ZONE-W-LOCAL');
 
         setIsEditingZone(false);
         setScannedPackageInfo({
           code: cleanCode,
           order: orderData,
-          suggestedZoneCode,
-          suggestedZoneName,
+          suggestedZoneCode: targetZoneCode,
+          suggestedZoneName: matchedZone?.zoneName || suggestedZoneName,
           instructionText,
         });
 
