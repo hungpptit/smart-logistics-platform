@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../core/config/app_config.dart';
+import '../core/constants/api_constants.dart';
 import 'auth_service.dart';
 
 class AddressPrediction {
@@ -38,7 +38,7 @@ class LocationService {
     // 1. Call Backend API (/locations/autocomplete)
     try {
       final token = await AuthService.getToken();
-      final uri = Uri.parse('${AppConfig.baseUrl}/locations/autocomplete?input=${Uri.encodeComponent(input)}');
+      final uri = Uri.parse(ApiConstants.locationAutocomplete(input));
       debugPrint('📡 [Autocomplete] Gọi backend: $uri');
       final response = await http.get(
         uri,
@@ -112,7 +112,7 @@ class LocationService {
   static Future<List<Map<String, dynamic>>> fetchProvinces() async {
     try {
       final token = await AuthService.getToken();
-      final uri = Uri.parse('${AppConfig.baseUrl}/locations/provinces');
+      final uri = Uri.parse(ApiConstants.locationProvinces);
       debugPrint('📡 [Provinces] Gọi API Backend: GET $uri');
       debugPrint('🔑 [Provinces] Token: ${token != null ? "có token" : "KHÔNG có token"}');
       final response = await http.get(
@@ -204,7 +204,7 @@ class LocationService {
   static Future<List<Map<String, dynamic>>> fetchWards(String provinceCode, [String? districtCode]) async {
     try {
       final token = await AuthService.getToken();
-      final uri = Uri.parse('${AppConfig.baseUrl}/locations/provinces/$provinceCode/wards');
+      final uri = Uri.parse(ApiConstants.locationWards(provinceCode));
       debugPrint('📡 [Wards] Gọi API Backend: GET $uri');
       debugPrint('🔑 [Wards] Token: ${token != null ? "có token" : "KHÔNG có token"}');
       final response = await http.get(
@@ -502,7 +502,7 @@ class LocationService {
   static Future<Map<String, dynamic>?> fetchPlaceDetail(String placeId) async {
     try {
       final token = await AuthService.getToken();
-      final uri = Uri.parse('${AppConfig.baseUrl}/locations/place-detail?placeId=$placeId');
+      final uri = Uri.parse(ApiConstants.locationPlaceDetail(placeId));
       final response = await http.get(
         uri,
         headers: {

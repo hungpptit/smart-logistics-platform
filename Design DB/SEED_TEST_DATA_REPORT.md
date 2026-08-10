@@ -4,13 +4,14 @@
 
 ---
 
-## 🏢 1. Danh Sách 4 Bưu Cục Chặng Đầu / Chặng Cuối - TP. Thủ Đức
+## 🏢 1. Danh Sách 5 Bưu Cục Chặng Đầu / Chặng Cuối - TP. Thủ Đức
 
 | Mã Bưu cục | Tên Bưu cục | Địa chỉ Thực tế | Vai trò trong Đơn Test | Số Staff | Số Shipper |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `FAC-TD-DANGBI` | **Bưu cục Đặng Văn Bi** | 180 Đặng Văn Bi, Phường Bình Thọ, TP. Thủ Đức | **Bưu cục Nhận Chặng cuối** (Tập kết 50 đơn sẵn sàng AI Routing) | 2 Staff | **3 Shipper** |
 | `FAC-TD-LINHTRUNG` | **Bưu cục Linh Trung** | 250 Đường Linh Trung, Phường Linh Trung, TP. Thủ Đức | Kho xuất phát gửi (Cust 1 & 2) | 1 Staff (`stf_linhtrung_1`) | **2 Shipper** |
 | `FAC-TD-PHUOCLONG` | **Bưu cục Phước Long** | 85 Đỗ Xuân Hợp, Phường Phước Long B, TP. Thủ Đức | Kho xuất phát gửi (Cust 3 & 4) | 1 Staff (`stf_phuoclong_1`) | **2 Shipper** |
+| `FAC-TD-TANGNHONPHU` | **Bưu cục Tăng Nhơn Phú** | 97 Đường Man Thiện, Phường Tăng Nhơn Phú A, TP. Thủ Đức | Kho xuất phát gửi (Cust 6) | 1 Staff (`stf_tangnhonphu_1`) | **2 Shipper** |
 | `FAC-TD-ANPHU` | **Bưu cục An Phú (Kho xa)** | 25 Song Hành, Phường An Phú, TP. Thủ Đức | Kho xuất phát gửi xa (Cust 5) | - | - |
 | `FAC-000050` | **Bưu Cục Xuân Sơn** | UBND xã Xuân Sơn, Xã Xuân Sơn, Châu Đức, Bà Rịa - Vũng Tàu | Kho nhận chặng cuối (Giao khu vực Châu Đức / BR-VT) | - | - |
 
@@ -19,13 +20,13 @@
 ## 🚚 2. Luồng Nghiệp Vụ 50 Đơn Hàng Test AI Routing
 
 1. **Hình thức gửi (`pickupType`)**: **`PICKUP`** (Shipper đến lấy hàng tận nơi tại Shop/Địa chỉ Khách hàng).
-2. **Kho gửi xuất phát (`originFacilityId`)**: Các Bưu cục khởi tạo (`Bưu cục Linh Trung`, `Bưu cục Phước Long`, `Bưu cục An Phú`).
+2. **Kho gửi xuất phát (`originFacilityId`)**: Các Bưu cục khởi tạo (`Bưu cục Linh Trung`, `Bưu cục Phước Long`, `Bưu cục Tăng Nhơn Phú`, `Bưu cục An Phú`).
 3. **Kho nhận chặng cuối (`destinationFacilityId`)**: **`Bưu cục Đặng Văn Bi`** (`FAC-TD-DANGBI`).
 4. **Trạng thái Đơn hàng & Kiện hàng**: **`AT_HUB` / `ARRIVED_DESTINATION`** (Toàn bộ 50 kiện hàng đã được trung chuyển về nằm sẵn trong Kho Bưu cục Đặng Văn Bi để 3 Shipper xe máy của bưu cục Đặng Văn Bi nhận nhiệm vụ **chạy AI phân cụm lộ trình phát chặng cuối**).
 
 ---
 
-## 👤 3. Danh Sách 4 Tài Khoản Nhân Viên Kho (`WAREHOUSE_STAFF`)
+## 👤 3. Danh Sách 5 Tài Khoản Nhân Viên Kho (`WAREHOUSE_STAFF`)
 
 | Username | Mật khẩu | Họ và Tên | Mã NV | Bưu cục Công tác |
 | :--- | :--- | :--- | :--- | :--- |
@@ -33,10 +34,11 @@
 | `stf_dangvanbi_2` | `SlpTest@2026` | Lê Thị Xuân (Kiểm kho 2) | `STF-TD-02` | Bưu cục Đặng Văn Bi |
 | `stf_linhtrung_1` | `SlpTest@2026` | Phạm Văn Bình (Thủ kho) | `STF-TD-03` | Bưu cục Linh Trung |
 | `stf_phuoclong_1` | `SlpTest@2026` | Nguyễn Văn Minh (Thủ kho) | `STF-TD-04` | Bưu cục Phước Long |
+| `stf_tangnhonphu_1` | `SlpTest@2026` | Vũ Văn Hoàng (Thủ kho) | `STF-TD-05` | Bưu cục Tăng Nhơn Phú |
 
 ---
 
-## 🛵 4. Danh Sách 7 Tài Xế / Shipper & Xe Máy (`DRIVER`)
+## 🛵 4. Danh Sách 9 Tài Xế / Shipper & Xe Máy (`DRIVER`)
 
 | Username | Mật khẩu | Họ và Tên | Mã Tài Xế | Biển Số Xe Máy | Bưu cục Quản Lý | Tọa độ Ưu tiên (Lat, Lng) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -47,10 +49,12 @@
 | `shp_linhtrung_2` | `SlpTest@2026` | Vũ Văn Khải | `DRV-TD-05` | `59-X1 111.05` | Bưu cục Linh Trung | `10.8590, 106.7760` |
 | `shp_phuoclong_1` | `SlpTest@2026` | Bùi Thanh Tùng | `DRV-TD-06` | `59-X1 111.06` | Bưu cục Phước Long | `10.8240, 106.7590` |
 | `shp_phuoclong_2` | `SlpTest@2026` | Đặng Quang Huy | `DRV-TD-07` | `59-X1 111.07` | Bưu cục Phước Long | `10.8260, 106.7610` |
+| `shp_tangnhonphu_1` | `SlpTest@2026` | Đỗ Văn Nam | `DRV-TD-08` | `59-X1 111.08` | Bưu cục Tăng Nhơn Phú | `10.8460, 106.7860` |
+| `shp_tangnhonphu_2` | `SlpTest@2026` | Trịnh Hoàng Long | `DRV-TD-09` | `59-X1 111.09` | Bưu cục Tăng Nhơn Phú | `10.8470, 106.7870` |
 
 ---
 
-## 🛍️ 5. Danh Sách 5 Khách Hàng Gửi Hàng (`CUSTOMER`)
+## 🛍️ 5. Danh Sách 6 Khách Hàng Gửi Hàng (`CUSTOMER`)
 
 | Username | Mật khẩu | Tên Khách hàng / Shop | Bưu cục Gửi Chặng Đầu | Địa chỉ Lấy Hàng Tận Nơi (`PICKUP`) |
 | :--- | :--- | :--- | :--- | :--- |
@@ -59,6 +63,7 @@
 | `cust_thuduc_3` | `SlpTest@2026` | Cửa Hàng Điện Tử Phước Long | Bưu cục Phước Long | 42 Đỗ Xuân Hợp, Phường Phước Long B |
 | `cust_thuduc_4` | `SlpTest@2026` | Nhà Sách Giáo Dục Tây Hòa | Bưu cục Phước Long | 18 Tây Hòa, Phường Phước Long A |
 | `cust_thuduc_5` | `SlpTest@2026` | Nông Sản Sạch An Phú (Kho xa) | Bưu cục An Phú | 15 Song Hành, Phường An Phú |
+| `cust_thuduc_6` | `SlpTest@2026` | Cửa Hàng Thiết Bị Số Man Thiện | Bưu cục Tăng Nhơn Phú | 97 Đường Man Thiện, Phường Tăng Nhơn Phú A |
 
 ---
 

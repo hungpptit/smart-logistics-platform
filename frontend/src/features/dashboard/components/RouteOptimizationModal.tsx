@@ -10,6 +10,7 @@ interface RouteOptimizationModalProps {
   facilityId?: string;
   facilities?: Array<{ id: string; facilityCode: string; facilityName: string }>;
   isAdmin?: boolean;
+  initialRouteType?: 'ALL' | 'PICKUP' | 'DELIVERY';
 }
 
 export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
@@ -20,8 +21,10 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
   facilityId = '',
   facilities = [],
   isAdmin = false,
+  initialRouteType = 'ALL',
 }) => {
   const [selectedFacilityId, setSelectedFacilityId] = useState(facilityId);
+  const [routeType, setRouteType] = useState<'ALL' | 'PICKUP' | 'DELIVERY'>(initialRouteType);
   const [populationSize, setPopulationSize] = useState('100');
   const [generations, setGenerations] = useState('200');
   const [mutationRate, setMutationRate] = useState('0.15');
@@ -33,6 +36,12 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewResult, setPreviewResult] = useState<any | null>(null);
+
+  React.useEffect(() => {
+    if (initialRouteType) {
+      setRouteType(initialRouteType);
+    }
+  }, [initialRouteType, isOpen]);
 
   React.useEffect(() => {
     if (facilityId) {
@@ -62,6 +71,7 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
         },
         body: JSON.stringify({
           facilityId: selectedFacilityId,
+          routeType,
           ...(isAdmin ? {
             params: {
               populationSize: Number(populationSize),
@@ -152,6 +162,65 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* 2. Select Route Type (Gom Lấy Hàng, Gom Giao Hàng, Cờ Kép) */}
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <Sliders size={14} className="text-[#bc0100]" /> 2. Chế độ Gom Cụm AI Phân Tuyến
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => setRouteType('ALL')}
+                className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${routeType === 'ALL'
+                  ? 'border-indigo-600 bg-indigo-50/90 text-indigo-950 ring-2 ring-indigo-500/20 font-bold'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs uppercase font-extrabold text-indigo-900">Cờ Kép (Tất cả)</span>
+                  {routeType === 'ALL' && <CheckCircle2 size={16} className="text-indigo-600 shrink-0" />}
+                </div>
+                <p className="text-[10px] text-slate-500 font-normal mt-1 leading-relaxed">
+                  Gom cả đơn Lấy hàng tận nơi và đơn Giao hàng tại bưu cục.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setRouteType('PICKUP')}
+                className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${routeType === 'PICKUP'
+                  ? 'border-amber-600 bg-amber-50/90 text-amber-950 ring-2 ring-amber-500/20 font-bold'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs uppercase font-extrabold text-amber-900">Chỉ Gom Lấy Hàng</span>
+                  {routeType === 'PICKUP' && <CheckCircle2 size={16} className="text-amber-600 shrink-0" />}
+                </div>
+                <p className="text-[10px] text-slate-500 font-normal mt-1 leading-relaxed">
+                  Chỉ gom các đơn Khách/Shop đã báo Sẵn sàng lấy hàng.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setRouteType('DELIVERY')}
+                className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${routeType === 'DELIVERY'
+                  ? 'border-emerald-600 bg-emerald-50/90 text-emerald-950 ring-2 ring-emerald-500/20 font-bold'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs uppercase font-extrabold text-emerald-900">Chỉ Gom Giao Hàng</span>
+                  {routeType === 'DELIVERY' && <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />}
+                </div>
+                <p className="text-[10px] text-slate-500 font-normal mt-1 leading-relaxed">
+                  Chỉ gom các đơn bưu kiện hiện đã nhập về kho bưu cục.
+                </p>
+              </button>
+            </div>
           </div>
 
           {/* Staff Info Banner vs Admin Param Controls */}

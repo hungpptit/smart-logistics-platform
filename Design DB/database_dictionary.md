@@ -1,4 +1,4 @@
-# 📖 TỰ ĐIỂN CƠ SỞ DỮ LIỆU CHUẨN HÓA (DATABASE DICTIONARY) - SMART LOGISTICS PLATFORM
+ # 📖 TỰ ĐIỂN CƠ SỞ DỮ LIỆU CHUẨN HÓA (DATABASE DICTIONARY) - SMART LOGISTICS PLATFORM
 
 Tài liệu này tổng hợp toàn bộ 41 bảng cơ sở dữ liệu được thiết kế theo chuẩn **Clean Architecture & Domain Driven Design**, phân chia theo 10 Phân hệ (Module) phục vụ hệ thống Smart Logistics Platform (SLP). 
 

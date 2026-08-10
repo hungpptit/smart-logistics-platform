@@ -20,7 +20,9 @@ import {
   Bot,
   RotateCcw,
   Printer,
-  FileSpreadsheet
+  FileSpreadsheet,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 
 interface PackageItem {
@@ -40,6 +42,9 @@ interface OrderPayment {
   shippingFee: number;
   insuranceFee: number;
   codAmount: number;
+  finalShippingFee?: number;
+  finalInsuranceFee?: number;
+  finalCodAmount?: number;
   feePayer: 'SENDER' | 'RECEIVER';
   paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'E_WALLET' | 'COD';
   paymentStatus: 'UNPAID' | 'PAID' | 'REFUNDED';
@@ -162,11 +167,51 @@ export const OrderTab: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState<boolean>(false);
   const [isOptimizationModalOpen, setIsOptimizationModalOpen] = useState<boolean>(false);
+  const [selectedAiRouteType, setSelectedAiRouteType] = useState<'ALL' | 'PICKUP' | 'DELIVERY'>('ALL');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [optimizing] = useState<boolean>(false);
+
+  // Custom Confirmation & Notification Popup State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'warning' | 'danger' | 'info' | 'success';
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  const [popupAlert, setPopupAlert] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'info';
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setPopupAlert({
+      isOpen: true,
+      title,
+      message,
+      type,
+    });
+  };
+
   const isAdminOrStaff = user?.roles.includes('ADMIN') || user?.roles.includes('STAFF');
   const isAdmin = user?.roles.includes('ADMIN');
   const isStaff = user?.roles.includes('STAFF') && !user?.roles.includes('ADMIN');
+  const isCustomer = user?.roles.includes('CUSTOMER') && !isAdminOrStaff;
   const isStaffWithoutFacility = isStaff && !user?.staffProfile?.assignedFacilityId;
 
   const [facilities, setFacilities] = useState<any[]>([]);
@@ -176,7 +221,8 @@ export const OrderTab: React.FC = () => {
   const userAssignedFacilityId = user?.staffProfile?.assignedFacilityId;
   const canOperateOnCurrentFacility = isAdmin || (isStaffOnly && facilityFilter === userAssignedFacilityId);
 
-  const handleRunAiOptimization = () => {
+  const handleRunAiOptimization = (type: 'ALL' | 'PICKUP' | 'DELIVERY' = 'ALL') => {
+    setSelectedAiRouteType(type);
     setIsOptimizationModalOpen(true);
   };
 
@@ -186,12 +232,12 @@ export const OrderTab: React.FC = () => {
     const targetFacilityId = facilityFilter || userAssignedFacilityId;
 
     if (!targetFacilityId && !isAdmin) {
-      alert('Vui lòng chọn Kho/Bưu cục cần hoàn tác dữ liệu AI!');
+      showAlert('CẢNH BÁO', 'Vui lòng chọn Kho/Bưu cục cần hoàn tác dữ liệu AI!', 'error');
       return;
     }
 
     if (!canOperateOnCurrentFacility && !isAdmin) {
-      alert('❌ Quyền hạn không đủ! Bạn chỉ được phép hoàn tác dữ liệu AI tại Bưu cục mình quản lý.');
+      showAlert('KHÔNG ĐỦ QUYỀN', 'Bạn chỉ được phép hoàn tác dữ liệu AI tại Bưu cục mình quản lý.', 'error');
       return;
     }
 
@@ -199,34 +245,41 @@ export const OrderTab: React.FC = () => {
       ? (facilities.find(f => f.id === targetFacilityId)?.facilityName || 'kho đang chọn')
       : 'TOÀN BỘ CÁC BƯU CỤC HỆ THỐNG';
 
-    if (!window.confirm(`⚠️ [DEV RESET] Bạn có chắc muốn HOÀN TÁC tất cả các tuyến AI đã gom và trả lại các đơn hàng của ${targetFacName} về trạng thái chờ ban đầu?`)) {
-      return;
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'HOÀN TÁC DỮ LIỆU AI ROUTING',
+      message: `Bạn có chắc muốn HOÀN TÁC tất cả các tuyến AI đã gom và trả lại các đơn hàng của ${targetFacName} về trạng thái chờ ban đầu?`,
+      type: 'warning',
+      confirmText: 'Hoàn tác ngay',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        setResetting(true);
+        try {
+          const response = await fetch(`${CONFIG.API_BASE_URL}/routes/dev-reset`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ facilityId: targetFacilityId })
+          });
 
-    setResetting(true);
-    try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}/routes/dev-reset`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ facilityId: targetFacilityId })
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
-        alert(`🎉 ${data.message || 'Đã hoàn tác dữ liệu AI về ban đầu!'}`);
-        fetchOrders(currentPage);
-      } else {
-        alert(`❌ Lỗi hoàn tác: ${data.message || 'Không thể hoàn tác dữ liệu.'}`);
+          const data = await response.json();
+          if (response.ok && data.success) {
+            showAlert('HOÀN TÁC THÀNH CÔNG', data.message || 'Đã hoàn tác dữ liệu AI về trạng thái ban đầu!', 'success');
+            fetchOrders(currentPage);
+          } else {
+            showAlert('LỖI HOÀN TÁC', data.message || 'Không thể hoàn tác dữ liệu.', 'error');
+          }
+        } catch (err) {
+          console.error('Lỗi khi gọi API dev-reset:', err);
+          showAlert('LỖI KẾT NỐI', 'Đã xảy ra lỗi kết nối khi hoàn tác.', 'error');
+        } finally {
+          setResetting(false);
+        }
       }
-    } catch (err) {
-      console.error('Lỗi khi gọi API dev-reset:', err);
-      alert('❌ Đã xảy ra lỗi kết nối khi hoàn tác.');
-    } finally {
-      setResetting(false);
-    }
+    });
   };
 
 
@@ -357,34 +410,85 @@ export const OrderTab: React.FC = () => {
     }
   };
 
-  const handleCancelOrder = async (orderId: string) => {
+  const handleCancelOrder = (orderId: string) => {
     if (!token) return;
-    if (!window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?')) return;
-    setActionLoading(true);
-    try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}/orders/${orderId}/cancel`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+    setConfirmDialog({
+      isOpen: true,
+      title: 'XÁC NHẬN HỦY VẬN ĐƠN',
+      message: 'Bạn có chắc chắn muốn hủy đơn hàng này không? Thao tác này sẽ dừng vận chuyển và không thể hoàn tác.',
+      type: 'danger',
+      confirmText: 'Xác nhận Hủy Đơn',
+      cancelText: 'Quay lại',
+      onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        setActionLoading(true);
+        try {
+          const response = await fetch(`${CONFIG.API_BASE_URL}/orders/${orderId}/cancel`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          const data = await response.json();
+          if (response.ok && data.success) {
+            showAlert('HỦY ĐƠN THÀNH CÔNG', 'Đơn hàng đã được hủy thành công trên hệ thống.', 'success');
+            if (selectedOrder?.id === orderId) {
+              fetchOrderDetail(orderId);
+            }
+            fetchOrders(currentPage);
+          } else {
+            showAlert('LỖI HỦY ĐƠN', data.message || 'Hủy đơn hàng thất bại.', 'error');
+          }
+        } catch (err) {
+          console.error(err);
+          showAlert('LỖI KẾT NỐI', 'Không thể kết nối đến máy chủ API.', 'error');
+        } finally {
+          setActionLoading(false);
         }
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        alert('Hủy đơn hàng thành công!');
-        if (selectedOrder?.id === orderId) {
-          fetchOrderDetail(orderId);
-        }
-        fetchOrders(currentPage);
-      } else {
-        alert(data.message || 'Hủy đơn hàng thất bại.');
       }
-    } catch (err) {
-      console.error(err);
-      alert('Lỗi kết nối máy chủ.');
-    } finally {
-      setActionLoading(false);
-    }
+    });
+  };
+
+  const handleReadyForPickup = (orderId: string) => {
+    if (!token) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'SẴN SÀNG LẤY HÀNG',
+      message: 'Báo cho Shipper biết đơn hàng này đã được đóng gói xong và SẴN SÀNG LẤY HÀNG?',
+      type: 'info',
+      confirmText: 'Xác nhận sẵn sàng',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        setActionLoading(true);
+        try {
+          const response = await fetch(`${CONFIG.API_BASE_URL}/orders/${orderId}/status`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: 'READY_FOR_PICKUP' })
+          });
+          const data = await response.json();
+          if (response.ok && data.success) {
+            showAlert('THÔNG BÁO THÀNH CÔNG', 'Đã báo trạng thái Sẵn sàng lấy hàng! Hệ thống đã thông báo cho Shipper khu vực.', 'success');
+            if (selectedOrder?.id === orderId) {
+              fetchOrderDetail(orderId);
+            }
+            fetchOrders(currentPage);
+          } else {
+            showAlert('LỖI CẬP NHẬT', data.message || 'Không thể cập nhật trạng thái đơn hàng.', 'error');
+          }
+        } catch (err) {
+          console.error(err);
+          showAlert('LỖI KẾT NỐI', 'Lỗi kết nối máy chủ khi báo sẵn sàng lấy hàng.', 'error');
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    });
   };
 
   const formatPrice = (value: any) => {
@@ -565,10 +669,10 @@ export const OrderTab: React.FC = () => {
             {isAdminOrStaff && canOperateOnCurrentFacility && (
               <>
                 <button
-                  onClick={handleRunAiOptimization}
+                  onClick={() => handleRunAiOptimization('ALL')}
                   disabled={optimizing || resetting}
                   className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3.5 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
-                  title="Kích hoạt thuật toán AI K-Means & VRP gom cụm phân đơn cho tài xế"
+                  title="Kích hoạt thuật toán AI K-Means & VRP gom cụm lộ trình phân đơn cho tài xế"
                 >
                   <Bot size={16} className={optimizing ? 'animate-bounce' : ''} />
                   <span>{optimizing ? 'Đang gom...' : 'AI Gom Cụm'}</span>
@@ -578,7 +682,7 @@ export const OrderTab: React.FC = () => {
                   onClick={handleDevResetAi}
                   disabled={optimizing || resetting}
                   className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-3 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
-                  title="[DEV TOOL] Hoàn tác toàn bộ lộ trình AI và khôi phục 80 đơn hàng về trạng thái ban đầu để test AI tiếp"
+                  title="[DEV TOOL] Hoàn tác toàn bộ lộ trình AI và khôi phục các đơn hàng về trạng thái ban đầu"
                 >
                   <RotateCcw size={14} className={resetting ? 'animate-spin' : ''} />
                   <span>{resetting ? 'Đang reset...' : 'Hoàn tác AI (DEV)'}</span>
@@ -705,20 +809,11 @@ export const OrderTab: React.FC = () => {
                             <td className="px-6 py-4 text-center flex justify-center gap-2">
                               <button
                                 onClick={() => fetchOrderDetail(order.id)}
-                                className="bg-[#161D25] hover:bg-gray-800 text-white p-1.5 rounded transition-colors"
+                                className="bg-[#161D25] hover:bg-gray-800 text-white p-1.5 rounded transition-colors cursor-pointer"
                                 title="Xem chi tiết"
                               >
                                 <Eye size={12} />
                               </button>
-                              {order.status === 'CREATED' && (
-                                <button
-                                  onClick={() => handleCancelOrder(order.id)}
-                                  className="border border-red-500 hover:bg-red-50 text-red-500 p-1.5 rounded transition-colors text-[10px] font-bold uppercase tracking-widest"
-                                  title="Hủy đơn"
-                                >
-                                  HỦY
-                                </button>
-                              )}
                             </td>
                           </tr>
                         );
@@ -841,7 +936,7 @@ export const OrderTab: React.FC = () => {
               </button>
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="text-gray-400 hover:text-white p-1"
+                className="text-gray-400 hover:text-white p-1 cursor-pointer"
               >
                 Đóng
               </button>
@@ -1022,6 +1117,26 @@ export const OrderTab: React.FC = () => {
                 </div>
               </div>
 
+              {/* Customer Sticky Footer Actions */}
+              {isCustomer && (selectedOrder.status === 'CREATED' || selectedOrder.status === 'DRAFT' || selectedOrder.status === 'PENDING') && (
+                <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-2 shrink-0">
+                  <button
+                    onClick={() => handleReadyForPickup(selectedOrder.id)}
+                    disabled={actionLoading}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer uppercase tracking-wider"
+                  >
+                    <CheckCircle size={16} />
+                    <span>SẴN SÀNG LẤY HÀNG</span>
+                  </button>
+                  <button
+                    onClick={() => handleCancelOrder(selectedOrder.id)}
+                    disabled={actionLoading}
+                    className="border border-red-500 text-red-600 hover:bg-red-50 font-bold text-xs py-2.5 px-3 rounded-lg transition-colors cursor-pointer uppercase tracking-wider"
+                  >
+                    HỦY ĐƠN
+                  </button>
+                </div>
+              )}
             </>
           ) : null}
         </div>
@@ -1072,29 +1187,81 @@ export const OrderTab: React.FC = () => {
                 <span className="font-mono text-[10px] font-bold text-slate-600 mt-1">{selectedOrder.orderCode}</span>
               </div>
 
-              {/* 2D QR Code */}
+              {/* 2D QR Code & Waybill Details */}
               {(() => {
                 const packageCode =
                   selectedOrder.packages?.[0]?.packageCode ||
                   (selectedOrder as any).package?.packageCode ||
                   selectedOrder.orderCode.replace('ORD-', 'PKG-');
+
+                const senderNameDisp = selectedOrder.senderName || selectedOrder.customer?.fullName || 'Người gửi';
+                const senderPhoneDisp = selectedOrder.senderPhone || selectedOrder.customer?.phone || 'N/A';
+                const codDisp = selectedOrder.payment?.finalCodAmount ?? selectedOrder.codAmount ?? (selectedOrder as any).estimatedCodAmount ?? 0;
+
                 return (
-                  <div className="flex items-center justify-center gap-4 bg-white p-3 border border-slate-200 rounded">
-                    <div className="flex flex-col items-center">
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${packageCode}`}
-                        alt="2D QR Code Package"
-                        className="w-28 h-28 object-contain"
-                      />
-                      <span className="font-mono text-[9px] font-extrabold text-amber-700 mt-1">{packageCode}</span>
+                  <div className="bg-white p-3 border border-slate-200 rounded-lg space-y-2 text-left">
+                    <div className="flex items-start gap-3 border-b border-slate-100 pb-2">
+                      <div className="flex flex-col items-center shrink-0">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${packageCode}`}
+                          alt="2D QR Code Package"
+                          className="w-24 h-24 object-contain"
+                        />
+                        <span className="font-mono text-[9px] font-extrabold text-amber-800 mt-1">{packageCode}</span>
+                      </div>
+
+                      <div className="flex-1 text-[10px] space-y-1 text-slate-700 min-w-0">
+                        <p className="truncate">
+                          <strong className="text-slate-900">Mã kiện:</strong>{' '}
+                          <span className="font-mono text-amber-800 font-bold">{packageCode}</span>
+                        </p>
+
+                        <div className="border-t border-slate-100 pt-1">
+                          <p className="truncate">
+                            <strong className="text-slate-900">Từ (Người gửi):</strong>{' '}
+                            <span className="font-semibold text-slate-900">{senderNameDisp}</span> ({senderPhoneDisp})
+                          </p>
+                          <p className="text-[9.5px] text-slate-500 truncate leading-tight" title={selectedOrder.pickupAddressText}>
+                            📍 {selectedOrder.pickupAddressText || 'Địa chỉ lấy hàng'}
+                          </p>
+                        </div>
+
+                        <div className="border-t border-slate-100 pt-1">
+                          <p className="truncate">
+                            <strong className="text-slate-900">Đến (Người nhận):</strong>{' '}
+                            <span className="font-semibold text-slate-900">{selectedOrder.receiverName || 'N/A'}</span> ({selectedOrder.receiverPhone || 'N/A'})
+                          </p>
+                          <p className="text-[9.5px] text-slate-500 truncate leading-tight" title={selectedOrder.deliveryAddressText}>
+                            📍 {selectedOrder.deliveryAddressText || 'Địa chỉ giao hàng'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-left text-[10px] space-y-1 text-slate-600">
-                      <p><strong className="text-slate-800">Mã kiện hàng (QR):</strong> <span className="font-mono text-amber-800 font-bold">{packageCode}</span></p>
-                      <p><strong className="text-slate-800">Từ:</strong> {selectedOrder.senderName}</p>
-                      <p><strong className="text-slate-800">Đến:</strong> {selectedOrder.receiverName}</p>
-                      <p><strong className="text-slate-800">Kho nhận:</strong> {selectedOrder.destinationFacility?.facilityCode || 'N/A'}</p>
-                      <p><strong className="text-slate-800">Số kiện:</strong> {selectedOrder.packages?.length || 1} kiện</p>
-                      <p className="text-red-600 font-bold">COD: {formatCurrency(selectedOrder.codAmount ?? (selectedOrder as any).estimatedCodAmount)}</p>
+
+                    {/* Routing Facilities & Meta */}
+                    <div className="grid grid-cols-2 gap-2 text-[9.5px] bg-slate-50 p-2 rounded border border-slate-100">
+                      <div>
+                        <span className="text-slate-400 font-bold block text-[8.5px] uppercase">Kho xử lý gửi</span>
+                        <span className="font-bold text-blue-700 truncate block">
+                          {selectedOrder.originFacility?.facilityName || selectedOrder.originFacility?.facilityCode || 'Bưu cục gửi'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-400 font-bold block text-[8.5px] uppercase">Kho xử lý nhận</span>
+                        <span className="font-bold text-emerald-700 truncate block">
+                          {selectedOrder.destinationFacility?.facilityName || selectedOrder.destinationFacility?.facilityCode || 'Bưu cục nhận'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 text-xs">
+                      <span className="text-slate-600 font-semibold text-[10px]">
+                        Số lượng: <strong>{selectedOrder.packages?.length || 1} kiện</strong>
+                      </span>
+                      <span className="text-red-600 font-extrabold text-sm">
+                        COD: {formatCurrency(Number(codDisp))}
+                      </span>
                     </div>
                   </div>
                 );
@@ -1149,7 +1316,91 @@ export const OrderTab: React.FC = () => {
         facilityId={facilityFilter || userAssignedFacilityId}
         facilities={facilities}
         isAdmin={isAdmin}
+        initialRouteType={selectedAiRouteType}
       />
+
+      {/* Custom Confirmation Popup Modal */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-100 space-y-5 text-center">
+            <div className="flex flex-col items-center">
+              <div className={`p-3 rounded-full mb-3 ${
+                confirmDialog.type === 'danger' ? 'bg-red-100 text-red-600' :
+                confirmDialog.type === 'warning' ? 'bg-amber-100 text-amber-600' :
+                confirmDialog.type === 'success' ? 'bg-emerald-100 text-emerald-600' :
+                'bg-blue-100 text-blue-600'
+              }`}>
+                {confirmDialog.type === 'danger' ? <AlertCircle size={28} /> :
+                 confirmDialog.type === 'warning' ? <AlertCircle size={28} /> :
+                 confirmDialog.type === 'success' ? <CheckCircle size={28} /> :
+                 <Package size={28} />}
+              </div>
+
+              <h3 className="text-base font-extrabold text-slate-800 uppercase tracking-wide">
+                {confirmDialog.title}
+              </h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed px-2">
+                {confirmDialog.message}
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer"
+              >
+                {confirmDialog.cancelText || 'Hủy bỏ'}
+              </button>
+              <button
+                type="button"
+                onClick={confirmDialog.onConfirm}
+                className={`flex-1 px-4 py-2.5 rounded-xl text-white text-xs font-bold transition-colors shadow-sm cursor-pointer ${
+                  confirmDialog.type === 'danger' ? 'bg-red-600 hover:bg-red-700' :
+                  confirmDialog.type === 'warning' ? 'bg-amber-600 hover:bg-amber-700' :
+                  confirmDialog.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' :
+                  'bg-indigo-600 hover:bg-indigo-700'
+                }`}
+              >
+                {confirmDialog.confirmText || 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Popup Alert Notification Modal */}
+      {popupAlert.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-100 space-y-4 text-center">
+            <div className="flex flex-col items-center">
+              <div className={`p-3 rounded-full mb-2 ${
+                popupAlert.type === 'error' ? 'bg-red-100 text-red-600' :
+                popupAlert.type === 'success' ? 'bg-emerald-100 text-emerald-600' :
+                'bg-blue-100 text-blue-600'
+              }`}>
+                {popupAlert.type === 'error' ? <AlertCircle size={28} /> :
+                 popupAlert.type === 'success' ? <CheckCircle size={28} /> :
+                 <Package size={28} />}
+              </div>
+              <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">
+                {popupAlert.title}
+              </h3>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                {popupAlert.message}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPopupAlert(prev => ({ ...prev, isOpen: false }))}
+              className="w-full px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-sm"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

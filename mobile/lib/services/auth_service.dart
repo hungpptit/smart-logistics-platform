@@ -1,43 +1,44 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../core/config/app_config.dart';
+import '../core/constants/api_constants.dart';
+import '../core/constants/app_constants.dart';
 
 class AuthService {
   static const _storage = FlutterSecureStorage();
 
   // Save authentication details
   static Future<void> saveAuthData(String token, String role, String email, String username, String phone) async {
-    await _storage.write(key: 'token', value: token);
-    await _storage.write(key: 'role', value: role);
-    await _storage.write(key: 'email', value: email);
-    await _storage.write(key: 'username', value: username);
+    await _storage.write(key: AppConstants.tokenKey, value: token);
+    await _storage.write(key: AppConstants.userRoleKey, value: role);
+    await _storage.write(key: AppConstants.userEmailKey, value: email);
+    await _storage.write(key: AppConstants.usernameKey, value: username);
     await _storage.write(key: 'phone', value: phone);
   }
 
   // Clear authentication details (Logout)
   static Future<void> clearAuthData() async {
-    await _storage.delete(key: 'token');
-    await _storage.delete(key: 'role');
-    await _storage.delete(key: 'email');
-    await _storage.delete(key: 'username');
+    await _storage.delete(key: AppConstants.tokenKey);
+    await _storage.delete(key: AppConstants.userRoleKey);
+    await _storage.delete(key: AppConstants.userEmailKey);
+    await _storage.delete(key: AppConstants.usernameKey);
     await _storage.delete(key: 'phone');
   }
 
   // Check if token exists
   static Future<bool> isLoggedIn() async {
-    final token = await _storage.read(key: 'token');
+    final token = await _storage.read(key: AppConstants.tokenKey);
     return token != null;
   }
 
   // Get stored role
   static Future<String?> getStoredRole() async {
-    return await _storage.read(key: 'role');
+    return await _storage.read(key: AppConstants.userRoleKey);
   }
 
   // Get stored token
   static Future<String?> getToken() async {
-    return await _storage.read(key: 'token');
+    return await _storage.read(key: AppConstants.tokenKey);
   }
 
   // Get stored email
@@ -59,7 +60,7 @@ class AuthService {
   static Future<Map<String, dynamic>> login(String username, String password) async {
     try {
       final response = await http.post(
-        Uri.parse('${AppConfig.baseUrl}/auth/login'),
+        Uri.parse(ApiConstants.login),
         headers: {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
@@ -136,7 +137,7 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('${AppConfig.baseUrl}/auth/register'),
+        Uri.parse(ApiConstants.register),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': username,
@@ -175,7 +176,7 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('${AppConfig.baseUrl}/auth/verify-otp'),
+        Uri.parse(ApiConstants.verifyOtp),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
@@ -242,7 +243,7 @@ class AuthService {
   static Future<Map<String, dynamic>> forgotPassword(String email) async {
     try {
       final response = await http.post(
-        Uri.parse('${AppConfig.baseUrl}/auth/forgot-password'),
+        Uri.parse(ApiConstants.forgotPassword),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email}),
       );
@@ -276,7 +277,7 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('${AppConfig.baseUrl}/auth/reset-password'),
+        Uri.parse(ApiConstants.resetPassword),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'otp': otp, 'newPassword': newPassword}),
       );
@@ -317,7 +318,7 @@ class AuthService {
       }
 
       final response = await http.post(
-        Uri.parse('${AppConfig.baseUrl}/customers/me/addresses'),
+        Uri.parse(ApiConstants.customerAddresses),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -360,7 +361,7 @@ class AuthService {
       if (token == null || token.isEmpty) return [];
 
       final response = await http.get(
-        Uri.parse('${AppConfig.baseUrl}/customers/me/addresses'),
+        Uri.parse(ApiConstants.customerAddresses),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

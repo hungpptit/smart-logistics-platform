@@ -7,7 +7,7 @@ export class RoutingController {
 
   public optimize = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { facilityId } = req.body;
+      const { facilityId, routeType = 'ALL' } = req.body;
       const creatorId = (req as any).user?.id;
 
       if (!facilityId) {
@@ -31,11 +31,12 @@ export class RoutingController {
         }
       }
 
-      const routes = await this.routingService.optimizeRoutesForFacility(facilityId, creatorId);
+      const routes = await this.routingService.optimizeRoutesForFacility(facilityId, creatorId, routeType);
 
+      const typeDesc = routeType === 'PICKUP' ? 'Lấy Hàng' : routeType === 'DELIVERY' ? 'Giao Hàng' : 'Cờ Kép Lấy & Giao';
       return res.status(200).json({
         success: true,
-        message: 'Tối ưu lộ trình và điều phối tài xế thành công',
+        message: `Tối ưu lộ trình AI (${typeDesc}) thành công`,
         data: routes,
       });
     } catch (error) {
@@ -128,6 +129,23 @@ export class RoutingController {
       return res.status(200).json({
         success: true,
         message: '✅ Đã xác nhận quét mã Sọt và chuyển các đơn hàng sang Đang đi giao (OUT_FOR_DELIVERY)',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public completeRoute = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+
+      const result = await this.routingService.confirmRouteComplete(id, userId);
+
+      return res.status(200).json({
+        success: true,
+        message: '🎉 Chốt hoàn thành chuyến đi thành công! Tài xế đã sẵn sàng nhận lộ trình mới từ bưu cục.',
         data: result,
       });
     } catch (error) {

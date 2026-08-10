@@ -128,7 +128,7 @@ export class VRPService {
     const locations: Location[] = [
       facilityLocation,
       ...orders.map((o) => {
-        const isPickup = o.status === 'READY_FOR_PICKUP';
+        const isPickup = o.status !== 'AT_HUB' && o.status !== 'OUT_FOR_DELIVERY' && o.status !== 'DELIVERED';
         const lat = isPickup ? o.pickupLatitude : o.deliveryLatitude;
         const lng = isPickup ? o.pickupLongitude : o.deliveryLongitude;
         return { lat: lat!, lng: lng! };

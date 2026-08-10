@@ -28,9 +28,9 @@
 * **Tính năng ĐÃ CÓ**:
   * Web `CreateOrderModal.tsx`: Tạo đơn lẻ (Tên, SĐT, COD, cân nặng, địa chỉ).
   * Web `BulkOrderUploadModal.tsx`: Import file Excel tạo đơn hàng loạt.
+  * Web & Mobile `OrderTab.tsx` / `order_detail_screen.dart`: Nút bấm Shop **"Sẵn sàng lấy" (`READY_FOR_PICKUP`)** báo cho Shipper (Dành riêng cho role `CUSTOMER`).
   * Mobile `create_order_tab.dart`: Tạo đơn trên ứng dụng di động Flutter.
 * **Tính năng CẦN BỔ SUNG**:
-  * ❌ Nút bấm Shop **"Sẵn sàng lấy" (`READY_FOR_PICKUP`)**.
   * ❌ Tính năng **In Tem Mã Vạch / Shipping Label (PDF)** dán lên bưu kiện.
 
 ---

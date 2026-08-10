@@ -13,6 +13,20 @@ export interface OrderItem {
   deliveryLongitude: number | null;
   estimatedDeliveryDate?: string | Date | null;
   packageWeightKg?: number;
+  package?: {
+    weight?: number | string;
+    volume?: number | string;
+    length?: number | string;
+    width?: number | string;
+    height?: number | string;
+  };
+  packages?: Array<{
+    weight?: number | string;
+    volume?: number | string;
+    length?: number | string;
+    width?: number | string;
+    height?: number | string;
+  }>;
 }
 
 export interface Cluster {
@@ -47,7 +61,7 @@ export class KMeansService {
     if (k <= 0) return [];
 
     const getOrderCoords = (order: OrderItem) => {
-      const isPickup = order.status === 'READY_FOR_PICKUP';
+      const isPickup = order.status !== 'AT_HUB' && order.status !== 'OUT_FOR_DELIVERY' && order.status !== 'DELIVERED';
       const lat = isPickup ? order.pickupLatitude : order.deliveryLatitude;
       const lng = isPickup ? order.pickupLongitude : order.deliveryLongitude;
       return { lat, lng };
@@ -60,7 +74,73 @@ export class KMeansService {
 
     if (validOrders.length === 0) return [];
 
-    const targetK = Math.min(k, validOrders.length);
+    // Count unique physical location coordinates
+    const uniqueLocKeys = new Set<string>();
+    for (const o of validOrders) {
+      const coords = getOrderCoords(o);
+      if (coords.lat != null && coords.lng != null) {
+        uniqueLocKeys.add(`${coords.lat.toFixed(4)},${coords.lng.toFixed(4)}`);
+      }
+    }
+
+    // 1. Calculate physical capacity demands (Weight, Volume m3, Order Count)
+    let totalWeightKg = 0;
+    let totalVolumeM3 = 0;
+
+    for (const o of validOrders) {
+      const pkg = o.package;
+      const pkgs = o.packages;
+      let w = 0;
+      let v = 0;
+
+      if (pkg) {
+        w = Number(pkg.weight) || 0;
+        v = Number(pkg.volume) || 0;
+      } else if (pkgs && pkgs.length > 0) {
+        for (const p of pkgs) {
+          w += Number(p.weight) || 0;
+          v += Number(p.volume) || 0;
+        }
+      }
+
+      totalWeightKg += (w > 0 ? w : 1.0);
+      totalVolumeM3 += (v > 0 ? v : 0.004);
+    }
+
+    // Standard Motorcycle Shipper Bag/Box Constraints:
+    // Max 50 kg weight, Max 0.20 m3 volume (~200 Liters sọt hàng), Max 25 orders per driver
+    const MAX_WEIGHT_PER_DRIVER = 50.0;
+    const MAX_VOLUME_PER_DRIVER = 0.20;
+    const MAX_ORDERS_PER_DRIVER = 25;
+
+    const weightK = Math.ceil(totalWeightKg / MAX_WEIGHT_PER_DRIVER);
+    const volumeK = Math.ceil(totalVolumeM3 / MAX_VOLUME_PER_DRIVER);
+    const countK = Math.ceil(validOrders.length / MAX_ORDERS_PER_DRIVER);
+
+    const capacityK = Math.max(1, weightK, volumeK, countK);
+
+    // 2. Calculate spatial spread (max distance between any two orders in km)
+    let maxDistanceKm = 0;
+    for (let i = 0; i < validOrders.length; i++) {
+      const c1 = getOrderCoords(validOrders[i]);
+      for (let j = i + 1; j < validOrders.length; j++) {
+        const c2 = getOrderCoords(validOrders[j]);
+        if (c1.lat != null && c1.lng != null && c2.lat != null && c2.lng != null) {
+          const d = this.haversineDistance(c1.lat, c1.lng, c2.lat, c2.lng);
+          if (d > maxDistanceKm) maxDistanceKm = d;
+        }
+      }
+    }
+
+    // Determine spatial clusters: if all orders are within 1.0 km radius (same street/neighborhood), 1 driver is sufficient
+    let spatialK = 1;
+    if (maxDistanceKm > 1.0) {
+      spatialK = Math.min(k, uniqueLocKeys.size);
+    }
+
+    // Ideal number of drivers is max of capacity demand and spatial cluster demand
+    const idealK = Math.max(capacityK, spatialK);
+    const targetK = Math.max(1, Math.min(k, idealK));
     const centroids: { lat: number; lng: number }[] = [];
     const usedIndices = new Set<number>();
     

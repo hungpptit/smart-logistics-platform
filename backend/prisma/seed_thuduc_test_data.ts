@@ -139,6 +139,16 @@ async function main() {
     },
   });
 
+  const addrHub5 = await prisma.address.create({
+    data: {
+      addressLine1: '97 Đường Man Thiện, Phường Tăng Nhơn Phú A, TP. Thủ Đức, TP. Hồ Chí Minh',
+      wardCode: await getWardCode('Phường Tăng Nhơn Phú A'),
+      country: 'Vietnam',
+      latitude: 10.8465,
+      longitude: 106.7865,
+    },
+  });
+
   // Bưu cục Đặng Văn Bi (Trạm phát chặng cuối chính)
   const hub1 = await prisma.facility.upsert({
     where: { facilityCode: 'FAC-TD-DANGBI' },
@@ -210,6 +220,26 @@ async function main() {
       parentFacilityId: provincialHub.id,
       provinceCode: '79',
       addressId: addrHub4.id,
+      operatingStatus: FacilityStatus.ACTIVE,
+      openedAt: new Date('2025-01-01'),
+    },
+  });
+
+  // Bưu cục Tăng Nhơn Phú (Kho gửi 4 - Đường Man Thiện)
+  const hub5 = await prisma.facility.upsert({
+    where: { facilityCode: 'FAC-TD-TANGNHONPHU' },
+    update: {
+      parentFacilityId: provincialHub.id,
+      provinceCode: '79',
+      addressId: addrHub5.id,
+    },
+    create: {
+      facilityCode: 'FAC-TD-TANGNHONPHU',
+      facilityName: 'Bưu cục Tăng Nhơn Phú - TP. Thủ Đức',
+      facilityTypeId: lastMileFacilityType.id,
+      parentFacilityId: provincialHub.id,
+      provinceCode: '79',
+      addressId: addrHub5.id,
       operatingStatus: FacilityStatus.ACTIVE,
       openedAt: new Date('2025-01-01'),
     },
@@ -290,6 +320,7 @@ async function main() {
     { username: 'stf_dangvanbi_2', name: 'Lê Thị Xuân (Kho Đặng Văn Bi 2)', facilityId: hub1.id, code: 'STF-TD-02' },
     { username: 'stf_linhtrung_1', name: 'Phạm Văn Bình (Kho Linh Trung)', facilityId: hub2.id, code: 'STF-TD-03' },
     { username: 'stf_phuoclong_1', name: 'Nguyễn Văn Minh (Kho Phước Long)', facilityId: hub3.id, code: 'STF-TD-04' },
+    { username: 'stf_tangnhonphu_1', name: 'Vũ Văn Hoàng (Kho Tăng Nhơn Phú)', facilityId: hub5.id, code: 'STF-TD-05' },
     // Nhân viên Kho Trung chuyển Tỉnh/Sorter
     { username: 'stf_sorter_south_1', name: 'Trần Văn Thắng (Thủ kho Tổng Kho Miền Nam Q.12)', facilityId: sortingCenter.id, code: 'STF-HUB-01' },
     { username: 'stf_hub_hcm_1', name: 'Đặng Hoàng Lâm (Thủ kho Kho Tổng TP.HCM Tân Bình)', facilityId: provincialHub.id, code: 'STF-HUB-02' },
@@ -339,6 +370,9 @@ async function main() {
     // Phước Long (2 Shipper)
     { username: 'shp_phuoclong_1', name: 'Bùi Thanh Tùng', facilityId: hub3.id, code: 'DRV-TD-06', plate: '59-X1 111.06', isTruck: false, lat: 10.8240, lng: 106.7590 },
     { username: 'shp_phuoclong_2', name: 'Đặng Quang Huy', facilityId: hub3.id, code: 'DRV-TD-07', plate: '59-X1 111.07', isTruck: false, lat: 10.8260, lng: 106.7610 },
+    // Tăng Nhơn Phú (2 Shipper)
+    { username: 'shp_tangnhonphu_1', name: 'Đỗ Văn Nam', facilityId: hub5.id, code: 'DRV-TD-08', plate: '59-X1 111.08', isTruck: false, lat: 10.8460, lng: 106.7860 },
+    { username: 'shp_tangnhonphu_2', name: 'Trịnh Hoàng Long', facilityId: hub5.id, code: 'DRV-TD-09', plate: '59-X1 111.09', isTruck: false, lat: 10.8470, lng: 106.7870 },
 
     // 🚛 TÀI XẾ XE TẢI TRUNG CHUYỂN LIÊN KHO (LINEHAUL TRUCK DRIVERS)
     { username: 'drv_linehaul_hcm', name: 'Phạm Quốc Hùng (Tài xế Xe Tải Kho Tổng TP.HCM)', facilityId: provincialHub.id, code: 'DRV-LH-01', plate: '50H-888.01', isTruck: true, lat: 10.8050, lng: 106.6500 },
@@ -417,6 +451,7 @@ async function main() {
     { username: 'cust_thuduc_3', name: 'Cửa Hàng Điện Tử Phước Long', code: 'CUST-TD-03', phone: '0903000003', type: CustomerType.BUSINESS, hub: hub3, pickupAddr: '42 Đỗ Xuân Hợp, Phường Phước Long B', lat: 10.8240, lng: 106.7590 },
     { username: 'cust_thuduc_4', name: 'Nhà Sách Giáo Dục Tây Hòa', code: 'CUST-TD-04', phone: '0903000004', type: CustomerType.INDIVIDUAL, hub: hub3, pickupAddr: '18 Tây Hòa, Phường Phước Long A', lat: 10.8270, lng: 106.7580 },
     { username: 'cust_thuduc_5', name: 'Nông Sản Sạch An Phú (Kho xa)', code: 'CUST-TD-05', phone: '0903000005', type: CustomerType.BUSINESS, hub: hub4, pickupAddr: '15 Song Hành, Phường An Phú', lat: 10.8020, lng: 106.7430 },
+    { username: 'cust_thuduc_6', name: 'Cửa Hàng Thiết Bị Số Man Thiện', code: 'CUST-TD-06', phone: '0903000006', type: CustomerType.BUSINESS, hub: hub5, pickupAddr: '97 Đường Man Thiện, Phường Tăng Nhơn Phú A', lat: 10.8465, lng: 106.7865 },
   ];
 
   const createdCustomers = [];

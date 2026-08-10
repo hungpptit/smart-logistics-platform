@@ -488,6 +488,28 @@ export class ShipmentService {
 
     return await prisma.$transaction(async (tx) => {
       if (!shipment) {
+        // Auto resolve destination facility from parent facility or Provincial Hub
+        let targetDestFacilityId: string | null = null;
+        if (tote.facilityId) {
+          const originFac = await tx.facility.findUnique({
+            where: { id: tote.facilityId },
+            select: { parentFacilityId: true },
+          });
+          targetDestFacilityId = originFac?.parentFacilityId || null;
+        }
+
+        if (!targetDestFacilityId) {
+          const defaultHub = await tx.facility.findFirst({
+            where: {
+              OR: [
+                { facilityCode: { contains: 'HUB' } },
+                { facilityCode: { contains: 'FAC-HUB' } },
+              ],
+            },
+          });
+          targetDestFacilityId = defaultHub?.id || null;
+        }
+
         const count = await tx.shipment.count();
         const shipmentCode = `SHP-LH-${Date.now().toString().slice(-4)}${String(count + 1).padStart(4, '0')}`;
         shipment = await tx.shipment.create({
@@ -496,6 +518,7 @@ export class ShipmentService {
             status: ShipmentStatus.IN_TRANSIT,
             createdBy: driverUserId,
             originFacilityId: tote.facilityId || staff?.assignedFacilityId || null,
+            destinationFacilityId: targetDestFacilityId,
           },
         });
       } else if (shipment.status !== ShipmentStatus.IN_TRANSIT) {

@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
-import '../core/config/app_config.dart';
+import '../core/constants/api_constants.dart';
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
@@ -19,7 +19,7 @@ class SocketService {
       return;
     }
 
-    final serverUrl = AppConfig.baseUrl.replaceAll('/api/v1', '').replaceAll('/api', '');
+    final serverUrl = ApiConstants.socketServerUrl;
     debugPrint('🔌 [SocketService] Đang kết nối tới Gateway Socket: $serverUrl');
 
     _socket = io.io(

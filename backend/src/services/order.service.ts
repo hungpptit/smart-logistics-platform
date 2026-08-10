@@ -3,7 +3,7 @@ import { GeocodingService } from './geocoding.service';
 import { PricingService } from './pricing/pricing.service';
 import { CreateOrderDto, UpdateOrderStatusDto } from '../dtos/order.dto';
 import { BadRequestException, NotFoundException, ForbiddenException } from '../middlewares/error.middleware';
-import { OrderStatus, PaymentStatus } from '@prisma/client';
+import { OrderStatus, PaymentStatus, CustomerAddressType, RouteStopStatus, RouteStatus } from '@prisma/client';
 import { resolveAddressDetails } from '../utils/address-resolver';
 
 export class OrderService {
@@ -293,15 +293,47 @@ export class OrderService {
         },
       });
 
+      // Ensure customer_addresses table has contactName & contactPhone for (customerId, resolvedPickupAddressId)
+      if (customerId && resolvedPickupAddressId && resolvedSenderName) {
+        await tx.customerAddress.upsert({
+          where: {
+            customerId_addressId: {
+              customerId,
+              addressId: resolvedPickupAddressId,
+            },
+          },
+          create: {
+            customerId,
+            addressId: resolvedPickupAddressId,
+            addressType: CustomerAddressType.WAREHOUSE,
+            contactName: resolvedSenderName,
+            contactPhone: resolvedSenderPhone,
+          },
+          update: {
+            contactName: resolvedSenderName,
+            contactPhone: resolvedSenderPhone,
+          },
+        });
+      }
+
       // Fetch newly created order details to return
-      return await tx.order.findUnique({
+      const createdOrder = await tx.order.findUnique({
         where: { id: order.id },
         include: {
+          customer: true,
+          service: true,
           package: true,
           payment: true,
           statusHistory: true,
+          pickupAddress: {
+            include: {
+              customerAddresses: true,
+            },
+          },
         },
       });
+
+      return this.formatOrderWithSenderInfo(createdOrder);
     });
   }
 
@@ -423,18 +455,43 @@ export class OrderService {
           payment: true,
           originFacility: true,
           destinationFacility: true,
+          pickupAddress: {
+            include: {
+              customerAddresses: true,
+            },
+          },
         },
       }),
     ]);
 
+    const formattedOrders = orders.map((o) => this.formatOrderWithSenderInfo(o));
+
     return {
-      orders,
+      orders: formattedOrders,
       pagination: {
         total,
         page,
         limit,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  /**
+   * Helper to format order output by JOINing customer_addresses for senderName & senderPhone
+   */
+  private formatOrderWithSenderInfo(order: any) {
+    if (!order) return order;
+    const matchingCustAddr = order.pickupAddress?.customerAddresses?.find(
+      (ca: any) => ca.customerId === order.customerId
+    );
+    const senderName = matchingCustAddr?.contactName || order.customer?.fullName || 'Người gửi';
+    const senderPhone = matchingCustAddr?.contactPhone || order.customer?.phone || 'N/A';
+
+    return {
+      ...order,
+      senderName,
+      senderPhone,
     };
   }
 
@@ -448,11 +505,11 @@ export class OrderService {
       where: isUuid
         ? { OR: [{ id: idOrCode }, { orderCode: idOrCode }, { package: { id: idOrCode } }] }
         : {
-            OR: [
-              { orderCode: idOrCode },
-              { package: { packageCode: idOrCode } },
-            ],
-          },
+          OR: [
+            { orderCode: idOrCode },
+            { package: { packageCode: idOrCode } },
+          ],
+        },
       include: {
         customer: true,
         service: true,
@@ -467,6 +524,11 @@ export class OrderService {
         payment: true,
         originFacility: true,
         destinationFacility: true,
+        pickupAddress: {
+          include: {
+            customerAddresses: true,
+          },
+        },
         statusHistory: {
           orderBy: { createdAt: 'asc' },
           include: {
@@ -536,7 +598,7 @@ export class OrderService {
       }
     }
 
-    return order;
+    return this.formatOrderWithSenderInfo(order);
   }
 
   /**
@@ -631,6 +693,82 @@ export class OrderService {
           reason: dto.reason || `Cập nhật trạng thái đơn hàng sang ${dto.status}`,
         },
       });
+
+      // If order is completed/picked up/delivered, update linked RouteStops and check if Route is completed
+      if (['PICKED_UP', 'DELIVERED', 'COMPLETED', 'ARRIVED_ORIGIN_FACILITY'].includes(dto.status)) {
+        const linkedStops = await tx.routeStop.findMany({
+          where: {
+            OR: [
+              { orderId: order.id },
+              {
+                shipment: {
+                  shipmentPackages: {
+                    some: { package: { orderId: order.id } },
+                  },
+                },
+              },
+            ],
+          },
+          select: { id: true, routeId: true },
+        });
+
+        if (linkedStops.length > 0) {
+          const stopIds = linkedStops.map((s) => s.id);
+          await tx.routeStop.updateMany({
+            where: { id: { in: stopIds } },
+            data: {
+              status: RouteStopStatus.DEPARTED,
+            },
+          });
+
+          const routeIds = Array.from(new Set(linkedStops.map((s) => s.routeId).filter(Boolean)));
+          for (const routeId of routeIds) {
+            if (!routeId) continue;
+            const remainingCount = await tx.routeStop.count({
+              where: {
+                routeId,
+                status: { notIn: [RouteStopStatus.DEPARTED, RouteStopStatus.SKIPPED, RouteStopStatus.FAILED] },
+              },
+            });
+
+            if (remainingCount === 0) {
+              await tx.route.update({
+                where: { id: routeId },
+                data: {
+                  status: RouteStatus.COMPLETED,
+                  completedAt: new Date(),
+                },
+              });
+            }
+          }
+        }
+      } else if (['PICK_FAILED', 'DELIVERY_FAILED'].includes(dto.status)) {
+        const linkedStops = await tx.routeStop.findMany({
+          where: {
+            OR: [
+              { orderId: order.id },
+              {
+                shipment: {
+                  shipmentPackages: {
+                    some: { package: { orderId: order.id } },
+                  },
+                },
+              },
+            ],
+          },
+          select: { id: true, routeId: true },
+        });
+
+        if (linkedStops.length > 0) {
+          const stopIds = linkedStops.map((s) => s.id);
+          await tx.routeStop.updateMany({
+            where: { id: { in: stopIds } },
+            data: {
+              status: RouteStopStatus.FAILED,
+            },
+          });
+        }
+      }
 
       return updatedOrder;
     });
@@ -836,13 +974,13 @@ export class OrderService {
       where: isUuid
         ? { OR: [{ id: cleanCode }, { orderCode: cleanCode }, { orderCode: baseCode }, { package: { id: cleanCode } }] }
         : {
-            OR: [
-              { orderCode: cleanCode },
-              { orderCode: baseCode },
-              { package: { packageCode: cleanCode } },
-              { package: { packageCode: baseCode } },
-            ],
-          },
+          OR: [
+            { orderCode: cleanCode },
+            { orderCode: baseCode },
+            { package: { packageCode: cleanCode } },
+            { package: { packageCode: baseCode } },
+          ],
+        },
       include: {
         package: {
           include: {
@@ -856,13 +994,32 @@ export class OrderService {
       throw new NotFoundException(`Không tìm thấy đơn hàng với mã [${orderCode}]`);
     }
 
-    const zone = await prisma.facilityZone.findUnique({
-      where: { id: zoneId },
-      include: { facility: true },
-    });
+    let zone = zoneId
+      ? await prisma.facilityZone.findUnique({
+        where: { id: zoneId },
+        include: { facility: true },
+      })
+      : null;
 
     if (!zone) {
-      throw new NotFoundException('Không tìm thấy Phân Khu Kho');
+      // Smart Auto Routing: Check Intra-Ward vs Outbound Transfer
+      const isIntraWard = order.originFacilityId && order.destinationFacilityId && order.originFacilityId === order.destinationFacilityId;
+      const targetZoneCode = isIntraWard ? 'ZONE-W-LOCAL-DELIVERY' : 'ZONE-W-PROVINCE-DISPATCH';
+
+      const staff = userId ? await prisma.staff.findUnique({ where: { userId } }) : null;
+      const staffFacId = staff?.assignedFacilityId || order.originFacilityId;
+
+      zone = (await prisma.facilityZone.findFirst({
+        where: {
+          ...(staffFacId ? { facilityId: staffFacId } : {}),
+          zoneCode: targetZoneCode,
+        },
+        include: { facility: true },
+      })) || (await prisma.facilityZone.findFirst({ include: { facility: true } }));
+    }
+
+    if (!zone) {
+      throw new NotFoundException('Không tìm thấy Phân Khu Kho phù hợp');
     }
 
     const activeToteCode = toteCode || `TOTE-${zone.zoneCode}-001`;

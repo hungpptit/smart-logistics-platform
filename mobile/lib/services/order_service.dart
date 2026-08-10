@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import '../core/config/app_config.dart';
+import '../core/constants/api_constants.dart';
 import 'auth_service.dart';
 
 class OrderService {
@@ -16,7 +16,7 @@ class OrderService {
         };
       }
 
-      final url = Uri.parse('${AppConfig.baseUrl}/orders');
+      final url = Uri.parse(ApiConstants.orders);
       debugPrint('📦 [OrderService] Đang gửi POST $url');
 
       final response = await http.post(
@@ -72,7 +72,7 @@ class OrderService {
         };
       }
 
-      final url = Uri.parse('${AppConfig.baseUrl}/orders/calculate-pricing');
+      final url = Uri.parse(ApiConstants.calculatePricing);
       final response = await http.post(
         url,
         headers: {
@@ -115,7 +115,7 @@ class OrderService {
       final token = await AuthService.getToken();
       if (token == null || token.isEmpty) return [];
 
-      final url = Uri.parse('${AppConfig.baseUrl}/orders');
+      final url = Uri.parse(ApiConstants.orders);
       final response = await http.get(
         url,
         headers: {
@@ -142,7 +142,7 @@ class OrderService {
       final token = await AuthService.getToken();
       if (token == null || token.isEmpty) return null;
 
-      final url = Uri.parse('${AppConfig.baseUrl}/orders/by-code/$code');
+      final url = Uri.parse(ApiConstants.orderByCode(code));
       debugPrint('📦 [OrderService] Đang gửi GET $url');
 
       final response = await http.get(
@@ -169,7 +169,7 @@ class OrderService {
       final token = await AuthService.getToken();
       if (token == null || token.isEmpty) return null;
 
-      final url = Uri.parse('${AppConfig.baseUrl}/orders/$id');
+      final url = Uri.parse(ApiConstants.orderDetail(id));
       final response = await http.get(
         url,
         headers: {
@@ -201,7 +201,7 @@ class OrderService {
         };
       }
 
-      final url = Uri.parse('${AppConfig.baseUrl}/orders/$orderId/cancel');
+      final url = Uri.parse(ApiConstants.cancelOrder(orderId));
       debugPrint('📦 [OrderService] Đang gửi POST $url');
 
       final response = await http.post(
@@ -244,7 +244,7 @@ class OrderService {
         };
       }
 
-      final url = Uri.parse('${AppConfig.baseUrl}/orders/$orderId/status');
+      final url = Uri.parse(ApiConstants.orderStatus(orderId));
       debugPrint('📦 [OrderService] Đang gửi PUT $url ($status)');
 
       final response = await http.put(

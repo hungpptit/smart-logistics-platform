@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
-import '../core/config/app_config.dart';
+import '../core/constants/api_constants.dart';
 import 'auth_service.dart';
 
 class DriverService {
-  static const String goongApiKey = 'eTwacoQyptGn7akdN8psZ68iNvMGD4xFd45Vu4X9';
+  static const String goongApiKey = ApiConstants.goongApiKey;
 
   /// Fetch list of active/assigned routes for the logged in driver
   static Future<List<Map<String, dynamic>>> fetchMyRoutes() async {
@@ -16,7 +16,7 @@ class DriverService {
       return [];
     }
 
-    final url = Uri.parse('${AppConfig.baseUrl}/routes');
+    final url = Uri.parse(ApiConstants.routes);
 
     for (int attempt = 1; attempt <= 2; attempt++) {
       try {
@@ -61,7 +61,7 @@ class DriverService {
       final token = await AuthService.getToken();
       if (token == null || token.isEmpty) return null;
 
-      final url = Uri.parse('${AppConfig.baseUrl}/routes/$routeId');
+      final url = Uri.parse(ApiConstants.routeDetail(routeId));
       final response = await http.get(
         url,
         headers: {
@@ -89,7 +89,7 @@ class DriverService {
       final token = await AuthService.getToken();
       if (token == null || token.isEmpty) return false;
 
-      final url = Uri.parse('${AppConfig.baseUrl}/shipments/$shipmentId/status');
+      final url = Uri.parse(ApiConstants.shipmentStatus(shipmentId));
       final Map<String, dynamic> payload = {'status': status};
       if (notes != null) payload['notes'] = notes;
 
@@ -119,7 +119,7 @@ class DriverService {
       final token = await AuthService.getToken();
       if (token == null || token.isEmpty) return false;
 
-      final url = Uri.parse('${AppConfig.baseUrl}/orders/$orderIdOrCode/status');
+      final url = Uri.parse(ApiConstants.orderStatus(orderIdOrCode));
       final Map<String, dynamic> payload = {
         'status': status,
         if (reason != null) 'reason': reason,
@@ -153,7 +153,7 @@ class DriverService {
       final token = await AuthService.getToken();
       if (token == null || token.isEmpty) return false;
 
-      final url = Uri.parse('${AppConfig.baseUrl}/drivers/duty-status');
+      final url = Uri.parse(ApiConstants.dutyStatus);
       final response = await http.patch(
         url,
         headers: {
@@ -181,7 +181,7 @@ class DriverService {
       final token = await AuthService.getToken();
       if (token == null || token.isEmpty) return false;
 
-      final url = Uri.parse('${AppConfig.baseUrl}/routes/$routeId/start');
+      final url = Uri.parse(ApiConstants.routeStart(routeId));
       final response = await http.post(
         url,
         headers: {
@@ -202,13 +202,40 @@ class DriverService {
     return false;
   }
 
+  /// Confirm Route Complete & Finish Shift (POST /routes/:id/complete)
+  static Future<bool> completeRoute(String routeId) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || token.isEmpty) return false;
+
+      final url = Uri.parse(ApiConstants.routeComplete(routeId));
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
+        },
+      );
+
+      debugPrint('📡 [DriverService] Confirm complete route ($routeId): ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        return body['success'] == true;
+      }
+    } catch (e) {
+      debugPrint('💥 [DriverService] Lỗi completeRoute: $e');
+    }
+    return false;
+  }
+
   /// Load Tote Bag into Shipment and confirm transit (POST /shipments/load-tote)
   static Future<Map<String, dynamic>?> loadToteIntoShipment(String toteCode) async {
     try {
       final token = await AuthService.getToken();
       if (token == null || token.isEmpty) return null;
 
-      final url = Uri.parse('${AppConfig.baseUrl}/shipments/load-tote');
+      final url = Uri.parse(ApiConstants.loadTote);
       final response = await http.post(
         url,
         headers: {
@@ -239,7 +266,7 @@ class DriverService {
     if (stops.length < 2) return stops;
     try {
       final coordsString = stops.map((p) => '${p.longitude},${p.latitude}').join(';');
-      final urlStr = 'https://router.project-osrm.org/route/v1/driving/$coordsString?overview=full&geometries=geojson';
+      final urlStr = ApiConstants.osrmRoutingUrl(coordsString);
 
       debugPrint('🗺️ [OSRM API Mobile] Requesting direction: $urlStr');
       final response = await http.get(Uri.parse(urlStr)).timeout(const Duration(seconds: 6));

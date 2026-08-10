@@ -116,4 +116,10 @@ router.post(
   routingController.startRoute
 );
 
+router.post(
+  '/:id/complete',
+  requireRoles(['ADMIN', 'STAFF', 'SHIPPER', 'DRIVER', 'LINEHAUL_TRANSFER']),
+  routingController.completeRoute
+);
+
 export default router;

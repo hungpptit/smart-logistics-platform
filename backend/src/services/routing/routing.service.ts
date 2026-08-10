@@ -4,7 +4,7 @@ import { AssignmentService } from './assignment.service';
 import { VRPService } from './vrp.service';
 import { BadRequestException, NotFoundException } from '../../middlewares/error.middleware';
 import { getTrackingGateway } from '../../gateways/tracking.gateway';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, RouteStatus, RouteStopStatus, DriverEmploymentStatus } from '@prisma/client';
 
 export class RoutingService {
   private kmeansService = new KMeansService();
@@ -14,7 +14,7 @@ export class RoutingService {
   /**
    * Triggers the AI routing optimization pipeline for a facility.
    */
-  public async optimizeRoutesForFacility(facilityId: string, creatorId: string) {
+  public async optimizeRoutesForFacility(facilityId: string, creatorId: string, routeType: string = 'ALL') {
     // 0. Automatically reset previous PLANNED routes for this facility to ensure all 50 orders are restored to AT_HUB / READY_FOR_PICKUP
     await this.resetFacilityAi(facilityId);
 
@@ -35,21 +35,45 @@ export class RoutingService {
       lng: facility.address?.longitude || 106.6582,
     };
 
-    // 2. Fetch all orders ready for AI routing at this facility (Pickup or Delivery)
+    // 2. Fetch all orders ready for AI routing at this facility based on routeType (PICKUP, DELIVERY, or ALL)
+    let orderConditions: any[] = [];
+    if (routeType === 'PICKUP') {
+      orderConditions.push({
+        originFacilityId: facilityId,
+        status: OrderStatus.READY_FOR_PICKUP,
+      });
+    } else if (routeType === 'DELIVERY') {
+      orderConditions.push({
+        destinationFacilityId: facilityId,
+        status: OrderStatus.AT_HUB,
+      });
+    } else {
+      // ALL / Dual-flag (Cờ Kép)
+      orderConditions.push({
+        originFacilityId: facilityId,
+        status: OrderStatus.READY_FOR_PICKUP,
+      });
+      orderConditions.push({
+        destinationFacilityId: facilityId,
+        status: OrderStatus.AT_HUB,
+      });
+    }
+
     const orders = await prisma.order.findMany({
       where: {
-        OR: [
-          { originFacilityId: facilityId, status: 'READY_FOR_PICKUP' },
-          { destinationFacilityId: facilityId, status: 'AT_HUB' },
-        ],
+        OR: orderConditions,
+      },
+      include: {
+        package: true,
       },
     });
 
     if (orders.length === 0) {
-      throw new BadRequestException('Không có đơn hàng nào ở trạng thái "Chờ lấy hàng" (READY_FOR_PICKUP) hoặc "Đã đến kho nhận" (AT_HUB) tại bưu cục này');
+      const typeLabel = routeType === 'PICKUP' ? 'LẤY HÀNG (READY_FOR_PICKUP)' : routeType === 'DELIVERY' ? 'GIAO HÀNG (AT_HUB)' : 'Lấy hàng / Giao hàng';
+      throw new BadRequestException(`Không có đơn hàng nào ở trạng thái "${typeLabel}" tại bưu cục này`);
     }
 
-    console.log(`🔍 [AI DEBUG] 1. Total Orders fetched for facility ${facilityId}: ${orders.length}`);
+    console.log(`🔍 [AI DEBUG] 1. Total Orders fetched for facility ${facilityId} (routeType: ${routeType}): ${orders.length}`);
 
     // 3. Fetch all active drivers assigned to this facility
     const drivers = await prisma.staff.findMany({
@@ -192,7 +216,7 @@ export class RoutingService {
       let prevLoc = facilityLocation;
 
       for (const order of sortedOrders) {
-        const isPickup = order.status === 'READY_FOR_PICKUP';
+        const isPickup = order.status !== OrderStatus.AT_HUB && order.status !== OrderStatus.OUT_FOR_DELIVERY && order.status !== OrderStatus.DELIVERED;
         const lat = (isPickup ? order.pickupLatitude : order.deliveryLatitude) || facilityLocation.lat;
         const lng = (isPickup ? order.pickupLongitude : order.deliveryLongitude) || facilityLocation.lng;
         const orderLoc = { lat, lng };
@@ -293,7 +317,7 @@ export class RoutingService {
           },
         });
 
-        const isPickup = order.status === OrderStatus.READY_FOR_PICKUP;
+        const isPickup = order.status !== OrderStatus.AT_HUB && order.status !== OrderStatus.OUT_FOR_DELIVERY && order.status !== OrderStatus.DELIVERED;
         const nextStatus = isPickup ? OrderStatus.PICKUP_ASSIGNED : OrderStatus.READY_FOR_DISPATCH;
 
         if (isPickup) {
@@ -444,6 +468,7 @@ export class RoutingService {
               select: {
                 id: true,
                 orderCode: true,
+                status: true,
                 receiverName: true,
                 receiverPhone: true,
                 estimatedCodAmount: true,
@@ -461,6 +486,7 @@ export class RoutingService {
                           select: {
                             id: true,
                             orderCode: true,
+                            status: true,
                             receiverName: true,
                             receiverPhone: true,
                             estimatedCodAmount: true,
@@ -844,6 +870,62 @@ export class RoutingService {
 
       if (historyLogs.length > 0) {
         await prisma.orderStatusHistory.createMany({ data: historyLogs as any });
+      }
+    }
+
+    getTrackingGateway()?.broadcastRoutesUpdated();
+
+    return updatedRoute;
+  }
+
+  /**
+   * Confirm Route Complete & Liberate Driver for Next Assignment (POST /routes/:id/complete)
+   */
+  public async confirmRouteComplete(routeId: string, userId?: string) {
+    const route = await prisma.route.findFirst({
+      where: {
+        OR: [
+          { id: routeId },
+          { routeCode: routeId },
+        ],
+      },
+    });
+
+    if (!route) {
+      throw new NotFoundException('Không tìm thấy lộ trình / chuyến đi này');
+    }
+
+    // 1. Mark all route stops as DEPARTED
+    await prisma.routeStop.updateMany({
+      where: { routeId: route.id },
+      data: { status: RouteStopStatus.DEPARTED },
+    });
+
+    // 2. Mark Route status as COMPLETED
+    const updatedRoute = await prisma.route.update({
+      where: { id: route.id },
+      data: {
+        status: RouteStatus.COMPLETED,
+        completedAt: new Date(),
+      },
+    });
+
+    // 3. Liberate Driver Vehicle Assignment (set isActive = true)
+    if (route.driverVehicleAssignmentId) {
+      await prisma.driverVehicleAssignment.update({
+        where: { id: route.driverVehicleAssignmentId },
+        data: { isActive: true },
+      });
+    }
+
+    // 4. Update Staff driver employmentStatus to ACTIVE if applicable
+    if (userId) {
+      const staffProfile = await prisma.staff.findFirst({ where: { userId } });
+      if (staffProfile) {
+        await prisma.staff.update({
+          where: { id: staffProfile.id },
+          data: { employmentStatus: DriverEmploymentStatus.ACTIVE },
+        });
       }
     }
 

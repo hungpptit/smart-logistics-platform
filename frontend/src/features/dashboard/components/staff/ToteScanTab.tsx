@@ -537,8 +537,21 @@ export const ToteScanTab: React.FC = () => {
                     facCode.includes('HUB') ||
                     facCode === 'FAC-HUB-HCM' ||
                     facCode === 'FAC_HUB_HCM';
-                  const receivingZoneCode = isProvincialHub ? 'ZONE-P-INBOUND' : 'ZONE-W-REC';
-                  const receivingZoneName = isProvincialHub ? 'Bãi Nhập Hàng Xe Tải Bưu Cục Phường' : 'Khu Tiếp Nhận & Bàn Giao Hàng';
+
+                  const scannedDetails = lastScannedResult?.details;
+                  const isIntraWardLocal = scannedDetails && (
+                    (scannedDetails.originFacilityId && scannedDetails.destinationFacilityId && scannedDetails.originFacilityId === scannedDetails.destinationFacilityId) ||
+                    (scannedDetails.isLocalDelivery === true)
+                  );
+
+                  const receivingZoneCode = isProvincialHub 
+                    ? 'ZONE-P-INBOUND' 
+                    : (isIntraWardLocal ? 'ZONE-W-LOCAL-DELIVERY' : 'ZONE-W-PROVINCE-DISPATCH');
+
+                  const receivingZoneName = isProvincialHub 
+                    ? 'Bãi Nhập Hàng Xe Tải Bưu Cục Phường' 
+                    : (isIntraWardLocal ? 'Khu Hàng Nội Phường Giao Ngay (Intra-Ward Local)' : 'Khu Xuất Hàng Trung Chuyển (Outbound Transfer)');
+
                   const facCodeClean = facCode ? facCode.replace(/[^a-zA-Z0-9]/g, '_') : 'FAC_HUB_HCM';
                   const receivingToteCode = `TOTE-${facCodeClean}-${receivingZoneCode}-001`;
 
@@ -549,7 +562,11 @@ export const ToteScanTab: React.FC = () => {
                           <Sparkles size={14} />
                           Phân Khu Lưu Kho Nhập Hàng (Assigned Receiving Zone)
                         </span>
-                        <span className="px-3 py-1 rounded text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+                        <span className={`px-3 py-1 rounded text-xs font-extrabold font-mono border ${
+                          isIntraWardLocal
+                            ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        }`}>
                           {receivingZoneCode}
                         </span>
                       </div>
@@ -557,14 +574,18 @@ export const ToteScanTab: React.FC = () => {
                       <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700 space-y-1.5 text-xs">
                         <div className="flex items-center gap-2">
                           <span className="font-extrabold text-slate-300">📍 Phân khu tiếp nhận:</span>
-                          <span className="font-bold text-emerald-400">{receivingZoneName}</span>
+                          <span className={`font-bold ${isIntraWardLocal ? 'text-blue-400' : 'text-emerald-400'}`}>{receivingZoneName}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-extrabold text-slate-300">📦 Sọt tập kết nhận đơn:</span>
                           <span className="font-mono font-bold text-amber-400">[{receivingToteCode}]</span>
                         </div>
                         <p className="text-[11px] text-slate-300 pt-1.5 border-t border-slate-700/80 mt-1">
-                          👉 <em>Bưu kiện đã được lưu kho thành công tại <strong>{receivingZoneName}</strong>. Chuyển sang tab <strong>"Phân Loại Hàng Vào Zone Kho"</strong> khi chia bưu kiện sang sọt mới.</em>
+                          {isIntraWardLocal ? (
+                            <>🔵 <strong>Đơn Nội Phường:</strong> Bưu kiện lấy & phát ngay tại địa bàn bưu cục. Đã phân vào sọt Nội Phường <strong>{receivingZoneCode}</strong> để Shipper xe máy đi phát ngay!</>
+                          ) : (
+                            <>👉 <em>Bưu kiện đã được lưu kho thành công tại <strong>{receivingZoneName}</strong>. Chuyển sang tab <strong>"Phân Loại Hàng Vào Zone Kho"</strong> khi chia bưu kiện sang sọt mới.</em></>
+                          )}
                         </p>
                       </div>
                     </div>

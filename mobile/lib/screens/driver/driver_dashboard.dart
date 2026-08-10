@@ -9,6 +9,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_styles.dart';
+import '../../core/constants/order_status_constants.dart';
 import '../../services/auth_service.dart';
 import '../../services/driver_service.dart';
 import '../../services/socket_service.dart';
@@ -141,6 +142,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
           if (stopsRaw.isNotEmpty) {
             final List<Map<String, dynamic>> mappedStops = [];
+            bool foundActiveIncomplete = false;
             for (int i = 0; i < stopsRaw.length; i++) {
               try {
                 final stop = stopsRaw[i];
@@ -217,6 +219,30 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     ? (isSenderPayFee ? shippingFee : 0)
                     : (codAmount + (isReceiverPayFee ? shippingFee : 0));
 
+                // Check actual Backend status of stop & order to prevent completed stops from being reset
+                final String rawStopStatus = (stop['status']?.toString() ?? '').toUpperCase();
+                final String rawOrderStatus = (firstOrder?['status']?.toString() ?? '').toUpperCase();
+                
+                final bool isCompleted = (rawStopStatus == 'COMPLETED') ||
+                    (rawOrderStatus == 'PICKED_UP') ||
+                    (rawOrderStatus == 'ARRIVED_ORIGIN_FACILITY') ||
+                    (rawOrderStatus == 'AT_HUB') ||
+                    (rawOrderStatus == 'DELIVERED') ||
+                    (rawOrderStatus == 'COMPLETED');
+
+                String displayStatus;
+                bool isActive = false;
+
+                if (isCompleted) {
+                  displayStatus = (stopType == 'PICKUP') ? 'ĐÃ LẤY HÀNG' : 'ĐÃ GIAO';
+                } else if (!foundActiveIncomplete) {
+                  displayStatus = 'ĐANG THỰC HIỆN';
+                  isActive = true;
+                  foundActiveIncomplete = true;
+                } else {
+                  displayStatus = 'TIẾP THEO';
+                }
+
                 mappedStops.add({
                   'index': i + 1,
                   'id': stop['id'] ?? '$i',
@@ -237,9 +263,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   'packages': 1,
                   'eta': 'Chờ giao',
                   'distance': 'Theo tuyến',
-                  'status': i == 0 ? 'ĐANG THỰC HIỆN' : 'TIẾP THEO',
-                  'isActive': i == 0,
-                  'isCheckedIn': false,
+                  'status': displayStatus,
+                  'isActive': isActive,
+                  'isCheckedIn': isCompleted,
                   'signature': null,
                   'photo': null,
                 });
@@ -1041,7 +1067,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     children: [
                       Text('Hoàn thành', style: AppTypography.bodyMd.copyWith(color: AppColors.secondary)),
                       Text(
-                        '${_driverStops.where((s) => s['status'] == 'ĐÃ GIAO').length} / ${_driverStops.length}',
+                        '${_driverStops.where((s) => s['isCheckedIn'] == true || s['status'] == 'ĐÃ GIAO' || s['status'] == 'ĐÃ LẤY HÀNG').length} / ${_driverStops.length}',
                         style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ],
@@ -1050,7 +1076,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   LinearProgressIndicator(
                     value: _driverStops.isEmpty
                         ? 0.0
-                        : (_driverStops.where((s) => s['status'] == 'ĐÃ GIAO').length / _driverStops.length),
+                        : (_driverStops.where((s) => s['isCheckedIn'] == true || s['status'] == 'ĐÃ GIAO' || s['status'] == 'ĐÃ LẤY HÀNG').length / _driverStops.length),
                     backgroundColor: AppColors.cloudGray,
                     color: AppColors.logisticsRed,
                     minHeight: 8.0,
@@ -1121,7 +1147,62 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 ],
               ),
             ),
-            const SizedBox(height: 20.0),
+            const SizedBox(height: 16.0),
+
+            // Finish Route Action Card (Shown when all stops are completed: 2/2)
+            if (_driverStops.isNotEmpty &&
+                _driverStops.where((s) => s['isCheckedIn'] == true || s['status'] == 'ĐÃ GIAO' || s['status'] == 'ĐÃ LẤY HÀNG').length == _driverStops.length) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(16.0),
+                  border: Border.all(color: const Color(0xFF166534), width: 1.5),
+                  boxShadow: AppStyles.softShadow,
+                ),
+                child: Column(
+                  children: [
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.stars, color: Color(0xFF166534), size: 24),
+                        SizedBox(width: 8),
+                        Text(
+                          'HOÀN THÀNH 100% CÁC ĐIỂM DỪNG',
+                          style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF166534), fontSize: 13),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Bạn đã hoàn thành tất cả đơn hàng trong chuyến này. Bấm nút bên dưới để chốt ca & giải phóng tài xế nhận đơn tiếp theo!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11, color: Color(0xFF15803D)),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: ElevatedButton.icon(
+                        onPressed: _isDutyLoading ? null : _handleFinishRouteAndShift,
+                        icon: const Icon(Icons.check_circle_outline, size: 20),
+                        label: const Text(
+                          '🎉 CHỐT HOÀN THÀNH CHUYẾN ĐI',
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF166534),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16.0),
+            ],
 
             // Live Map Preview Card
             Container(
@@ -1913,7 +1994,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
                     child: LinearProgressIndicator(
-                      value: 0.82,
+                      value: _driverStops.isEmpty
+                          ? 0.0
+                          : (_driverStops.where((s) => s['isCheckedIn'] == true || s['status'] == 'ĐÃ GIAO' || s['status'] == 'ĐÃ LẤY HÀNG').length / _driverStops.length),
                       minHeight: 6.0,
                       backgroundColor: AppColors.surfaceContainerHighest,
                       color: AppColors.logisticsRed,
@@ -2071,7 +2154,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   border: Border.all(color: Colors.indigo.shade200, width: 2),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                       spreadRadius: 2,
                     ),
@@ -2688,31 +2771,192 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     ],
                     const SizedBox(height: 24.0),
 
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52.0,
-                      child: ElevatedButton(
-                        onPressed: canComplete
-                            ? () {
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: SizedBox(
+                            height: 52.0,
+                            child: ElevatedButton(
+                              onPressed: canComplete
+                                  ? () {
+                                      Navigator.pop(context);
+                                      _completeStop(stop);
+                                    }
+                                  : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.logisticsRed,
+                                foregroundColor: AppColors.pureWhite,
+                              ),
+                              child: Text(
+                                isPickupStop ? 'XÁC NHẬN ĐÃ LẤY HÀNG' : 'HOÀN THÀNH GIAO HÀNG',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8.0),
+                        Expanded(
+                          flex: 2,
+                          child: SizedBox(
+                            height: 52.0,
+                            child: OutlinedButton.icon(
+                              onPressed: () {
                                 Navigator.pop(context);
-                                _completeStop(stop);
-                              }
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.logisticsRed,
-                          foregroundColor: AppColors.pureWhite,
+                                _showReportFailureDialog(stop);
+                              },
+                              icon: const Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.error),
+                              label: const Text('Báo Lỗi', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.error, fontSize: 12)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.error, width: 1.5),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
                         ),
-                        child: Text(
-                          isPickupStop ? 'XÁC NHẬN ĐÃ LẤY HÀNG' : 'HOÀN THÀNH GIAO HÀNG',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
           );
+          },
+        );
+      },
+    );
+  }
+
+  void _showReportFailureDialog(Map<String, dynamic> stop) {
+    final bool isPickupStop = stop['isPickup'] == true ||
+        stop['stopType'] == 'PICKUP' ||
+        stop['title']?.toString().contains('lấy hàng') == true;
+
+    final List<String> pickupReasons = OrderStatusConstants.pickupFailureReasons;
+    final List<String> deliveryReasons = OrderStatusConstants.deliveryFailureReasons;
+
+    final reasonsList = isPickupStop ? pickupReasons : deliveryReasons;
+    String selectedReason = reasonsList.first;
+    final TextEditingController customNoteController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              backgroundColor: AppColors.pureWhite,
+              shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+              title: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: AppColors.logisticsRed, size: 28),
+                  const SizedBox(width: 8.0),
+                  Text(
+                    isPickupStop ? 'Báo Lấy Hàng Thất Bại' : 'Báo Giao Hàng Thất Bại',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Đơn hàng: ${stop['orderCode'] ?? ''}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.logisticsRed),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Chọn lý do không thể hoàn thành:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedReason,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    items: reasonsList
+                        .map((r) => DropdownMenuItem(
+                              value: r,
+                              child: Text(r, style: const TextStyle(fontSize: 11)),
+                            ))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) setModalState(() => selectedReason = val);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: customNoteController,
+                    maxLines: 2,
+                    style: const TextStyle(fontSize: 11),
+                    decoration: InputDecoration(
+                      labelText: 'Ghi chú chi tiết (Không bắt buộc)',
+                      labelStyle: const TextStyle(fontSize: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Hủy', style: TextStyle(color: AppColors.secondary)),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+
+                    final finalReason = (selectedReason == 'Lý do khác' && customNoteController.text.trim().isNotEmpty)
+                        ? customNoteController.text.trim()
+                        : (customNoteController.text.trim().isNotEmpty
+                            ? '$selectedReason - ${customNoteController.text.trim()}'
+                            : selectedReason);
+
+                    final orderCode = stop['orderCode'];
+                    final shipmentId = stop['shipmentId'];
+                    final targetStatus = isPickupStop ? 'PICK_FAILED' : 'DELIVERY_FAILED';
+
+                    if (orderCode != null) {
+                      await DriverService.updateOrderStatus(orderCode.toString(), targetStatus, reason: finalReason);
+                    }
+                    if (shipmentId != null) {
+                      await DriverService.updateShipmentStatus(shipmentId.toString(), targetStatus, notes: finalReason);
+                    }
+
+                    setState(() {
+                      stop['status'] = 'THẤT BẠI';
+                      stop['isActive'] = false;
+
+                      final currentIndex = stop['index'] as int;
+                      final nextStop = _driverStops.firstWhere(
+                        (s) => s['index'] == currentIndex + 1,
+                        orElse: () => <String, dynamic>{},
+                      );
+                      if (nextStop.isNotEmpty) {
+                        nextStop['isActive'] = true;
+                        nextStop['status'] = 'ĐANG THỰC HIỆN';
+                      }
+                    });
+
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('⚠️ Đã báo THẤT BẠI đơn hàng ${stop['orderCode']}! Lý do: $finalReason'),
+                          backgroundColor: AppColors.logisticsRed,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.logisticsRed,
+                    foregroundColor: AppColors.pureWhite,
+                  ),
+                  child: const Text('Xác nhận báo lỗi'),
+                ),
+              ],
+            );
           },
         );
       },
@@ -2845,6 +3089,52 @@ class _DriverDashboardState extends State<DriverDashboard> {
         );
       },
     );
+  }
+
+  Future<void> _handleFinishRouteAndShift() async {
+    if (_activeRouteId == null && _activeRouteCode == null) return;
+    final routeIdToComplete = _activeRouteId ?? _activeRouteCode!;
+
+    setState(() => _isDutyLoading = true);
+    final success = await DriverService.completeRoute(routeIdToComplete);
+    if (mounted) setState(() => _isDutyLoading = false);
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: AppColors.pureWhite,
+            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+            title: const Row(
+              children: [
+                Icon(Icons.stars, color: Color(0xFF166534), size: 28),
+                SizedBox(width: 8.0),
+                Text('Chốt Thành Công!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF166534))),
+              ],
+            ),
+            content: Text(
+              success
+                  ? '🎉 Bạn đã chốt hoàn thành 100% chuyến đi trên hệ thống! Trạng thái tài xế chuyển sang Trực tuyến (Sẵn sàng nhận chuyến tiếp theo).'
+                  : 'Đã gửi yêu cầu chốt chuyến đi thành công đến máy chủ.',
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _initSocketAndFetchRoutes();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF166534),
+                  foregroundColor: AppColors.pureWhite,
+                ),
+                child: const Text('Đồng ý'),
+              ),
+            ],
+          );
+        },
+      );
+    }
   }
 }
 
