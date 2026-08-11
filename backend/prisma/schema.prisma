@@ -915,16 +915,16 @@ model WarehouseScan {
   shipmentId    String?      @map("shipment_id") @db.Uuid
   packageId     String?      @map("package_id") @db.Uuid
   scannedBy     String       @map("scanned_by") @db.Uuid
-  toteCode      String?      @map("tote_code") @db.VarChar(100)
+  toteBagId     String?      @map("tote_bag_id") @db.Uuid
   scannedAt     DateTime     @default(now()) @map("scanned_at") @db.Timestamptz
 
   facility      Facility?    @relation(fields: [facilityId], references: [id], onDelete: SetNull)
   shipment      Shipment?    @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
   package       Package?     @relation(fields: [packageId], references: [id], onDelete: SetNull)
   scanner       User         @relation(fields: [scannedBy], references: [id], onDelete: Restrict)
-  toteBag       ToteBag?     @relation(fields: [toteCode], references: [toteCode], onDelete: SetNull)
+  toteBag       ToteBag?     @relation(fields: [toteBagId], references: [id], onDelete: SetNull)
 
-  @@index([toteCode], name: "idx_warehouse_scans_tote")
+  @@index([toteBagId], name: "idx_warehouse_scans_tote")
   @@index([shipmentId], name: "idx_warehouse_scans_shipment")
   @@map("warehouse_scans")
 }

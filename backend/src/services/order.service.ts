@@ -1074,8 +1074,9 @@ export class OrderService {
       }
     }
 
+    let activeToteBagId: string | null = null;
     if (activeToteCode) {
-      await prisma.toteBag.upsert({
+      const tote = await prisma.toteBag.upsert({
         where: { toteCode: activeToteCode },
         update: {
           facilityId: zone.facilityId,
@@ -1088,12 +1089,13 @@ export class OrderService {
           status: 'OPEN',
         },
       });
+      activeToteBagId = tote.id;
     }
 
     const existingScan = await prisma.warehouseScan.findFirst({
       where: {
         packageId: pkgId,
-        toteCode: activeToteCode,
+        toteBagId: activeToteBagId,
       },
     });
 
@@ -1104,7 +1106,7 @@ export class OrderService {
           shipmentId: targetShipmentId,
           facilityId: zone.facilityId,
           scannedBy: userId || order.customerId,
-          toteCode: activeToteCode,
+          toteBagId: activeToteBagId,
           scannedAt: new Date(),
         },
       });
@@ -1115,7 +1117,7 @@ export class OrderService {
           shipmentId: targetShipmentId,
           facilityId: zone.facilityId,
           scannedBy: userId || order.customerId,
-          toteCode: activeToteCode,
+          toteBagId: activeToteBagId,
         },
       });
     }
@@ -1165,6 +1167,7 @@ export class OrderService {
       orderBy: { scannedAt: 'desc' },
       include: {
         shipment: true,
+        toteBag: true,
         package: {
           include: {
             order: true,
@@ -1189,7 +1192,7 @@ export class OrderService {
           packageCode: code,
           zoneCode: s.package?.currentZone?.zoneCode || 'ZONE-W-LOCAL',
           zoneName: s.package?.currentZone?.zoneName || 'Khu Giao Hàng Nội Phường',
-          toteCode: s.toteCode || `TOTE-${s.package?.currentZone?.zoneCode || 'LOCAL'}-001`,
+          toteCode: s.toteBag?.toteCode || `TOTE-${s.package?.currentZone?.zoneCode || 'LOCAL'}-001`,
           sortedAt: new Date(s.scannedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         });
       }
@@ -1291,23 +1294,23 @@ export class OrderService {
       }
     }
 
-    const scansWhere: any = { toteCode: { not: null } };
+    const scansWhere: any = { toteBagId: { not: null } };
     if (targetFacilityId) {
       scansWhere.facilityId = targetFacilityId;
     }
 
     const scans = await prisma.warehouseScan.findMany({
       where: scansWhere,
-      select: { toteCode: true, packageId: true },
+      select: { toteBagId: true, packageId: true },
     });
 
     const totePackageSetMap = new Map<string, Set<string>>();
     for (const s of scans) {
-      if (s.toteCode && s.packageId) {
-        if (!totePackageSetMap.has(s.toteCode)) {
-          totePackageSetMap.set(s.toteCode, new Set());
+      if (s.toteBagId && s.packageId) {
+        if (!totePackageSetMap.has(s.toteBagId)) {
+          totePackageSetMap.set(s.toteBagId, new Set());
         }
-        totePackageSetMap.get(s.toteCode)!.add(s.packageId);
+        totePackageSetMap.get(s.toteBagId)!.add(s.packageId);
       }
     }
 
@@ -1324,7 +1327,7 @@ export class OrderService {
       zoneTotesMap.get(zoneCode)!.push({
         toteCode: tote.toteCode,
         status: tote.status,
-        packageCount: totePackageSetMap.get(tote.toteCode)?.size || 0,
+        packageCount: totePackageSetMap.get(tote.id)?.size || 0,
         sealedAt: tote.sealedAt ? new Date(tote.sealedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : null,
         createdAt: new Date(tote.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       });
@@ -1349,7 +1352,7 @@ export class OrderService {
 
     const scans = await prisma.warehouseScan.findMany({
       where: {
-        toteCode: cleanCode,
+        toteBagId: toteObj?.id || '',
       },
       orderBy: { scannedAt: 'desc' },
       include: {

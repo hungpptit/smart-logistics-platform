@@ -540,16 +540,16 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 ---
 
 ### 35. Bảng `warehouse_scans` (Nhật ký Quét kho & Sọt hàng Tập kết)
-📌 **Chức năng của bảng:** Quản lý nhật ký vết quét vạch Barcode/QR Code của bưu kiện và sọt hàng tập kết (`tote_code`) tại từng phân khu bưu cục và trên phương tiện trung chuyển. Ghi nhận vết ai quét (`scanned_by`), tại bưu cục nào (`facility_id`), thuộc chuyến xe trung chuyển nào (`shipment_id`) và mã sọt tập kết (`tote_code`).
+📌 **Chức năng của bảng:** Quản lý nhật ký vết quét vạch Barcode/QR Code của bưu kiện và sọt hàng tập kết (`tote_bag_id`) tại từng phân khu bưu cục và trên phương tiện trung chuyển. Ghi nhận vết ai quét (`scanned_by`), tại bưu cục nào (`facility_id`), thuộc chuyến xe trung chuyển nào (`shipment_id`), bưu kiện lẻ (`package_id`) và sọt gom tập kết (`tote_bag_id`).
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
 | `id` | Uuid | **Khóa chính (PK)** | Mã lượt quét kho. VD: `ws-01`, `ws-02` |
-| `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục/Kho thực hiện quét mã. VD: `fac-01` |
+| `facility_id` | Uuid | **Khóa ngoại (FK ➔ bảng facilities)** | Bưu cục/Kho thực hiện quét mã (Bắt buộc). VD: `fac-01` |
 | `shipment_id` | Uuid | **Khóa ngoại (FK ➔ bảng shipments)** | Thuộc Chuyến xe trung chuyển nào (Trỏ `shipments.id`). VD: `spm-01` |
 | `package_id` | Uuid | **Khóa ngoại (FK ➔ bảng packages)** | Bưu kiện được quét (Trỏ `packages.id`). VD: `pkg-01` |
 | `scanned_by` | Uuid | **Khóa ngoại (FK ➔ bảng users)** | Người dùng/Thủ kho thực hiện quét (Trỏ `users.id`). VD: `usr-03` |
-| `tote_code` | VarChar(100) | **Khóa ngoại (FK ➔ bảng tote_bags)** | Mã sọt gom tập kết bưu kiện. VD: `TOTE-FAC_HUB_HCM-ZONE-P-INBOUND-001` |
+| `tote_bag_id` | Uuid | **Khóa ngoại (FK ➔ bảng tote_bags)** | Sọt gom tập kết bưu kiện (Trỏ `tote_bags.id`). VD: `tb-01` |
 | `scanned_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian thực hiện quét kho |
 
 ---

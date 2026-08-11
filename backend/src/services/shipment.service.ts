@@ -304,6 +304,7 @@ export class ShipmentService {
             },
           });
 
+          let receivingToteBagId: string | null = null;
           let receivingToteCode: string | null = null;
           if (receivingZone) {
             const facObj = await tx.facility.findUnique({
@@ -324,6 +325,7 @@ export class ShipmentService {
             });
 
             if (activeTote) {
+              receivingToteBagId = activeTote.id;
               receivingToteCode = activeTote.toteCode;
             } else {
               const newTote = await tx.toteBag.upsert({
@@ -336,6 +338,7 @@ export class ShipmentService {
                   status: 'OPEN',
                 },
               });
+              receivingToteBagId = newTote.id;
               receivingToteCode = newTote.toteCode;
             }
           }
@@ -385,7 +388,7 @@ export class ShipmentService {
                   facilityId: targetFacilityId,
                   shipmentId: shipment.id,
                   packageId: sp.package.id,
-                  toteCode: receivingToteCode,
+                  toteBagId: receivingToteBagId,
                   scannedBy: userId,
                 },
               });
@@ -450,7 +453,7 @@ export class ShipmentService {
     }
 
     const scans = await prisma.warehouseScan.findMany({
-      where: { toteCode: cleanToteCode },
+      where: { toteBagId: tote.id },
       select: { packageId: true },
     });
 
@@ -556,7 +559,7 @@ export class ShipmentService {
       });
 
       await tx.warehouseScan.updateMany({
-        where: { toteCode: cleanToteCode },
+        where: { toteBagId: tote.id },
         data: {
           shipmentId: shipment.id,
         },

@@ -433,16 +433,16 @@ def build_excel():
                 ["dp-05", "spm-05", "rs-02", "SUCCESS", 150000.00, "https://storage.goong.io/pod/proof_dp05.jpg", "Hoàng Văn F", "0966778899", None, 10.7721, 106.6578, "2026-07-24 10:10:00"]
             ]
         },
-        # 35. barcode_scans
+        # 35. warehouse_scans
         {
-            "name": "barcode_scans (Nhật ký Quét mã vạch kiểm hàng)",
-            "headers": ["id", "shipment_id", "package_id", "route_stop_id", "facility_id", "scanned_by", "scan_type", "barcode_value", "scanned_at"],
+            "name": "warehouse_scans (Nhật ký Quét kho & Sọt hàng Tập kết)",
+            "headers": ["id", "facility_id", "shipment_id", "package_id", "scanned_by", "tote_bag_id", "scanned_at"],
             "rows": [
-                ["bs-01", "spm-01", "pkg-01", "rs-01", "fac-01", "usr-03", "DELIVERY", "PKG-8891-01", "2026-07-24 09:44:00"],
-                ["bs-02", "spm-02", "pkg-02", "rs-03", "fac-01", "usr-02", "OUTBOUND", "PKG-8892-01", "2026-07-24 09:05:00"],
-                ["bs-03", "spm-03", "pkg-03", "rs-04", "fac-04", "usr-03", "INBOUND", "PKG-8893-01", "2026-07-24 08:00:00"],
-                ["bs-04", "spm-04", "pkg-04", "rs-05", "fac-04", "usr-05", "SORTING", "PKG-8894-01", "2026-07-24 09:20:00"],
-                ["bs-05", "spm-05", "pkg-05", "rs-02", "fac-05", "usr-01", "INBOUND", "PKG-8895-01", "2026-07-24 10:02:00"]
+                ["ws-01", "fac-01", "spm-01", "pkg-01", "usr-02", "tb-01", "2026-07-24 09:44:00"],
+                ["ws-02", "fac-01", "spm-02", "pkg-02", "usr-02", "tb-01", "2026-07-24 09:05:00"],
+                ["ws-03", "fac-04", "spm-03", "pkg-03", "usr-03", "tb-02", "2026-07-24 08:00:00"],
+                ["ws-04", "fac-04", "spm-04", "pkg-04", "usr-03", "tb-02", "2026-07-24 09:20:00"],
+                ["ws-05", "fac-05", "spm-05", "pkg-05", "usr-01", "tb-03", "2026-07-24 10:02:00"]
             ]
         },
         # 38. tracking_events
