@@ -190,23 +190,30 @@ export class OrderService {
       if (pkg.isFragile) isFragile = true;
     });
 
-    // 6. Calculate Pricing
+    // 6. Calculate Pricing and Dynamic ETA
+    const pickupAddrObj = resolvedPickupAddressId
+      ? await prisma.address.findUnique({ where: { id: resolvedPickupAddressId } })
+      : null;
+    const deliveryAddrObj = resolvedDeliveryAddressId
+      ? await prisma.address.findUnique({ where: { id: resolvedDeliveryAddressId } })
+      : null;
+
     const pricing = await this.pricingService.calculatePrice(
       dto.serviceCode,
       distanceKm,
       totalChargeableWeight,
       isFragile,
-      dto.codAmount || 0
+      dto.codAmount || 0,
+      pickupAddrObj?.wardCode || undefined,
+      deliveryAddrObj?.wardCode || undefined
     );
 
     // 7. Generate order code
     const count = await prisma.order.count();
     const orderCode = `ORD-${Date.now().toString().slice(-4)}${String(count + 1).padStart(6, '0')}`;
 
-    // Estimated delivery date based on service hours
-    const service = await prisma.service.findUnique({ where: { serviceCode: dto.serviceCode } });
-    const estDeliveryDate = new Date();
-    estDeliveryDate.setHours(estDeliveryDate.getHours() + (service?.estimatedDeliveryHours || 24));
+    // Estimated delivery date calculated dynamically from pricing service
+    const estDeliveryDate = pricing.estimatedDeliveryDate ? new Date(pricing.estimatedDeliveryDate) : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     // Resolve origin and destination facilities based on distance
     const originFacilityId = await this.findNearestFacility(pickupLat, pickupLon);

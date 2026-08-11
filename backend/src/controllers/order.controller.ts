@@ -141,7 +141,7 @@ export class OrderController {
 
   public calculatePricing = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { serviceCode, distanceKm, totalWeightKg, isFragile, codAmount } = req.body;
+      const { serviceCode, distanceKm, totalWeightKg, isFragile, codAmount, pickupWardCode, deliveryWardCode } = req.body;
       if (!serviceCode) {
         res.status(400).json({ success: false, message: 'Thiếu mã dịch vụ vận chuyển (serviceCode).' });
         return;
@@ -151,7 +151,9 @@ export class OrderController {
         Number(distanceKm || 0),
         Number(totalWeightKg || 0),
         !!isFragile,
-        Number(codAmount || 0)
+        Number(codAmount || 0),
+        pickupWardCode,
+        deliveryWardCode
       );
       res.status(200).json({
         success: true,

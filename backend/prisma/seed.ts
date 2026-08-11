@@ -155,7 +155,7 @@ async function main() {
       pricePerKm: 0.00,
       freeWeightKg: 1.0,
       pricePerKg: 2000.00,
-      estimatedDeliveryHours: 72,
+      estimatedDeliveryHours: 48,
       isActive: true
     },
     {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Package, MapPin, Truck, User, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, HelpCircle, ShieldCheck, BookMarked, Plus, Pencil } from 'lucide-react';
+import { X, Package, MapPin, Truck, User, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, HelpCircle, ShieldCheck, BookMarked, Plus, Pencil, Clock } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { AddressModal } from './customer/AddressModal';
 import { CONFIG } from '../../../config';
@@ -788,6 +788,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   let totalAmount = 0;
   let billableDistance = 0;
   let billableWeight = 0;
+  let formattedDeliveryEta = '';
 
   if (activeService) {
     basePrice = Number(activeService.basePrice);
@@ -813,6 +814,49 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     }
 
     totalAmount = basePrice + distanceFee + weightFee + fragileSurcharge + insuranceFee;
+
+    // Calculate dynamic ETA for display
+    if (serviceCode === 'EXPRESS') {
+      if (distanceKm > 20) {
+        formattedDeliveryEta = 'Vượt quá 20km (Không hỗ trợ Hỏa tốc)';
+      } else {
+        const totalMins = Math.round(25 + (distanceKm * 2.4));
+        if (totalMins < 60) {
+          formattedDeliveryEta = `Dự kiến giao sau ${totalMins} phút`;
+        } else {
+          const hrs = Math.floor(totalMins / 60);
+          const mins = totalMins % 60;
+          formattedDeliveryEta = mins > 0 ? `Dự kiến giao sau ${hrs} tiếng ${mins} phút` : `Dự kiến giao sau ${hrs} tiếng`;
+        }
+      }
+    } else {
+      const baseHours = activeService.estimatedDeliveryHours || 24;
+      let extraHours = 0;
+
+      if (distanceKm <= 30) {
+        // 1. Nội tỉnh / Nội thành (< 30km)
+        extraHours = 0;
+      } else if (distanceKm <= 300) {
+        // 2. Nội miền khác tỉnh (30km - 300km)
+        extraHours = serviceCode === 'COLD_CHAIN' ? 12 : 24;
+      } else if (distanceKm <= 800) {
+        // 3. Cận miền (300km - 800km)
+        extraHours = serviceCode === 'COLD_CHAIN' ? 24 : 48;
+      } else {
+        // 4. Liên miền (> 800km)
+        extraHours = serviceCode === 'COLD_CHAIN' ? 24 : 72;
+      }
+      const totalHours = baseHours + extraHours;
+      const etaDate = new Date(Date.now() + totalHours * 60 * 60 * 1000);
+      const days = Math.round(totalHours / 24);
+      const dayText = days > 0 ? `${days} ngày` : `${totalHours} giờ`;
+      const dateStr = etaDate.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+      formattedDeliveryEta = `Dự kiến giao: ${dateStr} (${dayText})`;
+    }
   }
 
   const stepsList = [
@@ -1640,6 +1684,18 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                           <span className="text-[#161D25] uppercase tracking-wider text-[10px]">Tổng cước tạm tính:</span>
                           <span className="text-base text-[#bc0100] font-extrabold">{formatCurrency(totalAmount)}</span>
                         </div>
+
+                        {formattedDeliveryEta && (
+                          <div className="mt-2.5 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-[10px] uppercase tracking-wider">
+                              <Clock size={14} className="text-emerald-600 shrink-0" />
+                              <span>Thời gian dự kiến giao:</span>
+                            </div>
+                            <span className="text-xs font-bold text-emerald-800 bg-white px-2.5 py-1 rounded border border-emerald-300">
+                              {formattedDeliveryEta}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
