@@ -1,9 +1,10 @@
 import { prisma } from '../config/prisma';
 import { CreateShipmentDto, UpdateShipmentStatusDto } from '../dtos/shipment.dto';
 import { BadRequestException, NotFoundException } from '../middlewares/error.middleware';
-import { ShipmentStatus, TrackingEventType, OrderStatus } from '@prisma/client';
+import { ShipmentStatus, TrackingEventType, OrderStatus, RouteStatus, RouteStopStatus } from '@prisma/client';
 import { TRACKING_EVENT_CONFIG } from '../constants/tracking.constant';
 import { SHIPMENT_TO_TRACKING_EVENT_MAP, SHIPMENT_TO_ORDER_SYNC_MAP } from '../constants/status.constant';
+import { getTrackingGateway } from '../gateways/tracking.gateway';
 
 export class ShipmentService {
   /**
@@ -182,9 +183,18 @@ export class ShipmentService {
   /**
    * Get shipment by ID
    */
-  public async getShipmentById(id: string) {
+  public async getShipmentById(idOrCode: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrCode);
     const shipment = await prisma.shipment.findFirst({
-      where: { id, status: { not: ShipmentStatus.CANCELLED } },
+      where: isUuid
+        ? { id: idOrCode, status: { not: ShipmentStatus.CANCELLED } }
+        : {
+            OR: [
+              { shipmentCode: idOrCode },
+              { route: { routeCode: idOrCode } },
+            ],
+            status: { not: ShipmentStatus.CANCELLED },
+          },
       include: {
         route: {
           include: {
@@ -233,7 +243,13 @@ export class ShipmentService {
     const shipment = await prisma.shipment.findFirst({
       where: isUuid
         ? { id: idOrCode, status: { not: ShipmentStatus.CANCELLED } }
-        : { shipmentCode: idOrCode, status: { not: ShipmentStatus.CANCELLED } },
+        : {
+            OR: [
+              { shipmentCode: idOrCode },
+              { route: { routeCode: idOrCode } },
+            ],
+            status: { not: ShipmentStatus.CANCELLED },
+          },
     });
 
     if (!shipment) {
@@ -361,6 +377,13 @@ export class ShipmentService {
             });
           }
 
+          const targetFacilityObj = await tx.facility.findUnique({
+            where: { id: targetFacilityId },
+            select: { facilityName: true },
+          });
+          const facName = targetFacilityObj?.facilityName || 'Bưu cục / Kho tổng';
+          const inboundReason = `Đã nhập kho thành công tại ${facName}`;
+
           for (const sp of shipmentPackages) {
             await tx.order.update({
               where: { id: sp.package.orderId },
@@ -394,24 +417,14 @@ export class ShipmentService {
               });
             }
 
-            const existingHistory = await tx.orderStatusHistory.findFirst({
-              where: {
+            await tx.orderStatusHistory.create({
+              data: {
                 orderId: sp.package.orderId,
                 status: orderSyncMeta.orderStatus,
-                reason,
+                changedByUserId: userId,
+                reason: inboundReason,
               },
             });
-
-            if (!existingHistory) {
-              await tx.orderStatusHistory.create({
-                data: {
-                  orderId: sp.package.orderId,
-                  status: orderSyncMeta.orderStatus,
-                  changedByUserId: userId,
-                  reason,
-                },
-              });
-            }
           }
         }
       }
@@ -474,6 +487,35 @@ export class ShipmentService {
 
     const driverName = staff?.fullName || 'Tài xế xe tải';
 
+    // Find or auto-create active DriverVehicleAssignment for this driver
+    let dva = staff
+      ? await prisma.driverVehicleAssignment.findFirst({
+          where: { driverId: staff.id, isActive: true },
+        })
+      : null;
+
+    if (staff && !dva) {
+      let vehicle = await prisma.vehicle.findFirst({
+        where: { assignedFacilityId: tote.facilityId || undefined, operatingStatus: 'ACTIVE' },
+      });
+      if (!vehicle) {
+        vehicle = await prisma.vehicle.findFirst({ where: { operatingStatus: 'ACTIVE' } });
+      }
+      if (!vehicle) {
+        vehicle = await prisma.vehicle.findFirst();
+      }
+      if (vehicle) {
+        dva = await prisma.driverVehicleAssignment.create({
+          data: {
+            driverId: staff.id,
+            vehicleId: vehicle.id,
+            assignedFrom: new Date(),
+            isActive: true,
+          },
+        });
+      }
+    }
+
     let shipment = await prisma.shipment.findFirst({
       where: {
         createdBy: driverUserId,
@@ -489,7 +531,7 @@ export class ShipmentService {
       }
     }
 
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       if (!shipment) {
         // Auto resolve destination facility from parent facility or Provincial Hub
         let targetDestFacilityId: string | null = null;
@@ -528,6 +570,97 @@ export class ShipmentService {
         shipment = await tx.shipment.update({
           where: { id: shipment.id },
           data: { status: ShipmentStatus.IN_TRANSIT },
+        });
+      }
+
+      // Create or update assigned Route for Linehaul Transfer Driver
+      const originFacId = tote.facilityId || staff?.assignedFacilityId || shipment.originFacilityId;
+      const destFacId = shipment.destinationFacilityId;
+
+      let route = shipment.routeId
+        ? await tx.route.findUnique({ where: { id: shipment.routeId } })
+        : null;
+
+      if (!route) {
+        const routeCode = `RT-LH-${Date.now().toString().slice(-4)}${Math.floor(1000 + Math.random() * 9000)}`;
+        route = await tx.route.create({
+          data: {
+            routeCode,
+            driverVehicleAssignmentId: dva?.id || null,
+            startFacilityId: originFacId || staff?.assignedFacilityId!,
+            endFacilityId: destFacId || null,
+            status: RouteStatus.IN_PROGRESS,
+            actualStartAt: new Date(),
+            plannedDistanceKm: 12.5,
+            plannedDurationMin: 30,
+            totalStops: 2,
+          },
+        });
+
+        await tx.shipment.update({
+          where: { id: shipment.id },
+          data: { routeId: route.id },
+        });
+      } else if (dva && route.driverVehicleAssignmentId !== dva.id) {
+        await tx.route.update({
+          where: { id: route.id },
+          data: {
+            driverVehicleAssignmentId: dva.id,
+            status: RouteStatus.IN_PROGRESS,
+            actualStartAt: route.actualStartAt || new Date(),
+          },
+        });
+      }
+
+      // Ensure RouteStops exist for the Linehaul Route
+      const existingStopsCount = await tx.routeStop.count({
+        where: { routeId: route.id },
+      });
+
+      if (existingStopsCount === 0 && originFacId) {
+        const originFac = await tx.facility.findUnique({
+          where: { id: originFacId },
+          include: { address: true },
+        });
+        const destFac = destFacId
+          ? await tx.facility.findUnique({
+              where: { id: destFacId },
+              include: { address: true },
+            })
+          : null;
+
+        await tx.routeStop.create({
+          data: {
+            routeId: route.id,
+            shipmentId: shipment.id,
+            facilityId: originFac?.id || null,
+            stopType: 'PICKUP',
+            sequence: 1,
+            addressSnapshot: originFac
+              ? `${originFac.facilityName} - ${originFac.address?.addressLine1 || ''}`
+              : 'Bưu cục xuất kho trung chuyển',
+            latitude: originFac?.address?.latitude ? Number(originFac.address.latitude) : 10.8500,
+            longitude: originFac?.address?.longitude ? Number(originFac.address.longitude) : 106.7700,
+            status: RouteStopStatus.DEPARTED,
+            arrivedAt: new Date(),
+            departedAt: new Date(),
+          },
+        });
+
+        await tx.routeStop.create({
+          data: {
+            routeId: route.id,
+            shipmentId: shipment.id,
+            facilityId: destFac?.id || null,
+            stopType: 'DELIVERY',
+            sequence: 2,
+            addressSnapshot: destFac
+              ? `${destFac.facilityName} - ${destFac.address?.addressLine1 || ''}`
+              : 'Bưu cục / Hub nhận hàng trung chuyển',
+            latitude: destFac?.address?.latitude ? Number(destFac.address.latitude) : 10.8700,
+            longitude: destFac?.address?.longitude ? Number(destFac.address.longitude) : 106.8000,
+            status: RouteStopStatus.PENDING,
+          },
         });
       }
 
@@ -594,5 +727,11 @@ export class ShipmentService {
         driverName,
       };
     });
+
+    try {
+      getTrackingGateway()?.broadcastRoutesUpdated();
+    } catch (_) {}
+
+    return result;
   }
 }

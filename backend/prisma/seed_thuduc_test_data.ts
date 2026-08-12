@@ -256,15 +256,54 @@ async function main() {
     let zonesForFacility: { code: string; name: string; type: string; capacity?: number }[] = [];
 
     if (typeCode === 'SORTING_CENTER') {
-      // 🏬 CẤP 1: MEGA SORTER CENTER (Tổng Kho Miền)
-      zonesForFacility = [
-        { code: 'ZONE-S-UNLOADING', name: 'Sàn Hạ Bãi Xe Tải Container 15 Tấn', type: 'RECEIVING', capacity: 2000 },
-        { code: 'ZONE-S-AUTOMATED-SORTER', name: 'Phân Khu Băng Chuyền Phân Loại Tự Động Cross-Docking', type: 'SORTING', capacity: 5000 },
-        { code: 'ZONE-S-NORTH-DISPATCH', name: 'Khu Xuất Hàng Tuyến Miền Bắc & Hà Nội', type: 'SHIPPING', capacity: 2000 },
-        { code: 'ZONE-S-CENTRAL-DISPATCH', name: 'Khu Xuất Hàng Tuyến Miền Trung & Đà Nẵng', type: 'SHIPPING', capacity: 2000 },
-        { code: 'ZONE-S-SOUTH-DISPATCH', name: 'Khu Xuất Hàng Tuyến Miền Nam & Miền Tây', type: 'SHIPPING', capacity: 2000 },
-        { code: 'ZONE-S-HOLDING', name: 'Khu Lưu Hàng Tạm Chờ Xe Tải Đêm', type: 'STORAGE', capacity: 1500 },
-      ];
+      const isSouth = fac.facilityCode.includes('SOUTH') || fac.facilityCode.includes('REGION5') || fac.facilityName.includes('Miền Nam');
+      const isRegion2 = fac.facilityCode.includes('REGION2') || fac.facilityName.includes('Hà Nội') || fac.facilityName.includes('Sông Hồng');
+
+      if (isSouth) {
+        // 🏬 MEGA SORTER MIỀN NAM (TP.HCM / Đông Nam Bộ - 11 Zone)
+        zonesForFacility = [
+          { code: 'ZONE-S-UNLOADING', name: 'Sàn Hạ Bãi Xe Tải Container 15 Tấn', type: 'RECEIVING', capacity: 3000 },
+          // 5 Zone Tỉnh Nội Vùng Đông Nam Bộ
+          { code: 'ZONE-S-DISPATCH-HCM', name: 'Khu Xuất Hàng TP. Hồ Chí Minh', type: 'SHIPPING', capacity: 2000 },
+          { code: 'ZONE-S-DISPATCH-BINHDUONG', name: 'Khu Xuất Hàng Bình Dương', type: 'SHIPPING', capacity: 1500 },
+          { code: 'ZONE-S-DISPATCH-DONGNAI', name: 'Khu Xuất Hàng Đồng Nai', type: 'SHIPPING', capacity: 1500 },
+          { code: 'ZONE-S-DISPATCH-TAYNINH', name: 'Khu Xuất Hàng Tây Ninh', type: 'SHIPPING', capacity: 1200 },
+          { code: 'ZONE-S-DISPATCH-VUNGTAU', name: 'Khu Xuất Hàng Bà Rịa - Vũng Tàu', type: 'SHIPPING', capacity: 1200 },
+          // 5 Zone Cụm Miền Trung Chuyển (Đủ 5 Miền khác)
+          { code: 'ZONE-S-NORTH-DISPATCH', name: 'Khu Xuất Hàng Đi Đồng bằng Sông Hồng (Hà Nội)', type: 'SHIPPING', capacity: 2500 },
+          { code: 'ZONE-S-REGION3-NORTH-CENTRAL', name: 'Khu Xuất Hàng Đi Bắc Trung Bộ (Thừa Thiên Huế)', type: 'SHIPPING', capacity: 1500 },
+          { code: 'ZONE-S-CENTRAL-DISPATCH', name: 'Khu Xuất Hàng Đi Nam Trung Bộ & Tây Nguyên (Đà Nẵng)', type: 'SHIPPING', capacity: 2000 },
+          { code: 'ZONE-S-REGION6-MEKONG', name: 'Khu Xuất Hàng Đi Đồng bằng Sông Cửu Long (Cần Thơ)', type: 'SHIPPING', capacity: 2000 },
+          { code: 'ZONE-S-REGION1-NORTH-WEST', name: 'Khu Xuất Hàng Đi Trung du & Miền núi phía Bắc (Thái Nguyên)', type: 'SHIPPING', capacity: 1500 },
+          { code: 'ZONE-S-HOLDING', name: 'Khu Lưu Hàng Tạm Chờ Xe Tải Đêm', type: 'STORAGE', capacity: 1500 },
+        ];
+      } else if (isRegion2) {
+        // 🏬 MEGA SORTER MIỀN BẮC (Hà Nội / Đồng Bằng Sông Hồng - 11 Zone)
+        zonesForFacility = [
+          { code: 'ZONE-N-UNLOADING', name: 'Sàn Hạ Bãi Xe Tải Container 15 Tấn', type: 'RECEIVING', capacity: 3000 },
+          // 5 Zone Tỉnh Nội Vùng Sông Hồng
+          { code: 'ZONE-N-DISPATCH-HANOI', name: 'Khu Xuất Hàng TP. Hà Nội', type: 'SHIPPING', capacity: 2500 },
+          { code: 'ZONE-N-DISPATCH-HAIPHONG', name: 'Khu Xuất Hàng Hải Phòng', type: 'SHIPPING', capacity: 1500 },
+          { code: 'ZONE-N-DISPATCH-QUANGNINH', name: 'Khu Xuất Hàng Quảng Ninh', type: 'SHIPPING', capacity: 1200 },
+          { code: 'ZONE-N-DISPATCH-HAIDUONG', name: 'Khu Xuất Hàng Hải Dương', type: 'SHIPPING', capacity: 1200 },
+          { code: 'ZONE-N-DISPATCH-BACNINH', name: 'Khu Xuất Hàng Bắc Ninh & Nam Định', type: 'SHIPPING', capacity: 1200 },
+          // 4 Zone Cụm Miền Trung Chuyển (Ghi rõ tên Vùng Kinh Tế + Kho Cấp 1)
+          { code: 'ZONE-N-SOUTH-DISPATCH', name: 'Khu Xuất Hàng Đi Đông Nam Bộ (TP. Hồ Chí Minh)', type: 'SHIPPING', capacity: 2500 },
+          { code: 'ZONE-N-REGION4-SOUTH-CENTRAL', name: 'Khu Xuất Hàng Đi Nam Trung Bộ (Đà Nẵng)', type: 'SHIPPING', capacity: 1500 },
+          { code: 'ZONE-N-REGION3-NORTH-CENTRAL', name: 'Khu Xuất Hàng Đi Bắc Trung Bộ (Thừa Thiên Huế)', type: 'SHIPPING', capacity: 1500 },
+          { code: 'ZONE-N-REGION6-MEKONG', name: 'Khu Xuất Hàng Đi Đồng bằng Sông Cửu Long (Cần Thơ)', type: 'SHIPPING', capacity: 1500 },
+          { code: 'ZONE-N-REGION1-NORTH-WEST', name: 'Khu Xuất Hàng Đi Trung du & Miền núi phía Bắc (Thái Nguyên)', type: 'SHIPPING', capacity: 1500 },
+          { code: 'ZONE-N-HOLDING', name: 'Khu Lưu Hàng Tạm Chờ Xe Tải Đêm', type: 'STORAGE', capacity: 1500 },
+        ];
+      } else {
+        zonesForFacility = [
+          { code: 'ZONE-S-UNLOADING', name: 'Sàn Hạ Bãi Xe Tải Container 15 Tấn', type: 'RECEIVING', capacity: 2000 },
+          { code: 'ZONE-S-NORTH-DISPATCH', name: 'Khu Xuất Hàng Tuyến Miền Bắc & Hà Nội', type: 'SHIPPING', capacity: 2000 },
+          { code: 'ZONE-S-CENTRAL-DISPATCH', name: 'Khu Xuất Hàng Tuyến Miền Trung & Đà Nẵng', type: 'SHIPPING', capacity: 2000 },
+          { code: 'ZONE-S-SOUTH-DISPATCH', name: 'Khu Xuất Hàng Tuyến Miền Nam & Miền Tây', type: 'SHIPPING', capacity: 2000 },
+          { code: 'ZONE-S-HOLDING', name: 'Khu Lưu Hàng Tạm Chờ Xe Tải Đêm', type: 'STORAGE', capacity: 1500 },
+        ];
+      }
     } else if (typeCode === 'PROVINCIAL_HUB') {
       // 🏢 CẤP 2: PROVINCIAL HUB (Kho Tổng Tỉnh / Thành Phố)
       zonesForFacility = [

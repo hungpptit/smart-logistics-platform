@@ -19,7 +19,7 @@ import { CONFIG } from '../../../../config';
 interface ScanHistoryItem {
   id: string;
   code: string;
-  type: 'SHIPMENT' | 'ORDER';
+  type: 'SHIPMENT' | 'ORDER' | 'SỌT HÀNG';
   status: string;
   orderCount?: number;
   scannedAt: string;
@@ -35,6 +35,7 @@ export const ToteScanTab: React.FC = () => {
   const [lastScannedResult, setLastScannedResult] = useState<any | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
   const [currentFacility, setCurrentFacility] = useState<any | null>(null);
+  const [facilityZones, setFacilityZones] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchStaffFacility = async () => {
@@ -46,7 +47,17 @@ export const ToteScanTab: React.FC = () => {
         });
         const data = await res.json();
         if (data.success && data.data?.staff?.assignedFacility) {
-          setCurrentFacility(data.data.staff.assignedFacility);
+          const fac = data.data.staff.assignedFacility;
+          setCurrentFacility(fac);
+          if (fac.id) {
+            const zonesRes = await fetch(`${CONFIG.API_BASE_URL}/facilities/${fac.id}/zones`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const zonesData = await zonesRes.json();
+            if (zonesData.success && Array.isArray(zonesData.data)) {
+              setFacilityZones(zonesData.data);
+            }
+          }
         }
       } catch (err) { }
     };
@@ -109,10 +120,18 @@ export const ToteScanTab: React.FC = () => {
       });
       const data = await res.json();
       if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-        setScanHistory(data.data);
+        // Only include tote/shipment scan items for Tote Scan Tab history
+        const toteScans = data.data.filter((item: any) => 
+          item.type === 'SHIPMENT' || 
+          item.type === 'TOTE' || 
+          (item.code && (item.code.startsWith('TOTE-') || item.code.startsWith('RT-') || item.code.startsWith('SHP-')))
+        );
+        if (toteScans.length > 0) {
+          setScanHistory(toteScans);
+        }
       }
     } catch (err) {
-      console.log('Không thể tải lịch sử quét từ máy chủ.');
+      console.log('Không thể tải lịch sử quét sọt từ máy chủ.');
     }
   };
 
@@ -226,23 +245,23 @@ export const ToteScanTab: React.FC = () => {
             details: res.data,
           });
 
+          const pkgCount = res.data?.shipmentPackages?.length || res.data?.packages?.length || res.data?.packageCount || 3;
           setScanHistory((prev) => {
             if (prev.length > 0 && prev[0].code === cleanCode) return prev;
             return [
               {
                 id: Date.now().toString(),
                 code: cleanCode,
-                type: 'SHIPMENT',
+                type: 'SỌT HÀNG',
                 status: targetShipmentStatus,
-                orderCount: res.data?.shipmentPackages?.length || 1,
+                orderCount: pkgCount,
                 scannedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-                message: `Xác nhận ${activeTab === 'IN_TRANSIT' ? 'Xuất kho' : 'Nhập kho'} Sọt hàng ${cleanCode}`,
+                message: `Xác nhận ${activeTab === 'IN_TRANSIT' ? 'Xuất kho' : 'Nhập kho'} Sọt hàng ${cleanCode} (${pkgCount} bưu kiện)`,
               },
               ...prev,
             ];
           });
           setScanCode('');
-          fetchScanHistory();
         } else {
           throw new Error(res.message || 'Cập nhật trạng thái sọt hàng không thành công');
         }
@@ -533,26 +552,39 @@ export const ToteScanTab: React.FC = () => {
                 {/* Smart Facility Zone Sorting Recommendation Banner */}
                 {(() => {
                   const facCode = currentFacility?.facilityCode?.toUpperCase() || '';
-                  const isProvincialHub = currentFacility?.facilityType === 'PROVINCIAL_HUB' ||
-                    facCode.includes('HUB') ||
-                    facCode === 'FAC-HUB-HCM' ||
-                    facCode === 'FAC_HUB_HCM';
-
+                  const facType = currentFacility?.facilityType || '';
                   const scannedDetails = lastScannedResult?.details;
                   const isIntraWardLocal = scannedDetails && (
                     (scannedDetails.originFacilityId && scannedDetails.destinationFacilityId && scannedDetails.originFacilityId === scannedDetails.destinationFacilityId) ||
                     (scannedDetails.isLocalDelivery === true)
                   );
 
-                  const receivingZoneCode = isProvincialHub 
-                    ? 'ZONE-P-INBOUND' 
-                    : (isIntraWardLocal ? 'ZONE-W-LOCAL-DELIVERY' : 'ZONE-W-PROVINCE-DISPATCH');
+                  // Dynamically resolve Inbound Receiving Zone from database facilityZones
+                  const inboundZone = (facilityZones || []).find((z: any) =>
+                    z && (
+                      z.zoneType === 'RECEIVING' ||
+                      z.zoneType === 'INBOUND' ||
+                      (typeof z.zoneCode === 'string' && (z.zoneCode.includes('INBOUND') || z.zoneCode.includes('UNLOADING')))
+                    )
+                  );
 
-                  const receivingZoneName = isProvincialHub 
-                    ? 'Bãi Nhập Hàng Xe Tải Bưu Cục Phường' 
-                    : (isIntraWardLocal ? 'Khu Hàng Nội Phường Giao Ngay (Intra-Ward Local)' : 'Khu Xuất Hàng Trung Chuyển (Outbound Transfer)');
+                  const receivingZoneCode = inboundZone?.zoneCode || (
+                    facType === 'SORTING_CENTER'
+                      ? 'ZONE-S-UNLOADING'
+                      : (facType === 'PROVINCIAL_HUB' || facCode.includes('HUB')
+                          ? 'ZONE-P-INBOUND'
+                          : (isIntraWardLocal ? 'ZONE-W-LOCAL-DELIVERY' : 'ZONE-W-PROVINCE-DISPATCH'))
+                  );
 
-                  const facCodeClean = facCode ? facCode.replace(/[^a-zA-Z0-9]/g, '_') : 'FAC_HUB_HCM';
+                  const receivingZoneName = inboundZone?.zoneName || (
+                    facType === 'SORTING_CENTER'
+                      ? 'Sàn Hạ Bãi Xe Tải Container 15 Tấn'
+                      : (facType === 'PROVINCIAL_HUB' || facCode.includes('HUB')
+                          ? 'Bãi Nhập Hàng Xe Tải Bưu Cục Phường'
+                          : (isIntraWardLocal ? 'Khu Hàng Nội Phường Giao Ngay' : 'Khu Xuất Hàng Trung Chuyển'))
+                  );
+
+                  const facCodeClean = facCode ? facCode.replace(/[^a-zA-Z0-9]/g, '_') : 'FAC_SC_SOUTH';
                   const receivingToteCode = `TOTE-${facCodeClean}-${receivingZoneCode}-001`;
 
                   return (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, X, RefreshCw, QrCode, Lock, CheckCircle2, Package, ShieldCheck } from 'lucide-react';
+import { Box, X, RefreshCw, Lock, CheckCircle2, Package, ShieldCheck } from 'lucide-react';
 
 interface TotePackageDetailModalProps {
   selectedToteModal: any | null;
@@ -75,24 +75,36 @@ export const TotePackageDetailModal: React.FC<TotePackageDetailModalProps> = ({
           <div className="p-6 space-y-6 overflow-y-auto flex-1 max-h-[520px]">
             {/* Scannable 2D QR Code Container for Mobile Camera Scanning */}
             <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center gap-5 shadow-xl">
-              <div className="bg-white p-3 rounded-xl border-4 border-amber-400 shadow-lg shrink-0">
-                <img
-                  src={qrCodeUrl}
-                  alt={`QR Code ${toteCode}`}
-                  className="w-36 h-36 object-contain"
-                />
-              </div>
+              {isSealed ? (
+                <div className="bg-white p-3 rounded-xl border-4 border-amber-400 shadow-lg shrink-0">
+                  <img
+                    src={qrCodeUrl}
+                    alt={`QR Code ${toteCode}`}
+                    className="w-36 h-36 object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="w-36 h-36 bg-slate-800/90 rounded-xl border-2 border-dashed border-amber-500/50 flex flex-col items-center justify-center p-3 text-center shrink-0 space-y-2">
+                  <Lock size={32} className="text-amber-400 animate-pulse" />
+                  <span className="text-[11px] font-bold text-amber-300">Chưa Niêm Phong</span>
+                  <span className="text-[9px] text-slate-400 leading-tight">Mã QR sẽ xuất hiện sau khi chốt Sọt</span>
+                </div>
+              )}
 
               <div className="space-y-3 flex-1 text-center md:text-left">
                 <div>
                   <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block mb-0.5">
-                    📱 MÃ QR QUÉT BỐC HÀNG LÊN XE TẢI:
+                    {isSealed ? '📱 MÃ QR QUÉT BỐC HÀNG LÊN XE TẢI:' : '🔒 SỌT HÀNG ĐANG TRONG TRẠNG THÁI GOM:'}
                   </span>
                   <h4 className="font-mono text-xl font-black text-white tracking-tight">{toteCode}</h4>
                 </div>
 
                 <p className="text-xs text-slate-300 bg-slate-800/90 p-2.5 rounded-xl border border-slate-700/80 leading-relaxed">
-                  📱 **Tài xế / Nhân viên bốc xếp**: Dùng Camera điện thoại quét mã QR này để xác nhận đã bốc toàn bộ **{selectedToteModal?.totalPackages || 0} đơn hàng** trong sọt lên xe tải!
+                  {isSealed ? (
+                    <>📱 <strong>Tài xế / Nhân viên bốc xếp:</strong> Dùng Camera điện thoại quét mã QR này để xác nhận đã bốc toàn bộ <strong>{selectedToteModal?.totalPackages || 0} đơn hàng</strong> trong sọt lên xe tải!</>
+                  ) : (
+                    <>⚠️ Sọt hiện đang trong trạng thái <strong>ĐANG GOM HÀNG</strong> ({selectedToteModal?.totalPackages || 0} bưu kiện). Hãy bấm <strong>'CHỐT NIÊM PHONG SỌT'</strong> bên dưới để xuất Mã QR lên xe tải!</>
+                  )}
                 </p>
 
                 {!isSealed ? (
@@ -102,7 +114,7 @@ export const TotePackageDetailModal: React.FC<TotePackageDetailModalProps> = ({
                     className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Lock size={15} />
-                    <span>CHỐT NIÊM PHONG SỌT (SẴN SÀNG LÊN XE)</span>
+                    <span>CHỐT NIÊM PHONG SỌT (KÍCH HOẠT MÃ QR LÊN XE)</span>
                   </button>
                 ) : (
                   <div className="py-2 px-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-emerald-300 font-extrabold text-xs flex items-center justify-center gap-1.5">

@@ -1092,6 +1092,14 @@ export class OrderService {
       activeToteBagId = tote.id;
     }
 
+    // Clean up previous tote scans for this package so it is removed from any old tote
+    await prisma.warehouseScan.deleteMany({
+      where: {
+        packageId: pkgId,
+        toteBagId: { not: activeToteBagId },
+      },
+    });
+
     const existingScan = await prisma.warehouseScan.findFirst({
       where: {
         packageId: pkgId,
@@ -1122,23 +1130,21 @@ export class OrderService {
       });
     }
 
-    const existingHistory = await prisma.orderStatusHistory.findFirst({
-      where: {
-        orderId: order.id,
-        reason: { contains: activeToteCode },
-      },
+    const targetStatus = OrderStatus.AT_HUB;
+
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { status: targetStatus },
     });
 
-    if (!existingHistory) {
-      await prisma.orderStatusHistory.create({
-        data: {
-          orderId: order.id,
-          status: OrderStatus.ARRIVED_ORIGIN_FACILITY,
-          changedByUserId: userId,
-          reason: `Hàng hóa đã phân loại và lưu kho tại ${zone.facility?.facilityName || 'Bưu cục phân phối'}`,
-        },
-      });
-    }
+    await prisma.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        status: targetStatus,
+        changedByUserId: userId,
+        reason: `Bưu kiện đã được phân loại vào ${zone.zoneName} (${zone.zoneCode}) tại ${zone.facility?.facilityName || 'Kho trung chuyển'}`,
+      },
+    });
 
     return {
       orderCode: order.orderCode,
@@ -1153,7 +1159,9 @@ export class OrderService {
    * Get recent sorting scans for current facility / staff with active toteCode
    */
   public async getSortingHistory(userId: string, facilityId?: string) {
-    const whereCondition: any = {};
+    const whereCondition: any = {
+      packageId: { not: null },
+    };
 
     if (facilityId) {
       whereCondition.facilityId = facilityId;
@@ -1166,7 +1174,6 @@ export class OrderService {
       take: 50,
       orderBy: { scannedAt: 'desc' },
       include: {
-        shipment: true,
         toteBag: true,
         package: {
           include: {
@@ -1179,20 +1186,25 @@ export class OrderService {
 
     const uniqueMap = new Map<string, any>();
     for (const s of scans) {
-      const code = s.shipment?.shipmentCode || s.package?.order?.orderCode || s.package?.packageCode || 'N/A';
-      if (!uniqueMap.has(code)) {
-        uniqueMap.set(code, {
+      if (!s.package) continue;
+      const orderCode = s.package.order?.orderCode || s.package.packageCode || 'ORD-UNKNOWN';
+
+      if (!uniqueMap.has(s.packageId!)) {
+        const zoneCode = s.package.currentZone?.zoneCode || s.toteBag?.zoneCode || 'ZONE-P-INBOUND';
+        const zoneName = s.package.currentZone?.zoneName || 'Bãi Nhập Hàng Xe Tải Bưu Cục';
+        const toteCode = s.toteBag?.toteCode || `TOTE-${zoneCode}-001`;
+
+        uniqueMap.set(s.packageId!, {
           id: s.id,
-          code: code,
-          type: s.shipment ? 'SHIPMENT' : 'ORDER',
+          code: orderCode,
+          packageCode: orderCode,
+          type: 'ORDER',
           status: 'SUCCESS',
-          orderCount: 1,
           scannedAt: new Date(s.scannedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          message: s.shipment ? `Xác nhận Nhập kho Sọt hàng ${code}` : `Phân loại bưu kiện ${code} thành công`,
-          packageCode: code,
-          zoneCode: s.package?.currentZone?.zoneCode || 'ZONE-W-LOCAL',
-          zoneName: s.package?.currentZone?.zoneName || 'Khu Giao Hàng Nội Phường',
-          toteCode: s.toteBag?.toteCode || `TOTE-${s.package?.currentZone?.zoneCode || 'LOCAL'}-001`,
+          message: `Phân loại bưu kiện ${orderCode} thành công`,
+          zoneCode,
+          zoneName,
+          toteCode,
           sortedAt: new Date(s.scannedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         });
       }

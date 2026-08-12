@@ -304,7 +304,9 @@ export class TrackingController {
         shipmentCode: shipmentCode,
         status: order.status,
         statusLabel: currentStatusInfo.label,
-        eta: order.scheduledPickupAt ? new Date(order.scheduledPickupAt).toLocaleDateString('vi-VN') : 'Dự kiến hôm nay',
+        eta: order.estimatedDeliveryDate
+          ? new Date(order.estimatedDeliveryDate).toLocaleDateString('vi-VN')
+          : (order.scheduledPickupAt ? new Date(order.scheduledPickupAt).toLocaleDateString('vi-VN') : 'Dự kiến trong ngày'),
         senderName: senderName,
         senderPhone: senderPhone,
         senderAddress: order.pickupAddressText || order.pickupAddress?.addressLine1 || '',

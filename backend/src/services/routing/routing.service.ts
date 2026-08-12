@@ -464,6 +464,20 @@ export class RoutingService {
         },
         stops: {
           include: {
+            facility: {
+              select: {
+                id: true,
+                facilityCode: true,
+                facilityName: true,
+                address: {
+                  select: {
+                    addressLine1: true,
+                    latitude: true,
+                    longitude: true,
+                  },
+                },
+              },
+            },
             order: {
               select: {
                 id: true,
@@ -575,6 +589,20 @@ export class RoutingService {
         },
         stops: {
           include: {
+            facility: {
+              select: {
+                id: true,
+                facilityCode: true,
+                facilityName: true,
+                address: {
+                  select: {
+                    addressLine1: true,
+                    latitude: true,
+                    longitude: true,
+                  },
+                },
+              },
+            },
             shipment: {
               include: {
                 shipmentPackages: {

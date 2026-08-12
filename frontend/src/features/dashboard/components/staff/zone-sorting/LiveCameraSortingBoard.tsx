@@ -136,41 +136,42 @@ export const LiveCameraSortingBoard: React.FC<LiveCameraSortingBoardProps> = ({
             </div>
           )}
 
-          {/* Dynamic 4 Facility Zones Reference Footer */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs border-t border-slate-800 pt-3">
-            {facilityZones.map((z, idx) => {
-              const activeTote = getActiveToteCode(z.zoneCode);
-              const styles = [
-                'bg-emerald-950/60 text-emerald-300 border-emerald-500/40',
-                'bg-blue-950/60 text-blue-300 border-blue-500/40',
-                'bg-amber-950/60 text-amber-300 border-amber-500/40',
-                'bg-rose-950/60 text-rose-300 border-rose-500/40',
-              ];
-              return (
-                <div
-                  key={z.id || idx}
-                  className={`p-2.5 rounded-xl border font-sans font-semibold text-[11px] leading-tight flex flex-col justify-between ${styles[idx % styles.length]}`}
-                >
-                  <div>
-                    <span className="font-mono font-extrabold text-xs block opacity-90">{z.zoneCode}</span>
-                    <span className="text-[10px] font-medium opacity-80 line-clamp-1">{z.zoneName}</span>
+          {/* Target Zone & Tote Action Box (Only display the SINGLE matched target zone!) */}
+          {activeDisplayInfo && (() => {
+            const targetZone = facilityZones.find((z) => z.zoneCode === activeDisplayInfo.suggestedZoneCode)
+              || facilityZones[0];
+            const activeTote = activeDisplayInfo.toteCode || (targetZone ? getActiveToteCode(targetZone.zoneCode) : '');
+
+            return (
+              <div className="border-t border-slate-800 pt-3">
+                <div className="p-3.5 bg-slate-800/90 rounded-xl border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-extrabold text-amber-400 uppercase tracking-wider">
+                        🎯 ZONE VÀ SỌT TẬP KẾT ĐÍCH:
+                      </span>
+                      <span className="font-mono text-xs font-black text-white bg-slate-950 px-2.5 py-0.5 rounded border border-slate-700">
+                        {targetZone.zoneCode}
+                      </span>
+                    </div>
+                    <p className="text-xs font-extrabold text-slate-200">{targetZone.zoneName}</p>
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <span className="text-[11px] text-slate-400 font-medium">Sọt thu gom hiện tại:</span>
+                      <span className="font-mono text-xs font-black text-amber-400 bg-black/40 px-2 py-0.5 rounded border border-white/10">{activeTote}</span>
+                    </div>
                   </div>
-                  <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between">
-                    <span className="font-mono font-bold text-[10px] bg-black/40 px-2 py-0.5 rounded border border-white/10">
-                      {activeTote}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleSealAndOpenNewTote(z.zoneCode)}
-                      className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-extrabold rounded transition cursor-pointer"
-                    >
-                      Chốt Sọt
-                    </button>
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSealAndOpenNewTote(targetZone.zoneCode)}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black rounded-xl shadow transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                  >
+                    <span>CHỐT SỌT {targetZone.zoneCode}</span>
+                  </button>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

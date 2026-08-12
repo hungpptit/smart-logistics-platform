@@ -88,8 +88,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   // ------ Data Fetching ------
-  Future<void> _initSocketAndFetchRoutes() async {
-    if (_isFetchingRoutes) return;
+  Future<void> _initSocketAndFetchRoutes({bool force = false}) async {
+    if (_isFetchingRoutes && !force) return;
     _isFetchingRoutes = true;
     try {
       final token = await AuthService.getToken();
@@ -98,7 +98,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
       }
       final routes = await DriverService.fetchMyRoutes();
       if (routes.isNotEmpty && mounted) {
-        final firstRoute = routes.first;
+        final firstRoute = routes.firstWhere(
+          (r) => r['status'] == 'IN_PROGRESS' || r['status'] == 'ASSIGNED' || r['status'] == 'PLANNED',
+          orElse: () => routes.first,
+        );
         _activeRouteId = firstRoute['id']?.toString();
         _activeRouteCode = firstRoute['routeCode']?.toString() ?? _activeRouteId;
         if (_activeRouteId != null) {
@@ -117,14 +120,16 @@ class _DriverDashboardState extends State<DriverDashboard> {
               try {
                 final stop = stopsRaw[i];
                 final stopType = stop['stopType'] ?? 'DELIVERY';
-                final address = stop['facility']?['facilityName'] ??
-                    stop['addressSnapshot'] ??
-                    stop['addressLine1'] ??
-                    stop['address'] ??
-                    'Dia diem giao nhan Viet Nam';
+                final facilityObj = stop['facility'];
+                final String address = (facilityObj != null && facilityObj['facilityName'] != null)
+                    ? '${facilityObj['facilityName']}${facilityObj['address'] != null && facilityObj['address']['addressLine1'] != null ? " - ${facilityObj['address']['addressLine1']}" : ""}'
+                    : (stop['addressSnapshot'] ??
+                        stop['addressLine1'] ??
+                        stop['address'] ??
+                        'Địa điểm giao nhận Việt Nam');
                 final shipmentId = stop['shipmentId'];
-                final double lat = double.tryParse(stop['latitude']?.toString() ?? '') ?? (10.762 + i * 0.004);
-                final double lng = double.tryParse(stop['longitude']?.toString() ?? '') ?? (106.682 + i * 0.004);
+                final double lat = double.tryParse(stop['latitude']?.toString() ?? facilityObj?['address']?['latitude']?.toString() ?? '') ?? (10.762 + i * 0.004);
+                final double lng = double.tryParse(stop['longitude']?.toString() ?? facilityObj?['address']?['longitude']?.toString() ?? '') ?? (106.682 + i * 0.004);
 
                 dynamic firstOrder;
                 try {
@@ -146,9 +151,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     stop['shipment']?['trackingNumber']?.toString() ??
                     stop['shipment']?['shipmentCode']?.toString() ??
                     (shipmentId != null
-                        ? 'ORD-${shipmentId.toString().substring(0, 8).toUpperCase()}'
+                        ? 'SHP-${shipmentId.toString().substring(0, 8).toUpperCase()}'
                         : 'ORD-66266482-0${i + 1}');
-                final String receiverName = firstOrder?['receiverName']?.toString() ?? stop['receiverName']?.toString() ?? 'Khach nhan';
+                final String receiverName = firstOrder?['receiverName']?.toString() ??
+                    stop['receiverName']?.toString() ??
+                    (facilityObj?['facilityName'] != null ? 'Bưu cục: ${facilityObj['facilityName']}' : 'Chuyến xe trung chuyển');
                 final String receiverPhone = firstOrder?['receiverPhone']?.toString() ?? stop['receiverPhone']?.toString() ?? '';
                 final paymentInfo = firstOrder?['payment'];
                 final String feePayer = (paymentInfo?['feePayer'] ?? firstOrder?['feePayer'] ?? stop['feePayer'] ?? 'SENDER').toString();
@@ -164,6 +171,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 final String rawStopStatus = (stop['status']?.toString() ?? '').toUpperCase();
                 final String rawOrderStatus = (firstOrder?['status']?.toString() ?? '').toUpperCase();
                 final bool isCompleted = (rawStopStatus == 'COMPLETED') ||
+                    (rawStopStatus == 'DEPARTED') ||
                     (rawOrderStatus == 'PICKED_UP') ||
                     (rawOrderStatus == 'ARRIVED_ORIGIN_FACILITY') ||
                     (rawOrderStatus == 'AT_HUB') ||
@@ -180,6 +188,12 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 } else {
                   displayStatus = 'TIEP THEO';
                 }
+
+                final isLinehaul = _activeRouteCode != null && _activeRouteCode!.contains('LH');
+                final String stopTitle = isLinehaul
+                    ? (stopType == 'PICKUP' ? 'Diem xuat sot trung chuyen' : 'Diem giao sot kho dich')
+                    : (stopType == 'PICKUP' ? 'Diem lay hang' : 'Diem giao hang');
+
                 mappedStops.add({
                   'index': i + 1,
                   'id': stop['id'] ?? '$i',
@@ -193,7 +207,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   'totalToCollect': totalToCollect,
                   'stopType': stopType,
                   'isPickup': (stopType == 'PICKUP'),
-                  'title': stopType == 'PICKUP' ? 'Diem lay hang' : 'Diem giao hang',
+                  'title': stopTitle,
                   'address': address,
                   'latitude': lat,
                   'longitude': lng,
@@ -385,6 +399,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
       onCapturePhoto: _simulateCameraCapture,
       onCompleteStop: _completeStop,
       onShowQRScanner: () => _showQRScanner(stop),
+      onShowShipmentQR: _showShipmentQRModal,
       onFailureConfirmed: () {
         setState(() {
           stop['status'] = 'THAT BAI';
@@ -423,7 +438,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
           setState(() { _activeRouteCode = newCode; _activeRouteId = newCode; });
         }
       },
-      onRefreshRoutes: _initSocketAndFetchRoutes,
+      onRefreshRoutes: () => _initSocketAndFetchRoutes(force: true),
       onStopCheckedIn: (stop) {
         setState(() => stop['isCheckedIn'] = true);
         _showStopDetailsDialog(stop);
@@ -458,16 +473,25 @@ class _DriverDashboardState extends State<DriverDashboard> {
     final orderCode = stop['orderCode'];
     final bool isPickupStop = stop['isPickup'] == true ||
         stop['stopType'] == 'PICKUP' ||
-        stop['title']?.toString().contains('lay hang') == true ||
+        stop['title']?.toString().toLowerCase().contains('lay hang') == true ||
+        stop['title']?.toString().toLowerCase().contains('xuat sot') == true ||
         stop['status'] == 'PICKING' ||
         stop['status'] == 'READY_FOR_PICKUP' ||
         stop['status'] == 'PICKUP_ASSIGNED';
-    final nextStatus = isPickupStop ? 'PICKED_UP' : 'DELIVERED';
-    final reason = isPickupStop
-        ? 'Shipper da quet ma buu kien va xac nhan lay hang tu nguoi gui thanh cong'
-        : 'Shipper da hoan thanh giao hang cho nguoi nhan';
+    final bool isLinehaul = _activeRouteCode != null && _activeRouteCode!.contains('LH') ||
+        (orderCode != null && orderCode.toString().startsWith('SHP-'));
+    final String nextStatus = isLinehaul
+        ? (isPickupStop ? 'IN_TRANSIT' : 'AT_HUB')
+        : (isPickupStop ? 'PICKED_UP' : 'DELIVERED');
+    final String reason = isLinehaul
+        ? (isPickupStop
+            ? 'Xe tai da boc toan bo sot hang va xuat kho buu cuc nguon'
+            : 'Xe tai da cap ben buu cuc / hub dich, san sang cho thu kho quet nhap kho')
+        : (isPickupStop
+            ? 'Shipper da quet ma buu kien va xac nhan lay hang tu nguoi gui thanh cong'
+            : 'Shipper da hoan thanh giao hang cho nguoi nhan');
 
-    if (orderCode != null && orderCode.toString().isNotEmpty) {
+    if (orderCode != null && orderCode.toString().isNotEmpty && !isLinehaul) {
       await DriverService.updateOrderStatus(orderCode.toString(), nextStatus, reason: reason);
     }
     if (shipmentId != null && shipmentId.toString().isNotEmpty) {
@@ -475,7 +499,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
     }
 
     setState(() {
-      stop['status'] = isPickupStop ? 'DA LAY HANG' : 'DA GIAO';
+      stop['status'] = isLinehaul
+          ? (isPickupStop ? 'DA XUAT KHO' : 'DA TOI KHO DICH')
+          : (isPickupStop ? 'DA LAY HANG' : 'DA GIAO');
       stop['isActive'] = false;
       final currentIndex = stop['index'] as int;
       final nextStop = _driverStops.firstWhere(
@@ -499,14 +525,20 @@ class _DriverDashboardState extends State<DriverDashboard> {
             const Icon(Icons.check_circle, color: Colors.green, size: 28),
             const SizedBox(width: 8.0),
             Text(
-              isPickupStop ? 'Lay Hang Thanh Cong' : 'Giao Hang Thanh Cong',
+              isLinehaul
+                  ? (isPickupStop ? 'Xuat Buu Cuc Thanh Cong' : 'Cap Ben Kho Dich Thanh Cong')
+                  : (isPickupStop ? 'Lay Hang Thanh Cong' : 'Giao Hang Thanh Cong'),
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ],
         ),
-        content: Text(isPickupStop
-            ? 'Da quet ma va xac nhan lay buu kien ${stop['orderCode'] ?? ''} thanh cong. Trang thai cap nhat sang DA LAY HANG.'
-            : 'Da cap nhat trang thai Diem dung ${stop['title']} thanh DA GIAO va truyen thong tin POD len may chu.'),
+        content: Text(isLinehaul
+            ? (isPickupStop
+                ? 'Da cap nhat trang thai Chuyen xe trung chuyen sang DANG TRUNG CHUYEN. Tai xe bat dau di den Buu cuc dich.'
+                : 'Da xac nhan Xe tai cap ben Buu cuc / Hub dich. Vui long dua Ma QR Chuyen xe cho Thu kho quet nhap kho.')
+            : (isPickupStop
+                ? 'Da quet ma va xac nhan lay buu kien ${stop['orderCode'] ?? ''} thanh cong.'
+                : 'Da cap nhat trang thai Diem dung ${stop['title']} thanh DA GIAO va truyen thong tin POD len may chu.')),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
