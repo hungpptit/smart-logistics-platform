@@ -51,7 +51,7 @@ export class RoutingController {
 
       let filterDriverId = driverId as string;
       if (!filterDriverId && user?.id) {
-        const isManagement = user?.roles?.includes('ADMIN') || user?.roles?.includes('DISPATCHER');
+        const isManagement = user?.roles?.includes('ADMIN') || user?.roles?.includes('STAFF') || user?.roles?.includes('DISPATCHER');
         if (!isManagement) {
           const driverProfile = await prisma.staff.findFirst({
             where: { userId: user.id },

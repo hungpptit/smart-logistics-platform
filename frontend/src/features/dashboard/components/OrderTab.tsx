@@ -1308,7 +1308,10 @@ export const OrderTab: React.FC = () => {
       {/* AI Route Optimization Modal */}
       <RouteOptimizationModal
         isOpen={isOptimizationModalOpen}
-        onClose={() => setIsOptimizationModalOpen(false)}
+        onClose={() => {
+          setIsOptimizationModalOpen(false);
+          fetchOrders(currentPage);
+        }}
         onSuccess={() => {
           fetchOrders(currentPage);
         }}

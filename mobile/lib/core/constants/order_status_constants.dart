@@ -32,14 +32,14 @@ class OrderStatusConstants {
   // Standard Failure Reasons (Pickup)
   static const List<String> pickupFailureReasons = [
     'Không liên lạc được người gửi',
-    'Hàng chưa chuẩn bị xong / người gửi hẹn lại',
+    'Người gửi hẹn lấy lại sau',
     'Lý do khác',
   ];
 
   // Standard Failure Reasons (Delivery)
   static const List<String> deliveryFailureReasons = [
     'Không liên lạc được người nhận',
-    'Người nhận hẹn lại ngày giao',
+    'Người nhận hẹn lại sau',
     'Lý do khác',
   ];
 

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_styles.dart';
 import '../../../core/constants/order_status_constants.dart';
@@ -65,7 +65,7 @@ class _ReportFailureDialogState extends State<ReportFailureDialog> {
           const Icon(Icons.warning_amber_rounded, color: AppColors.logisticsRed, size: 28),
           const SizedBox(width: 8.0),
           Text(
-            _isPickupStop ? 'Bao Lay Hang That Bai' : 'Bao Giao Hang That Bai',
+            _isPickupStop ? 'Báo Lấy Hàng Thất Bại' : 'Báo Giao Hàng Thất Bại',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
         ],
@@ -75,12 +75,12 @@ class _ReportFailureDialogState extends State<ReportFailureDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Don hang: ${widget.stop['orderCode'] ?? ''}',
+            'Đơn hàng: ${widget.stop['orderCode'] ?? ''}',
             style: const TextStyle(
                 fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.logisticsRed),
           ),
           const SizedBox(height: 12),
-          const Text('Chon ly do khong the hoan thanh:',
+          const Text('Chọn lý do không thể hoàn thành:',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
@@ -106,7 +106,7 @@ class _ReportFailureDialogState extends State<ReportFailureDialog> {
             maxLines: 2,
             style: const TextStyle(fontSize: 11),
             decoration: InputDecoration(
-              labelText: 'Ghi chu chi tiet (Khong bat buoc)',
+              labelText: 'Ghi chú chi tiết (Không bắt buộc)',
               labelStyle: const TextStyle(fontSize: 10),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -116,14 +116,14 @@ class _ReportFailureDialogState extends State<ReportFailureDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Huy', style: TextStyle(color: AppColors.secondary)),
+          child: const Text('Hủy', style: TextStyle(color: AppColors.secondary)),
         ),
         ElevatedButton(
           onPressed: () async {
             Navigator.pop(context);
 
             final finalReason =
-                (_selectedReason == 'Ly do khac' && _noteController.text.trim().isNotEmpty)
+                ((_selectedReason == 'Lý do khác' || _selectedReason == 'Ly do khac') && _noteController.text.trim().isNotEmpty)
                     ? _noteController.text.trim()
                     : (_noteController.text.trim().isNotEmpty
                         ? '$_selectedReason - ${_noteController.text.trim()}'
@@ -148,7 +148,7 @@ class _ReportFailureDialogState extends State<ReportFailureDialog> {
             backgroundColor: AppColors.logisticsRed,
             foregroundColor: AppColors.pureWhite,
           ),
-          child: const Text('Xac nhan bao loi'),
+          child: const Text('Xác nhận báo lỗi'),
         ),
       ],
     );

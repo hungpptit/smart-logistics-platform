@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_styles.dart';
@@ -46,7 +46,7 @@ class DutyStatusCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isDutyActive ? 'Trang thai: Truc tuyen' : 'Trang thai: Ngoai tuyen',
+                    isDutyActive ? 'Trạng thái: Trực tuyến' : 'Trạng thái: Ngoại tuyến',
                     style: AppTypography.labelLg.copyWith(
                       fontWeight: FontWeight.bold,
                       color: isDutyActive ? Colors.green.shade800 : AppColors.deepOnyx,
@@ -54,7 +54,7 @@ class DutyStatusCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2.0),
                   Text(
-                    isDutyActive ? 'San sang nhan lo trinh tu buu cuc' : 'Tam dung nhan lo trinh moi',
+                    isDutyActive ? 'Sẵn sàng nhận lộ trình từ bưu cục' : 'Tạm dừng nhận lộ trình mới',
                     style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
                   ),
                 ],

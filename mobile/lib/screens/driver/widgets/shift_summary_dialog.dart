@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_styles.dart';
@@ -28,7 +28,7 @@ class ShiftSummaryDialog extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Tom tat ca',
+                  'Tóm tắt ca',
                   style: AppTypography.headlineLgMobile.copyWith(
                     fontWeight: FontWeight.bold,
                     color: AppColors.deepOnyx,
@@ -55,12 +55,12 @@ class ShiftSummaryDialog extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'THOI GIAN HIEN TAI',
+                        'THỜI GIAN HIỆN TẠI',
                         style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
                       ),
                       const SizedBox(height: 2.0),
                       Text(
-                        '0gio 42phut 12giay',
+                        '0giờ 42phút 12giây',
                         style: AppTypography.headlineMd.copyWith(
                           color: AppColors.deepOnyx,
                           fontWeight: FontWeight.bold,
@@ -84,7 +84,7 @@ class ShiftSummaryDialog extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Thanh cong',
+                        Text('Thành công',
                             style: AppTypography.labelMd.copyWith(color: AppColors.secondary)),
                         const SizedBox(height: 4.0),
                         Text(
@@ -109,7 +109,7 @@ class ShiftSummaryDialog extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Dang cho',
+                        Text('Đang chờ',
                             style: AppTypography.labelMd.copyWith(color: AppColors.secondary)),
                         const SizedBox(height: 4.0),
                         Text(
@@ -135,7 +135,7 @@ class ShiftSummaryDialog extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Thu nhap (Du kien)',
+                  Text('Thu nhập (Dự kiến)',
                       style: AppTypography.labelMd.copyWith(color: AppColors.secondary)),
                   const SizedBox(height: 4.0),
                   Row(
@@ -149,7 +149,7 @@ class ShiftSummaryDialog extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '+\$12.00 thuong',
+                        '+\$12.00 thưởng',
                         style: AppTypography.labelLg.copyWith(
                           color: Colors.green,
                           fontWeight: FontWeight.bold,
@@ -171,7 +171,7 @@ class ShiftSummaryDialog extends StatelessWidget {
                   foregroundColor: AppColors.pureWhite,
                   shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
                 ),
-                child: const Text('TAI BAO CAO'),
+                child: const Text('TẢI BÁO CÁO'),
               ),
             ),
           ],

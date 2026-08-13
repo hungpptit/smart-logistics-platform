@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_styles.dart';
 
@@ -52,7 +52,7 @@ class _SignaturePadState extends State<SignaturePad> {
                   _points.clear();
                 });
               },
-              child: const Text('Xoa chu ky', style: TextStyle(color: AppColors.error)),
+              child: const Text('Xóa chữ ký', style: TextStyle(color: AppColors.error)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -63,7 +63,7 @@ class _SignaturePadState extends State<SignaturePad> {
                 foregroundColor: AppColors.pureWhite,
                 shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
               ),
-              child: const Text('Luu chu ky'),
+              child: const Text('Lưu chữ ký'),
             ),
           ],
         ),

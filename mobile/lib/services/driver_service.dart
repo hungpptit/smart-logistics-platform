@@ -32,6 +32,11 @@ class DriverService {
 
         debugPrint('📨 [DriverService] Status: ${response.statusCode}');
 
+        if (response.statusCode == 401) {
+          debugPrint('⚠️ [DriverService] Token het han (401). Xoa token.');
+          await AuthService.clearAuthData();
+          return [];
+        }
         if (response.statusCode == 200) {
           final body = jsonDecode(response.body);
           if (body['success'] == true && body['data'] != null) {
@@ -429,5 +434,52 @@ class DriverService {
       points.add(LatLng(lat / 1E5, lng / 1E5));
     }
     return points;
+  }
+
+  /// Fetch turn-by-turn navigation steps from Goong Maps Direction API
+  static Future<List<Map<String, String>>> fetchGoongNavigationSteps({
+    required LatLng origin,
+    required LatLng destination,
+  }) async {
+    try {
+      final String originStr = '${origin.latitude},${origin.longitude}';
+      final String destStr = '${destination.latitude},${destination.longitude}';
+      final String urlStr =
+          'https://rsapi.goong.io/Direction?origin=$originStr&destination=$destStr&vehicle=bike&api_key=$goongApiKey';
+
+      final response = await http.get(Uri.parse(urlStr)).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['routes'] != null && (body['routes'] as List).isNotEmpty) {
+          final legs = body['routes'][0]['legs'];
+          if (legs != null && (legs as List).isNotEmpty) {
+            final steps = legs[0]['steps'];
+            if (steps is List) {
+              final List<Map<String, String>> result = [];
+              for (final s in steps) {
+                final rawHtml = s['html_instructions']?.toString() ?? '';
+                final cleanText = rawHtml
+                    .replaceAll(RegExp(r'<[^>]*>'), '')
+                    .replaceAll('&nbsp;', ' ')
+                    .trim();
+                final distText = s['distance']?['text']?.toString() ?? '';
+                final maneuver = s['maneuver']?.toString() ?? 'straight';
+                if (cleanText.isNotEmpty) {
+                  result.add({
+                    'instruction': cleanText,
+                    'distance': distText,
+                    'maneuver': maneuver,
+                  });
+                }
+              }
+              if (result.isNotEmpty) return result;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [Goong Steps API] Error: $e');
+    }
+    return [];
   }
 }

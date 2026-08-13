@@ -58,7 +58,7 @@ class ShipmentQrModal extends StatelessWidget {
               SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  'MA QR CHUYEN XE TAI TRUNG CHUYEN',
+                  'MÃ QR CHUYỂN XE TẢI TRUNG CHUYỂN',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -68,7 +68,7 @@ class ShipmentQrModal extends StatelessWidget {
           ),
           const SizedBox(height: 8.0),
           Text(
-            'Cho Thu Kho tai Buu cuc Dich / Kho Tong quet 1 phat nhap toan bo Chuyen xe vao kho',
+            'Cho Thủ kho tại Bưu cục Đích / Kho Tổng quét 1 phát nhập toàn bộ Chuyến xe vào kho',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
@@ -101,7 +101,7 @@ class ShipmentQrModal extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              'Ma Van Don Xe Tai: $shipmentCode',
+              'Mã Vận Đơn Xe Tải: $shipmentCode',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
@@ -121,7 +121,7 @@ class ShipmentQrModal extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('Dong'),
+              child: const Text('Đóng'),
             ),
           ),
         ],

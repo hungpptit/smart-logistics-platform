@@ -488,6 +488,16 @@ export class RoutingService {
                 estimatedCodAmount: true,
                 estimatedShippingFee: true,
                 estimatedInsuranceFee: true,
+                payment: {
+                  select: {
+                    feePayer: true,
+                    paymentMethod: true,
+                    paymentStatus: true,
+                    finalShippingFee: true,
+                    finalInsuranceFee: true,
+                    finalCodAmount: true,
+                  },
+                },
               },
             },
             shipment: {
@@ -506,6 +516,16 @@ export class RoutingService {
                             estimatedCodAmount: true,
                             estimatedShippingFee: true,
                             estimatedInsuranceFee: true,
+                            payment: {
+                              select: {
+                                feePayer: true,
+                                paymentMethod: true,
+                                paymentStatus: true,
+                                finalShippingFee: true,
+                                finalInsuranceFee: true,
+                                finalCodAmount: true,
+                              },
+                            },
                           },
                         },
                       },
@@ -603,6 +623,30 @@ export class RoutingService {
                 },
               },
             },
+            order: {
+              select: {
+                id: true,
+                orderCode: true,
+                status: true,
+                receiverName: true,
+                receiverPhone: true,
+                deliveryAddressText: true,
+                pickupAddressText: true,
+                estimatedCodAmount: true,
+                estimatedShippingFee: true,
+                estimatedInsuranceFee: true,
+                payment: {
+                  select: {
+                    feePayer: true,
+                    paymentMethod: true,
+                    paymentStatus: true,
+                    finalShippingFee: true,
+                    finalInsuranceFee: true,
+                    finalCodAmount: true,
+                  },
+                },
+              },
+            },
             shipment: {
               include: {
                 shipmentPackages: {
@@ -613,6 +657,7 @@ export class RoutingService {
                           select: {
                             id: true,
                             orderCode: true,
+                            status: true,
                             receiverName: true,
                             receiverPhone: true,
                             deliveryAddressText: true,
@@ -620,6 +665,16 @@ export class RoutingService {
                             estimatedCodAmount: true,
                             estimatedShippingFee: true,
                             estimatedInsuranceFee: true,
+                            payment: {
+                              select: {
+                                feePayer: true,
+                                paymentMethod: true,
+                                paymentStatus: true,
+                                finalShippingFee: true,
+                                finalInsuranceFee: true,
+                                finalCodAmount: true,
+                              },
+                            },
                           },
                         },
                       },

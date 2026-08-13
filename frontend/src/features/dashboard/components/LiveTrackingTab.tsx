@@ -998,9 +998,11 @@ export const LiveTrackingTab: React.FC = () => {
 
       <RouteOptimizationModal
         isOpen={isOptimizationModalOpen}
-        onClose={() => setIsOptimizationModalOpen(false)}
-        onSuccess={() => {
+        onClose={() => {
           setIsOptimizationModalOpen(false);
+          fetchRoutes();
+        }}
+        onSuccess={() => {
           fetchRoutes();
         }}
         token={token}

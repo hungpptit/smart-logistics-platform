@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_styles.dart';
@@ -9,6 +9,7 @@ class QrScannerDialog extends StatelessWidget {
   final Map<String, dynamic>? stop;
   final String? activeRouteCode;
   final String? activeRouteId;
+  final String scanMode;
   final void Function(String? newRouteCode) onRouteCodeUpdated;
   final VoidCallback onRefreshRoutes;
   final void Function(Map<String, dynamic>) onStopCheckedIn;
@@ -18,6 +19,7 @@ class QrScannerDialog extends StatelessWidget {
     this.stop,
     required this.activeRouteCode,
     required this.activeRouteId,
+    this.scanMode = 'ROUTE',
     required this.onRouteCodeUpdated,
     required this.onRefreshRoutes,
     required this.onStopCheckedIn,
@@ -28,6 +30,7 @@ class QrScannerDialog extends StatelessWidget {
     Map<String, dynamic>? stop,
     String? activeRouteCode,
     String? activeRouteId,
+    String scanMode = 'ROUTE',
     required void Function(String? newRouteCode) onRouteCodeUpdated,
     required VoidCallback onRefreshRoutes,
     required void Function(Map<String, dynamic>) onStopCheckedIn,
@@ -39,6 +42,7 @@ class QrScannerDialog extends StatelessWidget {
         stop: stop,
         activeRouteCode: activeRouteCode,
         activeRouteId: activeRouteId,
+        scanMode: scanMode,
         onRouteCodeUpdated: onRouteCodeUpdated,
         onRefreshRoutes: onRefreshRoutes,
         onStopCheckedIn: onStopCheckedIn,
@@ -63,11 +67,13 @@ class QrScannerDialog extends StatelessWidget {
 
     return StatefulBuilder(
       builder: (context, setScannerState) {
+        bool isProcessing = false;
+
         Future<void> performScanCheck() async {
           final scannedValue = scanController.text.trim();
           if (scannedValue.isEmpty) {
             setScannerState(() {
-              errorMessage = 'Vui long dua camera quet ma QR / nhap ma';
+              errorMessage = 'Vui lòng đưa camera quét mã QR / nhập mã';
             });
             return;
           }
@@ -93,20 +99,20 @@ class QrScannerDialog extends StatelessWidget {
                         Icon(isOk ? Icons.check_circle : Icons.error,
                             color: isOk ? Colors.green : Colors.red, size: 28),
                         const SizedBox(width: 8.0),
-                        Text(isOk ? 'Nap Sot Xe Tai Thanh Cong' : 'That Bai',
+                        Text(isOk ? 'Nạp Sọt Xe Tải Thành Công' : 'Thất Bại',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       ],
                     ),
                     content: Text(isOk
-                        ? 'Da tiep nhan Sot [$scannedValue] len xe tai (${result['shipmentCode'] ?? ''}). Toan bo ${result['packageCount'] ?? 1} buu kien da chuyen sang Dang trung chuyen (IN_TRANSIT).'
-                        : 'Khong the nap sot $scannedValue len xe tai.'),
+                        ? 'Đã tiếp nhận Sọt [$scannedValue] lên xe tải (${result['shipmentCode'] ?? ''}). Toàn bộ ${result['packageCount'] ?? 1} bưu kiện đã chuyển sang Đang trung chuyển (IN_TRANSIT).'
+                        : 'Không thể nạp sọt $scannedValue lên xe tải.'),
                     actions: [
                       ElevatedButton(
                         onPressed: () => Navigator.pop(ctx),
                         style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.logisticsRed,
                             foregroundColor: AppColors.pureWhite),
-                        child: const Text('Dong'),
+                        child: const Text('Đóng'),
                       ),
                     ],
                   );
@@ -116,15 +122,69 @@ class QrScannerDialog extends StatelessWidget {
             return;
           }
 
-          // Case A: Scanned Tote Code (RT-XXXX) or matching route ID
-          if (scannedValue.toUpperCase().startsWith('RT-') ||
-              (scannedValue == activeRouteCode && activeRouteCode != null) ||
-              (scannedValue == activeRouteId && activeRouteId != null)) {
-            Navigator.pop(context);
-            final routeIdToStart = activeRouteId ?? activeRouteCode ?? scannedValue;
-            final success = await DriverService.startRoute(routeIdToStart);
+          // Case A: Scanned Route / Tote Code (RT-XXXX, SHP-LH-XXXX, or matching active route)
+          final bool isToteCode = scannedValue.toUpperCase().startsWith('TOT-') ||
+              scannedValue.toUpperCase().startsWith('ST-');
+          final bool isRouteCodeFormat = scannedValue.toUpperCase().startsWith('RT-') ||
+              scannedValue.toUpperCase().startsWith('SHP-LH-') ||
+              (activeRouteCode != null && scannedValue.toUpperCase() == activeRouteCode!.toUpperCase()) ||
+              (activeRouteId != null && scannedValue.toUpperCase() == activeRouteId!.toUpperCase());
+
+          // Case A1: Tote Scan (Bốc sọt hàng lên xe tải trung chuyển)
+          if (isToteCode) {
+            setScannerState(() {
+              isProcessing = true;
+            });
+            final res = await DriverService.loadToteIntoShipment(scannedValue);
+            final bool success = res != null;
             if (context.mounted) {
+              Navigator.pop(context);
               onRefreshRoutes();
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: AppColors.pureWhite,
+                  shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+                  title: Row(
+                    children: [
+                      Icon(success ? Icons.check_circle : Icons.error_outline,
+                          color: success ? Colors.green : AppColors.error, size: 28),
+                      const SizedBox(width: 8.0),
+                      Text(success ? 'Bốc Sọt Hàng Lên Xe Thành Công' : 'Lỗi Quét Sọt Hàng',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: success ? Colors.green.shade900 : AppColors.error)),
+                    ],
+                  ),
+                  content: Text(success
+                      ? 'Đã bốc sọt $scannedValue lên xe tải trung chuyển. Dữ liệu đã được đồng bộ hệ thống!'
+                      : 'Không thể quét nhận sọt $scannedValue. Vui lòng kiểm tra mã Sọt Tote hoặc liên hệ Quản lý.'),
+                  actions: [
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: success ? AppColors.logisticsRed : AppColors.deepOnyx,
+                          foregroundColor: AppColors.pureWhite),
+                      child: const Text('Đóng'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return;
+          }
+
+          // Case A2: Route Code Scan (Nhận chuyến xe / Lộ trình)
+          if (isRouteCodeFormat) {
+            // Check if shipper is assigned to this route:
+            final bool isAssignedToThisDriver = (activeRouteCode != null &&
+                    scannedValue.toUpperCase() == activeRouteCode!.toUpperCase()) ||
+                (activeRouteId != null &&
+                    scannedValue.toUpperCase() == activeRouteId!.toUpperCase()) ||
+                scannedValue.toUpperCase().startsWith('RT-') ||
+                scannedValue.toUpperCase().startsWith('SHP-LH-');
+
+            if (!isAssignedToThisDriver) {
+              // Shipper is NOT assigned to this scanned route!
+              Navigator.pop(context);
               showDialog(
                 context: context,
                 builder: (ctx) => AlertDialog(
@@ -132,22 +192,64 @@ class QrScannerDialog extends StatelessWidget {
                   shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
                   title: const Row(
                     children: [
-                      Icon(Icons.check_circle, color: Colors.green, size: 28),
+                      Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 28),
                       SizedBox(width: 8.0),
-                      Text('Nhan Sot Hang Thanh Cong',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('Không Thể Nhận Chuyến Hàng',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.error)),
+                    ],
+                  ),
+                  content: Text(
+                    (activeRouteCode != null && activeRouteCode!.isNotEmpty)
+                        ? 'Bạn không được phân công chuyến hàng [$scannedValue]. Mã chuyến hàng được phân công của bạn là [$activeRouteCode].'
+                        : 'Bạn hiện chưa được hệ thống phân công chuyến hàng [$scannedValue]. Vui lòng liên hệ Quản lý/Điều phối viên để được phân công trước khi quét nhận.',
+                  ),
+                  actions: [
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.deepOnyx,
+                          foregroundColor: AppColors.pureWhite),
+                      child: const Text('Đã hiểu'),
+                    ),
+                  ],
+                ),
+              );
+              return;
+            }
+
+            // Driver IS assigned to this route -> Show loading & execute startRoute
+            setScannerState(() {
+              isProcessing = true;
+            });
+            final routeIdToStart = activeRouteId ?? activeRouteCode ?? scannedValue;
+            final success = await DriverService.startRoute(routeIdToStart);
+            if (context.mounted) {
+              Navigator.pop(context);
+              onRefreshRoutes();
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: AppColors.pureWhite,
+                  shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+                  title: Row(
+                    children: [
+                      Icon(success ? Icons.check_circle : Icons.error_outline,
+                          color: success ? Colors.green : AppColors.error, size: 28),
+                      const SizedBox(width: 8.0),
+                      Text(success ? 'Nhận Chuyến Xe Thành Công' : 'Không Thể Nhận Chuyến Hàng',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: success ? Colors.green.shade900 : AppColors.error)),
                     ],
                   ),
                   content: Text(success
-                      ? 'Da nhan sot $scannedValue tu buu cuc. Toan bo don hang trong sot da chuyen sang Dang di giao (OUT_FOR_DELIVERY).'
-                      : 'Da xac nhan sot $scannedValue thanh cong tren he thong.'),
+                      ? 'Đã quét nhận chuyến xe $scannedValue thành công! Lộ trình đã được kích hoạt và chuyển sang trạng thái Đang thực hiện.'
+                      : 'Đã cập nhật nhận chuyến xe $scannedValue lên hệ thống! Lộ trình hiện đã sẵn sàng di chuyển.'),
                   actions: [
                     ElevatedButton(
                       onPressed: () => Navigator.pop(ctx),
                       style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.logisticsRed,
                           foregroundColor: AppColors.pureWhite),
-                      child: const Text('Bat dau giao'),
+                      child: const Text('Bắt đầu giao'),
                     ),
                   ],
                 ),
@@ -164,14 +266,16 @@ class QrScannerDialog extends StatelessWidget {
                   scannedValue.toUpperCase().contains(targetCode.toUpperCase()) ||
                   targetCode.toUpperCase().contains(scannedValue.toUpperCase()));
 
-          if (isMatch || (stop != null && stop!.isNotEmpty)) {
+          if (isMatch) {
             Navigator.pop(context);
-            if (stop != null && stop!.isNotEmpty) {
-              onStopCheckedIn(stop!);
-            }
+            onStopCheckedIn(stop!);
+          } else if (stop != null && stop!.isNotEmpty) {
+            setScannerState(() {
+              errorMessage = 'Mã bưu kiện [$scannedValue] không thuộc lộ trình được phân công của bạn!';
+            });
           } else {
             setScannerState(() {
-              errorMessage = 'Ma quet khong khop voi sot hang hoac buu kien hien tai';
+              errorMessage = 'Mã quét [$scannedValue] không khớp với bất kỳ chuyến hàng hoặc bưu kiện được phân công nào!';
             });
           }
         }
@@ -189,7 +293,7 @@ class QrScannerDialog extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'QUET MA QR SOT HANG / BUU KIEN',
+                      'QUÉT MÃ QR SỌT HÀNG / BƯU KIỆN',
                       style: TextStyle(
                           color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                     ),
@@ -211,7 +315,7 @@ class QrScannerDialog extends StatelessWidget {
                         });
                       } else {
                         setScannerState(() {
-                          errorMessage = 'Chua co sot hang nao duoc phan cong de quet';
+                          errorMessage = 'Chưa có sọt hàng nào được phân công để quét';
                         });
                       }
                     },
@@ -251,7 +355,7 @@ class QrScannerDialog extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
-                                'Camera dang quet - Cham de dien ma thu',
+                                'Camera đang quét - Chạm để điền mã thử',
                                 style: TextStyle(
                                     color: Colors.amberAccent,
                                     fontSize: 9,
@@ -267,8 +371,8 @@ class QrScannerDialog extends StatelessWidget {
                 const SizedBox(height: 12.0),
                 Text(
                   targetCode != null
-                      ? 'Ma Sot Hang / Buu kien can quet: $targetCode'
-                      : 'Tinh trang: Chua duoc phan cong lo trinh',
+                      ? 'Mã Sọt Hàng / Bưu kiện cần quét: $targetCode'
+                      : 'Tình trạng: Chưa được phân công lộ trình',
                   style: const TextStyle(
                       color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12),
                 ),
@@ -278,7 +382,7 @@ class QrScannerDialog extends StatelessWidget {
                   style: const TextStyle(
                       color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
                   decoration: InputDecoration(
-                    labelText: 'Nhap hoac quet ma Sot (RT-XXXX) / Buu kien',
+                    labelText: 'Nhập hoặc quét mã Sọt (RT-XXXX) / Bưu kiện',
                     labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
                     prefixIcon: const Icon(Icons.barcode_reader, color: AppColors.logisticsRed),
                     filled: true,
@@ -317,7 +421,7 @@ class QrScannerDialog extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: performScanCheck,
                     icon: const Icon(Icons.qr_code_scanner),
-                    label: const Text('XAC NHAN MA QUET'),
+                    label: const Text('XÁC NHẬN MÃ QUÉT'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.logisticsRed,
                       foregroundColor: Colors.white,

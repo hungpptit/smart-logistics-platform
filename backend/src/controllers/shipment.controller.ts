@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ShipmentService } from '../services/shipment.service';
 import { RequestWithUser } from '../middlewares/auth.middleware';
+import { getTrackingGateway } from '../gateways/tracking.gateway';
 
 export class ShipmentController {
   private shipmentService = new ShipmentService();
@@ -83,6 +84,7 @@ export class ShipmentController {
         return;
       }
       const result = await this.shipmentService.loadToteIntoShipment(driverUserId, toteCode);
+      getTrackingGateway()?.broadcastRoutesUpdated();
       res.status(200).json({
         success: true,
         message: 'Tài xế đã tiếp nhận Sọt Hàng và gán vào Chuyến Xe Tải thành công!',

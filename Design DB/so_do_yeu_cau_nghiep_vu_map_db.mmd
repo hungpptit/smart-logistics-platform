@@ -1,96 +1,102 @@
 flowchart TB
-    KH["👤 CUSTOMER"] -- "1. CUSTOMER: Cung cấp thông tin đơn hàng" --> INFO_ORDER@{ label: "<b>📋 THÔNG TIN ĐƠN HÀNG</b><br><br><table border=\"1\" style=\"min-width:680px; border-collapse:collapse; text-align:left;\"><thead><tr style=\"background-color:#E3F2FD;\"><th style=\"padding:6px 12px; white-space:nowrap; width:30%; border:1px solid #1E88E5;\">Bảng (Table)</th><th style=\"padding:6px 12px; white-space:nowrap; width:35%; border:1px solid #1E88E5;\">Trường nghiệp vụ</th><th style=\"padding:6px 12px; white-space:nowrap; width:35%; border:1px solid #1E88E5;\">Cột trong DB (Column)</th></tr></thead><tbody><tr style=\"background-color:#E3F2FD;\"><td colspan=\"3\" style=\"padding:4px 10px; font-weight:bold; color:#0D47A1; border:1px solid #1E88E5;\">📌 BẢNG: addresses &amp; provinces (Địa chỉ)</td></tr><tr><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">addresses &amp; provinces</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">Địa chỉ chi tiết</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\"><code>address_line_1</code></td></tr><tr><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">addresses &amp; provinces</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">Phường / Xã (FK)</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\"><code>ward_code</code></td></tr><tr><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">addresses &amp; provinces</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">Tỉnh / TP</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\"><code>provinces.name</code></td></tr><tr style=\"background-color:#E3F2FD;\"><td colspan=\"3\" style=\"padding:4px 10px; font-weight:bold; color:#0D47A1; border:1px solid #1E88E5;\">📌 BẢNG: orders (Đơn hàng)</td></tr><tr><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">orders</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">Người gửi &amp; ĐC lấy (FK)</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\"><code>customer_id</code>, <code>pickup_address_id</code></td></tr><tr><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">orders</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">Họ tên người nhận</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\"><code>receiver_name</code></td></tr><tr><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">orders</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">SĐT người nhận</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\"><code>receiver_phone</code></td></tr><tr><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">orders</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">Địa chỉ nhận (FK)</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\"><code>delivery_address_id</code></td></tr><tr><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">orders</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">Loại dịch vụ / Lịch hẹn</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\"><code>service_id</code>, <code>scheduled_pickup_at</code></td></tr><tr style=\"background-color:#E3F2FD;\"><td colspan=\"3\" style=\"padding:4px 10px; font-weight:bold; color:#0D47A1; border:1px solid #1E88E5;\">📌 BẢNG: order_payments (Thanh toán)</td></tr><tr><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">order_payments</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">Số tiền COD</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\"><code>final_cod_amount</code></td></tr><tr><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">order_payments</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">Người chịu phí</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\"><code>fee_payer</code></td></tr><tr><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">order_payments</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\">PT thanh toán</td><td style=\"padding:4px 12px; white-space:nowrap; border:1px solid #D6E4F0;\"><code>payment_method</code></td></tr></tbody></table>" }
-    INFO_ORDER -- "2. CUSTOMER: Nhập thông tin kiện hàng" --> INFO_PKG["📦 Thông tin KIỆN HÀNG<br>====================================<br>   · Khối lượng (kg) -&gt; weight<br>   · Chiều dài (cm) -&gt; length<br>   · Chiều rộng (cm) -&gt; width<br>   · Chiều cao (cm) -&gt; height<br>   · Mô tả hàng hóa -&gt; description<br>   · Giá trị khai báo -&gt; declared_value<br>   · Hàng dễ vỡ? -&gt; is_fragile<br>   · Yêu cầu nhiệt độ -&gt; temperature_requirement<br>   · Loại xe yêu cầu -&gt; required_vehicle_type_id<br>====================================<br>💾 packages"]
+    KH["CUSTOMER"] -- "1. CUSTOMER: Cung cấp thông tin đơn hàng" --> INFO_ORDER["THÔNG TIN ĐƠN HÀNG & ĐỊA CHỈ<br>====================================<br>   · Họ tên &amp; SĐT Người gửi / Người nhận<br>   · Địa chỉ lấy &amp; Địa chỉ giao hàng<br>   · Loại dịch vụ &amp; Khung giờ hẹn<br>   · Tiền thu hộ COD &amp; Phí vận chuyển<br>===================================="]
+    INFO_ORDER -- "2. CUSTOMER: Nhập thông tin kiện hàng" --> INFO_PKG["THÔNG TIN KIỆN HÀNG<br>====================================<br>   · Kích thước (Dài x Rộng x Cao cm)<br>   · Trọng lượng thực tế (kg)<br>   · Tên &amp; Mô tả hàng hóa, Giá trị khai báo<br>   · Yêu cầu đặc biệt (Dễ vỡ / Nhiệt độ)<br>   · Loại xe vận chuyển yêu cầu<br>===================================="]
     INFO_PKG -- Chọn Gói dịch vụ --> DEC_SERVICE{{"Gói dịch vụ<br>"}}
     
     %% ==========================================
     %% NHÁNH 1 — EXPRESS (GIAO HỎA TỐC GIAO THẲNG)
     %% ==========================================
-    DEC_SERVICE -- Express --> SHIPPER_EX["🛵 SHIPPER (ON_DEMAND)"]
-    SHIPPER_EX -- SHIPPER: Đến lấy & Chở thẳng tới người nhận --> SCAN_EX["📲 SHIPPER xác nhận giao hàng<br>====================================<br>   · Quét mã xác nhận<br>   · Chụp ảnh bằng chứng (POD)<br>   · Nhập số tiền COD thu được<br>====================================<br>💾 delivery_proofs &amp; order_status_history<br>   actual_cod_collected<br>   delivery_result -&gt; SUCCESS"]
-    SCAN_EX -- Hoàn tất --> DONE_EX["✅ GIAO THÀNH CÔNG — EXPRESS"]
+    DEC_SERVICE -- Express --> SHIPPER_EX["SHIPPER (ON_DEMAND)"]
+    SHIPPER_EX -- SHIPPER: Đến lấy & Chở thẳng tới người nhận --> SCAN_EX["SHIPPER xác nhận giao hàng thành công<br>====================================<br>   · Quét mã xác nhận đơn hàng<br>   · Chụp ảnh bằng chứng (POD)<br>   · Thu số tiền COD từ Người nhận<br>===================================="]
+    SCAN_EX -- Hoàn tất --> DONE_EX["GIAO THÀNH CÔNG — EXPRESS"]
     
     %% ==========================================
     %% NHÁNH 2 — STANDARD / SAVING (CHUYỂN PHÁT QUA KHO)
     %% ==========================================
     DEC_SERVICE -- Standard --> DEC_PICKUP{{"Customer chọn hình thức gửi hàng<br>"}}
-    DEC_PICKUP -- 🛵 Pickup: SHIPPER đến lấy tận nhà --> SHIPPER_A["🛵 SHIPPER (HUB_DELIVERY)"]
-    SHIPPER_A -- SHIPPER: Đến nhà khách · Quét mã xác nhận lấy hàng --> SCAN_A["📲 SHIPPER quét mã xác nhận tại nhà Khách<br>====================================<br>   · Quét QR / Barcode trên kiện hàng<br>   · Chụp ảnh xác nhận đã lấy hàng<br>====================================<br>💾 orders &amp; order_status_history<br>   status -&gt; PICKED_UP"]
-    DEC_PICKUP -- "🚶 Drop-off: Tự mang ra Bưu cục" --> KH2["👤 CUSTOMER"]
-    KH2 -- CUSTOMER: Mang hàng ra Bưu cục gửi --> NV_BC2["👤 STAFF (Bưu cục gửi)"]
-    SCAN_A -- SHIPPER: Chuyển hàng về Bưu cục Phường gửi --> NV_BC2
-    NV_BC2 -- STAFF: Quét Barcode tiếp nhận và phân loại --> SCAN_KHO["📲 STAFF quét mã tiếp nhận &amp; Phân loại<br>====================================<br>   · Quét Barcode bưu kiện nhập bưu cục<br>   · Hệ thống hiển thị ngay khu vực để hàng<br>====================================<br>💾 warehouse_scans &amp; order_status_history<br>   facility_id<br>   status -&gt; ARRIVED_ORIGIN_FACILITY"]
-    SCAN_KHO -- Tự động xác định Hướng tuyến phân loại --> DEC_TUYEN{{"❓ Phạm vi<br>giao hàng?"}}
+    DEC_PICKUP -- Pickup: SHIPPER đến lấy tận nhà --> SHIPPER_A["SHIPPER (Lấy hàng)"]
+    SHIPPER_A -- SHIPPER: Đến nhà khách · Quét mã xác nhận lấy hàng --> SCAN_A["SHIPPER quét mã xác nhận tại nhà Khách<br>====================================<br>   · Quét QR / Barcode trên kiện hàng<br>   · Chụp ảnh xác nhận đã lấy hàng từ Khách<br>===================================="]
+    DEC_PICKUP -- Drop-off: Tự mang ra Bưu cục --> KH2["CUSTOMER"]
+    KH2 -- CUSTOMER: Mang hàng ra Bưu cục gửi --> NV_BC2["STAFF (Bưu cục gửi cấp 3)"]
+    SCAN_A -- SHIPPER: Chuyển hàng về Bưu cục gửi cấp 3 --> NV_BC2
+    NV_BC2 -- STAFF: Quét Barcode tiếp nhận và phân loại --> SCAN_KHO["STAFF quét mã tiếp nhận &amp; Phân loại kho<br>====================================<br>   · Quét Barcode bưu kiện nhập bưu cục cấp 3<br>   · Hệ thống hiển thị khu vực để hàng<br>===================================="]
+    SCAN_KHO -- Tự động xác định Hướng tuyến phân loại --> DEC_TUYEN{{"Phạm vi<br>giao hàng?"}}
 
     %% ==========================================
     %% QUY TRÌNH CHUẨN TRUNG CHUYỂN GIỮA CÁC KHO
     %% ==========================================
 
-    %% NHÁNH 1: CÙNG PHƯỜNG / NỘI QUẬN (1 NẤC)
-    DEC_TUYEN -- "1. Cùng Phường (1 nấc)<br>Thủ Đức -> Linh Trung" --> WARD_L1["🏪 Bưu cục Phường gửi (Thủ Đức)<br>WARD_STATION"]
-    WARD_L1 -- "STAFF: Quét xuất Bưu cục Phường gửi" --> L1_STAFF_OUT["📲 STAFF quét xuất bưu cục<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L1_STAFF_OUT -- "SHIPPER: Quét xác nhận nhận bưu kiện" --> L1_DRIVER_IN["🚚 SHIPPER quét xác nhận lên xe<br>💾 shipments (IN_TRANSIT)"]
-    L1_DRIVER_IN -- "Chuyển thẳng sang Phường nhận" --> C3_DST["🏪 Bưu cục Phường nhận (Linh Trung)<br>WARD_STATION"]
+    %% CASE 1: CÙNG PHƯỜNG / XÃ
+    DEC_TUYEN -- "1. Cùng Phường / Xã<br>BC gửi cấp 3 sang BC nhận cấp 3" --> WARD_L1["Bưu cục Phường gửi (BC Cấp 3)"]
+    WARD_L1 -- "STAFF: Quét xuất Bưu cục Phường gửi" --> L1_STAFF_OUT["STAFF quét xuất bưu cục cấp 3"]
+    L1_STAFF_OUT -- "SHIPPER: Quét xác nhận nhận bưu kiện" --> L1_DRIVER_IN["SHIPPER quét xác nhận lên xe"]
+    L1_DRIVER_IN -- "Chuyển thẳng sang BC nhận cấp 3" --> C3_DST["Bưu cục Phường nhận (BC Cấp 3)"]
 
-    %% NHÁNH 2: CÙNG TỈNH / NỘI TỈNH (3 NẤC)
-    DEC_TUYEN -- "2. Cùng Tỉnh (3 nấc)<br>Phường -> Kho Tỉnh -> Phường" --> WARD_L2["🏪 Bưu cục Phường gửi (Thủ Đức)<br>WARD_STATION"]
-    WARD_L2 -- "STAFF xuất Phường" --> L2_STAFF_OUT1["📲 STAFF quét xuất Bưu cục Phường<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L2_STAFF_OUT1 -- "SHIPPER LINEHAUL xác nhận lên xe" --> L2_DRIVER1["🚚 SHIPPER (LINEHAUL) quét xác nhận lên xe<br>💾 shipment_transfers (IN_TRANSIT)"]
-    L2_DRIVER1 -- "Chở đến Kho Tỉnh" --> PROV_L2["🏬 Kho Tổng Tỉnh (HCM)<br>PROVINCIAL_HUB"]
-    PROV_L2 -- "STAFF xuất Kho Tỉnh" --> L2_STAFF_OUT2["📲 STAFF quét xuất Kho Tỉnh<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L2_STAFF_OUT2 -- "SHIPPER LINEHAUL xác nhận chở về Phường" --> L2_DRIVER2["🚚 SHIPPER (LINEHAUL) quét xác nhận nhận chuyến<br>💾 shipment_transfers (IN_TRANSIT)"]
-    L2_DRIVER2 -- "Chở về Bưu cục Phường nhận" --> C3_DST_PROV["🏪 Bưu cục Phường nhận (Củ Chi)<br>WARD_STATION"]
+    %% CASE 2: KHÁC PHƯỜNG / XÃ NHƯNG CÙNG TỈNH / THÀNH PHỐ
+    DEC_TUYEN -- "2. Khác Phường / Xã nhưng Cùng Tỉnh / TP<br>BC gửi cấp 3 sang BC cấp 2 về BC nhận cấp 3" --> WARD_L2["Bưu cục Phường gửi (BC Cấp 3)"]
+    WARD_L2 -- "STAFF xuất Phường" --> L2_STAFF_OUT1["STAFF quét xuất BC gửi cấp 3"]
+    L2_STAFF_OUT1 -- "SHIPPER LINEHAUL xác nhận lên xe" --> L2_DRIVER1["SHIPPER LINEHAUL quét xác nhận chở lên BC cấp 2"]
+    L2_DRIVER1 -- "Chở đến BC cấp 2" --> PROV_L2["Kho Tổng Tỉnh (BC Cấp 2)"]
+    PROV_L2 -- "STAFF xuất Kho Tỉnh" --> L2_STAFF_OUT2["STAFF quét xuất BC cấp 2"]
+    L2_STAFF_OUT2 -- "SHIPPER LINEHAUL xác nhận chở về Phường" --> L2_DRIVER2["SHIPPER LINEHAUL quét xác nhận chở về BC nhận cấp 3"]
+    L2_DRIVER2 -- "Chở về BC nhận cấp 3" --> C3_DST_PROV["Bưu cục Phường nhận (BC Cấp 3)"]
 
-    %% NHÁNH 3: CÙNG MIỀN (5 NẤC - QUA 1 KHO MIỀN SORTER)
-    DEC_TUYEN -- "3. Cùng Miền (5 nấc)<br>Phường -> Tỉnh -> Kho Miền Sorter -> Tỉnh -> Phường" --> WARD_L3["🏪 Bưu cục Phường gửi (Thủ Đức)<br>WARD_STATION"]
-    WARD_L3 -- "STAFF xuất Phường" --> L3_STAFF_OUT1["📲 STAFF quét xuất Bưu cục Phường<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L3_STAFF_OUT1 -- "SHIPPER LINEHAUL xác nhận lên xe" --> L3_DRIVER1["🚚 SHIPPER (LINEHAUL) quét xác nhận lên xe<br>💾 shipment_transfers (IN_TRANSIT)"]
-    L3_DRIVER1 -- "Chở đến Kho Tỉnh gửi" --> PROV_L3_SRC["🏬 Kho Tổng Tỉnh gửi (HCM)<br>PROVINCIAL_HUB"]
+    %% CASE 3: KHÁC TỈNH / THÀNH PHỐ NHƯNG CÙNG MIỀN
+    DEC_TUYEN -- "3. Khác Tỉnh / Thành phố nhưng Cùng Miền<br>BC gửi cấp 3 sang BC cấp 2 gửi qua BC cấp 1 về BC cấp 2 nhận sang BC nhận cấp 3" --> WARD_L3["Bưu cục Phường gửi (BC Cấp 3)"]
+    WARD_L3 -- "STAFF xuất Phường" --> L3_STAFF_OUT1["STAFF quét xuất BC gửi cấp 3"]
+    L3_STAFF_OUT1 -- "SHIPPER LINEHAUL xác nhận lên xe" --> L3_DRIVER1["SHIPPER LINEHAUL quét xác nhận chở lên BC cấp 2 gửi"]
+    L3_DRIVER1 -- "Chở đến BC cấp 2 gửi" --> PROV_L3_SRC["Kho Tổng Tỉnh gửi (BC Cấp 2)"]
     
-    PROV_L3_SRC -- "STAFF xuất Kho Tỉnh gửi" --> L3_STAFF_OUT2["📲 STAFF quét xuất Kho Tỉnh gửi<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L3_STAFF_OUT2 -- "SHIPPER LINEHAUL xác nhận đi Kho Miền" --> L3_DRIVER2["🚚 SHIPPER (LINEHAUL) quét xác nhận xe tải đi Kho Miền<br>💾 shipment_transfers (IN_TRANSIT)"]
-    L3_DRIVER2 -- "Chở đến Kho Miền Nam" --> SORT_L3["🏭 Kho Phân Loại Miền (Miền Nam)<br>SORTING_CENTER"]
+    PROV_L3_SRC -- "STAFF xuất Kho Tỉnh gửi" --> L3_STAFF_OUT2["STAFF quét xuất BC cấp 2 gửi"]
+    L3_STAFF_OUT2 -- "SHIPPER LINEHAUL xác nhận đi BC cấp 1" --> L3_DRIVER2["SHIPPER LINEHAUL quét xác nhận xe tải đi BC Phân Loại cấp 1"]
+    L3_DRIVER2 -- "Chở đến BC Phân Loại cấp 1" --> SORT_L3["Kho Phân Loại Miền (BC Cấp 1)"]
 
-    SORT_L3 -- "STAFF phân loại & xuất Kho Miền" --> L3_STAFF_OUT3["📲 STAFF quét xuất Kho Miền<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L3_STAFF_OUT3 -- "SHIPPER LINEHAUL xác nhận sang Kho Tỉnh nhận" --> L3_DRIVER3["🚚 SHIPPER (LINEHAUL) quét xác nhận nhận chuyến<br>💾 shipment_transfers (IN_TRANSIT)"]
-    L3_DRIVER3 -- "Chở đến Kho Tỉnh nhận" --> PROV_L3_DST["🏬 Kho Tổng Tỉnh nhận (Tây Ninh)<br>PROVINCIAL_HUB"]
+    SORT_L3 -- "STAFF phân loại & xuất Kho Miền" --> L3_STAFF_OUT3["STAFF quét xuất BC Phân Loại cấp 1"]
+    L3_STAFF_OUT3 -- "SHIPPER LINEHAUL xác nhận sang BC cấp 2 nhận" --> L3_DRIVER3["SHIPPER LINEHAUL quét xác nhận chở sang BC cấp 2 nhận"]
+    L3_DRIVER3 -- "Chở đến BC cấp 2 nhận" --> PROV_L3_DST["Kho Tổng Tỉnh nhận (BC Cấp 2)"]
 
-    PROV_L3_DST -- "STAFF xuất Kho Tỉnh nhận" --> L3_STAFF_OUT4["📲 STAFF quét xuất Kho Tỉnh nhận<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L3_STAFF_OUT4 -- "SHIPPER LINEHAUL xác nhận chở về Phường" --> L3_DRIVER4["🚚 SHIPPER (LINEHAUL) quét xác nhận xe về Phường<br>💾 shipment_transfers (IN_TRANSIT)"]
-    L3_DRIVER4 -- "Chở đến Bưu cục Phường nhận" --> C3_DST_REGION["🏪 Bưu cục Phường nhận (Xã Phan)<br>WARD_STATION"]
+    PROV_L3_DST -- "STAFF xuất Kho Tỉnh nhận" --> L3_STAFF_OUT4["STAFF quét xuất BC cấp 2 nhận"]
+    L3_STAFF_OUT4 -- "SHIPPER LINEHAUL xác nhận chở về Phường" --> L3_DRIVER4["SHIPPER LINEHAUL quét xác nhận chở hàng về BC nhận cấp 3"]
+    L3_DRIVER4 -- "Chở đến BC nhận cấp 3" --> C3_DST_REGION["Bưu cục Phường nhận (BC Cấp 3)"]
 
-    %% NHÁNH 4: KHÁC MIỀN (6 NẤC - QUA 2 KHO MIỀN SORTER BẮC - NAM)
-    DEC_TUYEN -- "4. Khác Miền (6 nấc)<br>Phường -> Tỉnh -> Miền Nam -> Miền Bắc -> Tỉnh -> Phường" --> WARD_L4["🏪 Bưu cục Phường gửi (Thủ Đức)<br>WARD_STATION"]
-    WARD_L4 -- "STAFF xuất Phường" --> L4_STAFF_OUT1["📲 STAFF quét xuất Bưu cục Phường<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L4_STAFF_OUT1 -- "SHIPPER LINEHAUL xác nhận lên xe" --> L4_DRIVER1["🚚 SHIPPER (LINEHAUL) quét xác nhận lên xe<br>💾 shipment_transfers (IN_TRANSIT)"]
-    L4_DRIVER1 -- "Chở đến Kho Tỉnh gửi" --> PROV_L4_SRC["🏬 Kho Tổng Tỉnh gửi (HCM)<br>PROVINCIAL_HUB"]
+    %% CASE 4: KHÁC MIỀN (MIỀN NAM SANG MIỀN BẮC)
+    DEC_TUYEN -- "4. Khác Miền (Miền Nam sang Miền Bắc)<br>BC gửi cấp 3 sang BC cấp 2 gửi qua BC nguồn cấp 1 -> BC Đích cấp 1 về BC cấp 2 sang BC nhận cấp 3" --> WARD_L4["Bưu cục Phường gửi (BC Cấp 3)"]
+    WARD_L4 -- "STAFF xuất Phường" --> L4_STAFF_OUT1["STAFF quét xuất BC gửi cấp 3"]
+    L4_STAFF_OUT1 -- "SHIPPER LINEHAUL xác nhận lên xe" --> L4_DRIVER1["SHIPPER LINEHAUL quét xác nhận chở lên BC cấp 2 gửi"]
+    L4_DRIVER1 -- "Chở đến BC cấp 2 gửi" --> PROV_L4_SRC["Kho Tổng Tỉnh gửi (BC Cấp 2)"]
 
-    PROV_L4_SRC -- "STAFF xuất Kho Tỉnh gửi" --> L4_STAFF_OUT2["📲 STAFF quét xuất Kho Tỉnh gửi<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L4_STAFF_OUT2 -- "SHIPPER LINEHAUL xác nhận đi Kho Miền" --> L4_DRIVER2["🚚 SHIPPER (LINEHAUL) quét xác nhận xe tải đi Kho Miền<br>💾 shipment_transfers (IN_TRANSIT)"]
-    L4_DRIVER2 -- "Chở đến Kho Miền Nguồn" --> SORT_L4_SOUTH["🏭 Kho Phân Loại Miền Nguồn (Miền Nam)<br>SORTING_CENTER"]
+    PROV_L4_SRC -- "STAFF xuất Kho Tỉnh gửi" --> L4_STAFF_OUT2["STAFF quét xuất BC cấp 2 gửi"]
+    L4_STAFF_OUT2 -- "SHIPPER LINEHAUL xác nhận đi BC cấp 1 Nguồn" --> L4_DRIVER2["SHIPPER LINEHAUL quét xác nhận xe tải đi BC Miền Nguồn cấp 1"]
+    L4_DRIVER2 -- "Chở đến BC Miền Nguồn cấp 1" --> SORT_L4_SOUTH["Kho Phân Loại Miền Nguồn (BC Cấp 1)"]
 
-    SORT_L4_SOUTH -- "STAFF phân loại & xuất Kho Miền Nguồn" --> L4_STAFF_OUT3["📲 STAFF quét xuất Kho Miền Nguồn<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L4_STAFF_OUT3 -- "SHIPPER LINEHAUL xác nhận vận chuyển Liên miền" --> L4_DRIVER3["🚚 SHIPPER (LINEHAUL) quét xác nhận xe Container / Hàng không<br>💾 shipment_transfers (IN_TRANSIT)"]
-    L4_DRIVER3 -- "Chuyển sang Kho Miền Đích" --> SORT_L4_NORTH["🏭 Kho Phân Loại Miền Đích (Miền Bắc)<br>SORTING_CENTER"]
+    SORT_L4_SOUTH -- "STAFF phân loại & xuất Kho Miền Nguồn" --> L4_STAFF_OUT3["STAFF quét xuất BC Miền Nguồn cấp 1"]
+    L4_STAFF_OUT3 -- "SHIPPER LINEHAUL xác nhận vận chuyển Liên miền" --> L4_DRIVER3["SHIPPER LINEHAUL quét xác nhận lên xe Container / Hàng không"]
+    L4_DRIVER3 -- "Chuyển sang BC Miền Đích cấp 1" --> SORT_L4_NORTH["Kho Phân Loại Miền Đích (BC Cấp 1)"]
 
-    SORT_L4_NORTH -- "STAFF phân loại & xuất Kho Miền Đích" --> L4_STAFF_OUT4["📲 STAFF quét xuất Kho Miền Đích<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L4_STAFF_OUT4 -- "SHIPPER LINEHAUL xác nhận sang Kho Tỉnh nhận" --> L4_DRIVER4["🚚 SHIPPER (LINEHAUL) quét xác nhận nhận chuyến<br>💾 shipment_transfers (IN_TRANSIT)"]
-    L4_DRIVER4 -- "Chở đến Kho Tỉnh Hà Nội" --> PROV_L4_DST["🏬 Kho Tổng Tỉnh nhận (Hà Nội)<br>PROVINCIAL_HUB"]
+    SORT_L4_NORTH -- "STAFF phân loại & xuất Kho Miền Đích" --> L4_STAFF_OUT4["STAFF quét xuất BC Miền Đích cấp 1"]
+    L4_STAFF_OUT4 -- "SHIPPER LINEHAUL xác nhận sang BC cấp 2 nhận" --> L4_DRIVER4["SHIPPER LINEHAUL quét xác nhận chở sang BC cấp 2 nhận"]
+    L4_DRIVER4 -- "Chở đến BC cấp 2 nhận" --> PROV_L4_DST["Kho Tổng Tỉnh nhận (Hà Nội)<br>PROVINCIAL_HUB"]
 
-    PROV_L4_DST -- "STAFF xuất Kho Tỉnh nhận" --> L4_STAFF_OUT5["📲 STAFF quét xuất Kho Tỉnh nhận<br>💾 warehouse_scans (READY_FOR_DISPATCH)"]
-    L4_STAFF_OUT5 -- "SHIPPER LINEHAUL xác nhận chở về Phường" --> L4_DRIVER5["🚚 SHIPPER (LINEHAUL) quét xác nhận xe về Phường<br>💾 shipment_transfers (IN_TRANSIT)"]
-    L4_DRIVER5 -- "Chở đến Bưu cục Phường nhận" --> C3_DST_CROSS["🏪 Bưu cục Phường nhận (Cầu Giấy)<br>WARD_STATION"]
+    PROV_L4_DST -- "STAFF xuất Kho Tỉnh nhận" --> L4_STAFF_OUT5["STAFF quét xuất BC cấp 2 nhận"]
+    L4_STAFF_OUT5 -- "SHIPPER LINEHAUL xác nhận chở về Phường" --> L4_DRIVER5["SHIPPER LINEHAUL quét xác nhận chở hàng về BC nhận cấp 3"]
+    L4_DRIVER5 -- "Chở đến BC nhận cấp 3" --> C3_DST_CROSS["Bưu cục Phường nhận (Cầu Giấy)<br>WARD_STATION"]
 
     %% ==========================================
     %% PHASE 5 — GIAO HÀNG CHẶNG CUỐI
     %% ==========================================
-    C3_DST -- "STAFF: Quét nhập bưu cục (AT_HUB) & Gán đơn" --> SHIPPER_L["🛵 SHIPPER (Chặng cuối)"]
-    C3_DST_PROV -- "STAFF: Quét nhập bưu cục (AT_HUB) & Gán đơn" --> SHIPPER_L
-    C3_DST_REGION -- "STAFF: Quét nhập bưu cục (AT_HUB) & Gán đơn" --> SHIPPER_L
-    C3_DST_CROSS -- "STAFF: Quét nhập bưu cục (AT_HUB) & Gán đơn" --> SHIPPER_L
+    C3_DST -- "STAFF: Quét nhập bưu cục đích cấp 3 & Gán đơn" --> SHIPPER_L["SHIPPER (Chặng cuối BC cấp 3)"]
+    C3_DST_PROV -- "STAFF: Quét nhập bưu cục đích cấp 3 & Gán đơn" --> SHIPPER_L
+    C3_DST_REGION -- "STAFF: Quét nhập bưu cục đích cấp 3 & Gán đơn" --> SHIPPER_L
+    C3_DST_CROSS -- "STAFF: Quét nhập bưu cục đích cấp 3 & Gán đơn" --> SHIPPER_L
 
-    SHIPPER_L -- "SHIPPER: Đến địa chỉ người nhận" --> SCAN_GIAO["📲 SHIPPER xác nhận giao hàng<br>====================================<br>   · Quét mã xác nhận<br>   · Chụp ảnh bằng chứng (POD)<br>   · Nhập số tiền COD thu me<br>====================================<br>💾 delivery_proofs &amp; order_status_history<br>   actual_cod_collected<br>   delivery_result -&gt; SUCCESS"]
-    SCAN_GIAO -- Hoàn tất --> DONE["✅ GIAO THÀNH CÔNG — STANDARD"]
+    SHIPPER_L -- "SHIPPER: Đến địa chỉ người nhận" --> SCAN_GIAO["SHIPPER xác nhận giao hàng thành công<br>====================================<br>   · Quét mã xác nhận<br>   · Chụp ảnh bằng chứng (POD)<br>   · Thu số tiền COD từ Người nhận<br>===================================="]
+    SCAN_GIAO -- Hoàn tất --> DONE["GIAO THÀNH CÔNG — STANDARD"]
+
+    subgraph LEGEND["Chú thích Bưu cục"]
+        BC_CAP3["Cấp 3: Phường / Xã"]
+        BC_CAP2["Cấp 2: Kho Tỉnh / TP"]
+        BC_CAP1["Cấp 1: Kho Miền Sorter"]
+    end
 
     INFO_ORDER@{ shape: rect}
      KH:::actor
@@ -155,13 +161,17 @@ flowchart TB
      SCAN_GIAO:::inputScan
      DONE:::done
 
-    classDef actor     fill:#EDE7F6,stroke:#7E57C2,stroke-width:2px,color:#311B92,font-weight:bold
-    classDef inputOrd  fill:#FFFFFF,stroke:#1E88E5,stroke-width:2px,color:#0D47A1
-    classDef inputPkg  fill:#E8F5E9,stroke:#43A047,stroke-width:2px,color:#1B5E20
-    classDef inputScan fill:#FFF3E0,stroke:#FB8C00,stroke-width:2px,color:#E65100
-    classDef decision  fill:#FCE4EC,stroke:#E91E63,stroke-width:2px,color:#880E4F,font-weight:bold
-    classDef ward      fill:#E0F2F1,stroke:#26A69A,stroke-width:2px,color:#004D40,font-weight:bold
-    classDef prov      fill:#E3F2FD,stroke:#42A5F5,stroke-width:2px,color:#0D47A1,font-weight:bold
-    classDef sort      fill:#F3E5F5,stroke:#AB47BC,stroke-width:2px,color:#4A148C,font-weight:bold
-    classDef express   fill:#FBE9E7,stroke:#FF7043,stroke-width:2px,color:#BF360C,font-weight:bold
-    classDef done      fill:#E8F5E9,stroke:#66BB6A,stroke-width:3px,color:#1B5E20,font-weight:bold
+     BC_CAP3:::ward
+     BC_CAP2:::prov
+     BC_CAP1:::sort
+
+    classDef actor     fill:#FFFFFF,stroke:#000000,stroke-width:2px,color:#000000,font-weight:bold
+    classDef inputOrd  fill:#FFFFFF,stroke:#333333,stroke-width:1.5px,color:#000000
+    classDef inputPkg  fill:#F5F5F5,stroke:#333333,stroke-width:1.5px,color:#000000
+    classDef inputScan fill:#F5F5F5,stroke:#333333,stroke-width:1.5px,color:#000000
+    classDef decision  fill:#FFFFFF,stroke:#000000,stroke-width:2px,color:#000000,font-weight:bold
+    classDef ward      fill:#F0F0F0,stroke:#333333,stroke-width:1.5px,color:#000000
+    classDef prov      fill:#D9D9D9,stroke:#333333,stroke-width:1.5px,color:#000000,font-weight:bold
+    classDef sort      fill:#BFBFBF,stroke:#000000,stroke-width:2px,color:#000000,font-weight:bold
+    classDef express   fill:#E8E8E8,stroke:#000000,stroke-width:2px,color:#000000,font-weight:bold
+    classDef done      fill:#E6E6E6,stroke:#000000,stroke-width:2.5px,color:#000000,font-weight:bold

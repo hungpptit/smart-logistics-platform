@@ -124,7 +124,7 @@ class StopDetailsDialog extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              isLinehaul ? 'MA CHUYEN XE TAI:' : 'MA BUU KIEN:',
+                              isLinehaul ? 'MÃ CHUYỂN XE TẢI:' : 'MÃ BƯU KIỆN:',
                               style: const TextStyle(
                                   fontSize: 11.0,
                                   fontWeight: FontWeight.bold,
@@ -163,7 +163,7 @@ class StopDetailsDialog extends StatelessWidget {
                         ),
                         const SizedBox(height: 8.0),
                         Text(
-                          '${stop['receiverName'] ?? 'Buu cuc xu ly'}',
+                          '${stop['receiverName'] ?? 'Bưu cục xử lý'}',
                           style: const TextStyle(
                               fontSize: 11.0,
                               fontWeight: FontWeight.w600,
@@ -190,7 +190,7 @@ class StopDetailsDialog extends StatelessWidget {
                                     SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
-                                        'VAN CHUYEN TRUNG CHUYEN BUU CUC',
+                                        'VẬN CHUYỂN TRUNG CHUYỂN BƯU CỤC',
                                         style: TextStyle(
                                           fontSize: 11.0,
                                           fontWeight: FontWeight.w900,
@@ -203,8 +203,8 @@ class StopDetailsDialog extends StatelessWidget {
                                 const SizedBox(height: 6.0),
                                 Text(
                                   isPickupStop
-                                      ? '• Da xuat kho & tiep nhan toan bo sot hang len xe tai.\n• Giao dich van chuyen noi bo he thong (Khong thu tien mat).'
-                                      : '• Trinh ma QR Chuyen xe cho Nhan vien Buu cuc dich quet nhap kho.\n• Giao dich van chuyen noi bo he thong (Khong thu tien mat).',
+                                      ? '• Đã xuất kho & tiếp nhận toàn bộ sọt hàng lên xe tải.\n• Giao dịch vận chuyển nội bộ hệ thống (Không thu tiền mặt).'
+                                      : '• Trình mã QR Chuyến xe cho Nhân viên Bưu cục đích quét nhập kho.\n• Giao dịch vận chuyển nội bộ hệ thống (Không thu tiền mặt).',
                                   style: const TextStyle(
                                     fontSize: 10.5,
                                     color: Color(0xFF1E3A8A),
@@ -222,7 +222,7 @@ class StopDetailsDialog extends StatelessWidget {
                                     }
                                   },
                                   icon: const Icon(Icons.qr_code_2, size: 18),
-                                  label: const Text('HIEN MA QR CHUYEN XE CHO BUU CUC', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  label: const Text('HIỆN MÃ QR CHUYỂN XE CHO BƯU CỤC', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF1D4ED8),
                                     foregroundColor: Colors.white,
@@ -258,11 +258,11 @@ class StopDetailsDialog extends StatelessWidget {
                                       child: Text(
                                         (stop['totalToCollect'] as num? ?? 0) > 0
                                             ? (isPickupStop
-                                                ? 'CAN THU NGUOI GUI:'
-                                                : 'TONG CAN THU NGUOI NHAN:')
+                                                ? 'CẦN THU NGƯỜI GỬI:'
+                                                : 'TỔNG CẦN THU NGƯỜI NHẬN:')
                                             : (isPickupStop
-                                                ? 'KHONG THU TIEN NGUOI GUI'
-                                                : 'KHONG THU TIEN NGUOI NHAN'),
+                                                ? 'KHÔNG THU TIỀN NGƯỜI GỬI'
+                                                : 'KHÔNG THU TIỀN NGƯỜI NHẬN'),
                                         style: TextStyle(
                                           fontSize: 11.0,
                                           fontWeight: FontWeight.w800,
@@ -290,11 +290,13 @@ class StopDetailsDialog extends StatelessWidget {
                                 Text(
                                   isPickupStop
                                       ? ((stop['totalToCollect'] as num? ?? 0) > 0
-                                          ? '- Cuoc gui hang: ${formatCurrency((stop['shippingFee'] as num? ?? (stop['totalToCollect'] as num? ?? 0)))}\n- Tien COD: ${formatCurrency((stop['codAmount'] as num? ?? 0))} (Se thu tu Nguoi Nhan khi giao)'
-                                          : '- Nguoi gui da tra cuoc truoc.\n- Tien COD: ${formatCurrency((stop['codAmount'] as num? ?? 0))} (Se thu tu Nguoi Nhan khi giao)')
+                                          ? '- Cước gửi hàng (Người gửi trả): ${formatCurrency((stop['shippingFee'] as num? ?? (stop['totalToCollect'] as num? ?? 0)))}\n- Tiền COD: ${formatCurrency((stop['codAmount'] as num? ?? 0))} (Sẽ thu từ Người Nhận khi giao)'
+                                          : ((stop['isReceiverPayFee'] == true)
+                                              ? '- Cước vận chuyển: Người nhận trả khi giao hàng (Không thu Người gửi).\n- Tiền COD: ${formatCurrency((stop['codAmount'] as num? ?? 0))} (Sẽ thu từ Người Nhận khi giao)'
+                                              : '- Người gửi đã thanh toán cước trước.\n- Tiền COD: ${formatCurrency((stop['codAmount'] as num? ?? 0))} (Sẽ thu từ Người Nhận khi giao)'))
                                       : ((stop['isReceiverPayFee'] == true)
-                                          ? '- Tien COD thu ho: ${formatCurrency((stop['codAmount'] as num? ?? 0))}\n- Cuoc ship (Nguoi nhan tra): ${formatCurrency((stop['shippingFee'] as num? ?? 0))}'
-                                          : '- Tien COD thu ho: ${formatCurrency((stop['codAmount'] as num? ?? 0))}\n- Cuoc ship: 0d (Nguoi gui da tra cuoc)'),
+                                          ? '- Tiền COD thu hộ: ${formatCurrency((stop['codAmount'] as num? ?? 0))}\n- Cước ship (Người nhận trả): ${formatCurrency((stop['shippingFee'] as num? ?? 0))}'
+                                          : '- Tiền COD thu hộ: ${formatCurrency((stop['codAmount'] as num? ?? 0))}\n- Cước ship: 0đ (Người gửi đã trả cước)'),
                                   style: TextStyle(
                                     fontSize: 10.0,
                                     color: (stop['totalToCollect'] as num? ?? 0) > 0
@@ -323,11 +325,11 @@ class StopDetailsDialog extends StatelessWidget {
                         child: Text(
                           isLinehaul
                               ? (isPickupStop
-                                  ? '1. Da boc sot len xe & xuat buu cuc'
-                                  : '1. Trinh ma QR Chuyen xe cho Buu cuc dich')
+                                  ? '1. Đã bốc sọt lên xe & xuất bưu cục'
+                                  : '1. Trình mã QR Chuyến xe cho Bưu cục đích')
                               : (isPickupStop
-                                  ? '1. Quet QR / Barcode Ma Don Nguoi Gui'
-                                  : '1. Quet QR Check-in'),
+                                  ? '1. Quét QR / Barcode Mã Đơn Người Gửi'
+                                  : '1. Quét QR Check-in'),
                           style: TextStyle(
                             fontWeight: isCheckedIn ? FontWeight.bold : FontWeight.normal,
                             color: isCheckedIn ? AppColors.deepOnyx : AppColors.secondary,
@@ -344,7 +346,7 @@ class StopDetailsDialog extends StatelessWidget {
                             backgroundColor: AppColors.logisticsRed,
                             foregroundColor: AppColors.pureWhite,
                           ),
-                          child: const Text('Quet QR'),
+                          child: const Text('Quét QR'),
                         ),
                     ],
                   ),
@@ -361,11 +363,11 @@ class StopDetailsDialog extends StatelessWidget {
                         child: Text(
                           isLinehaul
                               ? (isPickupStop
-                                  ? '2. Chup anh xe tai / niem phong (Tuy chon)'
-                                  : '2. Chup anh ban giao tai kho dich (Tuy chon)')
+                                  ? '2. Chụp ảnh xe tải / niêm phong (Tùy chọn)'
+                                  : '2. Chụp ảnh bàn giao tại kho đích (Tùy chọn)')
                               : (isPickupStop
-                                  ? '2. Chup hinh buu kien da nhan tai Shop'
-                                  : '2. Chup hinh bang chung giao nhan'),
+                                  ? '2. Chụp hình bưu kiện đã nhận tại Shop'
+                                  : '2. Chụp hình bằng chứng giao nhận'),
                           style: TextStyle(
                             fontWeight: hasPhoto ? FontWeight.bold : FontWeight.normal,
                             color: hasPhoto ? AppColors.deepOnyx : AppColors.secondary,
@@ -383,7 +385,7 @@ class StopDetailsDialog extends StatelessWidget {
                             backgroundColor: AppColors.deepOnyx,
                             foregroundColor: AppColors.pureWhite,
                           ),
-                          child: const Text('Chup anh'),
+                          child: const Text('Chụp ảnh'),
                         ),
                     ],
                   ),
@@ -410,7 +412,7 @@ class StopDetailsDialog extends StatelessWidget {
                       Expanded(
                         flex: 3,
                         child: SizedBox(
-                          height: 52.0,
+                          height: 56.0,
                           child: ElevatedButton(
                             onPressed: canComplete
                                 ? () {
@@ -421,12 +423,17 @@ class StopDetailsDialog extends StatelessWidget {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.logisticsRed,
                               foregroundColor: AppColors.pureWhite,
+                              padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 6.0),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                             child: Text(
                               isLinehaul
-                                  ? (isPickupStop ? 'XAC NHAN DA XUAT BUU CUC' : 'XAC NHAN DA TOI BUU CUC DICH')
-                                  : (isPickupStop ? 'XAC NHAN DA LAY HANG' : 'HOAN THANH GIAO HANG'),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                  ? (isPickupStop ? 'ĐÃ XUẤT BƯU CỤC' : 'ĐÃ TỚI BƯU CỤC ĐÍCH')
+                                  : (isPickupStop ? 'XÁC NHẬN ĐÃ LẤY HÀNG' : 'XÁC NHẬN ĐÃ GIAO HÀNG'),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, height: 1.15),
                             ),
                           ),
                         ),
@@ -435,8 +442,8 @@ class StopDetailsDialog extends StatelessWidget {
                       Expanded(
                         flex: 2,
                         child: SizedBox(
-                          height: 52.0,
-                          child: OutlinedButton.icon(
+                          height: 56.0,
+                          child: OutlinedButton(
                             onPressed: () {
                               Navigator.pop(context);
                               ReportFailureDialog.show(
@@ -445,17 +452,29 @@ class StopDetailsDialog extends StatelessWidget {
                                 onConfirmed: onFailureConfirmed,
                               );
                             },
-                            icon: const Icon(Icons.warning_amber_rounded,
-                                size: 16, color: AppColors.error),
-                            label: const Text('Bao Loi',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.error,
-                                    fontSize: 12)),
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(color: AppColors.error, width: 1.5),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.error),
+                                const SizedBox(height: 2),
+                                Text(
+                                  isPickupStop ? 'Báo Lấy Thất Bại' : 'Báo Giao Thất Bại',
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.error,
+                                    fontSize: 11,
+                                    height: 1.1,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),

@@ -1,25 +1,74 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_styles.dart';
 
 class StatsBentoCard extends StatelessWidget {
   final List<Map<String, dynamic>> stops;
+  final bool isRouteStarted;
+  final LatLng? currentLocation;
 
-  const StatsBentoCard({super.key, required this.stops});
+  const StatsBentoCard({
+    super.key,
+    required this.stops,
+    this.isRouteStarted = true,
+    this.currentLocation,
+  });
 
   int get _completedCount => stops
       .where((s) =>
           s['isCheckedIn'] == true ||
           s['status'] == 'DA GIAO' ||
-          s['status'] == 'DA LAY HANG')
+          s['status'] == 'ĐÃ GIAO' ||
+          s['status'] == 'DA LAY HANG' ||
+          s['status'] == 'ĐÃ LẤY HÀNG')
       .length;
+
+  double get _totalRouteDistanceKm {
+    if (stops.isEmpty) return 0.0;
+    double totalMeters = 0.0;
+
+    LatLng prevPoint = currentLocation ??
+        LatLng(
+          double.tryParse(stops.first['latitude']?.toString() ?? '') ?? 10.849,
+          double.tryParse(stops.first['longitude']?.toString() ?? '') ?? 106.762,
+        );
+
+    for (final stop in stops) {
+      final double lat = double.tryParse(stop['latitude']?.toString() ?? '') ?? prevPoint.latitude;
+      final double lng = double.tryParse(stop['longitude']?.toString() ?? '') ?? prevPoint.longitude;
+      final LatLng currPoint = LatLng(lat, lng);
+      totalMeters += Geolocator.distanceBetween(
+        prevPoint.latitude,
+        prevPoint.longitude,
+        currPoint.latitude,
+        currPoint.longitude,
+      );
+      prevPoint = currPoint;
+    }
+
+    return totalMeters / 1000.0;
+  }
+
+  double get _avgStopMinutes {
+    if (stops.isEmpty) return 0.0;
+    final totalKm = _totalRouteDistanceKm;
+    final totalTravelMinutes = (totalKm / 25.0 * 60.0);
+    final totalServiceMinutes = stops.length * 5.0;
+    final avg = (totalTravelMinutes + totalServiceMinutes) / stops.length;
+    return avg.clamp(3.0, 30.0);
+  }
 
   @override
   Widget build(BuildContext context) {
     final completedCount = _completedCount;
     final totalCount = stops.length;
     final progress = stops.isEmpty ? 0.0 : completedCount / totalCount;
+    final bool isPendingScan = !isRouteStarted && stops.isNotEmpty;
+    final totalKm = _totalRouteDistanceKm;
+    final avgMins = _avgStopMinutes;
 
     return Container(
       padding: const EdgeInsets.all(20.0),
@@ -36,7 +85,7 @@ class StatsBentoCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Trang thai ca',
+                'Trạng thái ca',
                 style: AppTypography.labelLg.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.deepOnyx,
@@ -45,13 +94,13 @@ class StatsBentoCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: isPendingScan ? Colors.amber.shade50 : Colors.green.shade50,
                   borderRadius: BorderRadius.circular(12.0),
                 ),
                 child: Text(
-                  'HOAT DONG',
+                  isPendingScan ? 'CHỜ QUÉT NHẬN' : 'HOẠT ĐỘNG',
                   style: AppTypography.labelMd.copyWith(
-                    color: Colors.green.shade800,
+                    color: isPendingScan ? Colors.amber.shade900 : Colors.green.shade800,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -62,7 +111,7 @@ class StatsBentoCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Hoan thanh', style: AppTypography.bodyMd.copyWith(color: AppColors.secondary)),
+              Text('Hoàn thành', style: AppTypography.bodyMd.copyWith(color: AppColors.secondary)),
               Text(
                 '$completedCount / $totalCount',
                 style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
@@ -91,14 +140,12 @@ class StatsBentoCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Quang duong',
+                        'Quãng đường',
                         style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
                       ),
                       const SizedBox(height: 4.0),
                       Text(
-                        stops.isEmpty
-                            ? '0.0 km'
-                            : '${(stops.length * 3.5).toStringAsFixed(1)} km',
+                        '${totalKm.toStringAsFixed(1)} km',
                         style: AppTypography.headlineMd.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppColors.deepOnyx,
@@ -120,14 +167,12 @@ class StatsBentoCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Dung trung binh',
+                        'Dừng trung bình',
                         style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
                       ),
                       const SizedBox(height: 4.0),
                       Text(
-                        stops.isEmpty
-                            ? '0.0 phut'
-                            : '${(12.0 / (stops.isNotEmpty ? stops.length : 1)).toStringAsFixed(1)} phut',
+                        '${avgMins.toStringAsFixed(1)} phút',
                         style: AppTypography.headlineMd.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppColors.deepOnyx,

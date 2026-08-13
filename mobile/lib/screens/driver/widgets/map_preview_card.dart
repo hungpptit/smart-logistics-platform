@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -11,6 +12,7 @@ class MapPreviewCard extends StatelessWidget {
   final List<Map<String, dynamic>> stops;
   final List<LatLng> roadPolylinePoints;
   final VoidCallback onStartNavigation;
+  final bool isRouteStarted;
 
   const MapPreviewCard({
     super.key,
@@ -19,10 +21,30 @@ class MapPreviewCard extends StatelessWidget {
     required this.stops,
     required this.roadPolylinePoints,
     required this.onStartNavigation,
+    this.isRouteStarted = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    double distanceKm = 0.0;
+    int estimatedMinutes = 5;
+
+    final activeStop = stops.firstWhere(
+      (s) => s['isCheckedIn'] != true,
+      orElse: () => stops.isNotEmpty ? stops.first : <String, dynamic>{},
+    );
+
+    if (activeStop.isNotEmpty) {
+      final double lat = double.tryParse(activeStop['latitude']?.toString() ?? '') ?? currentLocation.latitude;
+      final double lng = double.tryParse(activeStop['longitude']?.toString() ?? '') ?? currentLocation.longitude;
+      final double distanceMeters = Geolocator.distanceBetween(
+        currentLocation.latitude, currentLocation.longitude, lat, lng,
+      );
+      distanceKm = distanceMeters / 1000.0;
+      estimatedMinutes = (distanceKm / 25 * 60).round();
+      if (estimatedMinutes < 2) estimatedMinutes = 2;
+    }
+
     return Container(
       height: 220.0,
       width: double.infinity,
@@ -147,12 +169,12 @@ class MapPreviewCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Du kien diem dung tiep',
+                          'Dự kiến điểm dừng tiếp',
                           style: AppTypography.labelMd.copyWith(
                               color: AppColors.logisticsRed, fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          '14 Phut',
+                          '$estimatedMinutes Phút (${distanceKm.toStringAsFixed(1)} km)',
                           style: AppTypography.bodyMd.copyWith(
                               fontWeight: FontWeight.bold, color: AppColors.deepOnyx),
                         ),
@@ -162,12 +184,12 @@ class MapPreviewCard extends StatelessWidget {
                   ElevatedButton(
                     onPressed: onStartNavigation,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.deepOnyx,
+                      backgroundColor: isRouteStarted ? AppColors.deepOnyx : const Color(0xFFD97706),
                       foregroundColor: AppColors.pureWhite,
                       shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 14.0),
                     ),
-                    child: const Text('Dan duong'),
+                    child: Text(isRouteStarted ? 'Dẫn đường' : 'Quét nhận trước'),
                   ),
                 ],
               ),

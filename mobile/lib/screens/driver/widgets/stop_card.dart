@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_styles.dart';
@@ -95,7 +95,7 @@ class StopCard extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6.0, vertical: 2.0),
                                 decoration: BoxDecoration(
-                                  color: status == 'DANG THUC HIEN'
+                                  color: (status == 'DANG THUC HIEN' || status == 'ĐANG THỰC HIỆN')
                                       ? AppColors.logisticsRed.withValues(alpha: 0.1)
                                       : AppColors.surfaceContainer,
                                   borderRadius: BorderRadius.circular(4.0),
@@ -103,7 +103,7 @@ class StopCard extends StatelessWidget {
                                 child: Text(
                                   status,
                                   style: TextStyle(
-                                    color: status == 'DANG THUC HIEN'
+                                    color: (status == 'DANG THUC HIEN' || status == 'ĐANG THỰC HIỆN')
                                         ? AppColors.logisticsRed
                                         : AppColors.secondary,
                                     fontSize: 9.0,
@@ -147,7 +147,7 @@ class StopCard extends StatelessWidget {
                                       : AppColors.secondary),
                               const SizedBox(width: 4.0),
                               Text(
-                                '$packages Kien hang',
+                                '$packages Kiện hàng',
                                 style: AppTypography.labelMd.copyWith(
                                   color: isActive
                                       ? AppColors.tertiary
@@ -162,7 +162,7 @@ class StopCard extends StatelessWidget {
                                   size: 14.0, color: AppColors.secondary),
                               const SizedBox(width: 4.0),
                               Text(
-                                'Du kien: $eta',
+                                'Dự kiến: $eta',
                                 style: AppTypography.labelMd
                                     .copyWith(color: AppColors.secondary),
                               ),

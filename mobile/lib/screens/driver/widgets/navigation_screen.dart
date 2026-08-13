@@ -1,9 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_styles.dart';
+import '../../../services/driver_service.dart';
 import 'map_stop_pin.dart';
 import 'floating_nav_btn.dart';
 import 'nav_stat_item.dart';
@@ -34,6 +36,8 @@ class NavigationScreen extends StatefulWidget {
 class _NavigationScreenState extends State<NavigationScreen> {
   bool _isVoiceOn = true;
   bool _isRouteExecuting = false;
+  List<Map<String, String>> _navSteps = [];
+  int _currentStepIndex = 0;
 
   Map<String, dynamic> get _activeStop => widget.stops.firstWhere(
         (s) => s['isCheckedIn'] != true,
@@ -41,12 +45,52 @@ class _NavigationScreenState extends State<NavigationScreen> {
       );
 
   @override
+  void initState() {
+    super.initState();
+    _fetchNavSteps();
+  }
+
+  Future<void> _fetchNavSteps() async {
+    final activeStop = _activeStop;
+    if (activeStop.isEmpty) return;
+    final double targetLat = double.tryParse(activeStop['latitude']?.toString() ?? '') ?? widget.currentLocation.latitude;
+    final double targetLng = double.tryParse(activeStop['longitude']?.toString() ?? '') ?? widget.currentLocation.longitude;
+    final steps = await DriverService.fetchGoongNavigationSteps(
+      origin: widget.currentLocation,
+      destination: LatLng(targetLat, targetLng),
+    );
+    if (mounted && steps.isNotEmpty) {
+      setState(() {
+        _navSteps = steps;
+        _currentStepIndex = 0;
+      });
+    }
+  }
+
+  IconData _getManeuverIcon(String maneuver) {
+    final m = maneuver.toLowerCase();
+    if (m.contains('left')) return Icons.turn_left;
+    if (m.contains('right')) return Icons.turn_right;
+    if (m.contains('uturn')) return Icons.u_turn_left;
+    if (m.contains('straight')) return Icons.straight;
+    return Icons.navigation;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final activeStop = _activeStop;
-    final String targetAddress = activeStop['address']?.toString() ?? 'Chua xac dinh diem dung';
+    final String targetAddress = activeStop['address']?.toString() ?? 'Chưa xác định điểm dừng';
     final dynamic rawIndex = activeStop['index'] ?? activeStop['sequence'] ?? 1;
     final int targetIndex = rawIndex is int ? rawIndex : (int.tryParse(rawIndex.toString()) ?? 1);
-    final String targetTitle = activeStop['title']?.toString() ?? 'Khach hang';
+    final String targetTitle = activeStop['title']?.toString() ?? 'Khách hàng';
+
+    final double targetLat = double.tryParse(activeStop['latitude']?.toString() ?? '') ?? widget.currentLocation.latitude;
+    final double targetLng = double.tryParse(activeStop['longitude']?.toString() ?? '') ?? widget.currentLocation.longitude;
+    final double distMeters = Geolocator.distanceBetween(
+      widget.currentLocation.latitude, widget.currentLocation.longitude, targetLat, targetLng,
+    );
+    final double navDistanceKm = distMeters / 1000.0;
+    final int navDurationMin = (navDistanceKm / 25 * 60).round().clamp(2, 120);
 
     return Scaffold(
       body: Stack(
@@ -144,79 +188,103 @@ class _NavigationScreenState extends State<NavigationScreen> {
               ],
             ),
           ),
-
-          // 2. Top Navigation Direction Banner
+          // 2. Top Navigation Direction Banner (Turn-by-Turn Goong Maps)
           Positioned(
             top: MediaQuery.of(context).padding.top + 12.0,
             left: 16.0,
             right: 16.0,
-            child: Container(
-              padding: const EdgeInsets.all(14.0),
-              decoration: BoxDecoration(
-                color: AppColors.deepOnyx,
-                borderRadius: AppStyles.roundedXl,
-                border: const Border(left: BorderSide(color: AppColors.logisticsRed, width: 4.0)),
-                boxShadow: AppStyles.softShadow,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: AppStyles.roundedLg,
+            child: GestureDetector(
+              onTap: () {
+                if (_navSteps.isNotEmpty) {
+                  setState(() {
+                    _currentStepIndex = (_currentStepIndex + 1) % _navSteps.length;
+                  });
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(14.0),
+                decoration: BoxDecoration(
+                  color: AppColors.deepOnyx,
+                  borderRadius: AppStyles.roundedXl,
+                  border: const Border(left: BorderSide(color: AppColors.logisticsRed, width: 4.0)),
+                  boxShadow: AppStyles.softShadow,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: AppStyles.roundedLg,
+                      ),
+                      child: Icon(
+                        _navSteps.isNotEmpty
+                            ? _getManeuverIcon(_navSteps[_currentStepIndex]['maneuver'] ?? '')
+                            : Icons.navigation,
+                        size: 28.0,
+                        color: AppColors.logisticsRed,
+                      ),
                     ),
-                    child: const Icon(Icons.navigation,
-                        size: 28.0, color: AppColors.logisticsRed),
-                  ),
-                  const SizedBox(width: 14.0),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.logisticsRed,
-                                borderRadius: BorderRadius.circular(4),
+                    const SizedBox(width: 14.0),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.logisticsRed,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'ĐIỂM DỪNG #$targetIndex',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold),
+                                ),
                               ),
-                              child: Text(
-                                'DIEM DUNG #$targetIndex',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold),
+                              const SizedBox(width: 8.0),
+                              Expanded(
+                                child: Text(
+                                  _navSteps.isNotEmpty
+                                      ? 'HƯỚNG DẪN RẼ (${_currentStepIndex + 1}/${_navSteps.length})'
+                                      : targetTitle.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.labelMd.copyWith(color: Colors.white70),
+                                ),
                               ),
+                            ],
+                          ),
+                          const SizedBox(height: 4.0),
+                          Text(
+                            _navSteps.isNotEmpty
+                                ? _navSteps[_currentStepIndex]['instruction'] ?? targetAddress
+                                : targetAddress,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.headlineMd.copyWith(
+                              color: AppColors.pureWhite,
+                              fontSize: 13.0,
+                              height: 1.25,
                             ),
-                            const SizedBox(width: 8.0),
-                            Expanded(
-                              child: Text(
-                                targetTitle.toUpperCase(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTypography.labelMd.copyWith(color: Colors.white70),
-                              ),
+                          ),
+                          if (_navSteps.isNotEmpty) ...[
+                            const SizedBox(height: 2.0),
+                            Text(
+                              'Trong ${_navSteps[_currentStepIndex]['distance']} • Nhấn để xem bước tiếp',
+                              style: const TextStyle(color: Colors.amberAccent, fontSize: 10.0),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 4.0),
-                        Text(
-                          targetAddress,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.headlineMd.copyWith(
-                            color: AppColors.pureWhite,
-                            fontSize: 13.0,
-                            height: 1.25,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -273,14 +341,14 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Ket xe phia truoc',
+                              'Kẹt xe phía trước',
                               style: AppTypography.labelLg.copyWith(
                                 color: const Color(0xFF663C00),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
-                              'Cham khoang 3 phut tren tuyen duong di chuyen.',
+                              'Chậm khoảng 3 phút trên tuyến đường di chuyển.',
                               style: AppTypography.labelMd.copyWith(color: const Color(0xFF663C00)),
                             ),
                           ],
@@ -327,20 +395,20 @@ class _NavigationScreenState extends State<NavigationScreen> {
                         )
                       ],
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        NavStatItem(label: 'Thoi gian', value: '5', unit: 'phut', isRed: true),
-                        SizedBox(
+                        NavStatItem(label: 'Thời gian', value: '$navDurationMin', unit: 'phút', isRed: true),
+                        const SizedBox(
                             child: ColoredBox(
                                 color: AppColors.surfaceContainer,
                                 child: SizedBox(width: 1.0, height: 40.0))),
-                        NavStatItem(label: 'Khoang cach', value: '1.2', unit: 'km'),
-                        SizedBox(
+                        NavStatItem(label: 'Khoảng cách', value: navDistanceKm.toStringAsFixed(1), unit: 'km'),
+                        const SizedBox(
                             child: ColoredBox(
                                 color: AppColors.surfaceContainer,
                                 child: SizedBox(width: 1.0, height: 40.0))),
-                        NavStatItem(label: 'Van toc', value: '35', unit: 'km/h'),
+                        NavStatItem(label: 'Vận tốc', value: _isRouteExecuting ? '32' : '0', unit: 'km/h'),
                       ],
                     ),
                   ),
@@ -366,7 +434,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           onPressed: () => ReportIncidentDialog.show(context),
                           icon: const Icon(Icons.warning_amber_rounded,
                               size: 16.0, color: AppColors.logisticsRed),
-                          label: const Text('Bao su co',
+                          label: const Text('Báo sự cố',
                               style:
                                   TextStyle(fontSize: 11.0, fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
@@ -402,13 +470,13 @@ class _NavigationScreenState extends State<NavigationScreen> {
                                                 mainAxisSize: MainAxisSize.min,
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  Text('Da bat dau hanh trinh',
+                                                  Text('Đã bắt đầu hành trình',
                                                       style: TextStyle(
                                                           fontWeight: FontWeight.bold,
                                                           fontSize: 13,
                                                           color: Colors.white)),
                                                   Text(
-                                                      'Dang truyen tin hieu dinh vi GPS thoi gian thuc',
+                                                      'Đang truyền tín hiệu định vị GPS thời gian thực',
                                                       style: TextStyle(
                                                           fontSize: 10,
                                                           color: Colors.white70)),
@@ -426,7 +494,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                                       );
                                     },
                                     icon: const Icon(Icons.play_arrow_rounded, size: 20.0),
-                                    label: const Text('BAT DAU CHAY',
+                                    label: const Text('BẮT ĐẦU CHẠY',
                                         style: TextStyle(
                                             fontSize: 12.0,
                                             fontWeight: FontWeight.w800,
@@ -454,12 +522,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
                                                 mainAxisSize: MainAxisSize.min,
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  Text('Da dung hanh trinh',
+                                                  Text('Đã dừng hành trình',
                                                       style: TextStyle(
                                                           fontWeight: FontWeight.bold,
                                                           fontSize: 13,
                                                           color: Colors.white)),
-                                                  Text('Tam ngat truyen tin hieu dinh vi GPS',
+                                                  Text('Tạm ngắt truyền tín hiệu định vị GPS',
                                                       style: TextStyle(
                                                           fontSize: 10,
                                                           color: Colors.white70)),
@@ -477,7 +545,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                                       );
                                     },
                                     icon: const Icon(Icons.stop_rounded, size: 20.0),
-                                    label: const Text('DUNG CHAY',
+                                    label: const Text('DỪNG CHẠY',
                                         style: TextStyle(
                                             fontSize: 12.0,
                                             fontWeight: FontWeight.w800,
@@ -519,7 +587,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
                                   .where((s) =>
                                       s['isCheckedIn'] == true ||
                                       s['status'] == 'DA GIAO' ||
-                                      s['status'] == 'DA LAY HANG')
+                                      s['status'] == 'ĐÃ GIAO' ||
+                                      s['status'] == 'DA LAY HANG' ||
+                                      s['status'] == 'ĐÃ LẤY HÀNG')
                                   .length /
                               widget.stops.length),
                       minHeight: 6.0,
