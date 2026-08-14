@@ -429,7 +429,10 @@ export class RoutingService {
       where.startFacilityId = filters.facilityId;
     }
     if (filters.driverId) {
-      where.driverVehicleAssignment = { driverId: filters.driverId };
+      where.OR = [
+        { driverVehicleAssignment: { driverId: filters.driverId } },
+        { driverVehicleAssignment: { driver: { userId: filters.driverId } } },
+      ];
     }
 
     const routes = await prisma.route.findMany({
@@ -528,6 +531,18 @@ export class RoutingService {
                             },
                           },
                         },
+                      },
+                    },
+                  },
+                },
+                warehouseScans: {
+                  include: {
+                    toteBag: {
+                      select: {
+                        id: true,
+                        toteCode: true,
+                        zoneCode: true,
+                        status: true,
                       },
                     },
                   },
@@ -681,6 +696,18 @@ export class RoutingService {
                     },
                   },
                 },
+                warehouseScans: {
+                  include: {
+                    toteBag: {
+                      select: {
+                        id: true,
+                        toteCode: true,
+                        zoneCode: true,
+                        status: true,
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -821,13 +848,14 @@ export class RoutingService {
    * Confirm Tote Scan & Start Route Execution (Transition Route -> IN_PROGRESS and Orders -> OUT_FOR_DELIVERY)
    */
   public async confirmRouteStart(routeId: string, userId?: string) {
+    // Check if routeId is a valid UUID format before querying by id
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isUuid = uuidRegex.test(routeId);
+
     const route = await prisma.route.findFirst({
-      where: {
-        OR: [
-          { id: routeId },
-          { routeCode: routeId },
-        ],
-      },
+      where: isUuid
+        ? { OR: [{ id: routeId }, { routeCode: routeId }] }
+        : { routeCode: routeId },
     });
 
     if (!route) {
@@ -883,16 +911,55 @@ export class RoutingService {
       facilityOrders.forEach(o => orderIds.push(o.id));
     }
 
+
+    // Always assign/re-assign driverVehicleAssignment to the driver who scanned and started this route
+    let assignmentId = route.driverVehicleAssignmentId;
+    if (userId) {
+      const staff = await prisma.staff.findFirst({ where: { userId } });
+      if (staff) {
+        let assignment = await prisma.driverVehicleAssignment.findFirst({
+          where: { driverId: staff.id, isActive: true },
+        });
+        if (!assignment) {
+          const vehicle = (await prisma.vehicle.findFirst({ where: { operatingStatus: 'ACTIVE' } }))
+            || (await prisma.vehicle.findFirst());
+          if (vehicle) {
+            assignment = await prisma.driverVehicleAssignment.create({
+              data: {
+                driverId: staff.id,
+                vehicleId: vehicle.id,
+                assignedFrom: new Date(),
+                isActive: true,
+              },
+            });
+          }
+        }
+        if (assignment) {
+          assignmentId = assignment.id;
+        }
+      }
+    }
+
+
     // Update Route status to IN_PROGRESS
     const updatedRoute = await prisma.route.update({
       where: { id: route.id },
       data: {
         status: 'IN_PROGRESS',
         actualStartAt: new Date(),
+        ...(assignmentId ? { driverVehicleAssignmentId: assignmentId } : {}),
       },
     });
 
+
+    await prisma.routeStop.updateMany({
+      where: { routeId: route.id, status: 'PENDING' },
+      data: { status: RouteStopStatus.ARRIVED },
+    });
+
     // Update related orders status: PICKING for pickup orders, OUT_FOR_DELIVERY for delivery orders
+
+
     if (orderIds.length > 0) {
       const uniqueOrderIds = Array.from(new Set(orderIds));
       const ordersToUpdate = await prisma.order.findMany({
@@ -965,13 +1032,13 @@ export class RoutingService {
    * Confirm Route Complete & Liberate Driver for Next Assignment (POST /routes/:id/complete)
    */
   public async confirmRouteComplete(routeId: string, userId?: string) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isUuid = uuidRegex.test(routeId);
+
     const route = await prisma.route.findFirst({
-      where: {
-        OR: [
-          { id: routeId },
-          { routeCode: routeId },
-        ],
-      },
+      where: isUuid
+        ? { OR: [{ id: routeId }, { routeCode: routeId }] }
+        : { routeCode: routeId },
     });
 
     if (!route) {

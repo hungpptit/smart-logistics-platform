@@ -4,7 +4,7 @@ import { CONFIG } from '../../../config';
 import { io, Socket } from 'socket.io-client';
 import {
   Navigation, Earth, Truck, MapPin, Search, RefreshCw,
-  Play, Square, Clock, Loader2, AlertCircle, Bot, RotateCcw, Building2, QrCode, X
+  Play, Square, Clock, Loader2, AlertCircle, Bot, Building2, QrCode, X
 } from 'lucide-react';
 import { Map, MapControls, MapMarker, MarkerContent, MapRoute, MarkerPopup } from '../../../components/ui/map';
 import MapLibreGL from 'maplibre-gl';
@@ -121,56 +121,6 @@ export const LiveTrackingTab: React.FC = () => {
     setIsOptimizationModalOpen(true);
   };
 
-  const [resetting, setResetting] = useState<boolean>(false);
-
-  const handleDevResetAi = async () => {
-    const targetFacilityId = facilityFilter || userAssignedFacilityId;
-
-    if (!targetFacilityId && !isAdmin) {
-      alert('Vui lòng chọn Kho/Bưu cục cần hoàn tác dữ liệu AI!');
-      return;
-    }
-
-    if (!canOperateOnCurrentFacility && !isAdmin) {
-      alert('❌ Quyền hạn không đủ! Bạn chỉ được phép hoàn tác dữ liệu AI tại Bưu cục mình quản lý.');
-      return;
-    }
-
-    const targetFacName = targetFacilityId
-      ? (facilities.find(f => f.id === targetFacilityId)?.facilityName || 'kho đang chọn')
-      : 'TOÀN BỘ CÁC BƯU CỤC HỆ THỐNG';
-
-    if (!window.confirm(`⚠️ [DEV RESET] Bạn có chắc muốn HOÀN TÁC tất cả các tuyến AI đã gom và trả lại các đơn hàng của ${targetFacName} về trạng thái chờ ban đầu?`)) {
-      return;
-    }
-
-    setResetting(true);
-    try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}/routes/dev-reset`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ facilityId: targetFacilityId })
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
-        alert(`🎉 ${data.message || 'Đã hoàn tác dữ liệu AI về ban đầu!'}`);
-        setSelectedRouteId(null);
-        setSelectedRoute(null);
-        fetchRoutes();
-      } else {
-        alert(`❌ Lỗi hoàn tác: ${data.message || 'Không thể hoàn tác dữ liệu.'}`);
-      }
-    } catch (err) {
-      console.error('Lỗi khi gọi API dev-reset:', err);
-      alert('❌ Đã xảy ra lỗi kết nối khi hoàn tác.');
-    } finally {
-      setResetting(false);
-    }
-  };
 
   // Socket.io
   const socketRef = useRef<Socket | null>(null);
@@ -641,22 +591,11 @@ export const LiveTrackingTab: React.FC = () => {
                 <>
                   <button
                     onClick={handleRunAiOptimization}
-                    disabled={resetting}
                     className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
                     title="Kích hoạt thuật toán AI K-Means & VRP gom cụm phân đơn cho tài xế"
                   >
                     <Bot size={12} />
                     <span>AI Gom Cụm</span>
-                  </button>
-
-                  <button
-                    onClick={handleDevResetAi}
-                    disabled={resetting}
-                    className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
-                    title="[DEV TOOL] Hoàn tác toàn bộ lộ trình AI và khôi phục 80 đơn hàng về trạng thái ban đầu để test AI tiếp"
-                  >
-                    <RotateCcw size={12} className={resetting ? 'animate-spin' : ''} />
-                    <span>{resetting ? 'Đang reset...' : 'Hoàn tác AI (DEV)'}</span>
                   </button>
                 </>
               )}
@@ -1006,7 +945,7 @@ export const LiveTrackingTab: React.FC = () => {
           fetchRoutes();
         }}
         token={token}
-        facilityId={facilityFilter || userAssignedFacilityId}
+        facilityId={facilityFilter || userAssignedFacilityId || undefined}
         facilities={facilities}
         isAdmin={isAdmin}
       />

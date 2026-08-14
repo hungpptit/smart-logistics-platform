@@ -242,11 +242,12 @@ export class ShipmentService {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrCode);
     const shipment = await prisma.shipment.findFirst({
       where: isUuid
-        ? { id: idOrCode, status: { not: ShipmentStatus.CANCELLED } }
+        ? { OR: [{ id: idOrCode }, { routeId: idOrCode }], status: { not: ShipmentStatus.CANCELLED } }
         : {
             OR: [
               { shipmentCode: idOrCode },
               { route: { routeCode: idOrCode } },
+              { routeId: idOrCode },
             ],
             status: { not: ShipmentStatus.CANCELLED },
           },
@@ -429,7 +430,106 @@ export class ShipmentService {
         }
       }
 
-      return updatedShipment;
+      // 3.1 Update associated Route and RouteStops in PostgreSQL DB
+      if (shipment.routeId) {
+        if (dto.status === 'IN_TRANSIT') {
+          await tx.routeStop.updateMany({
+            where: { routeId: shipment.routeId, sequence: 1 },
+            data: { status: 'DEPARTED', departedAt: new Date() },
+          });
+          await tx.route.update({
+            where: { id: shipment.routeId },
+            data: { status: 'IN_PROGRESS', actualStartAt: new Date() },
+          });
+        } else if (dto.status === 'AT_HUB' || dto.status === 'DELIVERED') {
+          await tx.routeStop.updateMany({
+            where: { routeId: shipment.routeId, sequence: { gte: 2 } },
+            data: { status: 'DEPARTED', arrivedAt: new Date() },
+          });
+          await tx.route.update({
+            where: { id: shipment.routeId },
+            data: { status: 'COMPLETED', completedAt: new Date() },
+          });
+        }
+      }
+
+      // 4. Dynamic Mid-Route Consolidation Check (< 80% Truck Utilization for 6-Region Network)
+      let consolidatedAdded = false;
+      let intermediateFacilityName = '';
+
+      if (dto.status === 'IN_TRANSIT' && shipment.routeId && shipment.originFacilityId && shipment.destinationFacilityId) {
+        const originFac = await tx.facility.findUnique({ where: { id: shipment.originFacilityId } });
+        const destFac = await tx.facility.findUnique({ where: { id: shipment.destinationFacilityId } });
+
+        if (originFac?.regionSequence && destFac?.regionSequence) {
+          const seqA = originFac.regionSequence;
+          const seqB = destFac.regionSequence;
+
+          // Check if non-adjacent regions (|seqA - seqB| > 1) e.g. South -> North
+          if (Math.abs(seqA - seqB) > 1) {
+            const scans = await tx.warehouseScan.findMany({
+              where: { shipmentId: shipment.id, toteBagId: { not: null } },
+            });
+            const toteIds = new Set(scans.map(s => s.toteBagId));
+            const loadedTotesCount = toteIds.size;
+
+            // Threshold: Capacity < 80% (<= 4 totes out of 8 max capacity)
+            if (loadedTotesCount < 4) {
+              const intermediateHubs = await tx.facility.findMany({
+                where: {
+                  regionSequence: {
+                    gt: Math.min(seqA, seqB),
+                    lt: Math.max(seqA, seqB),
+                  },
+                  operatingStatus: 'ACTIVE',
+                },
+                include: {
+                  address: true,
+                },
+                orderBy: {
+                  regionSequence: seqA < seqB ? 'asc' : 'desc',
+                },
+              });
+
+              if (intermediateHubs.length > 0) {
+                const targetHub = intermediateHubs[0];
+                const existingStop = await tx.routeStop.findFirst({
+                  where: { routeId: shipment.routeId, facilityId: targetHub.id },
+                });
+
+                if (!existingStop) {
+                  await tx.routeStop.updateMany({
+                    where: { routeId: shipment.routeId, sequence: { gte: 2 } },
+                    data: { sequence: 3 },
+                  });
+
+                  await tx.routeStop.create({
+                    data: {
+                      routeId: shipment.routeId,
+                      sequence: 2,
+                      facilityId: targetHub.id,
+                      stopType: 'PICKUP',
+                      status: 'PENDING',
+                      addressSnapshot: targetHub.address?.addressLine1 || targetHub.facilityName,
+                      latitude: targetHub.address?.latitude || 16.0678,
+                      longitude: targetHub.address?.longitude || 108.2208,
+                    },
+                  });
+
+                  consolidatedAdded = true;
+                  intermediateFacilityName = targetHub.facilityName;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return {
+        ...updatedShipment,
+        consolidatedAdded,
+        intermediateFacilityName,
+      };
     });
   }
 
@@ -641,9 +741,9 @@ export class ShipmentService {
               : 'Bưu cục xuất kho trung chuyển',
             latitude: originFac?.address?.latitude ? Number(originFac.address.latitude) : 10.8500,
             longitude: originFac?.address?.longitude ? Number(originFac.address.longitude) : 106.7700,
-            status: RouteStopStatus.DEPARTED,
+            status: RouteStopStatus.PENDING,
             arrivedAt: new Date(),
-            departedAt: new Date(),
+            departedAt: null,
           },
         });
 
@@ -719,11 +819,34 @@ export class ShipmentService {
         }
       }
 
+      // Calculate total loaded totes and packages for this shipment
+      const allScans = await tx.warehouseScan.findMany({
+        where: { shipmentId: shipment.id, toteBagId: { not: null } },
+        include: { toteBag: true },
+      });
+
+      const toteMap = new Map<string, string>();
+      for (const s of allScans) {
+        if (s.toteBag) {
+          toteMap.set(s.toteBag.id, s.toteBag.toteCode);
+        }
+      }
+      const loadedTotes = Array.from(toteMap.values());
+
+      const totalPackageCount = await tx.shipmentPackage.count({
+        where: { shipmentId: shipment.id },
+      });
+
       return {
         shipmentCode: shipment.shipmentCode,
+        routeCode: route.routeCode,
+        routeId: route.id,
         toteCode: cleanToteCode,
         status: 'IN_TRANSIT',
         packageCount: packageIds.length,
+        totalPackageCount,
+        loadedTotesCount: loadedTotes.length,
+        loadedTotes,
         driverName,
       };
     });

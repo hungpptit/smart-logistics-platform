@@ -36,6 +36,7 @@ class ApiConstants {
   // Shipment & Tote Endpoints
   static String shipmentStatus(String id) => '${AppConfig.baseUrl}/shipments/$id/status';
   static String get loadTote => '${AppConfig.baseUrl}/shipments/load-tote';
+  static String totePackages(String toteCode) => '${AppConfig.baseUrl}/orders/tote/$toteCode/packages';
 
   static String get customerAddresses => '${AppConfig.baseUrl}/customers/me/addresses';
   static String get forgotPassword => '${AppConfig.baseUrl}/auth/forgot-password';

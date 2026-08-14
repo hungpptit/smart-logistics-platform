@@ -9,12 +9,18 @@ class StatsBentoCard extends StatelessWidget {
   final List<Map<String, dynamic>> stops;
   final bool isRouteStarted;
   final LatLng? currentLocation;
+  final bool isLinehaul;
+  final int loadedTotesCount;
+  final int totalPackageCount;
 
   const StatsBentoCard({
     super.key,
     required this.stops,
     this.isRouteStarted = true,
     this.currentLocation,
+    this.isLinehaul = false,
+    this.loadedTotesCount = 0,
+    this.totalPackageCount = 0,
   });
 
   int get _completedCount => stops
@@ -66,19 +72,29 @@ class StatsBentoCard extends StatelessWidget {
     final completedCount = _completedCount;
     final totalCount = stops.length;
     final progress = stops.isEmpty ? 0.0 : completedCount / totalCount;
-    final bool isPendingScan = !isRouteStarted && stops.isNotEmpty;
+    final bool isToteMode = isLinehaul || loadedTotesCount > 0 || (stops.isNotEmpty && stops.first['isLinehaul'] == true);
+    final bool isPendingScan = !isRouteStarted && stops.isNotEmpty && !isToteMode;
     final double totalKm = _totalRouteDistanceKm;
     final double avgMins = _avgStopMinutes;
     final bool isAllFinished = totalCount > 0 && completedCount == totalCount;
-    final String statusText = isAllFinished
-        ? 'HOÀN THÀNH'
-        : (isPendingScan ? 'CHỜ QUÉT NHẬN' : 'HOẠT ĐỘNG');
-    final Color badgeBg = isAllFinished
-        ? Colors.blue.shade50
-        : (isPendingScan ? Colors.amber.shade50 : Colors.green.shade50);
-    final Color badgeTextColor = isAllFinished
-        ? Colors.blue.shade900
-        : (isPendingScan ? Colors.amber.shade900 : Colors.green.shade800);
+
+    final String statusText = isToteMode
+        ? 'TRUNG CHUYỂN SỌT'
+        : (isAllFinished
+            ? 'HOÀN THÀNH'
+            : (isPendingScan ? 'CHỜ QUÉT NHẬN' : 'HOẠT ĐỘNG'));
+
+    final Color badgeBg = isToteMode
+        ? Colors.indigo.shade50
+        : (isAllFinished
+            ? Colors.blue.shade50
+            : (isPendingScan ? Colors.amber.shade50 : Colors.green.shade50));
+
+    final Color badgeTextColor = isToteMode
+        ? Colors.indigo.shade900
+        : (isAllFinished
+            ? Colors.blue.shade900
+            : (isPendingScan ? Colors.amber.shade900 : Colors.green.shade800));
 
     return Container(
       padding: const EdgeInsets.all(20.0),
@@ -118,25 +134,43 @@ class StatsBentoCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16.0),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Hoàn thành', style: AppTypography.bodyMd.copyWith(color: AppColors.secondary)),
-              Text(
-                '$completedCount / $totalCount',
-                style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8.0),
-          LinearProgressIndicator(
-            value: progress,
-            backgroundColor: AppColors.cloudGray,
-            color: AppColors.logisticsRed,
-            minHeight: 8.0,
-            borderRadius: BorderRadius.circular(4.0),
-          ),
-          const SizedBox(height: 20.0),
+
+          if (isToteMode) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Sọt hàng đã lên xe', style: AppTypography.bodyMd.copyWith(color: AppColors.secondary)),
+                Text(
+                  '$loadedTotesCount sọt ($totalPackageCount bưu kiện)',
+                  style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold, color: Colors.indigo.shade800),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16.0),
+          ] else if (isRouteStarted && totalCount > 0) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Hoàn thành', style: AppTypography.bodyMd.copyWith(color: AppColors.secondary)),
+                Text(
+                  '$completedCount / $totalCount',
+                  style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8.0),
+            LinearProgressIndicator(
+              value: progress,
+              backgroundColor: AppColors.cloudGray,
+              color: AppColors.logisticsRed,
+              minHeight: 8.0,
+              borderRadius: BorderRadius.circular(4.0),
+            ),
+            const SizedBox(height: 20.0),
+          ] else ...[
+            const SizedBox(height: 8.0),
+          ],
+
           Row(
             children: [
               Expanded(

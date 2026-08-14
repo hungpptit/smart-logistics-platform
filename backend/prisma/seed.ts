@@ -500,14 +500,14 @@ async function main() {
   const provincialHubType = await prisma.facilityType.findFirst({ where: { typeCode: 'PROVINCIAL_HUB' } });
 
   if (sortingCenterType && provincialHubType) {
-    // 📍 1. REAL ADDRESS & GPS DATA DICTIONARY FOR 6 REGIONAL SORTING CENTERS
-    const scDataMap: Record<number, { code: string; name: string; provCode: string; address: string; lat: number; lng: number }> = {
-      1: { code: 'FAC-SC-REGION1', name: 'Tổng Kho Miền 1 (Trung du & Miền núi phía Bắc - Thái Nguyên)', provCode: '19', address: 'Khu Công Nghiệp Sông Công 1, Phường Bách Quang, TP. Sông Công, Tỉnh Thái Nguyên', lat: 21.4883, lng: 105.8167 },
-      2: { code: 'FAC-SC-REGION2', name: 'Tổng Kho Miền 2 (Đồng bằng sông Hồng - Hà Nội)', provCode: '01', address: 'Số 1 Phố Hàng Bài, Phường Tràng Tiền, Quận Hoàn Kiếm, TP. Hà Nội', lat: 21.0285, lng: 105.8542 },
-      3: { code: 'FAC-SC-REGION3', name: 'Tổng Kho Miền 3 (Bắc Trung Bộ - Huế)', provCode: '46', address: 'Khu Công Nghiệp Phú Bài, Phường Phú Bài, TP. Huế, Tỉnh Thừa Thiên Huế', lat: 16.3900, lng: 107.7011 },
-      4: { code: 'FAC-SC-REGION4', name: 'Tổng Kho Miền 4 (Nam Trung Bộ & Tây Nguyên - Đà Nẵng)', provCode: '48', address: 'Số 24 Đường Nguyễn Văn Linh, Phường Nam Dương, Quận Hải Châu, TP. Đà Nẵng', lat: 16.0678, lng: 108.2208 },
-      5: { code: 'FAC-SC-REGION5', name: 'Tổng Kho Miền 5 (Đông Nam Bộ - TP. Hồ Chí Minh)', provCode: '79', address: 'Số 1 Đường Lê Duẩn, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh', lat: 10.7828, lng: 106.7011 },
-      6: { code: 'FAC-SC-REGION6', name: 'Tổng Kho Miền 6 (Đồng bằng sông Cửu Long - Cần Thơ)', provCode: '92', address: 'Khu Công Nghiệp Trà Nóc 1, Phường Trà Nóc, Quận Bình Thủy, TP. Cần Thơ', lat: 10.0825, lng: 105.7483 },
+    // 📍 1. REAL ADDRESS & GPS DATA DICTIONARY FOR 6 REGIONAL SORTING CENTERS (North-South Sequence)
+    const scDataMap: Record<number, { code: string; name: string; provCode: string; address: string; lat: number; lng: number; seq: number }> = {
+      1: { code: 'FAC-SC-REGION1', name: 'Tổng Kho Miền 1 (Trung du & Miền núi phía Bắc - Thái Nguyên)', provCode: '19', address: 'Khu Công Nghiệp Sông Công 1, Phường Bách Quang, TP. Sông Công, Tỉnh Thái Nguyên', lat: 21.4883, lng: 105.8167, seq: 6 },
+      2: { code: 'FAC-SC-REGION2', name: 'Tổng Kho Miền 2 (Đồng bằng sông Hồng - Hà Nội)', provCode: '01', address: 'Số 1 Phố Hàng Bài, Phường Tràng Tiền, Quận Hoàn Kiếm, TP. Hà Nội', lat: 21.0285, lng: 105.8542, seq: 5 },
+      3: { code: 'FAC-SC-REGION3', name: 'Tổng Kho Miền 3 (Bắc Trung Bộ - Huế)', provCode: '46', address: 'Khu Công Nghiệp Phú Bài, Phường Phú Bài, TP. Huế, Tỉnh Thừa Thiên Huế', lat: 16.3900, lng: 107.7011, seq: 4 },
+      4: { code: 'FAC-SC-REGION4', name: 'Tổng Kho Miền 4 (Nam Trung Bộ & Tây Nguyên - Đà Nẵng)', provCode: '48', address: 'Số 24 Đường Nguyễn Văn Linh, Phường Nam Dương, Quận Hải Châu, TP. Đà Nẵng', lat: 16.0678, lng: 108.2208, seq: 3 },
+      5: { code: 'FAC-SC-REGION5', name: 'Tổng Kho Miền 5 (Đông Nam Bộ - TP. Hồ Chí Minh)', provCode: '79', address: 'Số 1 Đường Lê Duẩn, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh', lat: 10.7828, lng: 106.7011, seq: 2 },
+      6: { code: 'FAC-SC-REGION6', name: 'Tổng Kho Miền 6 (Đồng bằng sông Cửu Long - Cần Thơ)', provCode: '92', address: 'Khu Công Nghiệp Trà Nóc 1, Phường Trà Nóc, Quận Bình Thủy, TP. Cần Thơ', lat: 10.0825, lng: 105.7483, seq: 1 },
     };
 
     const findWardInProvince = async (provCode: string, addressText: string) => {
@@ -539,7 +539,7 @@ async function main() {
 
       const scFacility = await prisma.facility.upsert({
         where: { facilityCode: sc.code },
-        update: { provinceCode: sc.provCode, addressId: addr.id },
+        update: { provinceCode: sc.provCode, addressId: addr.id, regionSequence: sc.seq },
         create: {
           facilityCode: sc.code,
           facilityName: sc.name,
@@ -548,6 +548,7 @@ async function main() {
           provinceCode: sc.provCode,
           addressId: addr.id,
           operatingStatus: 'ACTIVE',
+          regionSequence: sc.seq,
           openedAt: new Date('2025-01-01'),
         },
       });

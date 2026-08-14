@@ -1355,7 +1355,9 @@ export class OrderService {
             order: {
               include: {
                 destinationFacility: true,
+                originFacility: true,
                 customer: true,
+                payment: true,
               },
             },
             currentZone: true,
@@ -1374,10 +1376,18 @@ export class OrderService {
           id: s.package.id,
           packageCode: s.package.packageCode,
           orderCode: s.package.order?.orderCode || 'N/A',
-          receiverName: s.package.order?.receiverName || 'N/A',
-          receiverPhone: s.package.order?.receiverPhone || 'N/A',
+          senderName: s.package.order?.customer?.fullName || 'Khách hàng gửi',
+          senderPhone: s.package.order?.customer?.phone || '',
+          receiverName: s.package.order?.receiverName || 'Khách hàng nhận',
+          receiverPhone: s.package.order?.receiverPhone || '',
+          pickupAddressText: s.package.order?.pickupAddressText || s.package.order?.originFacility?.facilityName || 'Bưu cục nguồn',
+          deliveryAddressText: s.package.order?.deliveryAddressText || s.package.order?.destinationFacility?.facilityName || 'Bưu cục đích',
           destinationFacilityName: s.package.order?.destinationFacility?.facilityName || 'Bưu cục đích',
+          originFacilityName: s.package.order?.originFacility?.facilityName || 'Bưu cục nguồn',
           weight: s.package.weight,
+          shippingFee: Number(s.package.order?.payment?.finalShippingFee || s.package.order?.estimatedShippingFee || 15000),
+          codAmount: Number(s.package.order?.payment?.finalCodAmount || s.package.order?.estimatedCodAmount || 0),
+          feePayer: (s.package.order?.payment?.feePayer || 'SENDER').toUpperCase(),
           scannedAt: new Date(s.scannedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         });
       }

@@ -18,7 +18,6 @@ import {
   ChevronRight,
   AlertTriangle,
   Bot,
-  RotateCcw,
   Printer,
   FileSpreadsheet,
   CheckCircle,
@@ -126,7 +125,8 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
   ARRIVED_ORIGIN_FACILITY: { label: 'Đến kho gửi', color: '#059669', bg: '#ecfdf5' },
   READY_FOR_DISPATCH: { label: 'Sẵn sàng giao hàng', color: '#7c3aed', bg: '#f5f3ff' },
   IN_TRANSIT: { label: 'Đang vận chuyển', color: '#3b82f6', bg: '#dbeafe' },
-  AT_HUB: { label: 'Đã đến kho nhận', color: '#f59e0b', bg: '#fef3c7' },
+  AT_HUB: { label: 'Tại kho bưu cục', color: '#f59e0b', bg: '#fef3c7' },
+  ARRIVED_DEST_FACILITY: { label: 'Đã đến kho đích', color: '#10b981', bg: '#d1fae5' },
   OUT_FOR_DELIVERY: { label: 'Đang giao hàng', color: '#06b6d4', bg: '#e0f7fa' },
   DELIVERED: { label: 'Giao hàng thành công', color: '#10b981', bg: '#d1fae5' },
   DELIVERY_FAILED: { label: 'Giao hàng thất bại', color: '#ef4444', bg: '#fee2e2' },
@@ -226,61 +226,7 @@ export const OrderTab: React.FC = () => {
     setIsOptimizationModalOpen(true);
   };
 
-  const [resetting, setResetting] = useState<boolean>(false);
 
-  const handleDevResetAi = async () => {
-    const targetFacilityId = facilityFilter || userAssignedFacilityId;
-
-    if (!targetFacilityId && !isAdmin) {
-      showAlert('CẢNH BÁO', 'Vui lòng chọn Kho/Bưu cục cần hoàn tác dữ liệu AI!', 'error');
-      return;
-    }
-
-    if (!canOperateOnCurrentFacility && !isAdmin) {
-      showAlert('KHÔNG ĐỦ QUYỀN', 'Bạn chỉ được phép hoàn tác dữ liệu AI tại Bưu cục mình quản lý.', 'error');
-      return;
-    }
-
-    const targetFacName = targetFacilityId
-      ? (facilities.find(f => f.id === targetFacilityId)?.facilityName || 'kho đang chọn')
-      : 'TOÀN BỘ CÁC BƯU CỤC HỆ THỐNG';
-
-    setConfirmDialog({
-      isOpen: true,
-      title: 'HOÀN TÁC DỮ LIỆU AI ROUTING',
-      message: `Bạn có chắc muốn HOÀN TÁC tất cả các tuyến AI đã gom và trả lại các đơn hàng của ${targetFacName} về trạng thái chờ ban đầu?`,
-      type: 'warning',
-      confirmText: 'Hoàn tác ngay',
-      cancelText: 'Hủy bỏ',
-      onConfirm: async () => {
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-        setResetting(true);
-        try {
-          const response = await fetch(`${CONFIG.API_BASE_URL}/routes/dev-reset`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ facilityId: targetFacilityId })
-          });
-
-          const data = await response.json();
-          if (response.ok && data.success) {
-            showAlert('HOÀN TÁC THÀNH CÔNG', data.message || 'Đã hoàn tác dữ liệu AI về trạng thái ban đầu!', 'success');
-            fetchOrders(currentPage);
-          } else {
-            showAlert('LỖI HOÀN TÁC', data.message || 'Không thể hoàn tác dữ liệu.', 'error');
-          }
-        } catch (err) {
-          console.error('Lỗi khi gọi API dev-reset:', err);
-          showAlert('LỖI KẾT NỐI', 'Đã xảy ra lỗi kết nối khi hoàn tác.', 'error');
-        } finally {
-          setResetting(false);
-        }
-      }
-    });
-  };
 
 
 
@@ -670,22 +616,12 @@ export const OrderTab: React.FC = () => {
               <>
                 <button
                   onClick={() => handleRunAiOptimization('ALL')}
-                  disabled={optimizing || resetting}
+                  disabled={optimizing}
                   className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3.5 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
                   title="Kích hoạt thuật toán AI K-Means & VRP gom cụm lộ trình phân đơn cho tài xế"
                 >
                   <Bot size={16} className={optimizing ? 'animate-bounce' : ''} />
                   <span>{optimizing ? 'Đang gom...' : 'AI Gom Cụm'}</span>
-                </button>
-
-                <button
-                  onClick={handleDevResetAi}
-                  disabled={optimizing || resetting}
-                  className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-3 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
-                  title="[DEV TOOL] Hoàn tác toàn bộ lộ trình AI và khôi phục các đơn hàng về trạng thái ban đầu"
-                >
-                  <RotateCcw size={14} className={resetting ? 'animate-spin' : ''} />
-                  <span>{resetting ? 'Đang reset...' : 'Hoàn tác AI (DEV)'}</span>
                 </button>
               </>
             )}
@@ -1316,7 +1252,7 @@ export const OrderTab: React.FC = () => {
           fetchOrders(currentPage);
         }}
         token={token}
-        facilityId={facilityFilter || userAssignedFacilityId}
+        facilityId={facilityFilter || userAssignedFacilityId || undefined}
         facilities={facilities}
         isAdmin={isAdmin}
         initialRouteType={selectedAiRouteType}

@@ -5,11 +5,12 @@ import '../../../core/theme/app_styles.dart';
 import '../../../services/driver_service.dart';
 import 'pulsing_scan_line.dart';
 
-class QrScannerDialog extends StatelessWidget {
+class QrScannerDialog extends StatefulWidget {
   final Map<String, dynamic>? stop;
   final String? activeRouteCode;
   final String? activeRouteId;
   final String scanMode;
+  final bool isLinehaulRoute;
   final void Function(String? newRouteCode) onRouteCodeUpdated;
   final VoidCallback onRefreshRoutes;
   final void Function(Map<String, dynamic>) onStopCheckedIn;
@@ -20,6 +21,7 @@ class QrScannerDialog extends StatelessWidget {
     required this.activeRouteCode,
     required this.activeRouteId,
     this.scanMode = 'ROUTE',
+    this.isLinehaulRoute = false,
     required this.onRouteCodeUpdated,
     required this.onRefreshRoutes,
     required this.onStopCheckedIn,
@@ -31,6 +33,7 @@ class QrScannerDialog extends StatelessWidget {
     String? activeRouteCode,
     String? activeRouteId,
     String scanMode = 'ROUTE',
+    bool isLinehaulRoute = false,
     required void Function(String? newRouteCode) onRouteCodeUpdated,
     required VoidCallback onRefreshRoutes,
     required void Function(Map<String, dynamic>) onStopCheckedIn,
@@ -43,6 +46,7 @@ class QrScannerDialog extends StatelessWidget {
         activeRouteCode: activeRouteCode,
         activeRouteId: activeRouteId,
         scanMode: scanMode,
+        isLinehaulRoute: isLinehaulRoute,
         onRouteCodeUpdated: onRouteCodeUpdated,
         onRefreshRoutes: onRefreshRoutes,
         onStopCheckedIn: onStopCheckedIn,
@@ -50,399 +54,482 @@ class QrScannerDialog extends StatelessWidget {
     );
   }
 
+  @override
+  State<QrScannerDialog> createState() => _QrScannerDialogState();
+}
+
+class _QrScannerDialogState extends State<QrScannerDialog> {
+  late final TextEditingController _scanController;
+  bool _isProcessing = false;
+  String? _errorMessage;
+  String? _successNotice;
+
+  @override
+  void initState() {
+    super.initState();
+    _scanController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _scanController.dispose();
+    super.dispose();
+  }
+
   String? get _targetCode {
-    if (stop != null && stop!.isNotEmpty) {
-      final code = stop!['orderCode'] ?? stop!['packageCode'] ?? stop!['shipmentCode'];
+    if (widget.stop != null && widget.stop!.isNotEmpty) {
+      final code = widget.stop!['orderCode'] ?? widget.stop!['packageCode'] ?? widget.stop!['shipmentCode'];
       if (code != null && code.toString().trim().isNotEmpty) {
         return code.toString().trim();
       }
     }
-    if (activeRouteCode != null && activeRouteCode!.isNotEmpty) {
-      return activeRouteCode;
+    if (widget.activeRouteCode != null && widget.activeRouteCode!.isNotEmpty) {
+      return widget.activeRouteCode;
     }
-    if (activeRouteId != null && activeRouteId!.isNotEmpty) {
-      return activeRouteId;
+    if (widget.activeRouteId != null && widget.activeRouteId!.isNotEmpty) {
+      return widget.activeRouteId;
     }
     return null;
+  }
+
+  Future<void> _performScanCheck() async {
+    final scannedValue = _scanController.text.trim();
+    if (scannedValue.isEmpty) {
+      setState(() {
+        _errorMessage = 'Vui lòng đưa camera quét mã QR / nhập mã';
+        _successNotice = null;
+      });
+      return;
+    }
+
+    // Case 0 & A1: Scanned Linehaul Warehouse Tote (TOTE-..., TOT-..., ST-...)
+    final bool isToteCode = scannedValue.toUpperCase().startsWith('TOTE-') ||
+        scannedValue.toUpperCase().startsWith('TOT-') ||
+        scannedValue.toUpperCase().startsWith('ST-');
+
+    if (isToteCode) {
+      setState(() {
+        _isProcessing = true;
+        _errorMessage = null;
+        _successNotice = null;
+      });
+
+      final result = await DriverService.loadToteIntoShipment(scannedValue);
+
+      if (!mounted) return;
+
+      if (result != null) {
+        final routeId = result['routeId']?.toString() ?? '';
+        final routeCode = result['routeCode']?.toString() ?? '';
+
+        if (routeId.isNotEmpty) {
+          widget.onRouteCodeUpdated(routeId);
+        } else if (routeCode.isNotEmpty) {
+          widget.onRouteCodeUpdated(routeCode);
+        }
+
+        widget.onRefreshRoutes();
+
+        Navigator.pop(context);
+
+        final bool consolidatedAdded = result['consolidatedAdded'] == true;
+        final String intermediateHubName = result['intermediateFacilityName']?.toString() ?? '';
+
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: AppColors.pureWhite,
+            shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+            title: Row(
+              children: [
+                Icon(
+                  consolidatedAdded ? Icons.bolt : Icons.check_circle,
+                  color: consolidatedAdded ? const Color(0xFFB91C1C) : Colors.green,
+                  size: 28,
+                ),
+                const SizedBox(width: 8.0),
+                Text(
+                  consolidatedAdded ? '⚡ Tối Ưu Lộ Trình Tự Động!' : 'Nạp Sọt Hàng Thành Công',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: consolidatedAdded ? const Color(0xFFB91C1C) : AppColors.deepOnyx,
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              consolidatedAdded
+                  ? '⚡ Tải trọng xe hiện tại < 80% sức chứa.\n\n'
+                    'Hệ thống đã tự động điều phối thêm chặng dừng tại [$intermediateHubName] để ghé bốc thêm sọt hàng tiện đường!'
+                  : 'Sọt hàng [$scannedValue] đã được xác nhận bốc lên xe thành công.',
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: consolidatedAdded ? const Color(0xFFB91C1C) : AppColors.logisticsRed,
+                  foregroundColor: AppColors.pureWhite,
+                ),
+                child: const Text('Đã Hiểu'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        setState(() {
+          _isProcessing = false;
+          _errorMessage = 'Không thể nạp Sọt Hàng [$scannedValue]. Vui lòng kiểm tra lại mã!';
+        });
+      }
+      return;
+    }
+
+    // Case B: Last-Mile Delivery / Pickup Route Scan
+    final String? targetCode = _targetCode;
+    final cleanScanned = scannedValue.toUpperCase();
+    final cleanTarget = targetCode?.toUpperCase() ?? '';
+    final cleanRouteCode = widget.activeRouteCode?.toUpperCase() ?? '';
+    final cleanRouteId = widget.activeRouteId?.toUpperCase() ?? '';
+
+    final bool isMatch = (cleanTarget.isNotEmpty && cleanScanned == cleanTarget) ||
+        (cleanRouteCode.isNotEmpty && cleanScanned == cleanRouteCode) ||
+        (cleanRouteId.isNotEmpty && cleanScanned == cleanRouteId);
+
+    if (isMatch || targetCode == null) {
+      setState(() {
+        _isProcessing = true;
+        _errorMessage = null;
+        _successNotice = (widget.stop != null && widget.stop!.isNotEmpty)
+            ? 'Mã khớp! Đã xác nhận bưu kiện...'
+            : 'Mã khớp! Đang nhận chuyến xe...';
+      });
+
+      try {
+        if (widget.stop != null && widget.stop!.isNotEmpty) {
+          widget.onStopCheckedIn(widget.stop!);
+          if (mounted) Navigator.pop(context);
+          return;
+        }
+
+        final routeToStart = (widget.activeRouteCode != null && widget.activeRouteCode!.isNotEmpty)
+            ? widget.activeRouteCode!
+            : ((targetCode != null && targetCode.isNotEmpty) ? targetCode : scannedValue);
+
+        if (routeToStart.isNotEmpty) {
+          bool startSuccess = false;
+          if (widget.isLinehaulRoute) {
+            startSuccess = await DriverService.updateShipmentStatus(routeToStart, 'IN_PROGRESS');
+          } else {
+            startSuccess = await DriverService.startRoute(routeToStart);
+          }
+
+          if (!startSuccess) {
+            if (mounted) {
+              setState(() {
+                _isProcessing = false;
+                _errorMessage = 'Không thể nhận chuyến xe [$routeToStart]. Vui lòng thử lại!';
+                _successNotice = null;
+              });
+            }
+            return;
+          }
+
+          widget.onRouteCodeUpdated(routeToStart);
+        }
+
+        widget.onRefreshRoutes();
+
+        if (mounted) {
+          Navigator.of(context).pop();
+          showDialog(
+            context: context,
+            builder: (dialogCtx) => AlertDialog(
+              backgroundColor: AppColors.pureWhite,
+              shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+              title: const Text(
+                'Nhận Chuyến Xe Thành Công',
+                style: TextStyle(
+                  color: Color(0xFF15803D),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              content: Text(
+                'Đã nhận chuyến xe [$routeToStart] thành công! Sẵn sàng khởi hành.',
+                style: const TextStyle(
+                  color: AppColors.deepOnyx,
+                  fontSize: 14,
+                ),
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF15803D),
+                    foregroundColor: AppColors.pureWhite,
+                    shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                  ),
+                  child: const Text('Đồng ý', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('💥 Lỗi khi xác nhận mã quét: $e');
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Lỗi xử lý xác nhận. Vui lòng thử lại!';
+          });
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+        }
+      }
+    } else {
+      setState(() {
+        _isProcessing = false;
+        _errorMessage = 'Mã QR không trùng khớp! Cần quét: ${targetCode ?? widget.activeRouteCode ?? 'bưu kiện'}';
+        _successNotice = null;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final targetCode = _targetCode;
-    final TextEditingController scanController = TextEditingController();
 
-    return StatefulBuilder(
-      builder: (context, setScannerState) {
-        bool isProcessing = false;
-        String? errorMessage;
-        String? successNotice;
-
-        Future<void> performScanCheck() async {
-          final scannedValue = scanController.text.trim();
-          if (scannedValue.isEmpty) {
-            setScannerState(() {
-              errorMessage = 'Vui lòng đưa camera quét mã QR / nhập mã';
-              successNotice = null;
-            });
-            return;
-          }
-
-          // Case 0 & A1: Scanned Linehaul Warehouse Tote (TOTE-..., TOT-..., ST-...)
-          final bool isToteCode = scannedValue.toUpperCase().startsWith('TOTE-') ||
-              scannedValue.toUpperCase().startsWith('TOT-') ||
-              scannedValue.toUpperCase().startsWith('ST-');
-
-          if (isToteCode) {
-            setScannerState(() {
-              isProcessing = true;
-              errorMessage = null;
-              successNotice = null;
-            });
-
-            final result = await DriverService.loadToteIntoShipment(scannedValue);
-
-            if (context.mounted) {
-              if (result != null) {
-                final shipCode = result['shipmentCode']?.toString() ?? '';
-                final pkgCount = result['packageCount'] ?? 1;
-                if (shipCode.isNotEmpty) {
-                  onRouteCodeUpdated(shipCode);
-                }
-                onRefreshRoutes();
-
-                setScannerState(() {
-                  isProcessing = false;
-                  successNotice = '🎉 NẠP SỌT [$scannedValue] THÀNH CÔNG VÀO XE TẢI (${shipCode.isNotEmpty ? shipCode : 'Chuyến vận chuyển'}). Đã cập nhật $pkgCount bưu kiện sang Đang trung chuyển!';
-                  errorMessage = null;
-                  scanController.clear();
-                });
-              } else {
-                setScannerState(() {
-                  isProcessing = false;
-                  errorMessage = '❌ Không thể nạp Sọt [$scannedValue] lên xe tải. Vui lòng kiểm tra mã Sọt hoặc trạng thái bưu kiện!';
-                  successNotice = null;
-                });
-              }
-            }
-            return;
-          }
-
-          // Case A2: Route Code Scan (Nhận chuyến xe / Lộ trình)
-          final bool isRouteCodeFormat = scannedValue.toUpperCase().startsWith('RT-') ||
-              scannedValue.toUpperCase().startsWith('SHP-LH-') ||
-              (stop == null &&
-                  ((activeRouteCode != null && scannedValue.toUpperCase() == activeRouteCode!.toUpperCase()) ||
-                   (activeRouteId != null && scannedValue.toUpperCase() == activeRouteId!.toUpperCase())));
-
-          if (isRouteCodeFormat) {
-            // Check if shipper is assigned to this route:
-            final bool isAssignedToThisDriver = (activeRouteCode != null &&
-                    scannedValue.toUpperCase() == activeRouteCode!.toUpperCase()) ||
-                (activeRouteId != null &&
-                    scannedValue.toUpperCase() == activeRouteId!.toUpperCase()) ||
-                scannedValue.toUpperCase().startsWith('RT-') ||
-                scannedValue.toUpperCase().startsWith('SHP-LH-');
-
-            if (!isAssignedToThisDriver) {
-              // Shipper is NOT assigned to this scanned route!
-              Navigator.pop(context);
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: AppColors.pureWhite,
-                  shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-                  title: const Row(
-                    children: [
-                      Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 28),
-                      SizedBox(width: 8.0),
-                      Text('Không Thể Nhận Chuyến Hàng',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.error)),
-                    ],
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+      child: Container(
+        padding: const EdgeInsets.all(20.0),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(24.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            )
+          ],
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'QUÉT MÃ QR SỌT HÀNG / BƯU KIỆN',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
-                  content: Text(
-                    (activeRouteCode != null && activeRouteCode!.isNotEmpty)
-                        ? 'Bạn không được phân công chuyến hàng [$scannedValue]. Mã chuyến hàng được phân công của bạn là [$activeRouteCode].'
-                        : 'Bạn hiện chưa được hệ thống phân công chuyến hàng [$scannedValue]. Vui lòng liên hệ Quản lý/Điều phối viên để được phân công trước khi quét nhận.',
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
                   ),
-                  actions: [
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.deepOnyx,
-                          foregroundColor: AppColors.pureWhite),
-                      child: const Text('Đã hiểu'),
-                    ),
-                  ],
-                ),
-              );
-              return;
-            }
+                ],
+              ),
+              const SizedBox(height: 8.0),
 
-            // Driver IS assigned to this route -> Show loading & execute startRoute
-            setScannerState(() {
-              isProcessing = true;
-            });
-            final routeIdToStart = activeRouteId ?? activeRouteCode ?? scannedValue;
-            final success = await DriverService.startRoute(routeIdToStart);
-            if (context.mounted) {
-              Navigator.pop(context);
-              onRefreshRoutes();
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: AppColors.pureWhite,
-                  shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-                  title: Row(
-                    children: [
-                      Icon(success ? Icons.check_circle : Icons.error_outline,
-                          color: success ? Colors.green : AppColors.error, size: 28),
-                      const SizedBox(width: 8.0),
-                      Text(success ? 'Nhận Chuyến Xe Thành Công' : 'Không Thể Nhận Chuyến Hàng',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: success ? Colors.green.shade900 : AppColors.error)),
-                    ],
-                  ),
-                  content: Text(success
-                      ? 'Đã quét nhận chuyến xe $scannedValue thành công! Lộ trình đã được kích hoạt và chuyển sang trạng thái Đang thực hiện.'
-                      : 'Đã cập nhật nhận chuyến xe $scannedValue lên hệ thống! Lộ trình hiện đã sẵn sàng di chuyển.'),
-                  actions: [
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.logisticsRed,
-                          foregroundColor: AppColors.pureWhite),
-                      child: const Text('Bắt đầu giao'),
+              // Camera Scanner Box
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16.0),
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _scanController.text = targetCode ?? 'TOTE-FAC_TD_TANGNHONPHU-ZONE-W-PROVINCE-DISPATCH-001';
+                      _errorMessage = null;
+                    });
+                  },
+                  child: Container(
+                    width: 250.0,
+                    height: 180.0,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.logisticsRed, width: 2.5),
+                      borderRadius: BorderRadius.circular(16.0),
+                      color: Colors.black,
                     ),
-                  ],
-                ),
-              );
-            }
-            return;
-          }
-
-          // Case B: Stop match or fallback
-          final bool isMatch = stop != null &&
-              stop!.isNotEmpty &&
-              targetCode != null &&
-              (scannedValue.toUpperCase() == targetCode.toUpperCase() ||
-                  scannedValue.toUpperCase().contains(targetCode.toUpperCase()) ||
-                  targetCode.toUpperCase().contains(scannedValue.toUpperCase()));
-
-          if (isMatch) {
-            Navigator.pop(context);
-            onStopCheckedIn(stop!);
-          } else if (stop != null && stop!.isNotEmpty) {
-            setScannerState(() {
-              errorMessage = 'Mã bưu kiện [$scannedValue] không thuộc lộ trình được phân công của bạn!';
-            });
-          } else {
-            setScannerState(() {
-              errorMessage = 'Mã quét [$scannedValue] không khớp với bất kỳ chuyến hàng hoặc bưu kiện được phân công nào!';
-            });
-          }
-        }
-
-        return Dialog(
-          backgroundColor: const Color(0xF20F172A),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'QUÉT MÃ QR SỌT HÀNG / BƯU KIỆN',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8.0),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16.0),
-                  child: GestureDetector(
-                    onTap: () {
-                      if (targetCode != null) {
-                        setScannerState(() {
-                          scanController.text = targetCode;
-                          errorMessage = null;
-                        });
-                      } else {
-                        setScannerState(() {
-                          errorMessage = 'Chưa có sọt hàng nào được phân công để quét';
-                        });
-                      }
-                    },
-                    child: Container(
-                      width: 250.0,
-                      height: 180.0,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.logisticsRed, width: 2.5),
-                        borderRadius: BorderRadius.circular(16.0),
-                        color: Colors.black,
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          MobileScanner(
-                            fit: BoxFit.cover,
-                            onDetect: (barcodeCapture) {
-                              for (final barcode in barcodeCapture.barcodes) {
-                                final String? rawValue = barcode.rawValue;
-                                if (rawValue != null && rawValue.isNotEmpty) {
-                                  setScannerState(() {
-                                    scanController.text = rawValue;
-                                    errorMessage = null;
-                                  });
-                                  break;
-                                }
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        MobileScanner(
+                          fit: BoxFit.cover,
+                          onDetect: (barcodeCapture) {
+                            for (final barcode in barcodeCapture.barcodes) {
+                              final String? rawValue = barcode.rawValue;
+                              if (rawValue != null && rawValue.isNotEmpty) {
+                                setState(() {
+                                  _scanController.text = rawValue;
+                                  _errorMessage = null;
+                                });
+                                break;
                               }
-                            },
-                          ),
-                          const PulsingScanLine(),
-                          Positioned(
-                            bottom: 6,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.black54,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'Camera đang quét - Chạm để điền mã thử',
-                                style: TextStyle(
-                                    color: Colors.amberAccent,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold),
-                              ),
+                            }
+                          },
+                        ),
+                        const PulsingScanLine(),
+                        Positioned(
+                          bottom: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(4),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12.0),
-                Text(
-                  targetCode != null
-                      ? 'Mã Sọt Hàng / Bưu kiện cần quét: $targetCode'
-                      : 'Tình trạng: Chưa được phân công lộ trình',
-                  style: const TextStyle(
-                      color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-                const SizedBox(height: 12.0),
-                TextField(
-                  controller: scanController,
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
-                  decoration: InputDecoration(
-                    labelText: 'Nhập hoặc quét mã Sọt (RT-XXXX) / Bưu kiện',
-                    labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
-                    prefixIcon: const Icon(Icons.barcode_reader, color: AppColors.logisticsRed),
-                    filled: true,
-                    fillColor: Colors.white10,
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white30),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: AppColors.logisticsRed),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                if (successNotice != null) ...[
-                  const SizedBox(height: 10.0),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade900.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(10.0),
-                      border: Border.all(color: Colors.greenAccent, width: 1.5),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle, color: Colors.greenAccent, size: 22),
-                        const SizedBox(width: 8.0),
-                        Expanded(
-                          child: Text(
-                            successNotice!,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                              height: 1.3,
+                            child: const Text(
+                              'Camera đang quét - Chạm để điền mã thử',
+                              style: TextStyle(
+                                color: Colors.amberAccent,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-                if (errorMessage != null) ...[
-                  const SizedBox(height: 10.0),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade900.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(10.0),
-                      border: Border.all(color: Colors.redAccent, width: 1.5),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.error_outline, color: Colors.redAccent, size: 22),
-                        const SizedBox(width: 8.0),
-                        Expanded(
-                          child: Text(
-                            errorMessage!,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                              height: 1.3,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                ),
+              ),
+              const SizedBox(height: 12.0),
+
+              Text(
+                targetCode != null
+                    ? 'Mã Sọt Hàng / Bưu kiện cần quét: $targetCode'
+                    : 'Tình trạng: Sẵn sàng quét mã sọt nạp xe',
+                style: const TextStyle(
+                  color: Colors.amberAccent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 12.0),
+
+              TextField(
+                controller: _scanController,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Nhập hoặc quét mã Sọt (TOTE-XXXX) / Bưu kiện',
+                  labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
+                  prefixIcon: const Icon(Icons.barcode_reader, color: AppColors.logisticsRed),
+                  filled: true,
+                  fillColor: Colors.white10,
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: const BorderSide(color: Colors.white30),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ],
-                const SizedBox(height: 16.0),
-                SizedBox(
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: const BorderSide(color: AppColors.logisticsRed),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+
+              if (_successNotice != null) ...[
+                const SizedBox(height: 10.0),
+                Container(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: isProcessing ? null : performScanCheck,
-                    icon: isProcessing
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Icon(Icons.qr_code_scanner),
-                    label: Text(isProcessing ? 'ĐANG XỬ LÝ NẠP SỌT...' : 'XÁC NHẬN MÃ QUÉT'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.logisticsRed,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-                      textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                  padding: const EdgeInsets.all(10.0),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade900.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(10.0),
+                    border: Border.all(color: Colors.greenAccent, width: 1.5),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle, color: Colors.greenAccent, size: 22),
+                      const SizedBox(width: 8.0),
+                      Expanded(
+                        child: Text(
+                          _successNotice!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ),
+
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 10.0),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10.0),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade900.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(10.0),
+                    border: Border.all(color: Colors.redAccent, width: 1.5),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.redAccent, size: 22),
+                      const SizedBox(width: 8.0),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 16.0),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isProcessing ? null : _performScanCheck,
+                  icon: _isProcessing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Icon(Icons.qr_code_scanner, size: 20),
+                  label: Text(
+                    _isProcessing ? 'ĐANG XỬ LÝ...' : 'XÁC NHẬN MÃ QUÉT',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.logisticsRed,
+                    foregroundColor: AppColors.pureWhite,
+                    padding: const EdgeInsets.symmetric(vertical: 14.0),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+                  ),
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

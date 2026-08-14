@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/constants/api_constants.dart';
 import '../core/constants/app_constants.dart';
+import 'socket_service.dart';
 
 class AuthService {
   static const _storage = FlutterSecureStorage();
@@ -18,11 +20,10 @@ class AuthService {
 
   // Clear authentication details (Logout)
   static Future<void> clearAuthData() async {
-    await _storage.delete(key: AppConstants.tokenKey);
-    await _storage.delete(key: AppConstants.userRoleKey);
-    await _storage.delete(key: AppConstants.userEmailKey);
-    await _storage.delete(key: AppConstants.usernameKey);
-    await _storage.delete(key: 'phone');
+    try {
+      SocketService().disconnect();
+    } catch (_) {}
+    await _storage.deleteAll();
   }
 
   // Check if token exists

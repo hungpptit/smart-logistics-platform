@@ -3,7 +3,7 @@ import { PrismaClient, ToteStatus, OrderStatus } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function restoreState() {
-  console.log('🔄 Restoring 2 Totes, 3 Orders, and wiping ALL test Linehaul Shipments/Routes...');
+  console.log('🔄 Restoring Totes, Orders, and wiping ALL driver routes...');
 
   const tote1Code = 'TOTE-FAC_TD_TANGNHONPHU-ZONE-W-PROVINCE-DISPATCH-001';
   const tote2Code = 'TOTE-FAC_TD_TANGNHONPHU-ZONE-W-PROVINCE-DISPATCH-002';
@@ -33,50 +33,84 @@ async function restoreState() {
   });
   console.log('✅ Restored 3 Orders status to AT_HUB');
 
-  // 3. Find and wipe ALL Linehaul test Shipments and Routes (SHP-LH-..., RT-LH-...)
-  const testShipments = await prisma.shipment.findMany({
-    where: {
-      shipmentCode: { startsWith: 'SHP-LH-' },
-    },
-    select: { id: true, routeId: true },
-  });
+  // 3. Wipe ALL Shipments, ShipmentPackages, DispatchTasks, RouteStops, and Routes
+  await prisma.shipmentPackage.deleteMany({});
+  await prisma.warehouseScan.deleteMany({});
+  await prisma.dispatchTask.deleteMany({});
+  await prisma.routeStop.deleteMany({});
+  await prisma.shipment.deleteMany({});
+  await prisma.route.deleteMany({});
+  console.log('🧹 Cleaned up ALL test Shipments, Routes, RouteStops, and DispatchTasks 100%');
 
-  const shipmentIds = testShipments.map((s) => s.id);
-  const routeIds = testShipments.map((s) => s.routeId).filter((id): id is string => id !== null);
+  // 3.1 Re-link WarehouseScans linking packages to tote1 and tote2
+  const adminUser = await prisma.user.findFirst();
+  const scannedUserId = adminUser?.id || '00000000-0000-0000-0000-000000000000';
 
-  // Also include any routes starting with RT-LH-
-  const lhRoutes = await prisma.route.findMany({
-    where: { routeCode: { startsWith: 'RT-LH-' } },
+  const tote1 = await prisma.toteBag.findUnique({ where: { toteCode: tote1Code } });
+  const tote2 = await prisma.toteBag.findUnique({ where: { toteCode: tote2Code } });
+
+  const order1 = await prisma.order.findUnique({ where: { orderCode: 'ORD-9782000002' }, include: { package: true } });
+  const order2 = await prisma.order.findUnique({ where: { orderCode: 'ORD-1314000001' }, include: { package: true } });
+  const order3 = await prisma.order.findUnique({ where: { orderCode: 'ORD-0419000003' }, include: { package: true } });
+
+  if (tote1 && order1?.package) {
+    await prisma.warehouseScan.create({
+      data: {
+        facilityId: tote1.facilityId,
+        toteBagId: tote1.id,
+        packageId: order1.package.id,
+        scannedBy: scannedUserId,
+      },
+    });
+  }
+
+  if (tote2 && order2?.package && order3?.package) {
+    await prisma.warehouseScan.createMany({
+      data: [
+        {
+          facilityId: tote2.facilityId,
+          toteBagId: tote2.id,
+          packageId: order2.package.id,
+          scannedBy: scannedUserId,
+        },
+        {
+          facilityId: tote2.facilityId,
+          toteBagId: tote2.id,
+          packageId: order3.package.id,
+          scannedBy: scannedUserId,
+        },
+      ],
+    });
+  }
+  console.log('✅ Re-linked packages inside Tote 1 and Tote 2');
+
+  // 4. Restore ORD-0182000004 to READY_FOR_PICKUP (CHỜ LẤY HÀNG)
+  const targetOrder = await prisma.order.findUnique({
+    where: { orderCode: 'ORD-0182000004' },
     select: { id: true },
   });
-  lhRoutes.forEach((r) => {
-    if (!routeIds.includes(r.id)) routeIds.push(r.id);
-  });
 
-  if (shipmentIds.length > 0) {
-    await prisma.shipmentPackage.deleteMany({
-      where: { shipmentId: { in: shipmentIds } },
+  if (targetOrder) {
+    // 4.1 Update Order status to READY_FOR_PICKUP
+    await prisma.order.update({
+      where: { id: targetOrder.id },
+      data: {
+        status: OrderStatus.READY_FOR_PICKUP,
+      },
     });
+
+    // 4.2 Wipe newer status history entries (keep only CREATED and READY_FOR_PICKUP)
+    await prisma.orderStatusHistory.deleteMany({
+      where: {
+        orderId: targetOrder.id,
+        status: { in: [OrderStatus.PICKUP_ASSIGNED, OrderStatus.PICKING, OrderStatus.PICKED_UP, OrderStatus.IN_TRANSIT] },
+      },
+    });
+
+    console.log('✅ Restored ORD-0182000004 status to READY_FOR_PICKUP (CHỜ LẤY HÀNG) & cleared driver assignment');
   }
 
-  if (routeIds.length > 0) {
-    await prisma.routeStop.deleteMany({
-      where: { routeId: { in: routeIds } },
-    });
-    await prisma.route.deleteMany({
-      where: { id: { in: routeIds } },
-    });
-    console.log(`🧹 Cleaned up ${routeIds.length} test Linehaul Route(s)`);
-  }
-
-  if (shipmentIds.length > 0) {
-    await prisma.shipment.deleteMany({
-      where: { id: { in: shipmentIds } },
-    });
-    console.log(`🧹 Cleaned up ${shipmentIds.length} test Linehaul Shipment(s)`);
-  }
-
-  console.log('🎉 Full restoration complete! Totes are SEALED, Orders are AT_HUB, and driver test routes have been cleared 100%.');
+  console.log('🎉 Full restoration complete! Totes are SEALED and linked with packages, Orders are AT_HUB / READY_FOR_PICKUP, and ALL driver routes have been cleared 100%.');
 }
 
 restoreState().finally(() => prisma.$disconnect());

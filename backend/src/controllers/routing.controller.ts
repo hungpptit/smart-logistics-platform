@@ -55,8 +55,12 @@ export class RoutingController {
           where: { userId: user.id },
         });
 
-        // If no explicit facilityId or all query parameter is provided, filter routes strictly by the user's staff/driver profile ID
-        if (staffProfile && !facilityId && req.query.all !== 'true') {
+        const isDriverOrShipper = user?.roles?.includes('SHIPPER') || user?.roles?.includes('DRIVER');
+        const isAdminOrStaff = user?.roles?.includes('ADMIN');
+
+        if (isDriverOrShipper && !isAdminOrStaff && staffProfile) {
+          filterDriverId = staffProfile.id;
+        } else if (staffProfile && !facilityId && req.query.all !== 'true') {
           filterDriverId = staffProfile.id;
         }
       }

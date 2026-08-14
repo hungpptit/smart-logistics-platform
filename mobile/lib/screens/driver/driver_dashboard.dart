@@ -20,6 +20,7 @@ import 'widgets/navigation_screen.dart';
 import 'widgets/stop_details_dialog.dart';
 import 'widgets/qr_scanner_dialog.dart';
 import 'widgets/shipment_qr_modal.dart';
+import 'widgets/tote_detail_dialog.dart';
 
 /// Driver Dashboard - Main screen for drivers.
 /// All UI widgets extracted to screens/driver/widgets/ directory.
@@ -42,6 +43,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
   Timer? _alertTimer;
   Timer? _routeRefreshTimer;
   bool _isFetchingRoutes = false;
+
+  bool _isLinehaulRoute = false;
+  int _loadedTotesCount = 0;
+  int _totalPackageCount = 0;
+  List<String> _loadedTotes = [];
 
   final List<Map<String, dynamic>> _driverStops = [];
   String _driverName = 'Tài xế';
@@ -101,11 +107,14 @@ class _DriverDashboardState extends State<DriverDashboard> {
       final routes = await DriverService.fetchMyRoutes();
       if (routes.isNotEmpty && mounted) {
         final firstRoute = routes.firstWhere(
-          (r) {
-            final st = (r['status']?.toString() ?? '').toUpperCase();
-            return st == 'IN_PROGRESS' || st == 'ASSIGNED' || st == 'PLANNED' || st == 'PENDING';
-          },
-          orElse: () => routes.first,
+          (r) => (r['status']?.toString() ?? '').toUpperCase() == 'IN_PROGRESS',
+          orElse: () => routes.firstWhere(
+            (r) {
+              final st = (r['status']?.toString() ?? '').toUpperCase();
+              return st == 'ASSIGNED' || st == 'PLANNED' || st == 'PENDING';
+            },
+            orElse: () => routes.first,
+          ),
         );
         final firstStatus = (firstRoute['status']?.toString() ?? '').toUpperCase();
         final hasActiveRoute = routes.any(
@@ -128,6 +137,39 @@ class _DriverDashboardState extends State<DriverDashboard> {
             }
           }
           if (stopsRaw.isNotEmpty) {
+            int loadedTotesCount = 0;
+            int totalPkgCount = 0;
+            List<String> loadedToteCodes = [];
+            bool isLinehaul = (_activeRouteCode != null && (_activeRouteCode!.contains('LH') || _activeRouteCode!.startsWith('RT-LH-') || _activeRouteCode!.startsWith('SHP-LH-')));
+
+            for (final s in stopsRaw) {
+              final shipment = s['shipment'];
+              if (shipment != null) {
+                if (shipment['shipmentCode']?.toString().contains('LH') == true) {
+                  isLinehaul = true;
+                }
+                final pkgs = shipment['shipmentPackages'] as List?;
+                if (pkgs != null && pkgs.length > totalPkgCount) {
+                  totalPkgCount = pkgs.length;
+                }
+                final scans = shipment['warehouseScans'] as List?;
+                if (scans != null) {
+                  final Set<String> toteSet = {};
+                  for (final scan in scans) {
+                    final tote = scan['toteBag'];
+                    if (tote != null && tote['toteCode'] != null) {
+                      toteSet.add(tote['toteCode'].toString());
+                    }
+                  }
+                  if (toteSet.isNotEmpty) {
+                    loadedToteCodes = toteSet.toList();
+                    loadedTotesCount = toteSet.length;
+                    isLinehaul = true;
+                  }
+                }
+              }
+            }
+
             final List<Map<String, dynamic>> mappedStops = [];
             bool foundActiveIncomplete = false;
             for (int i = 0; i < stopsRaw.length; i++) {
@@ -184,20 +226,34 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     : (codAmount + (isReceiverPayFee ? shippingFee : 0));
                 final String rawStopStatus = (stop['status']?.toString() ?? '').toUpperCase();
                 final String rawOrderStatus = (firstOrder?['status']?.toString() ?? '').toUpperCase();
-                final bool isCompleted = (stopType == 'PICKUP')
-                    ? (rawStopStatus == 'COMPLETED' ||
-                        rawStopStatus == 'DEPARTED' ||
-                        rawStopStatus == 'ARRIVED' ||
-                        rawOrderStatus == 'PICKED_UP' ||
-                        rawOrderStatus == 'ARRIVED_ORIGIN_FACILITY')
-                    : (rawStopStatus == 'COMPLETED' ||
-                        rawStopStatus == 'DEPARTED' ||
-                        rawOrderStatus == 'DELIVERED' ||
-                        rawOrderStatus == 'COMPLETED');
+                final bool isCompleted = isLinehaul
+                    ? (stopType == 'PICKUP'
+                        ? (rawStopStatus == 'COMPLETED' || rawStopStatus == 'DEPARTED')
+                        : (rawStopStatus == 'COMPLETED' || rawStopStatus == 'DELIVERED'))
+                    : ((stopType == 'PICKUP')
+                        ? (rawStopStatus == 'COMPLETED' ||
+                            rawStopStatus == 'DEPARTED' ||
+                            rawOrderStatus == 'PICKED_UP' ||
+                            rawOrderStatus == 'ARRIVED_ORIGIN_FACILITY')
+                        : (rawStopStatus == 'COMPLETED' ||
+                            rawStopStatus == 'DEPARTED' ||
+                            rawOrderStatus == 'DELIVERED' ||
+                            rawOrderStatus == 'COMPLETED'));
+
                 String displayStatus;
                 bool isActive = false;
                 if (isCompleted) {
                   displayStatus = (stopType == 'PICKUP') ? 'ĐÃ LẤY HÀNG' : 'ĐÃ GIAO';
+                  isActive = false;
+                } else if (isLinehaul) {
+                  if (stopType == 'PICKUP') {
+                    displayStatus = _loadedTotesCount > 0 ? 'ĐANG BỐC HÀNG' : 'CHỜ BỐC HÀNG';
+                    isActive = true;
+                  } else {
+                    final bool originDone = mappedStops.isNotEmpty && mappedStops.first['status'] == 'ĐÃ LẤY HÀNG';
+                    displayStatus = originDone ? 'ĐANG THỰC HIỆN' : 'CHỜ THỰC HIỆN';
+                    isActive = originDone;
+                  }
                 } else if (!_isRouteStarted) {
                   displayStatus = 'CHỜ QUÉT NHẬN';
                   isActive = false;
@@ -209,7 +265,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   displayStatus = 'TIẾP THEO';
                 }
 
-                final isLinehaul = _activeRouteCode != null && _activeRouteCode!.contains('LH');
                 final String stopTitle = isLinehaul
                     ? (stopType == 'PICKUP' ? 'Điểm xuất sọt trung chuyển' : 'Điểm giao sọt kho đích')
                     : (stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng');
@@ -231,7 +286,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   'address': address,
                   'latitude': lat,
                   'longitude': lng,
-                  'packages': 1,
+                  'packages': totalPkgCount > 0 ? totalPkgCount : 1,
+                  'loadedTotesCount': loadedTotesCount,
+                  'loadedTotes': loadedToteCodes,
+                  'isLinehaul': isLinehaul,
                   'eta': 'Chờ giao',
                   'distance': 'Theo tuyến',
                   'status': displayStatus,
@@ -248,6 +306,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
               setState(() {
                 _driverStops.clear();
                 _driverStops.addAll(mappedStops);
+                _isLinehaulRoute = isLinehaul;
+                _loadedTotesCount = loadedTotesCount;
+                _totalPackageCount = totalPkgCount;
+                _loadedTotes = loadedToteCodes;
               });
               _roadPolylinePoints.clear();
               Future.microtask(() => _updateGoongPolyline(force: true));
@@ -443,7 +505,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.pop(ctx);
-                _showQRScanner(activeStop);
+                _showQRScanner(null, 'ROUTE');
               },
               icon: const Icon(Icons.qr_code_scanner, size: 18),
               label: const Text('QUÉT NHẬN NGAY', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -518,21 +580,33 @@ class _DriverDashboardState extends State<DriverDashboard> {
       activeRouteCode: _activeRouteCode,
       activeRouteId: _activeRouteId,
       scanMode: scanMode,
+      isLinehaulRoute: _isLinehaulRoute,
       onRouteCodeUpdated: (newCode) {
-        if (newCode != null) {
-          setState(() { _activeRouteCode = newCode; _activeRouteId = newCode; });
+        if (newCode != null && newCode.isNotEmpty) {
+          setState(() {
+            _activeRouteCode = newCode;
+            _activeRouteId = newCode;
+            _isRouteStarted = true;
+          });
         }
       },
       onRefreshRoutes: () => _initSocketAndFetchRoutes(force: true),
       onStopCheckedIn: (stop) {
-        setState(() => stop['isCheckedIn'] = true);
-        _showStopDetailsDialog(stop);
+        _completeStop(stop);
       },
     );
   }
 
   void _showShipmentQRModal() {
     ShipmentQrModal.show(context, activeRouteCode: _activeRouteCode, activeRouteId: _activeRouteId);
+  }
+
+  void _showToteDetailDialog() {
+    ToteDetailDialog.show(
+      context,
+      loadedTotes: _loadedTotes,
+      totalPackageCount: _totalPackageCount,
+    );
   }
 
   Future<void> _simulateCameraCapture(Map<String, dynamic> stop, VoidCallback onCaptured) async {
@@ -596,8 +670,13 @@ class _DriverDashboardState extends State<DriverDashboard> {
     if (orderCode != null && orderCode.toString().isNotEmpty && !isLinehaul) {
       DriverService.updateOrderStatus(orderCode.toString(), nextStatus, reason: reason);
     }
-    if (shipmentId != null && shipmentId.toString().isNotEmpty) {
-      DriverService.updateShipmentStatus(shipmentId.toString(), nextStatus, notes: reason);
+    
+    final String targetShipmentKey = (shipmentId != null && shipmentId.toString().isNotEmpty)
+        ? shipmentId.toString()
+        : (_activeRouteCode ?? _activeRouteId ?? '');
+
+    if (isLinehaul && targetShipmentKey.isNotEmpty) {
+      DriverService.updateShipmentStatus(targetShipmentKey, nextStatus, notes: reason);
     }
 
     if (!mounted) return;
@@ -620,7 +699,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
         ),
         content: Text(isLinehaul
             ? (isPickupStop
-                ? 'Đã cập nhật trạng thái Chuyến xe trung chuyển sang ĐANG TRUNG CHUYỂN. Tài xế bắt đầu di chuyển đến Bưu cục đích.'
+                ? '⚡ Đã xác nhận hoàn thành nạp sọt & xuất bến thành công!\n\n'
+                  'Tải trọng xe: $_loadedTotesCount sọt sọt hàng (< 80% sức chứa).\n'
+                  'Hệ thống tự động kiểm tra và điều hướng ghé bốc thêm Sọt cùng hướng tại Kho Trung Gian trên hành trình!'
                 : 'Đã xác nhận Xe tải cập bến Bưu cục / Hub đích. Vui lòng đưa Mã QR Chuyến xe cho Thủ kho quét nhập kho.')
             : (isPickupStop
                 ? 'Đã quét mã và xác nhận lấy bưu kiện ${stop['orderCode'] ?? ''} thành công.'
@@ -786,6 +867,15 @@ class _DriverDashboardState extends State<DriverDashboard> {
             s['status'] == 'ĐÃ LẤY HÀNG' ||
             s['status'] == 'COMPLETED');
 
+    final bool showPendingScanBanner = !effectiveRouteStarted &&
+        _activeRouteCode != null &&
+        !_isRouteFinished &&
+        _driverStops.isNotEmpty &&
+        !allCompleted;
+
+    final bool showToteActions = _isLinehaulRoute ||
+        (!showPendingScanBanner && !effectiveRouteStarted);
+
     return Scaffold(
       backgroundColor: AppColors.cloudGray,
       appBar: AppBar(
@@ -852,50 +942,50 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 isDutyLoading: _isDutyLoading,
                 onToggle: _toggleDutyStatus,
               ),
-              const SizedBox(height: 16.0),
-
-              // 2. Quick Actions Row ("Quét Nhận Sọt" & "QR Chuyen Xe")
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        final activeStop = _driverStops.firstWhere(
-                          (s) => s['isCheckedIn'] != true,
-                          orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
-                        );
-                        _showQRScanner(activeStop, 'TOTE');
-                      },
-                      icon: const Icon(Icons.inventory_2, size: 18.0),
-                      label: const Text('Quét Nhận Sọt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.logisticsRed,
-                        foregroundColor: AppColors.pureWhite,
-                        padding: const EdgeInsets.symmetric(vertical: 14.0),
-                        shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+              // 2. Quick Actions Row ("Quét Nhận Sọt" & "QR Chuyen Xe") - Hidden when last-mile delivery route is active
+              if (showToteActions) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          final activeStop = _driverStops.firstWhere(
+                            (s) => s['isCheckedIn'] != true,
+                            orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
+                          );
+                          _showQRScanner(activeStop, 'TOTE');
+                        },
+                        icon: const Icon(Icons.inventory_2, size: 18.0),
+                        label: const Text('Quét Nhận Sọt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.logisticsRed,
+                          foregroundColor: AppColors.pureWhite,
+                          padding: const EdgeInsets.symmetric(vertical: 14.0),
+                          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12.0),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _showShipmentQRModal,
-                      icon: const Icon(Icons.qr_code_2, size: 18.0),
-                      label: const Text('QR Chuyen Xe', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo.shade700,
-                        foregroundColor: AppColors.pureWhite,
-                        padding: const EdgeInsets.symmetric(vertical: 14.0),
-                        shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                    const SizedBox(width: 12.0),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _showShipmentQRModal,
+                        icon: const Icon(Icons.qr_code_2, size: 18.0),
+                        label: const Text('QR Chuyen Xe', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo.shade700,
+                          foregroundColor: AppColors.pureWhite,
+                          padding: const EdgeInsets.symmetric(vertical: 14.0),
+                          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20.0),
+                  ],
+                ),
+                const SizedBox(height: 20.0),
+              ],
 
               // 3. Pending Scan Banner (when route is assigned but not yet scanned/started)
-              if (!effectiveRouteStarted && _activeRouteCode != null && !_isRouteFinished && _driverStops.isNotEmpty && !allCompleted)
+              if (showPendingScanBanner)
                 Container(
                   margin: const EdgeInsets.only(bottom: 20.0),
                   padding: const EdgeInsets.all(14.0),
@@ -930,11 +1020,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            final activeStop = _driverStops.firstWhere(
-                              (s) => s['isCheckedIn'] != true,
-                              orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
-                            );
-                            _showQRScanner(activeStop);
+                            _showQRScanner(null, 'ROUTE');
                           },
                           icon: const Icon(Icons.qr_code_scanner, size: 18),
                           label: const Text('QUÉT NHẬN CHUYẾN XE NGAY', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
@@ -954,6 +1040,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 stops: _driverStops,
                 isRouteStarted: effectiveRouteStarted,
                 currentLocation: _currentLocation,
+                isLinehaul: _isLinehaulRoute,
+                loadedTotesCount: _loadedTotesCount,
+                totalPackageCount: _totalPackageCount,
               ),
               const SizedBox(height: 16.0),
 
@@ -986,7 +1075,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 children: _driverStops.map((stop) {
                   return Column(
                     children: [
-                      StopCard(stop: stop, onTap: () => _showStopDetailsDialog(stop)),
+                      StopCard(
+                        stop: stop,
+                        onTap: () => _showStopDetailsDialog(stop),
+                        onShowToteDetails: _showToteDetailDialog,
+                      ),
                       const SizedBox(height: 12.0),
                     ],
                   );

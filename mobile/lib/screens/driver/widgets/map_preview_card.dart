@@ -36,9 +36,12 @@ class MapPreviewCard extends StatelessWidget {
             s['status'] == 'COMPLETED');
 
     double distanceKm = 0.0;
-    int estimatedMinutes = 5;
+    int estimatedMinutes = 0;
 
-    if (allCompleted) {
+    if (stops.isEmpty) {
+      distanceKm = 0.0;
+      estimatedMinutes = 0;
+    } else if (allCompleted) {
       final double hubLat = 10.8460;
       final double hubLng = 106.7860;
       final double distanceMeters = Geolocator.distanceBetween(
@@ -197,16 +200,22 @@ class MapPreviewCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          allCompleted ? 'Quay về Bưu cục bàn giao sọt' : 'Dự kiến điểm dừng tiếp',
+                          stops.isEmpty
+                              ? 'Chưa có lộ trình phân công'
+                              : (allCompleted ? 'Quay về Bưu cục bàn giao sọt' : 'Dự kiến điểm dừng tiếp'),
                           style: AppTypography.labelMd.copyWith(
-                            color: allCompleted ? Colors.green.shade900 : AppColors.logisticsRed,
+                            color: stops.isEmpty
+                                ? AppColors.secondary
+                                : (allCompleted ? Colors.green.shade900 : AppColors.logisticsRed),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          allCompleted
-                              ? 'Bưu cục Tăng Nhơn Phú ($estimatedMinutes Phút - ${distanceKm.toStringAsFixed(1)} km)'
-                              : '$estimatedMinutes Phút (${distanceKm.toStringAsFixed(1)} km)',
+                          stops.isEmpty
+                              ? 'Chờ nhận chuyến từ Bưu cục (0.0 km)'
+                              : (allCompleted
+                                  ? 'Bưu cục Tăng Nhơn Phú ($estimatedMinutes Phút - ${distanceKm.toStringAsFixed(1)} km)'
+                                  : '$estimatedMinutes Phút (${distanceKm.toStringAsFixed(1)} km)'),
                           style: AppTypography.bodyMd.copyWith(
                             fontWeight: FontWeight.bold,
                             color: AppColors.deepOnyx,
