@@ -50,129 +50,90 @@ class QrScannerDialog extends StatelessWidget {
     );
   }
 
-  String? get _targetCode =>
-      (activeRouteCode != null && activeRouteCode!.isNotEmpty)
-          ? activeRouteCode
-          : ((activeRouteId != null && activeRouteId!.isNotEmpty)
-              ? activeRouteId
-              : ((stop != null && stop!['orderCode'] != null)
-                  ? stop!['orderCode'].toString().trim()
-                  : null));
+  String? get _targetCode {
+    if (stop != null && stop!.isNotEmpty) {
+      final code = stop!['orderCode'] ?? stop!['packageCode'] ?? stop!['shipmentCode'];
+      if (code != null && code.toString().trim().isNotEmpty) {
+        return code.toString().trim();
+      }
+    }
+    if (activeRouteCode != null && activeRouteCode!.isNotEmpty) {
+      return activeRouteCode;
+    }
+    if (activeRouteId != null && activeRouteId!.isNotEmpty) {
+      return activeRouteId;
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final targetCode = _targetCode;
     final TextEditingController scanController = TextEditingController();
-    String? errorMessage;
 
     return StatefulBuilder(
       builder: (context, setScannerState) {
         bool isProcessing = false;
+        String? errorMessage;
+        String? successNotice;
 
         Future<void> performScanCheck() async {
           final scannedValue = scanController.text.trim();
           if (scannedValue.isEmpty) {
             setScannerState(() {
               errorMessage = 'Vui lòng đưa camera quét mã QR / nhập mã';
+              successNotice = null;
             });
             return;
           }
 
-          // Case 0: Scanned Linehaul Warehouse Tote (TOTE-ZONE-...)
-          if (scannedValue.toUpperCase().startsWith('TOTE-')) {
-            Navigator.pop(context);
-            final result = await DriverService.loadToteIntoShipment(scannedValue);
-            if (context.mounted) {
-              if (result != null && result['shipmentCode'] != null) {
-                onRouteCodeUpdated(result['shipmentCode'].toString());
-              }
-              onRefreshRoutes();
-              showDialog(
-                context: context,
-                builder: (ctx) {
-                  final bool isOk = result != null;
-                  return AlertDialog(
-                    backgroundColor: AppColors.pureWhite,
-                    shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-                    title: Row(
-                      children: [
-                        Icon(isOk ? Icons.check_circle : Icons.error,
-                            color: isOk ? Colors.green : Colors.red, size: 28),
-                        const SizedBox(width: 8.0),
-                        Text(isOk ? 'Nạp Sọt Xe Tải Thành Công' : 'Thất Bại',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      ],
-                    ),
-                    content: Text(isOk
-                        ? 'Đã tiếp nhận Sọt [$scannedValue] lên xe tải (${result['shipmentCode'] ?? ''}). Toàn bộ ${result['packageCount'] ?? 1} bưu kiện đã chuyển sang Đang trung chuyển (IN_TRANSIT).'
-                        : 'Không thể nạp sọt $scannedValue lên xe tải.'),
-                    actions: [
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.logisticsRed,
-                            foregroundColor: AppColors.pureWhite),
-                        child: const Text('Đóng'),
-                      ),
-                    ],
-                  );
-                },
-              );
-            }
-            return;
-          }
-
-          // Case A: Scanned Route / Tote Code (RT-XXXX, SHP-LH-XXXX, or matching active route)
-          final bool isToteCode = scannedValue.toUpperCase().startsWith('TOT-') ||
+          // Case 0 & A1: Scanned Linehaul Warehouse Tote (TOTE-..., TOT-..., ST-...)
+          final bool isToteCode = scannedValue.toUpperCase().startsWith('TOTE-') ||
+              scannedValue.toUpperCase().startsWith('TOT-') ||
               scannedValue.toUpperCase().startsWith('ST-');
-          final bool isRouteCodeFormat = scannedValue.toUpperCase().startsWith('RT-') ||
-              scannedValue.toUpperCase().startsWith('SHP-LH-') ||
-              (activeRouteCode != null && scannedValue.toUpperCase() == activeRouteCode!.toUpperCase()) ||
-              (activeRouteId != null && scannedValue.toUpperCase() == activeRouteId!.toUpperCase());
 
-          // Case A1: Tote Scan (Bốc sọt hàng lên xe tải trung chuyển)
           if (isToteCode) {
             setScannerState(() {
               isProcessing = true;
+              errorMessage = null;
+              successNotice = null;
             });
-            final res = await DriverService.loadToteIntoShipment(scannedValue);
-            final bool success = res != null;
+
+            final result = await DriverService.loadToteIntoShipment(scannedValue);
+
             if (context.mounted) {
-              Navigator.pop(context);
-              onRefreshRoutes();
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: AppColors.pureWhite,
-                  shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-                  title: Row(
-                    children: [
-                      Icon(success ? Icons.check_circle : Icons.error_outline,
-                          color: success ? Colors.green : AppColors.error, size: 28),
-                      const SizedBox(width: 8.0),
-                      Text(success ? 'Bốc Sọt Hàng Lên Xe Thành Công' : 'Lỗi Quét Sọt Hàng',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: success ? Colors.green.shade900 : AppColors.error)),
-                    ],
-                  ),
-                  content: Text(success
-                      ? 'Đã bốc sọt $scannedValue lên xe tải trung chuyển. Dữ liệu đã được đồng bộ hệ thống!'
-                      : 'Không thể quét nhận sọt $scannedValue. Vui lòng kiểm tra mã Sọt Tote hoặc liên hệ Quản lý.'),
-                  actions: [
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: success ? AppColors.logisticsRed : AppColors.deepOnyx,
-                          foregroundColor: AppColors.pureWhite),
-                      child: const Text('Đóng'),
-                    ),
-                  ],
-                ),
-              );
+              if (result != null) {
+                final shipCode = result['shipmentCode']?.toString() ?? '';
+                final pkgCount = result['packageCount'] ?? 1;
+                if (shipCode.isNotEmpty) {
+                  onRouteCodeUpdated(shipCode);
+                }
+                onRefreshRoutes();
+
+                setScannerState(() {
+                  isProcessing = false;
+                  successNotice = '🎉 NẠP SỌT [$scannedValue] THÀNH CÔNG VÀO XE TẢI (${shipCode.isNotEmpty ? shipCode : 'Chuyến vận chuyển'}). Đã cập nhật $pkgCount bưu kiện sang Đang trung chuyển!';
+                  errorMessage = null;
+                  scanController.clear();
+                });
+              } else {
+                setScannerState(() {
+                  isProcessing = false;
+                  errorMessage = '❌ Không thể nạp Sọt [$scannedValue] lên xe tải. Vui lòng kiểm tra mã Sọt hoặc trạng thái bưu kiện!';
+                  successNotice = null;
+                });
+              }
             }
             return;
           }
 
           // Case A2: Route Code Scan (Nhận chuyến xe / Lộ trình)
+          final bool isRouteCodeFormat = scannedValue.toUpperCase().startsWith('RT-') ||
+              scannedValue.toUpperCase().startsWith('SHP-LH-') ||
+              (stop == null &&
+                  ((activeRouteCode != null && scannedValue.toUpperCase() == activeRouteCode!.toUpperCase()) ||
+                   (activeRouteId != null && scannedValue.toUpperCase() == activeRouteId!.toUpperCase())));
+
           if (isRouteCodeFormat) {
             // Check if shipper is assigned to this route:
             final bool isAssignedToThisDriver = (activeRouteCode != null &&
@@ -397,21 +358,61 @@ class QrScannerDialog extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (successNotice != null) ...[
+                  const SizedBox(height: 10.0),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10.0),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade900.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(10.0),
+                      border: Border.all(color: Colors.greenAccent, width: 1.5),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: Colors.greenAccent, size: 22),
+                        const SizedBox(width: 8.0),
+                        Expanded(
+                          child: Text(
+                            successNotice!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (errorMessage != null) ...[
                   const SizedBox(height: 10.0),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade900.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(8.0),
-                      border: Border.all(color: Colors.redAccent),
+                      color: Colors.red.shade900.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(10.0),
+                      border: Border.all(color: Colors.redAccent, width: 1.5),
                     ),
-                    child: Text(
-                      errorMessage!,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 11.0, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.redAccent, size: 22),
+                        const SizedBox(width: 8.0),
+                        Expanded(
+                          child: Text(
+                            errorMessage!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -419,9 +420,15 @@ class QrScannerDialog extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: performScanCheck,
-                    icon: const Icon(Icons.qr_code_scanner),
-                    label: const Text('XÁC NHẬN MÃ QUÉT'),
+                    onPressed: isProcessing ? null : performScanCheck,
+                    icon: isProcessing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.qr_code_scanner),
+                    label: Text(isProcessing ? 'ĐANG XỬ LÝ NẠP SỌT...' : 'XÁC NHẬN MÃ QUÉT'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.logisticsRed,
                       foregroundColor: Colors.white,

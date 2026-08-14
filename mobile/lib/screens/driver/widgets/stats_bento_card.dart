@@ -67,8 +67,18 @@ class StatsBentoCard extends StatelessWidget {
     final totalCount = stops.length;
     final progress = stops.isEmpty ? 0.0 : completedCount / totalCount;
     final bool isPendingScan = !isRouteStarted && stops.isNotEmpty;
-    final totalKm = _totalRouteDistanceKm;
-    final avgMins = _avgStopMinutes;
+    final double totalKm = _totalRouteDistanceKm;
+    final double avgMins = _avgStopMinutes;
+    final bool isAllFinished = totalCount > 0 && completedCount == totalCount;
+    final String statusText = isAllFinished
+        ? 'HOÀN THÀNH'
+        : (isPendingScan ? 'CHỜ QUÉT NHẬN' : 'HOẠT ĐỘNG');
+    final Color badgeBg = isAllFinished
+        ? Colors.blue.shade50
+        : (isPendingScan ? Colors.amber.shade50 : Colors.green.shade50);
+    final Color badgeTextColor = isAllFinished
+        ? Colors.blue.shade900
+        : (isPendingScan ? Colors.amber.shade900 : Colors.green.shade800);
 
     return Container(
       padding: const EdgeInsets.all(20.0),
@@ -94,13 +104,13 @@ class StatsBentoCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                 decoration: BoxDecoration(
-                  color: isPendingScan ? Colors.amber.shade50 : Colors.green.shade50,
+                  color: badgeBg,
                   borderRadius: BorderRadius.circular(12.0),
                 ),
                 child: Text(
-                  isPendingScan ? 'CHỜ QUÉT NHẬN' : 'HOẠT ĐỘNG',
+                  statusText,
                   style: AppTypography.labelMd.copyWith(
-                    color: isPendingScan ? Colors.amber.shade900 : Colors.green.shade800,
+                    color: badgeTextColor,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

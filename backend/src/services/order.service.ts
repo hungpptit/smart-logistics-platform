@@ -729,25 +729,7 @@ export class OrderService {
           });
 
           const routeIds = Array.from(new Set(linkedStops.map((s) => s.routeId).filter(Boolean)));
-          for (const routeId of routeIds) {
-            if (!routeId) continue;
-            const remainingCount = await tx.routeStop.count({
-              where: {
-                routeId,
-                status: { notIn: [RouteStopStatus.DEPARTED, RouteStopStatus.SKIPPED, RouteStopStatus.FAILED] },
-              },
-            });
-
-            if (remainingCount === 0) {
-              await tx.route.update({
-                where: { id: routeId },
-                data: {
-                  status: RouteStatus.COMPLETED,
-                  completedAt: new Date(),
-                },
-              });
-            }
-          }
+          // Route status will be explicitly set to COMPLETED when the driver taps 'CHỐT HOÀN THÀNH CHUYẾN ĐI' via routing.service confirmRouteComplete
         }
       } else if (['PICK_FAILED', 'DELIVERY_FAILED'].includes(dto.status)) {
         const linkedStops = await tx.routeStop.findMany({

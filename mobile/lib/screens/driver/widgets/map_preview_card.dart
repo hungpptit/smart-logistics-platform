@@ -26,23 +26,43 @@ class MapPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool allCompleted = stops.isNotEmpty &&
+        stops.every((s) =>
+            s['isCheckedIn'] == true ||
+            s['status'] == 'DA GIAO' ||
+            s['status'] == 'ĐÃ GIAO' ||
+            s['status'] == 'DA LAY HANG' ||
+            s['status'] == 'ĐÃ LẤY HÀNG' ||
+            s['status'] == 'COMPLETED');
+
     double distanceKm = 0.0;
     int estimatedMinutes = 5;
 
-    final activeStop = stops.firstWhere(
-      (s) => s['isCheckedIn'] != true,
-      orElse: () => stops.isNotEmpty ? stops.first : <String, dynamic>{},
-    );
-
-    if (activeStop.isNotEmpty) {
-      final double lat = double.tryParse(activeStop['latitude']?.toString() ?? '') ?? currentLocation.latitude;
-      final double lng = double.tryParse(activeStop['longitude']?.toString() ?? '') ?? currentLocation.longitude;
+    if (allCompleted) {
+      final double hubLat = 10.8460;
+      final double hubLng = 106.7860;
       final double distanceMeters = Geolocator.distanceBetween(
-        currentLocation.latitude, currentLocation.longitude, lat, lng,
+        currentLocation.latitude, currentLocation.longitude, hubLat, hubLng,
       );
       distanceKm = distanceMeters / 1000.0;
       estimatedMinutes = (distanceKm / 25 * 60).round();
       if (estimatedMinutes < 2) estimatedMinutes = 2;
+    } else {
+      final activeStop = stops.firstWhere(
+        (s) => s['isCheckedIn'] != true,
+        orElse: () => stops.isNotEmpty ? stops.first : <String, dynamic>{},
+      );
+
+      if (activeStop.isNotEmpty) {
+        final double lat = double.tryParse(activeStop['latitude']?.toString() ?? '') ?? currentLocation.latitude;
+        final double lng = double.tryParse(activeStop['longitude']?.toString() ?? '') ?? currentLocation.longitude;
+        final double distanceMeters = Geolocator.distanceBetween(
+          currentLocation.latitude, currentLocation.longitude, lat, lng,
+        );
+        distanceKm = distanceMeters / 1000.0;
+        estimatedMinutes = (distanceKm / 25 * 60).round();
+        if (estimatedMinutes < 2) estimatedMinutes = 2;
+      }
     }
 
     return Container(
@@ -148,19 +168,27 @@ class MapPreviewCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(12.0),
               decoration: BoxDecoration(
-                color: AppColors.pureWhite.withValues(alpha: 0.9),
+                color: AppColors.pureWhite.withValues(alpha: 0.95),
                 borderRadius: AppStyles.roundedLg,
+                border: Border.all(
+                  color: allCompleted ? Colors.green.shade400 : AppColors.surfaceContainerHighest,
+                  width: allCompleted ? 1.5 : 1.0,
+                ),
               ),
               child: Row(
                 children: [
                   Container(
                     width: 36.0,
                     height: 36.0,
-                    decoration: const BoxDecoration(
-                      color: AppColors.logisticsRed,
+                    decoration: BoxDecoration(
+                      color: allCompleted ? Colors.green.shade700 : AppColors.logisticsRed,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.navigation, color: AppColors.pureWhite, size: 18.0),
+                    child: Icon(
+                      allCompleted ? Icons.warehouse_rounded : Icons.navigation,
+                      color: AppColors.pureWhite,
+                      size: 18.0,
+                    ),
                   ),
                   const SizedBox(width: 12.0),
                   Expanded(
@@ -169,28 +197,35 @@ class MapPreviewCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Dự kiến điểm dừng tiếp',
+                          allCompleted ? 'Quay về Bưu cục bàn giao sọt' : 'Dự kiến điểm dừng tiếp',
                           style: AppTypography.labelMd.copyWith(
-                              color: AppColors.logisticsRed, fontWeight: FontWeight.bold),
+                            color: allCompleted ? Colors.green.shade900 : AppColors.logisticsRed,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
-                          '$estimatedMinutes Phút (${distanceKm.toStringAsFixed(1)} km)',
+                          allCompleted
+                              ? 'Bưu cục Tăng Nhơn Phú ($estimatedMinutes Phút - ${distanceKm.toStringAsFixed(1)} km)'
+                              : '$estimatedMinutes Phút (${distanceKm.toStringAsFixed(1)} km)',
                           style: AppTypography.bodyMd.copyWith(
-                              fontWeight: FontWeight.bold, color: AppColors.deepOnyx),
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.deepOnyx,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  ElevatedButton(
-                    onPressed: onStartNavigation,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isRouteStarted ? AppColors.deepOnyx : const Color(0xFFD97706),
-                      foregroundColor: AppColors.pureWhite,
-                      shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                      padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                  if (isRouteStarted || allCompleted)
+                    ElevatedButton(
+                      onPressed: onStartNavigation,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: allCompleted ? Colors.green.shade800 : AppColors.deepOnyx,
+                        foregroundColor: AppColors.pureWhite,
+                        shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+                        padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                      ),
+                      child: Text(allCompleted ? 'Về bưu cục' : 'Dẫn đường'),
                     ),
-                    child: Text(isRouteStarted ? 'Dẫn đường' : 'Quét nhận trước'),
-                  ),
                 ],
               ),
             ),

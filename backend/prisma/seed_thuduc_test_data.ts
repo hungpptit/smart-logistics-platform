@@ -523,6 +523,12 @@ async function main() {
   }
 
   // 6. Tạo 50 Đơn hàng: Gửi từ Bưu cục Linh Trung / Phước Long / An Phú ➔ Chuyển kho về Bưu cục Đặng Văn Bi
+  if (process.env.SKIP_ORDERS === 'true') {
+    console.log('⏩ Bỏ qua bước nạp Đơn hàng/Kiện hàng/Vận đơn theo yêu cầu (SKIP_ORDERS=true).');
+    console.log('🎉 Hoàn tất nạp lại dữ liệu Mẫu Kho bãi & Tài khoản hệ thống!');
+    return;
+  }
+
   console.log('📦 Tạo 50 Đơn hàng xuất phát từ Kho gửi khác, Shipper lấy hàng tận nơi (PICKUP), đã trung chuyển về Bưu cục Đặng Văn Bi...');
 
   const deliveryLocations = [

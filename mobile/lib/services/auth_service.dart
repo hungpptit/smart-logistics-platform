@@ -56,6 +56,12 @@ class AuthService {
     return await _storage.read(key: 'phone');
   }
 
+  /// Returns true if role is CUSTOMER, false for all operational roles (SHIPPER, STAFF, ADMIN)
+  static bool isCustomerRole(String? role) {
+    if (role == null || role.trim().isEmpty) return true;
+    return role.trim().toUpperCase() == 'CUSTOMER';
+  }
+
   // Login API Call
   static Future<Map<String, dynamic>> login(String username, String password) async {
     try {
@@ -69,7 +75,7 @@ class AuthService {
           'username': username,
           'password': password,
         }),
-      );
+      ).timeout(const Duration(seconds: 10));
 
       final responseData = jsonDecode(response.body);
       
@@ -77,22 +83,16 @@ class AuthService {
         final data = responseData['data'];
         final token = data['accessToken'] ?? data['token'];
         final user = data['user'];
-        // Extract primary role code safely from either user.role object or user.roles list
-        String role = 'CUSTOMER';
+
+        // Backend defines exactly 4 System Roles: ADMIN, STAFF, SHIPPER, CUSTOMER
+        String roleCode = 'CUSTOMER';
         if (user != null) {
           if (user['role'] is Map && user['role']['roleCode'] != null) {
-            role = user['role']['roleCode'].toString();
+            roleCode = user['role']['roleCode'].toString();
           } else if (user['role'] is String) {
-            role = user['role'].toString();
+            roleCode = user['role'].toString();
           } else if (user['roles'] is List && (user['roles'] as List).isNotEmpty) {
-            final List<dynamic> roles = user['roles'];
-            if (roles.contains('ADMIN')) {
-              role = 'ADMIN';
-            } else if (roles.contains('STAFF')) {
-              role = 'STAFF';
-            } else if (roles.contains('SHIPPER') || roles.contains('DRIVER')) {
-              role = 'SHIPPER';
-            }
+            roleCode = (user['roles'] as List).first.toString();
           }
         }
 
@@ -102,7 +102,7 @@ class AuthService {
 
         await saveAuthData(
           token,
-          role,
+          roleCode,
           user['email'] ?? '',
           user['username'] ?? '',
           user['phone'] ?? '',
@@ -111,7 +111,7 @@ class AuthService {
         return {
           'success': true,
           'message': responseData['message'] ?? 'Đăng nhập thành công',
-          'role': role,
+          'role': roleCode,
         };
       } else {
         return {
@@ -120,9 +120,10 @@ class AuthService {
         };
       }
     } catch (e) {
+      debugPrint('💥 Login error via Ngrok: $e');
       return {
         'success': false,
-        'message': 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình IP.',
+        'message': 'Không thể kết nối đến máy chủ ngrok. Vui lòng kiểm tra lại kết nối mạng.',
       };
     }
   }

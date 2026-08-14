@@ -9,7 +9,9 @@
     "dev": "tsx watch src/index.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "db:clean": "tsx prisma/clean_data.ts",
+    "db:clean": "tsx prisma/reset_all_test_data.ts",
+    "db:reset-test": "tsx prisma/reset_all_test_data.ts",
+    "db:restore-totes": "tsx scripts/restore_totes_and_orders.ts",
     "reset:demo": "tsx scripts/reset_route_demo_data.ts"
   },
   "prisma": {

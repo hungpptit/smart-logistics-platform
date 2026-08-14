@@ -51,14 +51,13 @@ export class RoutingController {
 
       let filterDriverId = driverId as string;
       if (!filterDriverId && user?.id) {
-        const isManagement = user?.roles?.includes('ADMIN') || user?.roles?.includes('STAFF') || user?.roles?.includes('DISPATCHER');
-        if (!isManagement) {
-          const driverProfile = await prisma.staff.findFirst({
-            where: { userId: user.id },
-          });
-          if (driverProfile) {
-            filterDriverId = driverProfile.id;
-          }
+        const staffProfile = await prisma.staff.findFirst({
+          where: { userId: user.id },
+        });
+
+        // If no explicit facilityId or all query parameter is provided, filter routes strictly by the user's staff/driver profile ID
+        if (staffProfile && !facilityId && req.query.all !== 'true') {
+          filterDriverId = staffProfile.id;
         }
       }
 

@@ -39,10 +39,21 @@ class _NavigationScreenState extends State<NavigationScreen> {
   List<Map<String, String>> _navSteps = [];
   int _currentStepIndex = 0;
 
-  Map<String, dynamic> get _activeStop => widget.stops.firstWhere(
-        (s) => s['isCheckedIn'] != true,
-        orElse: () => widget.stops.isNotEmpty ? widget.stops.first : <String, dynamic>{},
-      );
+  Map<String, dynamic> get _activeStop {
+    final incomplete = widget.stops.where((s) => s['isCheckedIn'] != true);
+    if (incomplete.isNotEmpty) {
+      return incomplete.first;
+    }
+    return {
+      'title': 'Bưu cục Tăng Nhơn Phú',
+      'address': '120 Đường Tăng Nhơn Phú, Phường Tăng Nhơn Phú B, TP. Thủ Đức',
+      'latitude': 10.8460,
+      'longitude': 106.7860,
+      'orderCode': 'KHO-TANGNHONPHU',
+      'stopType': 'HUB',
+      'isCheckedIn': false,
+    };
+  }
 
   @override
   void initState() {

@@ -114,7 +114,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
             return st == 'IN_PROGRESS' || st == 'ASSIGNED' || st == 'PLANNED' || st == 'PENDING';
           },
         );
-        _isRouteFinished = (firstStatus == 'COMPLETED') || !hasActiveRoute;
+        _isRouteFinished = (firstStatus == 'COMPLETED');
         _isRouteStarted = (firstStatus == 'IN_PROGRESS');
         _activeRouteId = firstRoute['id']?.toString();
         _activeRouteCode = firstRoute['routeCode']?.toString() ?? _activeRouteId;
@@ -184,13 +184,16 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     : (codAmount + (isReceiverPayFee ? shippingFee : 0));
                 final String rawStopStatus = (stop['status']?.toString() ?? '').toUpperCase();
                 final String rawOrderStatus = (firstOrder?['status']?.toString() ?? '').toUpperCase();
-                final bool isCompleted = (rawStopStatus == 'COMPLETED') ||
-                    (rawStopStatus == 'DEPARTED') ||
-                    (rawOrderStatus == 'PICKED_UP') ||
-                    (rawOrderStatus == 'ARRIVED_ORIGIN_FACILITY') ||
-                    (rawOrderStatus == 'AT_HUB') ||
-                    (rawOrderStatus == 'DELIVERED') ||
-                    (rawOrderStatus == 'COMPLETED');
+                final bool isCompleted = (stopType == 'PICKUP')
+                    ? (rawStopStatus == 'COMPLETED' ||
+                        rawStopStatus == 'DEPARTED' ||
+                        rawStopStatus == 'ARRIVED' ||
+                        rawOrderStatus == 'PICKED_UP' ||
+                        rawOrderStatus == 'ARRIVED_ORIGIN_FACILITY')
+                    : (rawStopStatus == 'COMPLETED' ||
+                        rawStopStatus == 'DEPARTED' ||
+                        rawOrderStatus == 'DELIVERED' ||
+                        rawOrderStatus == 'COMPLETED');
                 String displayStatus;
                 bool isActive = false;
                 if (isCompleted) {
@@ -391,7 +394,28 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
   // ------ Navigation ------
   void _startNavigation() {
-    if (!_isRouteStarted) {
+    final bool allCompleted = _driverStops.isNotEmpty &&
+        _driverStops.every((s) {
+          final isPickup = s['stopType'] == 'PICKUP' ||
+              s['title']?.toString().contains('lấy') == true ||
+              s['title']?.toString().contains('xuất') == true;
+          if (isPickup) {
+            return s['isCheckedIn'] == true ||
+                s['status'] == 'DA LAY HANG' ||
+                s['status'] == 'ĐÃ LẤY HÀNG' ||
+                s['status'] == 'COMPLETED';
+          }
+          return s['isCheckedIn'] == true ||
+              s['status'] == 'DA GIAO' ||
+              s['status'] == 'ĐÃ GIAO' ||
+              s['status'] == 'COMPLETED';
+        });
+
+    final bool effectiveRouteStarted = _isRouteStarted ||
+        allCompleted ||
+        _driverStops.any((s) => s['isCheckedIn'] == true);
+
+    if (!effectiveRouteStarted) {
       final activeStop = _driverStops.firstWhere(
         (s) => s['isCheckedIn'] != true,
         orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
@@ -552,14 +576,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
             ? 'Shipper đã quét mã bưu kiện và xác nhận lấy hàng từ người gửi thành công'
             : 'Shipper đã hoàn thành giao hàng cho người nhận');
 
-    if (orderCode != null && orderCode.toString().isNotEmpty && !isLinehaul) {
-      await DriverService.updateOrderStatus(orderCode.toString(), nextStatus, reason: reason);
-    }
-    if (shipmentId != null && shipmentId.toString().isNotEmpty) {
-      await DriverService.updateShipmentStatus(shipmentId.toString(), nextStatus, notes: reason);
-    }
-
     setState(() {
+      stop['isCheckedIn'] = true;
       stop['status'] = isLinehaul
           ? (isPickupStop ? 'ĐÃ XUẤT KHO' : 'ĐÃ TỚI KHO ĐÍCH')
           : (isPickupStop ? 'ĐÃ LẤY HÀNG' : 'ĐÃ GIAO');
@@ -574,6 +592,13 @@ class _DriverDashboardState extends State<DriverDashboard> {
         nextStop['status'] = 'ĐANG THỰC HIỆN';
       }
     });
+
+    if (orderCode != null && orderCode.toString().isNotEmpty && !isLinehaul) {
+      DriverService.updateOrderStatus(orderCode.toString(), nextStatus, reason: reason);
+    }
+    if (shipmentId != null && shipmentId.toString().isNotEmpty) {
+      DriverService.updateShipmentStatus(shipmentId.toString(), nextStatus, notes: reason);
+    }
 
     if (!mounted) return;
     showDialog(
@@ -735,10 +760,31 @@ class _DriverDashboardState extends State<DriverDashboard> {
     }
 
     final bool allCompleted = _driverStops.isNotEmpty &&
-        _driverStops.where((s) =>
+        _driverStops.every((s) {
+          final isPickup = s['stopType'] == 'PICKUP' ||
+              s['title']?.toString().contains('lấy') == true ||
+              s['title']?.toString().contains('xuất') == true;
+          if (isPickup) {
+            return s['isCheckedIn'] == true ||
+                s['status'] == 'DA LAY HANG' ||
+                s['status'] == 'ĐÃ LẤY HÀNG' ||
+                s['status'] == 'COMPLETED';
+          }
+          return s['isCheckedIn'] == true ||
+              s['status'] == 'DA GIAO' ||
+              s['status'] == 'ĐÃ GIAO' ||
+              s['status'] == 'COMPLETED';
+        });
+
+    final bool effectiveRouteStarted = _isRouteStarted ||
+        allCompleted ||
+        _driverStops.any((s) =>
             s['isCheckedIn'] == true ||
             s['status'] == 'DA GIAO' ||
-            s['status'] == 'DA LAY HANG').length == _driverStops.length;
+            s['status'] == 'ĐÃ GIAO' ||
+            s['status'] == 'DA LAY HANG' ||
+            s['status'] == 'ĐÃ LẤY HÀNG' ||
+            s['status'] == 'COMPLETED');
 
     return Scaffold(
       backgroundColor: AppColors.cloudGray,
@@ -849,7 +895,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
               const SizedBox(height: 20.0),
 
               // 3. Pending Scan Banner (when route is assigned but not yet scanned/started)
-              if (!_isRouteStarted && _activeRouteCode != null && !_isRouteFinished && _driverStops.isNotEmpty)
+              if (!effectiveRouteStarted && _activeRouteCode != null && !_isRouteFinished && _driverStops.isNotEmpty && !allCompleted)
                 Container(
                   margin: const EdgeInsets.only(bottom: 20.0),
                   padding: const EdgeInsets.all(14.0),
@@ -906,7 +952,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
               // 4. Stats Bento Card
               StatsBentoCard(
                 stops: _driverStops,
-                isRouteStarted: _isRouteStarted,
+                isRouteStarted: effectiveRouteStarted,
                 currentLocation: _currentLocation,
               ),
               const SizedBox(height: 16.0),
@@ -926,7 +972,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 stops: _driverStops,
                 roadPolylinePoints: _roadPolylinePoints,
                 onStartNavigation: _startNavigation,
-                isRouteStarted: _isRouteStarted,
+                isRouteStarted: effectiveRouteStarted,
               ),
               const SizedBox(height: 24.0),
 

@@ -51,10 +51,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (result['success'] == true) {
         final role = result['role'];
-        if (role == 'DRIVER' || role == 'SHIPPER') {
-          Navigator.pushReplacementNamed(context, '/driver/dashboard');
-        } else {
+        if (AuthService.isCustomerRole(role)) {
           Navigator.pushReplacementNamed(context, '/customer/dashboard');
+        } else {
+          Navigator.pushReplacementNamed(context, '/driver/dashboard');
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(

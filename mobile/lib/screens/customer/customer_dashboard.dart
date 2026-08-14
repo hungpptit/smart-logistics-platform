@@ -7,6 +7,8 @@ import 'tabs/create_order_tab.dart';
 import 'tabs/tracking_tab.dart';
 import 'tabs/profile_tab.dart';
 
+import '../../services/auth_service.dart';
+
 class CustomerDashboard extends StatefulWidget {
   const CustomerDashboard({super.key});
 
@@ -20,6 +22,19 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   int _orderTypeKey = 0;
   int _ordersRefreshKey = 0;
   int _trackingRefreshKey = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkRole();
+  }
+
+  Future<void> _checkRole() async {
+    final role = await AuthService.getStoredRole();
+    if (mounted && !AuthService.isCustomerRole(role)) {
+      Navigator.pushReplacementNamed(context, '/driver/dashboard');
+    }
+  }
 
   List<Widget> get _tabs => [
         HomeTab(

@@ -335,6 +335,20 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     mapRef: receiverMapRef
   });
 
+  // Dynamic calculation for valid pickup time slots based on current time
+  const now = new Date();
+  const currentHour = now.getHours() + now.getMinutes() / 60;
+  const isTodayShiftAvailable = currentHour < 17; // Cutoff for today's pickup shifts is 17:00 (5 PM)
+
+  // Fixed Pickup Time Slots (Morning: 10:30-12:00, Afternoon: 16:00-18:00)
+  const [pickupDateOption, setPickupDateOption] = useState<'TODAY' | 'TOMORROW'>(isTodayShiftAvailable ? 'TODAY' : 'TOMORROW');
+  const [pickupShiftOption, setPickupShiftOption] = useState<'MORNING' | 'AFTERNOON'>(
+    isTodayShiftAvailable && currentHour >= 10.5 ? 'AFTERNOON' : 'MORNING'
+  );
+
+  const isMorningShiftAvailable = (pickupDateOption === 'TOMORROW') || (currentHour < 10.5);
+  const isAfternoonShiftAvailable = (pickupDateOption === 'TOMORROW') || (currentHour < 17);
+
   // Reset coordinates and states on modal open/close
   useEffect(() => {
     if (isOpen) {
@@ -380,10 +394,12 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       setReceiverWardCode('');
       setDescription('');
       setDeclaredValue('');
-      setPickupDateOption('TODAY');
-      setPickupShiftOption('MORNING');
+      const initDate = isTodayShiftAvailable ? 'TODAY' : 'TOMORROW';
+      const initShift = (initDate === 'TODAY' && currentHour >= 10.5) ? 'AFTERNOON' : 'MORNING';
+      setPickupDateOption(initDate);
+      setPickupShiftOption(initShift);
     }
-  }, [isOpen]);
+  }, [isOpen, isTodayShiftAvailable, currentHour]);
 
   const senderMapCallbackRef = useCallback((mapInstance: any) => {
     senderMapRef.current = mapInstance;
@@ -475,9 +491,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [description, setDescription] = useState('');
   const [declaredValue, setDeclaredValue] = useState<number | ''>('');
 
-  // Fixed Pickup Time Slots (Morning: 10:30-12:00, Afternoon: 16:00-18:00)
-  const [pickupDateOption, setPickupDateOption] = useState<'TODAY' | 'TOMORROW'>('TODAY');
-  const [pickupShiftOption, setPickupShiftOption] = useState<'MORNING' | 'AFTERNOON'>('MORNING');
+
 
   // Fetch initial data (customers if admin, active services)
   useEffect(() => {
@@ -997,19 +1011,17 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                           <div
                             key={item.id || item.addressId}
                             onClick={() => applySavedAddressToSender(item)}
-                            className={`p-3 rounded-xl border text-left cursor-pointer transition-all duration-200 flex items-center gap-3 relative ${
-                              isSelected
+                            className={`p-3 rounded-xl border text-left cursor-pointer transition-all duration-200 flex items-center gap-3 relative ${isSelected
                                 ? 'border-[#bc0100] bg-white ring-2 ring-[#bc0100]/20 shadow-xs'
                                 : 'border-[#e2e8f0] bg-white hover:border-[#bc0100]/50 hover:bg-gray-50'
-                            }`}
+                              }`}
                           >
                             {/* Radio/Check Indicator on Left (Centered Vertically) */}
                             <div className="shrink-0 flex items-center justify-center">
-                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                                isSelected
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${isSelected
                                   ? 'border-[#bc0100] bg-[#bc0100] text-white shadow-xs'
                                   : 'border-gray-300 bg-white'
-                              }`}>
+                                }`}>
                                 {isSelected && <CheckCircle2 size={12} strokeWidth={3} className="text-white" />}
                               </div>
                             </div>
@@ -1017,9 +1029,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                             {/* Main Info (Middle) */}
                             <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                               <div className="flex items-center gap-1.5 overflow-hidden">
-                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${
-                                  item.isDefault ? 'bg-[#bc0100] text-white' : 'bg-gray-100 text-gray-600'
-                                }`}>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${item.isDefault ? 'bg-[#bc0100] text-white' : 'bg-gray-100 text-gray-600'
+                                  }`}>
                                   {item.isDefault ? 'Mặc định' : item.addressType || 'Địa chỉ'}
                                 </span>
                                 <span className="font-bold text-gray-800 text-[11px] truncate">
@@ -1544,7 +1555,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       </select>
                       {serviceCode === 'EXPRESS' && distanceKm > 20 && (
                         <div className="mt-1.5 p-2.5 bg-red-50 border border-red-200 rounded text-red-700 text-[10px] font-semibold leading-relaxed">
-                          ⚠️ Dịch vụ Hỏa tốc 2h chỉ hỗ trợ giao hàng trong phạm vi bán kính tối đa 20 km. Vui lòng chọn gói dịch vụ khác.
+                          Dịch vụ Hỏa tốc 2h chỉ hỗ trợ giao hàng trong phạm vi bán kính tối đa 20 km. Vui lòng chọn gói dịch vụ khác.
                         </div>
                       )}
                     </>
@@ -1573,10 +1584,18 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                         <span className="text-[9px] font-bold text-gray-500 uppercase">Ngày lấy hàng</span>
                         <select
                           value={pickupDateOption}
-                          onChange={(e) => setPickupDateOption(e.target.value as any)}
+                          onChange={(e) => {
+                            const val = e.target.value as 'TODAY' | 'TOMORROW';
+                            setPickupDateOption(val);
+                            if (val === 'TODAY' && currentHour >= 10.5) {
+                              setPickupShiftOption('AFTERNOON');
+                            }
+                          }}
                           className="w-full px-2.5 py-1.5 border border-amber-300 rounded bg-white font-medium text-xs outline-none focus:border-[#bc0100]"
                         >
-                          <option value="TODAY">Hôm nay ({new Date().toLocaleDateString('vi-VN')})</option>
+                          {isTodayShiftAvailable && (
+                            <option value="TODAY">Hôm nay ({new Date().toLocaleDateString('vi-VN')})</option>
+                          )}
                           <option value="TOMORROW">Ngày mai ({new Date(Date.now() + 86400000).toLocaleDateString('vi-VN')})</option>
                         </select>
                       </div>
@@ -1587,11 +1606,25 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                           onChange={(e) => setPickupShiftOption(e.target.value as any)}
                           className="w-full px-2.5 py-1.5 border border-amber-300 rounded bg-white font-medium text-xs outline-none focus:border-[#bc0100]"
                         >
-                          <option value="MORNING">☀️ Ca Sáng (10:30 - 12:00)</option>
-                          <option value="AFTERNOON">🌤️ Ca Chiều (16:00 - 18:00)</option>
+                          {isMorningShiftAvailable && (
+                            <option value="MORNING">☀️ Ca Sáng (10:30 - 12:00)</option>
+                          )}
+                          {isAfternoonShiftAvailable && (
+                            <option value="AFTERNOON">🌤️ Ca Chiều (16:00 - 18:00)</option>
+                          )}
                         </select>
                       </div>
                     </div>
+                    {!isTodayShiftAvailable && (
+                      <span className="text-[10px] text-amber-700 italic font-medium">
+                        * Đã qua giờ làm việc ca thu hàng hôm nay (sau 17:00). Đơn sẽ tự động được xếp lịch lấy vào Ngày Mai.
+                      </span>
+                    )}
+                    {isTodayShiftAvailable && pickupDateOption === 'TODAY' && currentHour >= 10.5 && (
+                      <span className="text-[10px] text-amber-700 italic font-medium">
+                        * Ca sáng hôm nay (10:30 - 12:00) đã hết hạn. Hệ thống chuyển sang Ca Chiều (16:00 - 18:00).
+                      </span>
+                    )}
                   </div>
                 )}
 

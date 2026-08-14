@@ -519,7 +519,7 @@ export class ShipmentService {
     let shipment = await prisma.shipment.findFirst({
       where: {
         createdBy: driverUserId,
-        status: { in: [ShipmentStatus.CREATED, ShipmentStatus.ASSIGNED] },
+        status: { in: [ShipmentStatus.CREATED, ShipmentStatus.ASSIGNED, ShipmentStatus.IN_TRANSIT] },
       },
       orderBy: { createdAt: 'desc' },
     });
