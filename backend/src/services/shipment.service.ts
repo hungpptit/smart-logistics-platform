@@ -247,7 +247,6 @@ export class ShipmentService {
           OR: [
             { shipmentCode: idOrCode },
             { route: { routeCode: idOrCode } },
-            { routeId: idOrCode },
           ],
           status: { not: ShipmentStatus.CANCELLED },
         },
@@ -466,14 +465,53 @@ export class ShipmentService {
       // 3.1 Update associated Route and RouteStops in PostgreSQL DB
       if (shipment.routeId) {
         if (dto.status === 'IN_TRANSIT') {
-          await tx.routeStop.updateMany({
-            where: { routeId: shipment.routeId, sequence: 1 },
-            data: { status: 'DEPARTED', departedAt: new Date() },
+          const isStaffGateOutApproval = dto.isGateOutApproval === true ||
+            dto.notes?.includes('Gate Out') ||
+            dto.notes?.includes('phê duyệt xuất bến');
+
+          if (isStaffGateOutApproval) {
+            // Khi Thủ kho Web phê duyệt xuất bến:
+            // Chỉ cập nhật route sang IN_PROGRESS, giữ stop PICKUP ở PENDING để tài xế bấm xác nhận
+            await tx.route.update({
+              where: { id: shipment.routeId },
+              data: { status: 'IN_PROGRESS', actualStartAt: new Date() },
+            });
+          } else {
+            // Khi Tài xế Mobile bấm "Xác nhận Khởi hành":
+            // Hoàn thành stop 1 (PICKUP) sang DEPARTED
+            await tx.routeStop.updateMany({
+              where: { routeId: shipment.routeId, sequence: 1 },
+              data: { status: 'DEPARTED', departedAt: new Date() },
+            });
+            await tx.route.update({
+              where: { id: shipment.routeId },
+              data: { status: 'IN_PROGRESS', actualStartAt: new Date() },
+            });
+          }
+
+          // Update ShipmentTransfer to IN_TRANSIT with dispatchedAt
+          const existingTransfer = await tx.shipmentTransfer.findFirst({
+            where: { shipmentId: shipment.id },
           });
-          await tx.route.update({
-            where: { id: shipment.routeId },
-            data: { status: 'IN_PROGRESS', actualStartAt: new Date() },
-          });
+          if (existingTransfer) {
+            await tx.shipmentTransfer.update({
+              where: { id: existingTransfer.id },
+              data: {
+                status: TransferStatus.IN_TRANSIT,
+                dispatchedAt: new Date(),
+              },
+            });
+          } else if (shipment.originFacilityId && shipment.destinationFacilityId) {
+            await tx.shipmentTransfer.create({
+              data: {
+                shipmentId: shipment.id,
+                fromFacilityId: shipment.originFacilityId,
+                toFacilityId: shipment.destinationFacilityId,
+                status: TransferStatus.IN_TRANSIT,
+                dispatchedAt: new Date(),
+              },
+            });
+          }
         } else if (dto.status === 'AT_HUB' || dto.status === 'DELIVERED') {
           await tx.routeStop.updateMany({
             where: { routeId: shipment.routeId, sequence: { gte: 2 } },
@@ -693,16 +731,16 @@ export class ShipmentService {
         shipment = await tx.shipment.create({
           data: {
             shipmentCode,
-            status: ShipmentStatus.IN_TRANSIT,
+            status: ShipmentStatus.ASSIGNED,
             createdBy: driverUserId,
             originFacilityId: tote.facilityId || staff?.assignedFacilityId || null,
             destinationFacilityId: targetDestFacilityId,
           },
         });
-      } else if (shipment.status !== ShipmentStatus.IN_TRANSIT) {
+      } else if (shipment.status === ShipmentStatus.CREATED) {
         shipment = await tx.shipment.update({
           where: { id: shipment.id },
-          data: { status: ShipmentStatus.IN_TRANSIT },
+          data: { status: ShipmentStatus.ASSIGNED },
         });
       }
 
@@ -868,8 +906,8 @@ export class ShipmentService {
               shipmentId: shipment.id,
               fromFacilityId: shipment.originFacilityId,
               toFacilityId: shipment.destinationFacilityId,
-              status: TransferStatus.IN_TRANSIT,
-              dispatchedAt: new Date(),
+              status: TransferStatus.PENDING,
+              dispatchedAt: null,
             },
           });
         }

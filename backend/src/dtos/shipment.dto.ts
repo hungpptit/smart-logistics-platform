@@ -36,4 +36,7 @@ export class UpdateShipmentStatusDto {
   @IsString({ message: 'Ghi chú phải là chuỗi ký tự' })
   @IsOptional()
   notes?: string;
+
+  @IsOptional()
+  isGateOutApproval?: boolean;
 }
