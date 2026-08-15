@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import jsQR from 'jsqr';
 import {
   QrCode,
-  Package,
   CheckCircle2,
   AlertCircle,
   Building2,
@@ -121,9 +120,9 @@ export const ToteScanTab: React.FC = () => {
       const data = await res.json();
       if (data.success && Array.isArray(data.data) && data.data.length > 0) {
         // Only include tote/shipment scan items for Tote Scan Tab history
-        const toteScans = data.data.filter((item: any) => 
-          item.type === 'SHIPMENT' || 
-          item.type === 'TOTE' || 
+        const toteScans = data.data.filter((item: any) =>
+          item.type === 'SHIPMENT' ||
+          item.type === 'TOTE' ||
           (item.code && (item.code.startsWith('TOTE-') || item.code.startsWith('RT-') || item.code.startsWith('SHP-')))
         );
         if (toteScans.length > 0) {
@@ -367,19 +366,19 @@ export const ToteScanTab: React.FC = () => {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold uppercase tracking-wider mb-2">
               <QrCode size={14} />
-              Quy Trình Quét Mã Sọt & Kiện Hàng (Batch Inbound / Outbound)
+              Quy Trình Quét Nhập / Xuất Chuyến Xe (Trip Inbound / Outbound)
             </div>
-            <h2 className="text-2xl font-extrabold tracking-tight">Quét Nhập / Xuất Kho Bưu Cục</h2>
+            <h2 className="text-2xl font-extrabold tracking-tight">Quét Nhập / Xuất Chuyến Xe Trung Chuyển</h2>
             <p className="text-slate-400 text-xs mt-1">
-              Nhân viên bưu cục dùng camera hoặc súng quét mã bắn mã Sọt 1 lần ➔ Hệ thống tự động cập nhật đồng loạt trạng thái bưu kiện bên trong.
+              Nhân viên dùng camera hoặc máy quét bắn <strong>Mã Chuyến xe (`SH-...`)</strong> ➔ Hệ thống tự động tiếp nhận hoặc xuất kho đồng loạt toàn bộ Sọt hàng & Kiện hàng trên xe.
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => (isCameraActive ? stopCamera() : startCamera())}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 border shadow-sm ${isCameraActive
-                  ? 'bg-red-600 hover:bg-red-700 text-white border-red-500'
-                  : 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700'
+                ? 'bg-red-600 hover:bg-red-700 text-white border-red-500'
+                : 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700'
                 }`}
             >
               {isCameraActive ? <CameraOff size={16} /> : <Camera size={16} />}
@@ -423,7 +422,7 @@ export const ToteScanTab: React.FC = () => {
             </div>
           </div>
           <p className="text-[11px] text-slate-400 text-center">
-            Hướng ống kính camera về mã vạch / QR Code trên Sọt hàng hoặc Đơn hàng để quét.
+            Hướng ống kính camera về mã QR trên Phiếu điều chuyển chuyến xe của tài xế để quét.
           </p>
         </div>
       )}
@@ -439,8 +438,8 @@ export const ToteScanTab: React.FC = () => {
               <button
                 onClick={() => setActiveTab('AT_HUB')}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${activeTab === 'AT_HUB'
-                    ? 'bg-red-50 text-[#bc0100] border border-red-200 shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-50'
+                  ? 'bg-red-50 text-[#bc0100] border border-red-200 shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
                   }`}
               >
                 <Building2 size={14} />
@@ -449,8 +448,8 @@ export const ToteScanTab: React.FC = () => {
               <button
                 onClick={() => setActiveTab('IN_TRANSIT')}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${activeTab === 'IN_TRANSIT'
-                    ? 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-50'
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
                   }`}
               >
                 <Truck size={14} />
@@ -459,12 +458,12 @@ export const ToteScanTab: React.FC = () => {
               <button
                 onClick={() => setActiveTab('ARRIVED_DEST_FACILITY')}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${activeTab === 'ARRIVED_DEST_FACILITY'
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-50'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
                   }`}
               >
                 <Layers size={14} />
-                Nhập Kho Bưu Cục Phát (Destination Hub)
+                Nhập Kho Bưu Cục Phát / Kho Tỉnh (Destination Hub)
               </button>
             </div>
 
@@ -472,15 +471,15 @@ export const ToteScanTab: React.FC = () => {
             <form onSubmit={handleScanSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
-                  Quét Barcode / Nhập Mã Sọt Hàng (Tote) hoặc Mã Đơn Hàng:
+                  Quét Barcode / Nhập Mã Chuyến Xe Trung Chuyển (SH-...):
                 </label>
                 <div className="relative flex items-center">
                   <input
                     type="text"
                     value={scanCode}
                     onChange={(e) => setScanCode(e.target.value)}
-                    placeholder="VD: SH-79257540 hoặc ORD-7802000053..."
-                    className="w-full pl-11 pr-32 py-3.5 bg-slate-50 border-2 border-slate-200 focus:border-[#bc0100] focus:bg-white rounded-xl font-mono font-bold text-sm text-slate-900 shadow-inner transition outline-none"
+                    placeholder="VD: SH-79257540 hoặc SH-12345678..."
+                    className="w-full pl-11 pr-36 py-3.5 bg-slate-50 border-2 border-slate-200 focus:border-[#bc0100] focus:bg-white rounded-xl font-mono font-bold text-sm text-slate-900 shadow-inner transition outline-none"
                     autoFocus
                   />
                   <div className="absolute left-3 text-slate-400">
@@ -489,14 +488,14 @@ export const ToteScanTab: React.FC = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="absolute right-2 px-4 py-2 bg-[#bc0100] hover:bg-red-700 text-white rounded-lg text-xs font-bold transition shadow flex items-center gap-2 disabled:opacity-50"
+                    className="absolute right-2 px-4 py-2 bg-[#bc0100] hover:bg-red-700 text-white rounded-lg text-xs font-bold transition shadow flex items-center gap-2 disabled:opacity-50 cursor-pointer"
                   >
                     {loading ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    XÁC NHẬN NHẬP KHO
+                    XÁC NHẬN CHUYẾN XE
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1">
-                  💡 <strong>Mẹo:</strong> Sử dụng súng quét mã USB hoặc camera máy tính để bắn mã liên tục mà không cần click chuột.
+                  <strong>Mẹo:</strong> Quét hoặc nhập <strong>Mã Chuyến xe (`SH-...`)</strong> từ biên bản bàn giao của tài xế để tiếp nhận đồng loạt 100% hàng hóa trên xe.
                 </p>
               </div>
             </form>
@@ -516,25 +515,16 @@ export const ToteScanTab: React.FC = () => {
               </div>
             )}
 
-            {/* Last Scanned Tote / Order Preview Card */}
+            {/* Last Scanned Preview Card */}
             {lastScannedResult && (
-              <div className="border border-slate-200 rounded-xl p-5 bg-gradient-to-r from-slate-50 to-white space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="p-5 bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-200 shadow-sm space-y-4 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-red-100 rounded-lg text-[#bc0100]">
-                      <Package size={18} />
-                    </div>
-                    <div>
-                      <h4 className="font-mono font-extrabold text-sm text-slate-900">
-                        {lastScannedResult.code}
-                      </h4>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">
-                        {lastScannedResult.type === 'SHIPMENT' ? 'Sọt hàng gom (Shipment Tote)' : 'Bưu kiện lẻ (Order)'}
-                      </span>
-                    </div>
+                    <CheckCircle2 size={20} className="text-emerald-600" />
+                    <span className="font-extrabold text-slate-800 text-sm">Kết Quả Tiếp Nhận Chuyến Xe Vừa Quét</span>
                   </div>
-                  <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-extrabold border border-emerald-200">
-                    ✅ {lastScannedResult.statusLabel}
+                  <span className="font-mono text-xs font-bold bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-300">
+                    {lastScannedResult.code}
                   </span>
                 </div>
 
@@ -544,7 +534,7 @@ export const ToteScanTab: React.FC = () => {
                     <span className="font-semibold text-slate-700">{new Date().toLocaleString('vi-VN')}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Số lượng bưu kiện cập nhật:</span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Số lượng bưu kiện tiếp nhận:</span>
                     <span className="font-bold text-emerald-700">{lastScannedResult.details?.shipmentPackages?.length || 1} kiện</span>
                   </div>
                 </div>
@@ -572,16 +562,16 @@ export const ToteScanTab: React.FC = () => {
                     facType === 'SORTING_CENTER'
                       ? 'ZONE-S-UNLOADING'
                       : (facType === 'PROVINCIAL_HUB' || facCode.includes('HUB')
-                          ? 'ZONE-P-INBOUND'
-                          : (isIntraWardLocal ? 'ZONE-W-LOCAL-DELIVERY' : 'ZONE-W-PROVINCE-DISPATCH'))
+                        ? 'ZONE-P-INBOUND'
+                        : (isIntraWardLocal ? 'ZONE-W-LOCAL-DELIVERY' : 'ZONE-W-PROVINCE-DISPATCH'))
                   );
 
                   const receivingZoneName = inboundZone?.zoneName || (
                     facType === 'SORTING_CENTER'
                       ? 'Sàn Hạ Bãi Xe Tải Container 15 Tấn'
                       : (facType === 'PROVINCIAL_HUB' || facCode.includes('HUB')
-                          ? 'Bãi Nhập Hàng Xe Tải Bưu Cục Phường'
-                          : (isIntraWardLocal ? 'Khu Hàng Nội Phường Giao Ngay' : 'Khu Xuất Hàng Trung Chuyển'))
+                        ? 'Bãi Nhập Hàng Xe Tải Bưu Cục Phường'
+                        : (isIntraWardLocal ? 'Khu Hàng Nội Phường Giao Ngay' : 'Khu Xuất Hàng Trung Chuyển'))
                   );
 
                   const facCodeClean = facCode ? facCode.replace(/[^a-zA-Z0-9]/g, '_') : 'FAC_SC_SOUTH';
@@ -594,11 +584,10 @@ export const ToteScanTab: React.FC = () => {
                           <Sparkles size={14} />
                           Phân Khu Lưu Kho Nhập Hàng (Assigned Receiving Zone)
                         </span>
-                        <span className={`px-3 py-1 rounded text-xs font-extrabold font-mono border ${
-                          isIntraWardLocal
+                        <span className={`px-3 py-1 rounded text-xs font-extrabold font-mono border ${isIntraWardLocal
                             ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
                             : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                        }`}>
+                          }`}>
                           {receivingZoneCode}
                         </span>
                       </div>
@@ -634,10 +623,10 @@ export const ToteScanTab: React.FC = () => {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                 <History size={16} className="text-[#bc0100]" />
-                Lịch Sử Quét Sọt Gần Đây
+                Lịch Sử Quét Chuyến Xe Gần Đây
               </h3>
               <span className="text-[11px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                {scanHistory.length} sọt
+                {scanHistory.length} chuyến
               </span>
             </div>
 

@@ -212,11 +212,12 @@ export class OrderController {
     try {
       const userId = req.user?.id!;
       let facilityId = req.query.facilityId as string | undefined;
+      const includeLoaded = req.query.includeLoaded === 'true' || req.query.includeLoaded === '1';
       if (!facilityId) {
         const staff = await prisma.staff.findUnique({ where: { userId } });
         facilityId = staff?.assignedFacilityId || undefined;
       }
-      const result = await this.orderService.getZoneTotes(facilityId);
+      const result = await this.orderService.getZoneTotes(facilityId, includeLoaded);
       res.status(200).json({
         success: true,
         message: 'Lấy danh sách sọt hàng theo phân khu thành công',

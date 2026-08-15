@@ -34,13 +34,14 @@ async function restoreState() {
   console.log('✅ Restored 3 Orders status to AT_HUB');
 
   // 3. Wipe ALL Shipments, ShipmentPackages, DispatchTasks, RouteStops, and Routes
+  await prisma.shipmentTransfer.deleteMany({});
   await prisma.shipmentPackage.deleteMany({});
   await prisma.warehouseScan.deleteMany({});
   await prisma.dispatchTask.deleteMany({});
   await prisma.routeStop.deleteMany({});
   await prisma.shipment.deleteMany({});
   await prisma.route.deleteMany({});
-  console.log('🧹 Cleaned up ALL test Shipments, Routes, RouteStops, and DispatchTasks 100%');
+  console.log('🧹 Cleaned up ALL test Shipments, ShipmentTransfers, Routes, RouteStops, and DispatchTasks 100%');
 
   // 3.1 Re-link WarehouseScans linking packages to tote1 and tote2
   const adminUser = await prisma.user.findFirst();

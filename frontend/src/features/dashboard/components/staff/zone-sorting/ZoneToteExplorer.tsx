@@ -16,6 +16,8 @@ interface ZoneToteExplorerProps {
   getActiveToteCode: (zoneCode: string) => string;
   fetchZoneTotes: () => void;
   handleOpenToteDetailModal: (toteCode: string) => void;
+  includeLoaded?: boolean;
+  onToggleIncludeLoaded?: (include: boolean) => void;
 }
 
 export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
@@ -26,6 +28,8 @@ export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
   getActiveToteCode,
   fetchZoneTotes,
   handleOpenToteDetailModal,
+  includeLoaded = false,
+  onToggleIncludeLoaded,
 }) => {
   const getZoneTheme = (zoneCode: string, zoneType: string) => {
     const code = zoneCode.toUpperCase();
@@ -76,22 +80,51 @@ export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
       {/* Explorer Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
+      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-3 gap-3">
         <div>
           <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">
             DANH SÁCH {facilityZones.length} PHÂN KHU KHO & QUẢN LÝ SỌT HÀNG (ZONES & TOTES EXPLORER)
           </h3>
           <p className="text-[11px] text-slate-500 mt-0.5">
-            Bấm chọn Phân khu để xem các Sọt Hàng (`toteCode`). Cuộn xuống để xem trọn bộ {facilityZones.length} phân khu kho được phân màu trực quan.
+            Bấm chọn Phân khu để xem các Sọt Hàng (`toteCode`). Cuộn xuống để xem trọn bộ {facilityZones.length} phân khu kho.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={fetchZoneTotes}
-          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition self-start sm:self-center cursor-pointer"
-        >
-          Làm Mới Sọt
-        </button>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Toggle View Mode */}
+          <div className="bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex items-center text-xs">
+            <button
+              type="button"
+              onClick={() => onToggleIncludeLoaded && onToggleIncludeLoaded(false)}
+              className={`px-2.5 py-1 rounded-md font-bold transition text-[11px] cursor-pointer ${
+                !includeLoaded
+                  ? 'bg-white text-emerald-700 shadow-sm border border-emerald-200'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              🟢 Sọt tại sàn kho
+            </button>
+            <button
+              type="button"
+              onClick={() => onToggleIncludeLoaded && onToggleIncludeLoaded(true)}
+              className={`px-2.5 py-1 rounded-md font-bold transition text-[11px] cursor-pointer ${
+                includeLoaded
+                  ? 'bg-white text-indigo-700 shadow-sm border border-indigo-200'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              📋 Lịch sử tất cả sọt
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={fetchZoneTotes}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition self-start sm:self-center cursor-pointer"
+          >
+            Làm Mới Sọt
+          </button>
+        </div>
       </div>
 
       {/* Zone Cards Scrollable Grid Container */}
@@ -152,10 +185,10 @@ export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
           <div className="bg-slate-900 rounded-xl p-4 text-white space-y-3 border border-slate-800">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                DANH SÁCH SỌT HÀNG THUỘC: {selectedZone?.zoneName || activeExplorerZone}
+                DANH SÁCH SỌT HÀNG THUỘC: {selectedZone?.zoneName || activeExplorerZone} {includeLoaded ? '(TẤT CẢ LỊCH SỬ)' : '(ĐANG Ở SÀN KHO)'}
               </span>
               <span className="text-[11px] font-mono font-bold text-slate-400">
-                {totesList.length} sọt khả dụng
+                {totesList.length} sọt {includeLoaded ? 'tổng cộng' : 'tại sàn'}
               </span>
             </div>
 

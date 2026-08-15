@@ -43,6 +43,8 @@ export const ZoneSortingTab: React.FC = () => {
   const [zoneTotesData, setZoneTotesData] = useState<any[]>([]);
   const [selectedToteModal, setSelectedToteModal] = useState<any | null>(null);
   const [toteModalLoading, setToteModalLoading] = useState<boolean>(false);
+  const [includeLoaded, setIncludeLoaded] = useState<boolean>(false);
+  const [currentFacilityId, setCurrentFacilityId] = useState<string>('');
 
   const getActiveToteCode = (zoneCode: string) => {
     const zoneObj = zoneTotesData.find((z) => z.zoneCode === zoneCode);
@@ -78,13 +80,15 @@ export const ZoneSortingTab: React.FC = () => {
       [zoneCode]: nextCounter,
     }));
     setSuccessMsg(`Đã chốt niêm phong sọt [${currentCode}]! Đã tự động tạo Sọt mới [${nextCode}] sẵn sàng chứa hàng.`);
-    fetchZoneTotes();
+    fetchZoneTotes(currentFacilityId);
   };
 
-  const fetchZoneTotes = async (facilityId?: string) => {
+  const fetchZoneTotes = async (facilityId?: string, forceIncludeLoaded?: boolean) => {
     try {
       const token = localStorage.getItem('token');
-      const url = facilityId ? `${CONFIG.API_BASE_URL}/orders/zone-totes?facilityId=${facilityId}` : `${CONFIG.API_BASE_URL}/orders/zone-totes`;
+      const effectiveFacId = facilityId !== undefined ? facilityId : currentFacilityId;
+      const isLoaded = forceIncludeLoaded !== undefined ? forceIncludeLoaded : includeLoaded;
+      const url = `${CONFIG.API_BASE_URL}/orders/zone-totes?includeLoaded=${isLoaded}${effectiveFacId ? `&facilityId=${effectiveFacId}` : ''}`;
       const res = await fetch(url, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
@@ -234,6 +238,7 @@ export const ZoneSortingTab: React.FC = () => {
         const facilityId = staffData?.data?.staff?.assignedFacilityId;
 
         if (facilityId) {
+          setCurrentFacilityId(facilityId);
           const zonesRes = await fetch(`${CONFIG.API_BASE_URL}/facilities/${facilityId}/zones`, {
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -671,8 +676,13 @@ export const ZoneSortingTab: React.FC = () => {
         setActiveExplorerZone={setActiveExplorerZone}
         zoneTotesData={zoneTotesData}
         getActiveToteCode={getActiveToteCode}
-        fetchZoneTotes={fetchZoneTotes}
+        fetchZoneTotes={() => fetchZoneTotes(currentFacilityId)}
         handleOpenToteDetailModal={handleOpenToteDetailModal}
+        includeLoaded={includeLoaded}
+        onToggleIncludeLoaded={(val) => {
+          setIncludeLoaded(val);
+          fetchZoneTotes(currentFacilityId, val);
+        }}
       />
 
       {/* Sub-component 2: Scrollable Popup Modal for Tote Packages */}

@@ -1,7 +1,7 @@
 import { prisma } from '../config/prisma';
 import { CreateShipmentDto, UpdateShipmentStatusDto } from '../dtos/shipment.dto';
 import { BadRequestException, NotFoundException } from '../middlewares/error.middleware';
-import { ShipmentStatus, TrackingEventType, OrderStatus, RouteStatus, RouteStopStatus } from '@prisma/client';
+import { ShipmentStatus, TrackingEventType, OrderStatus, RouteStatus, RouteStopStatus, TransferStatus } from '@prisma/client';
 import { TRACKING_EVENT_CONFIG } from '../constants/tracking.constant';
 import { SHIPMENT_TO_TRACKING_EVENT_MAP, SHIPMENT_TO_ORDER_SYNC_MAP } from '../constants/status.constant';
 import { getTrackingGateway } from '../gateways/tracking.gateway';
@@ -189,12 +189,12 @@ export class ShipmentService {
       where: isUuid
         ? { id: idOrCode, status: { not: ShipmentStatus.CANCELLED } }
         : {
-            OR: [
-              { shipmentCode: idOrCode },
-              { route: { routeCode: idOrCode } },
-            ],
-            status: { not: ShipmentStatus.CANCELLED },
-          },
+          OR: [
+            { shipmentCode: idOrCode },
+            { route: { routeCode: idOrCode } },
+          ],
+          status: { not: ShipmentStatus.CANCELLED },
+        },
       include: {
         route: {
           include: {
@@ -244,13 +244,13 @@ export class ShipmentService {
       where: isUuid
         ? { OR: [{ id: idOrCode }, { routeId: idOrCode }], status: { not: ShipmentStatus.CANCELLED } }
         : {
-            OR: [
-              { shipmentCode: idOrCode },
-              { route: { routeCode: idOrCode } },
-              { routeId: idOrCode },
-            ],
-            status: { not: ShipmentStatus.CANCELLED },
-          },
+          OR: [
+            { shipmentCode: idOrCode },
+            { route: { routeCode: idOrCode } },
+            { routeId: idOrCode },
+          ],
+          status: { not: ShipmentStatus.CANCELLED },
+        },
     });
 
     if (!shipment) {
@@ -427,6 +427,39 @@ export class ShipmentService {
               },
             });
           }
+
+          // Update or create ShipmentTransfer to record handover completion at destination facility
+          if (shipment.originFacilityId && shipment.originFacilityId !== targetFacilityId) {
+            const existingTransfer = await tx.shipmentTransfer.findFirst({
+              where: {
+                shipmentId: shipment.id,
+                toFacilityId: targetFacilityId,
+              },
+            });
+
+            if (existingTransfer) {
+              await tx.shipmentTransfer.update({
+                where: { id: existingTransfer.id },
+                data: {
+                  status: TransferStatus.ARRIVED,
+                  arrivedAt: new Date(),
+                  receivedBy: userId,
+                },
+              });
+            } else {
+              await tx.shipmentTransfer.create({
+                data: {
+                  shipmentId: shipment.id,
+                  fromFacilityId: shipment.originFacilityId,
+                  toFacilityId: targetFacilityId,
+                  status: TransferStatus.ARRIVED,
+                  dispatchedAt: shipment.createdAt || new Date(),
+                  arrivedAt: new Date(),
+                  receivedBy: userId,
+                },
+              });
+            }
+          }
         }
       }
 
@@ -590,8 +623,8 @@ export class ShipmentService {
     // Find or auto-create active DriverVehicleAssignment for this driver
     let dva = staff
       ? await prisma.driverVehicleAssignment.findFirst({
-          where: { driverId: staff.id, isActive: true },
-        })
+        where: { driverId: staff.id, isActive: true },
+      })
       : null;
 
     if (staff && !dva) {
@@ -724,9 +757,9 @@ export class ShipmentService {
         });
         const destFac = destFacId
           ? await tx.facility.findUnique({
-              where: { id: destFacId },
-              include: { address: true },
-            })
+            where: { id: destFacId },
+            include: { address: true },
+          })
           : null;
 
         await tx.routeStop.create({
@@ -819,6 +852,29 @@ export class ShipmentService {
         }
       }
 
+      // Ensure ShipmentTransfer is recorded for inter-facility transfers
+      if (shipment.originFacilityId && shipment.destinationFacilityId && shipment.originFacilityId !== shipment.destinationFacilityId) {
+        const existingTransfer = await tx.shipmentTransfer.findFirst({
+          where: {
+            shipmentId: shipment.id,
+            fromFacilityId: shipment.originFacilityId,
+            toFacilityId: shipment.destinationFacilityId,
+          },
+        });
+
+        if (!existingTransfer) {
+          await tx.shipmentTransfer.create({
+            data: {
+              shipmentId: shipment.id,
+              fromFacilityId: shipment.originFacilityId,
+              toFacilityId: shipment.destinationFacilityId,
+              status: TransferStatus.IN_TRANSIT,
+              dispatchedAt: new Date(),
+            },
+          });
+        }
+      }
+
       // Calculate total loaded totes and packages for this shipment
       const allScans = await tx.warehouseScan.findMany({
         where: { shipmentId: shipment.id, toteBagId: { not: null } },
@@ -853,7 +909,7 @@ export class ShipmentService {
 
     try {
       getTrackingGateway()?.broadcastRoutesUpdated();
-    } catch (_) {}
+    } catch (_) { }
 
     return result;
   }

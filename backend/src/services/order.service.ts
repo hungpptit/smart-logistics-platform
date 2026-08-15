@@ -1244,7 +1244,7 @@ export class OrderService {
   /**
    * Get all active and sealed totes grouped by zoneCode for facility
    */
-  public async getZoneTotes(facilityId?: string) {
+  public async getZoneTotes(facilityId?: string, includeLoaded: boolean = false) {
     let targetFacilityId = facilityId;
     let facilityCodeClean = '';
 
@@ -1271,20 +1271,35 @@ export class OrderService {
     });
 
     for (const zCode of activeZoneCodes) {
-      const hasTote = dbTotes.some((t) => t.zoneCode === zCode);
-      if (!hasTote) {
-        const firstToteCode = facilityCodeClean ? `TOTE-${facilityCodeClean}-${zCode}-001` : `TOTE-${zCode}-001`;
+      const hasOpenTote = dbTotes.some((t) => t.zoneCode === zCode && t.status === 'OPEN');
+      if (!hasOpenTote) {
+        let maxCounter = 0;
+        dbTotes
+          .filter((t) => t.zoneCode === zCode)
+          .forEach((t) => {
+            const parts = t.toteCode.split('-');
+            const num = parseInt(parts[parts.length - 1], 10);
+            if (!isNaN(num) && num > maxCounter) {
+              maxCounter = num;
+            }
+          });
+
+        const nextNum = maxCounter + 1;
+        const nextToteCode = facilityCodeClean
+          ? `TOTE-${facilityCodeClean}-${zCode}-${String(nextNum).padStart(3, '0')}`
+          : `TOTE-${zCode}-${String(nextNum).padStart(3, '0')}`;
+
         const newTote = await prisma.toteBag.upsert({
-          where: { toteCode: firstToteCode },
-          update: targetFacilityId ? { facilityId: targetFacilityId } : {},
+          where: { toteCode: nextToteCode },
+          update: targetFacilityId ? { facilityId: targetFacilityId, status: 'OPEN' } : { status: 'OPEN' },
           create: {
-            toteCode: firstToteCode,
+            toteCode: nextToteCode,
             zoneCode: zCode,
             facilityId: targetFacilityId || null,
             status: 'OPEN',
           },
         });
-        dbTotes.push(newTote);
+        dbTotes.unshift(newTote);
       }
     }
 
@@ -1314,6 +1329,11 @@ export class OrderService {
     }
 
     for (const tote of dbTotes) {
+      // By default on the warehouse floor, hide totes that have already departed on a truck (LOADED)
+      if (!includeLoaded && tote.status === 'LOADED') {
+        continue;
+      }
+
       const zoneCode = tote.zoneCode;
       if (!zoneTotesMap.has(zoneCode)) {
         zoneTotesMap.set(zoneCode, []);

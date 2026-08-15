@@ -4,7 +4,7 @@ import { AssignmentService } from './assignment.service';
 import { VRPService } from './vrp.service';
 import { BadRequestException, NotFoundException } from '../../middlewares/error.middleware';
 import { getTrackingGateway } from '../../gateways/tracking.gateway';
-import { OrderStatus, RouteStatus, RouteStopStatus, DriverEmploymentStatus } from '@prisma/client';
+import { OrderStatus, RouteStatus, RouteStopStatus, DriverEmploymentStatus, TransferStatus } from '@prisma/client';
 
 export class RoutingService {
   private kmeansService = new KMeansService();
@@ -316,6 +316,17 @@ export class RoutingService {
             createdBy: creatorId || null,
           },
         });
+
+        if (originFacId && destFacId && originFacId !== destFacId) {
+          await prisma.shipmentTransfer.create({
+            data: {
+              shipmentId: shipment.id,
+              fromFacilityId: originFacId,
+              toFacilityId: destFacId,
+              status: TransferStatus.PENDING,
+            },
+          });
+        }
 
         const isPickup = order.status !== OrderStatus.AT_HUB && order.status !== OrderStatus.OUT_FOR_DELIVERY && order.status !== OrderStatus.DELIVERED;
         const nextStatus = isPickup ? OrderStatus.PICKUP_ASSIGNED : OrderStatus.READY_FOR_DISPATCH;
