@@ -10,15 +10,31 @@ class AuthService {
   static const _storage = FlutterSecureStorage();
 
   // Save authentication details
-  static Future<void> saveAuthData(String token, String role, String email, String username, String phone) async {
+  static Future<void> saveAuthData({
+    required String token,
+    required String role,
+    required String email,
+    required String username,
+    required String phone,
+    String? refreshToken,
+    bool isLinehaulDriver = false,
+    String driverLicenseClass = '',
+    List<String> driverTypes = const [],
+  }) async {
     await _storage.write(key: AppConstants.tokenKey, value: token);
     await _storage.write(key: AppConstants.userRoleKey, value: role);
     await _storage.write(key: AppConstants.userEmailKey, value: email);
     await _storage.write(key: AppConstants.usernameKey, value: username);
     await _storage.write(key: 'phone', value: phone);
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      await _storage.write(key: AppConstants.refreshTokenKey, value: refreshToken);
+    }
+    await _storage.write(key: AppConstants.isLinehaulDriverKey, value: isLinehaulDriver.toString());
+    await _storage.write(key: AppConstants.driverLicenseClassKey, value: driverLicenseClass);
+    await _storage.write(key: AppConstants.driverTypesKey, value: jsonEncode(driverTypes));
   }
 
-  // Clear authentication details (Logout)
+  // Clear authentication details (Only on explicit Logout)
   static Future<void> clearAuthData() async {
     try {
       SocketService().disconnect();
@@ -29,7 +45,7 @@ class AuthService {
   // Check if token exists
   static Future<bool> isLoggedIn() async {
     final token = await _storage.read(key: AppConstants.tokenKey);
-    return token != null;
+    return token != null && token.isNotEmpty;
   }
 
   // Get stored role
@@ -42,14 +58,21 @@ class AuthService {
     return await _storage.read(key: AppConstants.tokenKey);
   }
 
+  // Get stored refresh token
+  static Future<String?> getRefreshToken() async {
+    return await _storage.read(key: AppConstants.refreshTokenKey);
+  }
+
   // Get stored email
   static Future<String?> getStoredEmail() async {
-    return await _storage.read(key: 'email');
+    final email = await _storage.read(key: AppConstants.userEmailKey);
+    return email ?? await _storage.read(key: 'email');
   }
 
   // Get stored username
   static Future<String?> getStoredUsername() async {
-    return await _storage.read(key: 'username');
+    final uname = await _storage.read(key: AppConstants.usernameKey);
+    return uname ?? await _storage.read(key: 'username');
   }
 
   // Get stored phone
@@ -57,10 +80,64 @@ class AuthService {
     return await _storage.read(key: 'phone');
   }
 
+  // Check if driver is classified as Linehaul (Tài xế trung chuyển)
+  static Future<bool> isLinehaulDriver() async {
+    final val = await _storage.read(key: AppConstants.isLinehaulDriverKey);
+    return val == 'true';
+  }
+
+  // Get driver license class (e.g. A1, B2, C, FC)
+  static Future<String> getDriverLicenseClass() async {
+    return (await _storage.read(key: AppConstants.driverLicenseClassKey)) ?? 'A1';
+  }
+
+  // Get driver registered types
+  static Future<List<String>> getDriverTypes() async {
+    final raw = await _storage.read(key: AppConstants.driverTypesKey);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final List decoded = jsonDecode(raw);
+      return decoded.map((e) => e.toString()).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Returns true if role is CUSTOMER, false for all operational roles (SHIPPER, STAFF, ADMIN)
   static bool isCustomerRole(String? role) {
     if (role == null || role.trim().isEmpty) return true;
     return role.trim().toUpperCase() == 'CUSTOMER';
+  }
+
+  /// Attempt to refresh token silently using stored refreshToken
+  static Future<String?> tryRefreshToken() async {
+    try {
+      final refreshToken = await getRefreshToken();
+      if (refreshToken == null || refreshToken.isEmpty) return null;
+
+      final response = await http.post(
+        Uri.parse(ApiConstants.refresh),
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonEncode({'refreshToken': refreshToken}),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final newAccessToken = data['data']['accessToken'] ?? data['data']['token'];
+          if (newAccessToken != null) {
+            await _storage.write(key: AppConstants.tokenKey, value: newAccessToken.toString());
+            return newAccessToken.toString();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('💥 [AuthService] Refresh token error: $e');
+    }
+    return null;
   }
 
   // Login API Call
@@ -83,6 +160,7 @@ class AuthService {
       if (response.statusCode == 200 && responseData['success'] == true) {
         final data = responseData['data'];
         final token = data['accessToken'] ?? data['token'];
+        final refreshToken = data['refreshToken']?.toString();
         final user = data['user'];
 
         // Backend defines exactly 4 System Roles: ADMIN, STAFF, SHIPPER, CUSTOMER
@@ -101,18 +179,47 @@ class AuthService {
           throw Exception('Token không được trả về từ máy chủ');
         }
 
+        // Driver classification extraction
+        String driverLicenseClass = 'A1';
+        List<String> driverTypesList = [];
+        bool isLinehaul = false;
+
+        final staff = user?['staff'];
+        if (staff is Map) {
+          driverLicenseClass = staff['driverLicenseClass']?.toString().toUpperCase() ?? 'A1';
+          final rawTypes = staff['driverTypes'];
+          if (rawTypes is List) {
+            for (final t in rawTypes) {
+              if (t is Map && t['driverType'] != null) {
+                driverTypesList.add(t['driverType'].toString().toUpperCase());
+              } else if (t is String) {
+                driverTypesList.add(t.toUpperCase());
+              }
+            }
+          }
+          // Driver classification rule: Must have LINEHAUL_TRANSFER and license NOT IN (A1, A2)
+          isLinehaul = driverTypesList.contains('LINEHAUL_TRANSFER') &&
+              driverLicenseClass != 'A1' &&
+              driverLicenseClass != 'A2';
+        }
+
         await saveAuthData(
-          token,
-          roleCode,
-          user['email'] ?? '',
-          user['username'] ?? '',
-          user['phone'] ?? '',
+          token: token,
+          refreshToken: refreshToken,
+          role: roleCode,
+          email: user?['email'] ?? '',
+          username: user?['username'] ?? '',
+          phone: user?['phone'] ?? '',
+          isLinehaulDriver: isLinehaul,
+          driverLicenseClass: driverLicenseClass,
+          driverTypes: driverTypesList,
         );
         
         return {
           'success': true,
           'message': responseData['message'] ?? 'Đăng nhập thành công',
           'role': roleCode,
+          'isLinehaulDriver': isLinehaul,
         };
       } else {
         return {
@@ -215,11 +322,11 @@ class AuthService {
         }
 
         await saveAuthData(
-          token,
-          role,
-          user['email'] ?? '',
-          user['username'] ?? '',
-          user['phone'] ?? '',
+          token: token,
+          role: role,
+          email: user?['email'] ?? '',
+          username: user?['username'] ?? '',
+          phone: user?['phone'] ?? '',
         );
 
         return {

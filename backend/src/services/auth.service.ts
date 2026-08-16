@@ -241,7 +241,7 @@ export class AuthService {
         fullName: customer.fullName,
       },
       jwtSecret,
-      { expiresIn: '15m' }
+      { expiresIn: '30d' }
     );
 
     const refreshToken = jwt.sign(
@@ -249,10 +249,10 @@ export class AuthService {
         id: user.id,
       },
       jwtRefreshSecret,
-      { expiresIn: '7d' }
+      { expiresIn: '90d' }
     );
 
-    await redis.setEx(`refresh_token:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
+    await redis.setEx(`refresh_token:${user.id}`, 90 * 24 * 60 * 60, refreshToken);
 
     const { passwordHash: _, ...userWithoutPassword } = user;
     const roles = [user.role.roleCode];
@@ -289,6 +289,7 @@ export class AuthService {
         staff: {
           include: {
             assignedFacility: true,
+            driverTypes: true,
           },
         },
         customer: {
@@ -348,7 +349,7 @@ export class AuthService {
         fullName: profileFullName,
       },
       jwtSecret,
-      { expiresIn: '15m' }
+      { expiresIn: '30d' }
     );
 
     const refreshToken = jwt.sign(
@@ -356,10 +357,10 @@ export class AuthService {
         id: user.id,
       },
       jwtRefreshSecret,
-      { expiresIn: '7d' }
+      { expiresIn: '90d' }
     );
 
-    await redis.setEx(`refresh_token:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
+    await redis.setEx(`refresh_token:${user.id}`, 90 * 24 * 60 * 60, refreshToken);
 
     const { passwordHash: _, ...userWithoutPassword } = user;
     const roles = [user.role.roleCode];
@@ -455,6 +456,7 @@ export class AuthService {
         staff: {
           include: {
             assignedFacility: true,
+            driverTypes: true,
           },
         },
         customer: {

@@ -134,9 +134,8 @@ class LocationService {
           debugPrint('⚠️ [Provinces] Backend trả về rỗng/lỗi: ${response.body.substring(0, response.body.length.clamp(0, 300))}');
         }
       } else if (response.statusCode == 401) {
-        debugPrint('🔐 [Provinces] Token hết hạn (401) - Đang xóa token cũ...');
-        await AuthService.clearAuthData();
-        debugPrint('🔐 [Provinces] Đã xóa token. Vui lòng đăng nhập lại!');
+        debugPrint('🔐 [Provinces] Token 401 - Đang thử làm mới token...');
+        await AuthService.tryRefreshToken();
       } else {
         debugPrint('❌ [Provinces] HTTP lỗi ${response.statusCode}: ${response.body.substring(0, response.body.length.clamp(0, 300))}');
       }
@@ -226,9 +225,8 @@ class LocationService {
           debugPrint('⚠️ [Wards] Backend trả về rỗng/lỗi: ${response.body.substring(0, response.body.length.clamp(0, 300))}');
         }
       } else if (response.statusCode == 401) {
-        debugPrint('🔐 [Wards] Token hết hạn (401) - Đang xóa token cũ...');
-        await AuthService.clearAuthData();
-        debugPrint('🔐 [Wards] Đã xóa token. Vui lòng đăng nhập lại!');
+        debugPrint('🔐 [Wards] Token 401 - Đang thử làm mới token...');
+        await AuthService.tryRefreshToken();
       } else {
         debugPrint('❌ [Wards] HTTP lỗi ${response.statusCode}: ${response.body.substring(0, response.body.length.clamp(0, 300))}');
       }

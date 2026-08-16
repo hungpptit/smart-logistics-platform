@@ -45,6 +45,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   bool _isFetchingRoutes = false;
 
   bool _isLinehaulRoute = false;
+  bool _isLinehaulDriverProfile = false;
   int _loadedTotesCount = 0;
   int _totalPackageCount = 0;
   List<String> _loadedTotes = [];
@@ -140,14 +141,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
             int loadedTotesCount = 0;
             int totalPkgCount = 0;
             List<String> loadedToteCodes = [];
-            bool isLinehaul = (_activeRouteCode != null && (_activeRouteCode!.contains('LH') || _activeRouteCode!.startsWith('RT-LH-') || _activeRouteCode!.startsWith('SHP-LH-')));
+            bool isLinehaul = _isLinehaulDriverProfile;
 
             for (final s in stopsRaw) {
               final shipment = s['shipment'];
               if (shipment != null) {
-                if (shipment['shipmentCode']?.toString().contains('LH') == true) {
-                  isLinehaul = true;
-                }
                 final pkgs = shipment['shipmentPackages'] as List?;
                 if (pkgs != null && pkgs.length > totalPkgCount) {
                   totalPkgCount = pkgs.length;
@@ -353,10 +351,12 @@ class _DriverDashboardState extends State<DriverDashboard> {
   Future<void> _loadDriverProfile() async {
     final name = await AuthService.getStoredUsername();
     final email = await AuthService.getStoredEmail();
-    if (mounted && (name != null || email != null)) {
+    final isLinehaul = await AuthService.isLinehaulDriver();
+    if (mounted) {
       setState(() {
         if (name != null) _driverName = name;
         if (email != null) _driverEmail = email;
+        _isLinehaulDriverProfile = isLinehaul;
       });
     }
   }
@@ -601,7 +601,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
       activeRouteCode: _activeRouteCode,
       activeRouteId: _activeRouteId,
       scanMode: scanMode,
-      isLinehaulRoute: _isLinehaulRoute,
+      isLinehaulRoute: _isLinehaulDriverProfile || _isLinehaulRoute,
       onRouteCodeUpdated: (newCode) {
         if (newCode != null && newCode.isNotEmpty) {
           setState(() {
@@ -658,8 +658,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
         stop['status'] == 'PICKING' ||
         stop['status'] == 'READY_FOR_PICKUP' ||
         stop['status'] == 'PICKUP_ASSIGNED';
-    final bool isLinehaul = _activeRouteCode != null && _activeRouteCode!.contains('LH') ||
-        (orderCode != null && orderCode.toString().startsWith('SHP-'));
+    final bool isLinehaul = _isLinehaulDriverProfile;
     final String nextStatus = isLinehaul
         ? (isPickupStop ? 'IN_TRANSIT' : 'AT_HUB')
         : (isPickupStop ? 'PICKED_UP' : 'DELIVERED');
@@ -701,39 +700,30 @@ class _DriverDashboardState extends State<DriverDashboard> {
     }
 
     if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.pureWhite,
-        shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-        title: Row(
+    _updateGoongPolyline(force: true);
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 28),
-            const SizedBox(width: 8.0),
-            Text(
-              isLinehaul
-                  ? (isPickupStop ? 'Xuất Bưu Cục Thành Công' : 'Cập Bến Kho Đích Thành Công')
-                  : (isPickupStop ? 'Lấy Hàng Thành Công' : 'Giao Hàng Thành Công'),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            const Icon(Icons.check_circle, color: Colors.white, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                isLinehaul
+                    ? (isPickupStop ? 'Đã xuất bưu cục thành công!' : 'Đã tới kho đích thành công!')
+                    : (isPickupStop ? 'Đã lấy hàng [${stop['orderCode'] ?? ''}] thành công!' : 'Đã giao hàng [${stop['orderCode'] ?? ''}] thành công!'),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
             ),
           ],
         ),
-        content: Text(isLinehaul
-            ? (isPickupStop
-                ? '⚡ Đã xác nhận hoàn thành nạp sọt & xuất bến thành công!\n\n'
-                  'Tải trọng xe: $_loadedTotesCount sọt sọt hàng (< 80% sức chứa).\n'
-                  'Hệ thống tự động kiểm tra và điều hướng ghé bốc thêm Sọt cùng hướng tại Kho Trung Gian trên hành trình!'
-                : 'Đã xác nhận Xe tải cập bến Bưu cục / Hub đích. Vui lòng đưa Mã QR Chuyến xe cho Thủ kho quét nhập kho.')
-            : (isPickupStop
-                ? 'Đã quét mã và xác nhận lấy bưu kiện ${stop['orderCode'] ?? ''} thành công.'
-                : 'Đã cập nhật trạng thái Điểm dừng ${stop['title']} thành ĐÃ GIAO và truyền thông tin POD lên máy chủ.')),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.logisticsRed, foregroundColor: AppColors.pureWhite),
-            child: const Text('Đóng'),
-          ),
-        ],
+        backgroundColor: const Color(0xFF15803D),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -894,8 +884,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
         _driverStops.isNotEmpty &&
         !allCompleted;
 
-    final bool showToteActions = _isLinehaulRoute ||
-        (!showPendingScanBanner && !effectiveRouteStarted);
+    final bool showToteActions = _isLinehaulDriverProfile || _isLinehaulRoute;
 
     return Scaffold(
       backgroundColor: AppColors.cloudGray,
@@ -1061,7 +1050,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 stops: _driverStops,
                 isRouteStarted: effectiveRouteStarted,
                 currentLocation: _currentLocation,
-                isLinehaul: _isLinehaulRoute,
+                isLinehaul: _isLinehaulDriverProfile || _isLinehaulRoute,
                 loadedTotesCount: _loadedTotesCount,
                 totalPackageCount: _totalPackageCount,
               ),

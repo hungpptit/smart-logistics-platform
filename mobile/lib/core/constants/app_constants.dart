@@ -4,9 +4,13 @@ import 'package:latlong2/latlong.dart';
 class AppConstants {
   // Storage Keys for Secure Storage
   static const String tokenKey = 'jwt_token';
+  static const String refreshTokenKey = 'jwt_refresh_token';
   static const String usernameKey = 'user_name';
   static const String userEmailKey = 'user_email';
   static const String userRoleKey = 'user_role';
+  static const String isLinehaulDriverKey = 'is_linehaul_driver';
+  static const String driverLicenseClassKey = 'driver_license_class';
+  static const String driverTypesKey = 'driver_types';
 
   // Default Coordinates & Map Config
   static const LatLng defaultHcmLocation = LatLng(10.8231, 106.6297);

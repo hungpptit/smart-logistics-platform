@@ -39,7 +39,7 @@ class OrderService {
         };
       } else {
         if (response.statusCode == 401) {
-          await AuthService.clearAuthData();
+          await AuthService.tryRefreshToken();
         }
         return {
           'success': false,

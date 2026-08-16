@@ -33,8 +33,9 @@ class DriverService {
         debugPrint('📨 [DriverService] Status: ${response.statusCode}');
 
         if (response.statusCode == 401) {
-          debugPrint('⚠️ [DriverService] Token het han (401). Xoa token.');
-          await AuthService.clearAuthData();
+          debugPrint('⚠️ [DriverService] Token 401. Đang thử làm mới token...');
+          final refreshed = await AuthService.tryRefreshToken();
+          if (refreshed != null) continue;
           return [];
         }
         if (response.statusCode == 200) {

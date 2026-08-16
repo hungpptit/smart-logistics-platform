@@ -58,12 +58,7 @@ class StopDetailsDialog extends StatelessWidget {
       stop['status'] == 'READY_FOR_PICKUP' ||
       stop['status'] == 'PICKUP_ASSIGNED';
 
-  bool get _isLinehaul =>
-      stop['isLinehaul'] == true ||
-      (stop['orderCode']?.toString().startsWith('SHP-') ?? false) ||
-      (stop['orderCode']?.toString().startsWith('RT-LH-') ?? false) ||
-      stop['title']?.toString().toLowerCase().contains('sot') == true ||
-      stop['title']?.toString().toLowerCase().contains('trung chuyen') == true;
+  bool get _isLinehaul => stop['isLinehaul'] == true;
 
   @override
   Widget build(BuildContext context) {

@@ -107,6 +107,16 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
         scannedValue.toUpperCase().startsWith('TOT-') ||
         scannedValue.toUpperCase().startsWith('ST-');
 
+    // Chặn Shipper chặng cuối quét sọt của xe tải trung chuyển
+    if (isToteCode && !widget.isLinehaulRoute) {
+      setState(() {
+        _isProcessing = false;
+        _errorMessage = 'Bạn là Shipper chặng cuối, không thể quét nhận Sọt xe tải!';
+        _successNotice = null;
+      });
+      return;
+    }
+
     if (isToteCode) {
       setState(() {
         _isProcessing = true;
@@ -149,7 +159,7 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
                 ),
                 const SizedBox(width: 8.0),
                 Text(
-                  consolidatedAdded ? '⚡ Tối Ưu Lộ Trình Tự Động!' : 'Nạp Sọt Hàng Thành Công',
+                  consolidatedAdded ? 'Tối Ưu Lộ Trình Tự Động!' : 'Nạp Sọt Hàng Thành Công',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -160,7 +170,7 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
             ),
             content: Text(
               consolidatedAdded
-                  ? '⚡ Tải trọng xe hiện tại < 80% sức chứa.\n\n'
+                  ? 'Tải trọng xe hiện tại < 80% sức chứa.\n\n'
                     'Hệ thống đã tự động điều phối thêm chặng dừng tại [$intermediateHubName] để ghé bốc thêm sọt hàng tiện đường!'
                   : 'Sọt hàng [$scannedValue] đã được xác nhận bốc lên xe thành công.',
               style: const TextStyle(fontSize: 13, height: 1.4),
@@ -188,14 +198,47 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
 
     // Case B: Last-Mile Delivery / Pickup Route Scan
     final String? targetCode = _targetCode;
-    final cleanScanned = scannedValue.toUpperCase();
-    final cleanTarget = targetCode?.toUpperCase() ?? '';
-    final cleanRouteCode = widget.activeRouteCode?.toUpperCase() ?? '';
-    final cleanRouteId = widget.activeRouteId?.toUpperCase() ?? '';
+    final cleanScanned = scannedValue.toUpperCase().trim();
+    final cleanTarget = (targetCode ?? '').toUpperCase().trim();
+    final cleanRouteCode = (widget.activeRouteCode ?? '').toUpperCase().trim();
+    final cleanRouteId = (widget.activeRouteId ?? '').toUpperCase().trim();
 
-    final bool isMatch = (cleanTarget.isNotEmpty && cleanScanned == cleanTarget) ||
-        (cleanRouteCode.isNotEmpty && cleanScanned == cleanRouteCode) ||
-        (cleanRouteId.isNotEmpty && cleanScanned == cleanRouteId);
+    // Tách phần mã đơn gốc nếu mã quét có đuôi bưu kiện (-PKG-01, -PKG...)
+    final String baseScannedOrderCode = cleanScanned.contains('-PKG')
+        ? cleanScanned.split('-PKG').first
+        : cleanScanned;
+    final String baseTargetOrderCode = cleanTarget.contains('-PKG')
+        ? cleanTarget.split('-PKG').first
+        : cleanTarget;
+
+    final stopOrderCode = (widget.stop?['orderCode'] ?? '').toString().toUpperCase().trim();
+    final stopPkgCode = (widget.stop?['packageCode'] ?? '').toString().toUpperCase().trim();
+    final stopShipmentCode = (widget.stop?['shipmentCode'] ?? '').toString().toUpperCase().trim();
+    final stopTracking = (widget.stop?['trackingNumber'] ?? '').toString().toUpperCase().trim();
+
+    // Kiểm tra khớp mã
+    final bool isRouteStartMode = (widget.stop == null || widget.stop!.isEmpty);
+    
+    final bool isMatch = isRouteStartMode
+        ? (cleanScanned.isNotEmpty && (
+            cleanScanned == cleanRouteCode ||
+            cleanScanned == cleanRouteId ||
+            cleanScanned.startsWith('ORD-') ||
+            cleanScanned.startsWith('RT-') ||
+            cleanScanned.startsWith('SHP-') ||
+            cleanScanned.startsWith('PKG-')
+          ))
+        : (cleanTarget.isNotEmpty && (
+            cleanScanned == cleanTarget ||
+            cleanScanned.startsWith(cleanTarget) ||
+            cleanTarget.startsWith(cleanScanned) ||
+            baseScannedOrderCode == cleanTarget ||
+            baseScannedOrderCode == baseTargetOrderCode ||
+            (stopOrderCode.isNotEmpty && (cleanScanned == stopOrderCode || baseScannedOrderCode == stopOrderCode || cleanScanned.startsWith(stopOrderCode))) ||
+            (stopPkgCode.isNotEmpty && (cleanScanned == stopPkgCode || cleanScanned.startsWith(stopPkgCode))) ||
+            (stopShipmentCode.isNotEmpty && cleanScanned == stopShipmentCode) ||
+            (stopTracking.isNotEmpty && cleanScanned == stopTracking)
+        ));
 
     if (isMatch || targetCode == null) {
       setState(() {
@@ -278,7 +321,7 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
           );
         }
       } catch (e) {
-        debugPrint('💥 Lỗi khi xác nhận mã quét: $e');
+        debugPrint('Lỗi khi xác nhận mã quét: $e');
         if (mounted) {
           setState(() {
             _errorMessage = 'Lỗi xử lý xác nhận. Vui lòng thử lại!';
@@ -346,60 +389,54 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
               // Camera Scanner Box
               ClipRRect(
                 borderRadius: BorderRadius.circular(16.0),
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _scanController.text = targetCode ?? 'TOTE-FAC_TD_TANGNHONPHU-ZONE-W-PROVINCE-DISPATCH-001';
-                      _errorMessage = null;
-                    });
-                  },
-                  child: Container(
-                    width: 250.0,
-                    height: 180.0,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.logisticsRed, width: 2.5),
-                      borderRadius: BorderRadius.circular(16.0),
-                      color: Colors.black,
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        MobileScanner(
-                          fit: BoxFit.cover,
-                          onDetect: (barcodeCapture) {
-                            for (final barcode in barcodeCapture.barcodes) {
-                              final String? rawValue = barcode.rawValue;
-                              if (rawValue != null && rawValue.isNotEmpty) {
-                                setState(() {
-                                  _scanController.text = rawValue;
-                                  _errorMessage = null;
-                                });
-                                break;
-                              }
+                child: Container(
+                  width: 250.0,
+                  height: 180.0,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.logisticsRed, width: 2.5),
+                    borderRadius: BorderRadius.circular(16.0),
+                    color: Colors.black,
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      MobileScanner(
+                        fit: BoxFit.cover,
+                        onDetect: (barcodeCapture) {
+                          if (_isProcessing) return;
+                          for (final barcode in barcodeCapture.barcodes) {
+                            final String? rawValue = barcode.rawValue;
+                            if (rawValue != null && rawValue.trim().isNotEmpty) {
+                              setState(() {
+                                _scanController.text = rawValue.trim();
+                                _errorMessage = null;
+                              });
+                              _performScanCheck();
+                              break;
                             }
-                          },
-                        ),
-                        const PulsingScanLine(),
-                        Positioned(
-                          bottom: 6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'Camera đang quét - Chạm để điền mã thử',
-                              style: TextStyle(
-                                color: Colors.amberAccent,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          }
+                        },
+                      ),
+                      const PulsingScanLine(),
+                      Positioned(
+                        bottom: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Camera quang học đang quét trực tiếp...',
+                            style: TextStyle(
+                              color: Colors.amberAccent,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -419,13 +456,16 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
 
               TextField(
                 controller: _scanController,
+                readOnly: true,
+                enableInteractiveSelection: false,
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'monospace',
                 ),
                 decoration: InputDecoration(
-                  labelText: 'Nhập hoặc quét mã Sọt (TOTE-XXXX) / Bưu kiện',
+                  hintText: 'Mã nhận diện tự động từ Camera',
+                  hintStyle: const TextStyle(color: Colors.white38, fontSize: 11),
                   labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
                   prefixIcon: const Icon(Icons.barcode_reader, color: AppColors.logisticsRed),
                   filled: true,

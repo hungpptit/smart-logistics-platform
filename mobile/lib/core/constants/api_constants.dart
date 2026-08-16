@@ -23,6 +23,7 @@ class ApiConstants {
   static String get verifyOtp => '${AppConfig.baseUrl}/auth/verify-otp';
   static String get resendOtp => '${AppConfig.baseUrl}/auth/resend-otp';
   static String get resetPassword => '${AppConfig.baseUrl}/auth/reset-password';
+  static String get refresh => '${AppConfig.baseUrl}/auth/refresh';
   static String get me => '${AppConfig.baseUrl}/auth/me';
   static String get updateProfile => '${AppConfig.baseUrl}/auth/profile';
 
