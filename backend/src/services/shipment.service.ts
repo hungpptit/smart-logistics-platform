@@ -686,6 +686,15 @@ export class ShipmentService {
           include: {
             destinationFacility: { include: { address: true } },
             originFacility: { include: { address: true } },
+            pickupAddress: {
+              include: {
+                wardRelation: {
+                  include: {
+                    province: true,
+                  },
+                },
+              },
+            },
             deliveryAddress: {
               include: {
                 wardRelation: {
@@ -747,8 +756,8 @@ export class ShipmentService {
     }
 
     // =========================================================================
-    // THUẬT TOÁN PHÂN GIẢI ĐIỂM ĐẾN TRUNG CHUYỂN THEO MẠNG LƯỚI ĐA CẤP (3-TIER MULTI-ECHELON HUB NETWORK)
-    // Cấp 3 (Bưu cục) -> Cấp 2 (Kho Tổng Tỉnh) -> Cấp 1 (Tổng Kho Miền) -> Trục liên miền Cấp 1 -> Cấp 2 -> Cấp 3
+    // THUẬT TOÁN PHÂN GIẢI ĐIỂM ĐẾN TRUNG CHUYỂN LINH HOẠT THEO 4 KỊCH BẢN (3-2-1-1-2-3)
+    // Pipeline tự động tính chuỗi kho [Cấp 3 -> Cấp 2 -> Cấp 1 -> Cấp 1 -> Cấp 2 -> Cấp 3]
     // =========================================================================
     let targetDestFacilityId: string | null = null;
 
@@ -760,122 +769,115 @@ export class ShipmentService {
         })
       : null;
 
-    const originTypeCode = originFac?.facilityType?.typeCode || '';
-    const isOriginWardStation = originTypeCode === 'WARD_STATION';
-    const isOriginProvincialHub = originTypeCode === 'PROVINCIAL_HUB';
-    const isOriginSortingCenter = originTypeCode === 'SORTING_CENTER';
+    const samplePkg = packages[0];
+    const sampleOrder = samplePkg?.order;
 
-    // 1. TẦNG 1: NẾU XUẤT PHÁT TỪ BƯU CỤC CẤP 3 (WARD_STATION)
-    // Gom sọt hàng từ Bưu cục chuyển lên Kho Tổng Tỉnh Cấp 2 (Provincial Hub)!
-    if (isOriginWardStation && originFac?.parentFacilityId) {
-      targetDestFacilityId = originFac.parentFacilityId;
-    }
+    if (sampleOrder && originFac) {
+      // 1. Phân tích địa chỉ Người Gửi và Người Nhận
+      const senderWardCode = sampleOrder.pickupAddress?.wardCode || sampleOrder.originFacility?.address?.wardCode;
+      const receiverWardCode = sampleOrder.deliveryAddress?.wardCode || sampleOrder.destinationFacility?.address?.wardCode;
 
-    // 2. TẦNG 2: NẾU XUẤT PHÁT TỪ KHO TỔNG TỈNH CẤP 2 (PROVINCIAL_HUB)
-    else if (isOriginProvincialHub && originFac) {
-      let hasInterProvincial = false;
-      for (const pkg of packages) {
-        const destProvCode = pkg.order?.deliveryAddress?.wardRelation?.provinceCode ||
-                             pkg.order?.deliveryAddress?.wardRelation?.province?.code;
-        if (destProvCode && originFac.provinceCode && destProvCode !== originFac.provinceCode) {
-          hasInterProvincial = true;
-          break;
+      const senderWard = senderWardCode
+        ? await prisma.ward.findUnique({ where: { code: senderWardCode }, include: { province: { include: { administrativeRegion: true } } } })
+        : null;
+
+      const receiverWard = receiverWardCode
+        ? await prisma.ward.findUnique({ where: { code: receiverWardCode }, include: { province: { include: { administrativeRegion: true } } } })
+        : null;
+
+      const senderProvCode = senderWard?.provinceCode || sampleOrder.originFacility?.provinceCode;
+      const receiverProvCode = receiverWard?.provinceCode || sampleOrder.destinationFacility?.provinceCode;
+
+      // 2. Tìm các cơ sở kho trên từng nấc thang phân cấp:
+      // Cấp 3 gửi (Bưu cục gửi):
+      const wsOrigin = sampleOrder.originFacilityId
+        ? await prisma.facility.findUnique({ where: { id: sampleOrder.originFacilityId }, include: { facilityType: true } })
+        : (senderWardCode ? await prisma.facility.findFirst({ where: { address: { wardCode: senderWardCode } }, include: { facilityType: true } }) : null);
+
+      // Cấp 3 nhận (Bưu cục nhận):
+      const wsDest = sampleOrder.destinationFacilityId
+        ? await prisma.facility.findUnique({ where: { id: sampleOrder.destinationFacilityId }, include: { facilityType: true } })
+        : (receiverWardCode ? await prisma.facility.findFirst({ where: { address: { wardCode: receiverWardCode } }, include: { facilityType: true } }) : null);
+
+      // Cấp 2 gửi (Kho Tổng Tỉnh gửi):
+      const hubOrigin = wsOrigin?.parentFacilityId
+        ? await prisma.facility.findUnique({ where: { id: wsOrigin.parentFacilityId }, include: { facilityType: true } })
+        : (senderProvCode ? await prisma.facility.findFirst({ where: { provinceCode: senderProvCode, facilityType: { typeCode: 'PROVINCIAL_HUB' }, operatingStatus: 'ACTIVE' }, include: { facilityType: true } }) : null);
+
+      // Cấp 2 nhận (Kho Tổng Tỉnh nhận):
+      const hubDest = wsDest?.parentFacilityId
+        ? await prisma.facility.findUnique({ where: { id: wsDest.parentFacilityId }, include: { facilityType: true } })
+        : (receiverProvCode ? await prisma.facility.findFirst({ where: { provinceCode: receiverProvCode, facilityType: { typeCode: 'PROVINCIAL_HUB' }, operatingStatus: 'ACTIVE' }, include: { facilityType: true } }) : null);
+
+      // Cấp 1 gửi (Tổng Kho Miền gửi):
+      const scOrigin = hubOrigin?.parentFacilityId
+        ? await prisma.facility.findUnique({ where: { id: hubOrigin.parentFacilityId }, include: { facilityType: true } })
+        : (senderProvCode ? await prisma.facility.findFirst({ where: { provinceCode: senderProvCode, facilityType: { typeCode: 'SORTING_CENTER' }, operatingStatus: 'ACTIVE' }, include: { facilityType: true } }) : null);
+
+      // Cấp 1 nhận (Tổng Kho Miền nhận):
+      const scDest = hubDest?.parentFacilityId
+        ? await prisma.facility.findUnique({ where: { id: hubDest.parentFacilityId }, include: { facilityType: true } })
+        : (receiverProvCode ? await prisma.facility.findFirst({ where: { provinceCode: receiverProvCode, facilityType: { typeCode: 'SORTING_CENTER' }, operatingStatus: 'ACTIVE' }, include: { facilityType: true } }) : null);
+
+      // 3. Xây dựng Chuỗi Trạm Dừng (Pipeline) linh hoạt theo đúng 4 Kịch Bản:
+      const senderRegionId = senderWard?.province?.administrativeRegionId || sampleOrder.pickupAddress?.wardRelation?.province?.administrativeRegionId;
+      const receiverRegionId = receiverWard?.province?.administrativeRegionId || sampleOrder.deliveryAddress?.wardRelation?.province?.administrativeRegionId;
+
+      const isSameRegion = (senderRegionId && receiverRegionId && senderRegionId === receiverRegionId) ||
+                           (scOrigin && scDest && scOrigin.id === scDest.id);
+
+      let pipeline: (any | null)[] = [];
+
+      // CASE 1: Cùng Phường/Xã (3 - 3) -> Giao nội bộ bưu cục
+      if (senderWardCode && receiverWardCode && senderWardCode === receiverWardCode) {
+        pipeline = [wsOrigin || wsDest];
+      }
+      // CASE 2: Khác Phường/Xã cùng Tỉnh/TP (3 - 2 - 3) -> Qua Kho Tổng Tỉnh
+      else if (senderProvCode && receiverProvCode && senderProvCode === receiverProvCode) {
+        pipeline = [wsOrigin, hubOrigin || hubDest, wsDest];
+      }
+      // CASE 3: Khác Tỉnh/TP cùng Miền (3 - 2 - 1 - 2 - 3) -> Qua 1 Tổng Kho Miền
+      else if (isSameRegion) {
+        pipeline = [wsOrigin, hubOrigin, scOrigin || scDest, hubDest, wsDest];
+      }
+      // CASE 4: Khác Miền (3 - 2 - 1 - 1 - 2 - 3) -> Qua 2 Tổng Kho Miền (Trục Bắc - Nam)
+      else {
+        pipeline = [wsOrigin, hubOrigin, scOrigin, scDest, hubDest, wsDest];
+      }
+
+      // Lọc bỏ null và các trạm trùng lặp liên tiếp trong pipeline
+      const validPipeline: any[] = [];
+      for (const node of pipeline) {
+        if (node && (!validPipeline.length || validPipeline[validPipeline.length - 1].id !== node.id)) {
+          validPipeline.push(node);
         }
       }
 
-      // Nếu sọt chứa đơn hàng đi Liên Tỉnh / Liên Miền -> Chuyển lên Tổng Kho Miền Cấp 1 (Parent Sorting Center)!
-      if (hasInterProvincial) {
-        if (originFac.parentFacilityId) {
-          targetDestFacilityId = originFac.parentFacilityId;
-        } else {
-          // Fallback tìm Sorting Center cùng miền
-          const sc = await prisma.facility.findFirst({
-            where: { facilityType: { typeCode: 'SORTING_CENTER' }, provinceCode: originFac.provinceCode || undefined },
-          });
-          if (sc) targetDestFacilityId = sc.id;
-        }
-      } else {
-        // Hàng nội tỉnh -> Phân phối xuống Bưu cục phát cấp 3 của đơn hàng
-        for (const pkg of packages) {
-          if (pkg.order?.destinationFacilityId) {
-            targetDestFacilityId = pkg.order.destinationFacilityId;
-            break;
-          }
-        }
-      }
-    }
+      // 4. Tìm vị trí của Kho hiện tại (originFac) trong Pipeline để xác định trạm tiếp theo:
+      let currentIdx = validPipeline.findIndex((node) => node.id === originFac.id);
 
-    // 3. TẦNG 3: NẾU XUẤT PHÁT TỪ TỔNG KHO MIỀN CẤP 1 (SORTING_CENTER)
-    else if (isOriginSortingCenter) {
-      // 3a. Đối chiếu với Zone xuất sọt (Nếu sọt ở Zone xuất liên tỉnh/miền)
-      let destProvinceCode: string | null = null;
-      if (tote.zoneCode) {
-        const zone = await prisma.facilityZone.findFirst({
-          where: { zoneCode: tote.zoneCode, facilityId: tote.facilityId || undefined },
-        });
-        const zoneSearchText = `${tote.zoneCode} ${zone?.zoneName || ''} ${tote.toteCode}`
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '');
-
-        const provinces = await prisma.province.findMany({
-          select: { code: true, name: true, codeName: true },
-        });
-
-        const matchedProvince = provinces.find((p) => {
-          const cleanCodeName = (p.codeName || '').replace(/_/g, '').toLowerCase();
-          const cleanName = (p.name || '')
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, '');
-          return (cleanCodeName.length >= 3 && zoneSearchText.includes(cleanCodeName)) ||
-                 (cleanName.length >= 3 && zoneSearchText.includes(cleanName));
-        });
-
-        if (matchedProvince) {
-          destProvinceCode = matchedProvince.code;
+      // Nếu không tìm thấy chính xác theo ID (ví dụ kho hiện tại là FAC-SC-NORTH nhưng pipeline ghi nhận FAC-SC-REGION2):
+      // So khớp theo cấp độ kho (facilityType) và provinceCode
+      if (currentIdx === -1) {
+        const originType = originFac.facilityType?.typeCode;
+        if (originType === 'WARD_STATION') {
+          currentIdx = 0;
+        } else if (originType === 'PROVINCIAL_HUB') {
+          currentIdx = (senderProvCode === originFac.provinceCode) ? 1 : (validPipeline.length - 2);
+        } else if (originType === 'SORTING_CENTER') {
+          // Nếu ở miền nhận -> trạm Cấp 1 nhận
+          currentIdx = (receiverProvCode === originFac.provinceCode || originFac.facilityCode?.includes('NORTH')) ? (validPipeline.length - 3) : 2;
         }
       }
 
-      if (!destProvinceCode) {
-        for (const pkg of packages) {
-          const prov = pkg.order?.deliveryAddress?.wardRelation?.provinceCode ||
-                       pkg.order?.deliveryAddress?.wardRelation?.province?.code;
-          if (prov) {
-            destProvinceCode = prov;
-            break;
-          }
-        }
-      }
-
-      if (destProvinceCode) {
-        // Tìm Kho Tổng Tỉnh đích
-        const destProvHub = await prisma.facility.findFirst({
-          where: {
-            provinceCode: destProvinceCode,
-            facilityType: { typeCode: 'PROVINCIAL_HUB' },
-            operatingStatus: 'ACTIVE',
-          },
-          include: { parentFacility: true },
-        });
-
-        if (destProvHub) {
-          const destSortingCenterId = destProvHub.parentFacilityId;
-          // Nếu Kho Tổng Tỉnh đích thuộc Tổng Kho Miền khác (Khác miền với Kho hiện tại)
-          // -> Tuyến trục liên miền Cấp 1 -> Cấp 1 (Chuyển sang Tổng Kho Miền Đích)!
-          if (destSortingCenterId && destSortingCenterId !== originFac?.id) {
-            targetDestFacilityId = destSortingCenterId;
-          } else {
-            // Cùng miền -> Hạ về Kho Tổng Tỉnh Đích Cấp 2
-            targetDestFacilityId = destProvHub.id;
-          }
-        }
+      if (currentIdx !== -1 && currentIdx < validPipeline.length - 1) {
+        targetDestFacilityId = validPipeline[currentIdx + 1].id;
+      } else if (currentIdx === validPipeline.length - 1) {
+        targetDestFacilityId = validPipeline[currentIdx].id;
       }
     }
 
-    // 4. Fallback: Nếu vẫn chưa tìm ra, chuyển lên Kho Tổng cấp trên hoặc Kho gần nhất
+    // Fallback: Nếu vẫn chưa có targetDestFacilityId
     if (!targetDestFacilityId && originFac?.parentFacilityId) {
       targetDestFacilityId = originFac.parentFacilityId;
     }
@@ -1069,14 +1071,14 @@ export class ShipmentService {
       } else {
         // Update destination stop sequence 2 if destFac changed
         const stop2 = existingStops.find((s) => s.sequence === 2);
-        if (stop2 && destFac && (stop2.facilityId !== destFac.id || stop2.latitude > 15.0)) {
+        if (stop2 && destFac && stop2.facilityId !== destFac.id) {
           await tx.routeStop.update({
             where: { id: stop2.id },
             data: {
               facilityId: destFac.id,
               addressSnapshot: `${destFac.facilityName} - ${destFac.address?.addressLine1 || ''}`,
-              latitude: destFac.address?.latitude ? Number(destFac.address.latitude) : 11.3520,
-              longitude: destFac.address?.longitude ? Number(destFac.address.longitude) : 106.1820,
+              latitude: destFac.address?.latitude ? Number(destFac.address.latitude) : 21.0285,
+              longitude: destFac.address?.longitude ? Number(destFac.address.longitude) : 105.8542,
             },
           });
         }
