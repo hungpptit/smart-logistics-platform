@@ -20,6 +20,112 @@ import { SortingHistoryPanel } from './zone-sorting/SortingHistoryPanel';
 import type { SortingHistoryItem } from './zone-sorting/SortingHistoryPanel';
 import { resolveZoneClassification } from '../../../../constants/enumLabels';
 
+/**
+ * Dynamic Smart Zone Matching based on Administrative Relational Hierarchy:
+ * addresses (ward_code) -> wards (province_code) -> provinces (administrative_region_id) -> administrative_regions
+ * and Facility Tier (Cấp 3 - Bưu cục, Cấp 2 - Kho Tỉnh, Cấp 1 - Kho Miền).
+ */
+export const matchFacilityZoneByAdminHierarchy = (
+  zones: FacilityZoneItem[],
+  params: {
+    originWardCode?: string;
+    destWardCode?: string;
+    originProvinceCode?: string;
+    destProvinceCode?: string;
+    destProvinceCodeName?: string;
+    originRegionId?: number;
+    destRegionId?: number;
+    isIntraWard?: boolean;
+    isIntraProvince?: boolean;
+    destFacilityName?: string;
+    destProvinceName?: string;
+  }
+): FacilityZoneItem | undefined => {
+  const {
+    destProvinceCode,
+    destProvinceCodeName,
+    destRegionId,
+    isIntraWard,
+    isIntraProvince,
+  } = params;
+
+  // 1. CẤP 3: Bưu cục phường / xã (WARD_STATION / LAST_MILE)
+  if (isIntraWard && zones.some((z) => z.zoneCode.includes('LOCAL'))) {
+    return zones.find((z) => z.zoneCode.includes('LOCAL'));
+  }
+  if (zones.some((z) => z.zoneCode.includes('PROVINCE-DISPATCH'))) {
+    return zones.find((z) => z.zoneCode.includes('PROVINCE-DISPATCH'));
+  }
+
+  // 2. CẤP 2: Kho tổng Tỉnh / Thành phố (PROVINCIAL_HUB)
+  if (isIntraProvince && zones.some((z) => z.zoneCode.includes('INTRA-PROVINCE'))) {
+    return zones.find((z) => z.zoneCode.includes('INTRA-PROVINCE'));
+  }
+  if (!isIntraProvince && zones.some((z) => z.zoneCode.includes('INTER-HUB'))) {
+    return zones.find((z) => z.zoneCode.includes('INTER-HUB'));
+  }
+
+  // 3. CẤP 1: Mega Sorter / Trung tâm phân loại miền (SORTING_CENTER)
+  // Bước 3.1: Kiểm tra xuất hàng Tỉnh nội vùng (dựa vào provinceCode và codeName từ bảng provinces)
+  if (destProvinceCode || destProvinceCodeName) {
+    const pCode = (destProvinceCode || '').trim();
+    const pCodeName = (destProvinceCodeName || '').replace(/_/g, '').toUpperCase();
+
+    const provinceMatch = zones.find((z) => {
+      const zCode = z.zoneCode.toUpperCase();
+      // Mã tỉnh Tây Ninh (80) -> ZONE-S-DISPATCH-TAYNINH
+      if (pCode === '80' && zCode.includes('TAYNINH')) return true;
+      // Mã tỉnh TP.HCM (79) -> ZONE-S-DISPATCH-HCM
+      if (pCode === '79' && (zCode.includes('DISPATCH-HCM') || zCode.includes('HCMC'))) return true;
+      // Mã tỉnh Đồng Nai (75) -> ZONE-S-DISPATCH-DONGNAI
+      if (pCode === '75' && zCode.includes('DONGNAI')) return true;
+      // Mã tỉnh Bình Dương (74) -> ZONE-S-DISPATCH-BINHDUONG
+      if (pCode === '74' && zCode.includes('BINHDUONG')) return true;
+      // Mã tỉnh Bà Rịa - Vũng Tàu (77) -> ZONE-S-DISPATCH-VUNGTAU
+      if (pCode === '77' && zCode.includes('VUNGTAU')) return true;
+      // Mã tỉnh Hà Nội (01) -> ZONE-N-DISPATCH-HANOI / ZONE-S-NORTH-DISPATCH
+      if (pCode === '01' && (zCode.includes('DISPATCH-HANOI') || zCode.includes('NORTH-DISPATCH'))) return true;
+      // Mã tỉnh Hải Phòng (31) -> ZONE-N-DISPATCH-HAIPHONG
+      if (pCode === '31' && zCode.includes('HAIPHONG')) return true;
+      // Mã tỉnh Quảng Ninh (22) -> ZONE-N-DISPATCH-QUANGNINH
+      if (pCode === '22' && zCode.includes('QUANGNINH')) return true;
+      // Mã tỉnh Hải Dương (30) -> ZONE-N-DISPATCH-HAIDUONG
+      if (pCode === '30' && zCode.includes('HAIDUONG')) return true;
+      // Mã tỉnh Bắc Ninh (24) -> ZONE-N-DISPATCH-BACNINH
+      if (pCode === '24' && zCode.includes('BACNINH')) return true;
+      // Khớp theo codeName chuẩn của bảng provinces trong CSDL
+      if (pCodeName && zCode.includes(pCodeName)) return true;
+      return false;
+    });
+
+    if (provinceMatch) return provinceMatch;
+  }
+
+  // Bước 3.2: Phân loại theo Vùng Miền (dựa vào administrative_region_id: 1 đến 6)
+  if (destRegionId) {
+    const regionMatch = zones.find((z) => {
+      const zCode = z.zoneCode.toUpperCase();
+      // Region 1: Trung du & Miền núi phía Bắc
+      if (destRegionId === 1 && (zCode.includes('REGION1') || zCode.includes('NORTH-WEST'))) return true;
+      // Region 2: Đồng bằng sông Hồng (Hà Nội, Hải Phòng...)
+      if (destRegionId === 2 && (zCode.includes('REGION2') || zCode.includes('NORTH-DISPATCH') || zCode.includes('NORTH'))) return true;
+      // Region 3: Bắc Trung Bộ (Huế, Nghệ An, Thanh Hóa...)
+      if (destRegionId === 3 && (zCode.includes('REGION3') || zCode.includes('NORTH-CENTRAL'))) return true;
+      // Region 4: Nam Trung Bộ & Tây Nguyên (Đà Nẵng, Khánh Hòa, Gia Lai, Đắk Lắk...)
+      if (destRegionId === 4 && (zCode.includes('REGION4') || zCode.includes('CENTRAL-DISPATCH') || zCode.includes('CENTRAL'))) return true;
+      // Region 5: Đông Nam Bộ (TP.HCM, Đồng Nai, Tây Ninh, Bình Dương, BR-VT...)
+      if (destRegionId === 5 && (zCode.includes('REGION5') || zCode.includes('SOUTH-DISPATCH') || zCode.includes('SOUTH'))) return true;
+      // Region 6: Đồng bằng sông Cửu Long (Cần Thơ, An Giang, Cà Mau, Vĩnh Long...)
+      if (destRegionId === 6 && (zCode.includes('REGION6') || zCode.includes('MEKONG'))) return true;
+      return false;
+    });
+
+    if (regionMatch) return regionMatch;
+  }
+
+  return undefined;
+};
+
 export const ZoneSortingTab: React.FC = () => {
   const [scanCode, setScanCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -361,10 +467,23 @@ export const ZoneSortingTab: React.FC = () => {
 
       if (response.ok && res.success) {
         const orderData = res.data;
-        const isIntraWard = orderData.originFacilityId === orderData.destinationFacilityId;
-        const isIntraProvince = orderData.originFacility?.provinceCode === orderData.destinationFacility?.provinceCode;
+        const destWardCode = orderData.deliveryAddress?.wardCode || orderData.deliveryAddress?.wardRelation?.code || orderData.destinationFacility?.address?.wardCode || orderData.destinationFacility?.address?.wardRelation?.code;
+        const originWardCode = orderData.pickupAddress?.wardCode || orderData.pickupAddress?.wardRelation?.code || orderData.originFacility?.address?.wardCode || orderData.originFacility?.address?.wardRelation?.code;
+
+        const destProvinceCode = orderData.deliveryAddress?.wardRelation?.provinceCode || orderData.destinationFacility?.provinceCode || orderData.destinationFacility?.province?.code || orderData.destinationFacility?.address?.wardRelation?.provinceCode;
+        const originProvinceCode = orderData.pickupAddress?.wardRelation?.provinceCode || orderData.originFacility?.provinceCode || orderData.originFacility?.province?.code || orderData.originFacility?.address?.wardRelation?.provinceCode;
+
+        const destProvinceCodeName = orderData.deliveryAddress?.wardRelation?.province?.codeName || orderData.destinationFacility?.province?.codeName || orderData.destinationFacility?.address?.wardRelation?.province?.codeName;
+        const destRegionId = orderData.deliveryAddress?.wardRelation?.province?.administrativeRegionId || orderData.destinationFacility?.province?.administrativeRegionId || orderData.destinationFacility?.address?.wardRelation?.province?.administrativeRegionId;
+
+        const isIntraWard = Boolean(
+          (orderData.originFacilityId && orderData.destinationFacilityId && orderData.originFacilityId === orderData.destinationFacilityId) ||
+          (originWardCode && destWardCode && originWardCode === destWardCode)
+        );
+
+        const isIntraProvince = Boolean(originProvinceCode && destProvinceCode && originProvinceCode === destProvinceCode);
         const destFacilityName = orderData.destinationFacility?.facilityName || 'Bưu cục đích';
-        const destProvinceName = orderData.destinationFacility?.provinceName || 'Tỉnh / TP đích';
+        const destProvinceName = orderData.deliveryAddress?.wardRelation?.province?.name || orderData.destinationFacility?.province?.name || orderData.destinationFacility?.provinceName || 'Tỉnh / TP đích';
 
         // Domain Driven Matching using centralized resolveZoneClassification
         const { targetZoneType, suggestedZoneName, instructionText } = resolveZoneClassification(
@@ -374,90 +493,25 @@ export const ZoneSortingTab: React.FC = () => {
           destProvinceName
         );
 
-        // Smart regional & provincial zone matching for Mega Sorters based on destination province & facility name
-        const matchRegionalZone = (zones: FacilityZoneItem[], destProv: string, destFac: string) => {
-          const text = `${destProv} ${destFac}`.toLowerCase();
+        // Dynamic smart zone matching based on administrative hierarchy & facility tier
+        let matchedZone = matchFacilityZoneByAdminHierarchy(facilityZones, {
+          originWardCode,
+          destWardCode,
+          originProvinceCode,
+          destProvinceCode,
+          destProvinceCodeName,
+          destRegionId,
+          isIntraWard,
+          isIntraProvince,
+          destFacilityName,
+          destProvinceName,
+        });
 
-          // 1. Check exact intra-region province matching first
-          if (text.includes('tây ninh') || text.includes('tay ninh')) {
-            const z = zones.find((item) => item.zoneCode.includes('TAYNINH'));
-            if (z) return z;
-          }
-          if (text.includes('bình dương') || text.includes('binh duong')) {
-            const z = zones.find((item) => item.zoneCode.includes('BINHDUONG'));
-            if (z) return z;
-          }
-          if (text.includes('đồng nai') || text.includes('dong nai')) {
-            const z = zones.find((item) => item.zoneCode.includes('DONGNAI'));
-            if (z) return z;
-          }
-          if (text.includes('vũng tàu') || text.includes('vung tau') || text.includes('bà rịa')) {
-            const z = zones.find((item) => item.zoneCode.includes('VUNGTAU'));
-            if (z) return z;
-          }
-          if (text.includes('hồ chí minh') || text.includes('tp.hcm') || text.includes('tphcm')) {
-            const z = zones.find((item) => item.zoneCode.includes('DISPATCH-HCM'));
-            if (z) return z;
-          }
-
-          if (text.includes('hải phòng') || text.includes('hai phong')) {
-            const z = zones.find((item) => item.zoneCode.includes('HAIPHONG'));
-            if (z) return z;
-          }
-          if (text.includes('quảng ninh') || text.includes('quang ninh')) {
-            const z = zones.find((item) => item.zoneCode.includes('QUANGNINH'));
-            if (z) return z;
-          }
-          if (text.includes('hải dương') || text.includes('hai duong')) {
-            const z = zones.find((item) => item.zoneCode.includes('HAIDUONG'));
-            if (z) return z;
-          }
-          if (text.includes('bắc ninh') || text.includes('bac ninh')) {
-            const z = zones.find((item) => item.zoneCode.includes('BACNINH'));
-            if (z) return z;
-          }
-          if (text.includes('hà nội') || text.includes('ha noi')) {
-            const z = zones.find((item) => item.zoneCode.includes('DISPATCH-HANOI') || item.zoneCode.includes('NORTH-DISPATCH'));
-            if (z) return z;
-          }
-
-          // 2. Regional Cluster fallback (Bắc / Trung / Nam / Cần Thơ)
-          if (/hà nội|ha noi|hải phòng|hai phong|quảng ninh|bắc ninh|hải dương|nam định|thái nguyên|phú thọ|lạng sơn|cao bằng|tuyên quang|bắc giang|ninh bình|hà nam|hưng yên|vĩnh phúc/i.test(text)) {
-            const northZone = zones.find((z) =>
-              z.zoneCode.includes('NORTH') || z.zoneCode.includes('REGION2') || z.zoneName.toLowerCase().includes('miền bắc') || z.zoneName.toLowerCase().includes('hà nội')
-            );
-            if (northZone) return northZone;
-          }
-
-          if (/đà nẵng|da nang|thừa thiên huế|huế|quảng nam|quảng ngãi|bình định|phú yên|khánh hòa|nha trang|ninh thuận|bình thuận|phan thiết|quảng bình|quảng trị|nghệ an|vinh|thanh hóa/i.test(text)) {
-            const centralZone = zones.find((z) =>
-              z.zoneCode.includes('CENTRAL') || z.zoneCode.includes('REGION3') || z.zoneCode.includes('REGION4') || z.zoneName.toLowerCase().includes('miền trung') || z.zoneName.toLowerCase().includes('đà nẵng')
-            );
-            if (centralZone) return centralZone;
-          }
-
-          if (/cần thơ|can tho|long an|tiền giang|bến tre|vĩnh long|trà vinh|hậu giang|sóc trăng|an giang|kiên giang|cà mau|bạc liêu/i.test(text)) {
-            const mekongZone = zones.find((z) =>
-              z.zoneCode.includes('REGION6') || z.zoneCode.includes('MEKONG') || z.zoneName.toLowerCase().includes('sông cửu long') || z.zoneName.toLowerCase().includes('cần thơ')
-            );
-            if (mekongZone) return mekongZone;
-          }
-
-          if (/hồ chí minh|hcm|bình dương|đồng nai|bà rịa|vũng tàu|tây ninh|bình phước/i.test(text)) {
-            const southZone = zones.find((z) =>
-              z.zoneCode.includes('SOUTH') || z.zoneCode.includes('REGION5') || z.zoneName.toLowerCase().includes('miền nam') || z.zoneName.toLowerCase().includes('đông nam bộ')
-            );
-            if (southZone) return southZone;
-          }
-
-          return null;
-        };
-
-        // Dynamically find matched zone from database by region, zoneType, or fallback
-        const matchedZone = matchRegionalZone(facilityZones, destProvinceName, destFacilityName)
-          || facilityZones.find((z) => z.zoneType === targetZoneType)
-          || facilityZones.find((z) => z.zoneType === 'SHIPPING' || z.zoneType === 'SORTING')
-          || facilityZones[0];
+        if (!matchedZone) {
+          matchedZone = facilityZones.find((z) => z.zoneType === targetZoneType)
+            || facilityZones.find((z) => z.zoneType === 'SHIPPING' || z.zoneType === 'SORTING')
+            || facilityZones[0];
+        }
 
         const targetZoneCode = matchedZone?.zoneCode || (targetZoneType === 'SHIPPING' ? 'ZONE-W-PROVINCE-DISPATCH' : 'ZONE-W-LOCAL');
         const activeToteCode = getActiveToteCode(targetZoneCode);
@@ -472,6 +526,7 @@ export const ZoneSortingTab: React.FC = () => {
         });
 
         if (matchedZone) {
+          setSelectedZoneId(matchedZone.id);
           await fetch(`${CONFIG.API_BASE_URL}/orders/assign-zone`, {
             method: 'POST',
             headers,
@@ -516,10 +571,23 @@ export const ZoneSortingTab: React.FC = () => {
 
       if (response.ok && res.success) {
         const orderData = res.data;
-        const isIntraWard = orderData.originFacilityId === orderData.destinationFacilityId;
-        const isIntraProvince = orderData.originFacility?.provinceCode === orderData.destinationFacility?.provinceCode;
+        const destWardCode = orderData.deliveryAddress?.wardCode || orderData.deliveryAddress?.wardRelation?.code || orderData.destinationFacility?.address?.wardCode || orderData.destinationFacility?.address?.wardRelation?.code;
+        const originWardCode = orderData.pickupAddress?.wardCode || orderData.pickupAddress?.wardRelation?.code || orderData.originFacility?.address?.wardCode || orderData.originFacility?.address?.wardRelation?.code;
+
+        const destProvinceCode = orderData.deliveryAddress?.wardRelation?.provinceCode || orderData.destinationFacility?.provinceCode || orderData.destinationFacility?.province?.code || orderData.destinationFacility?.address?.wardRelation?.provinceCode;
+        const originProvinceCode = orderData.pickupAddress?.wardRelation?.provinceCode || orderData.originFacility?.provinceCode || orderData.originFacility?.province?.code || orderData.originFacility?.address?.wardRelation?.provinceCode;
+
+        const destProvinceCodeName = orderData.deliveryAddress?.wardRelation?.province?.codeName || orderData.destinationFacility?.province?.codeName || orderData.destinationFacility?.address?.wardRelation?.province?.codeName;
+        const destRegionId = orderData.deliveryAddress?.wardRelation?.province?.administrativeRegionId || orderData.destinationFacility?.province?.administrativeRegionId || orderData.destinationFacility?.address?.wardRelation?.province?.administrativeRegionId;
+
+        const isIntraWard = Boolean(
+          (orderData.originFacilityId && orderData.destinationFacilityId && orderData.originFacilityId === orderData.destinationFacilityId) ||
+          (originWardCode && destWardCode && originWardCode === destWardCode)
+        );
+
+        const isIntraProvince = Boolean(originProvinceCode && destProvinceCode && originProvinceCode === destProvinceCode);
         const destFacilityName = orderData.destinationFacility?.facilityName || 'Bưu cục đích';
-        const destProvinceName = orderData.destinationFacility?.provinceName || 'Tỉnh / TP đích';
+        const destProvinceName = orderData.deliveryAddress?.wardRelation?.province?.name || orderData.destinationFacility?.province?.name || orderData.destinationFacility?.provinceName || 'Tỉnh / TP đích';
 
         const { targetZoneType, suggestedZoneName, instructionText } = resolveZoneClassification(
           isIntraWard,
@@ -528,37 +596,24 @@ export const ZoneSortingTab: React.FC = () => {
           destProvinceName
         );
 
-        const matchRegionalZone = (zones: FacilityZoneItem[], destProv: string, destFac: string) => {
-          const text = `${destProv} ${destFac}`.toLowerCase();
+        let matchedZone = matchFacilityZoneByAdminHierarchy(facilityZones, {
+          originWardCode,
+          destWardCode,
+          originProvinceCode,
+          destProvinceCode,
+          destProvinceCodeName,
+          destRegionId,
+          isIntraWard,
+          isIntraProvince,
+          destFacilityName,
+          destProvinceName,
+        });
 
-          if (/hà nội|ha noi|hải phòng|hai phong|quảng ninh|bắc ninh|hải dương|nam định|thái nguyên|phú thọ|lạng sơn|cao bằng|tuyên quang|bắc giang|ninh bình|hà nam|hưng yên|vĩnh phúc/i.test(text)) {
-            const northZone = zones.find((z) =>
-              z.zoneCode.includes('NORTH') || z.zoneName.toLowerCase().includes('miền bắc') || z.zoneName.toLowerCase().includes('hà nội')
-            );
-            if (northZone) return northZone;
-          }
-
-          if (/đà nẵng|da nang|thừa thiên huế|huế|quảng nam|quảng ngãi|bình định|phú yên|khánh hòa|nha trang|ninh thuận|bình thuận|phan thiết|quảng bình|quảng trị|nghệ an|vinh|thanh hóa/i.test(text)) {
-            const centralZone = zones.find((z) =>
-              z.zoneCode.includes('CENTRAL') || z.zoneName.toLowerCase().includes('miền trung') || z.zoneName.toLowerCase().includes('đà nẵng')
-            );
-            if (centralZone) return centralZone;
-          }
-
-          if (/hồ chí minh|hcm|cần thơ|bình dương|đồng nai|bà rịa|vũng tàu|long an|tiền giang|bến tre|vĩnh long|trà vinh|hậu giang|sóc trăng|an giang|kiên giang|cà mau|bạc liêu|tây ninh|bình phước/i.test(text)) {
-            const southZone = zones.find((z) =>
-              z.zoneCode.includes('SOUTH') || z.zoneName.toLowerCase().includes('miền nam') || z.zoneName.toLowerCase().includes('miền tây')
-            );
-            if (southZone) return southZone;
-          }
-
-          return null;
-        };
-
-        const matchedZone = matchRegionalZone(facilityZones, destProvinceName, destFacilityName)
-          || facilityZones.find((z) => z.zoneType === targetZoneType)
-          || facilityZones.find((z) => z.zoneType === 'SHIPPING' || z.zoneType === 'SORTING')
-          || facilityZones[0];
+        if (!matchedZone) {
+          matchedZone = facilityZones.find((z) => z.zoneType === targetZoneType)
+            || facilityZones.find((z) => z.zoneType === 'SHIPPING' || z.zoneType === 'SORTING')
+            || facilityZones[0];
+        }
 
         if (matchedZone) {
           setSelectedZoneId(matchedZone.id);

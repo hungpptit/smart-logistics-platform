@@ -107,24 +107,33 @@ class _DriverDashboardState extends State<DriverDashboard> {
       }
       final routes = await DriverService.fetchMyRoutes();
       if (routes.isNotEmpty && mounted) {
-        final firstRoute = routes.firstWhere(
+        final activeRoutes = routes.where((r) {
+          final st = (r['status']?.toString() ?? '').toUpperCase();
+          return st == 'IN_PROGRESS' || st == 'ASSIGNED' || st == 'PLANNED' || st == 'PENDING';
+        }).toList();
+
+        if (activeRoutes.isEmpty) {
+          // Tài xế đã chốt xong toàn bộ chuyến đi và không còn chuyến nào đang chạy!
+          setState(() {
+            _activeRouteId = null;
+            _activeRouteCode = null;
+            _driverStops.clear();
+            _roadPolylinePoints.clear();
+            _isRouteFinished = false;
+            _isRouteStarted = false;
+            _loadedTotesCount = 0;
+            _totalPackageCount = 0;
+            _loadedTotes.clear();
+          });
+          return;
+        }
+
+        final firstRoute = activeRoutes.firstWhere(
           (r) => (r['status']?.toString() ?? '').toUpperCase() == 'IN_PROGRESS',
-          orElse: () => routes.firstWhere(
-            (r) {
-              final st = (r['status']?.toString() ?? '').toUpperCase();
-              return st == 'ASSIGNED' || st == 'PLANNED' || st == 'PENDING';
-            },
-            orElse: () => routes.first,
-          ),
+          orElse: () => activeRoutes.first,
         );
         final firstStatus = (firstRoute['status']?.toString() ?? '').toUpperCase();
-        final hasActiveRoute = routes.any(
-          (r) {
-            final st = (r['status']?.toString() ?? '').toUpperCase();
-            return st == 'IN_PROGRESS' || st == 'ASSIGNED' || st == 'PLANNED' || st == 'PENDING';
-          },
-        );
-        _isRouteFinished = (firstStatus == 'COMPLETED');
+        _isRouteFinished = false;
         _isRouteStarted = (firstStatus == 'IN_PROGRESS');
         _activeRouteId = firstRoute['id']?.toString();
         _activeRouteCode = firstRoute['routeCode']?.toString() ?? _activeRouteId;
@@ -224,68 +233,98 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     : (codAmount + (isReceiverPayFee ? shippingFee : 0));
                 final String rawStopStatus = (stop['status']?.toString() ?? '').toUpperCase();
                 final String rawOrderStatus = (firstOrder?['status']?.toString() ?? '').toUpperCase();
-                final bool isCompleted = isLinehaul
-                    ? (stopType == 'PICKUP'
-                        ? (rawStopStatus == 'COMPLETED' || rawStopStatus == 'DEPARTED')
-                        : (rawStopStatus == 'COMPLETED' || rawStopStatus == 'DELIVERED'))
-                    : ((stopType == 'PICKUP')
-                        ? (rawStopStatus == 'COMPLETED' ||
-                            rawStopStatus == 'DEPARTED' ||
-                            rawOrderStatus == 'PICKED_UP' ||
-                            rawOrderStatus == 'ARRIVED_ORIGIN_FACILITY')
-                        : (rawStopStatus == 'COMPLETED' ||
-                            rawStopStatus == 'DEPARTED' ||
-                            rawOrderStatus == 'DELIVERED' ||
-                            rawOrderStatus == 'COMPLETED'));
-
-                String displayStatus;
-                bool isActive = false;
-                if (isCompleted) {
-                  displayStatus = (stopType == 'PICKUP') ? 'ĐÃ LẤY HÀNG' : 'ĐÃ GIAO';
-                  isActive = false;
-                } else if (isLinehaul) {
-                  if (stopType == 'PICKUP') {
-                    displayStatus = _loadedTotesCount > 0 ? 'ĐANG BỐC HÀNG' : 'CHỜ BỐC HÀNG';
-                    isActive = true;
-                  } else {
-                    final bool originDone = mappedStops.isNotEmpty && mappedStops.first['status'] == 'ĐÃ LẤY HÀNG';
-                    displayStatus = originDone ? 'ĐANG THỰC HIỆN' : 'CHỜ THỰC HIỆN';
-                    isActive = originDone;
-                  }
-                } else if (!_isRouteStarted) {
-                  displayStatus = 'CHỜ QUÉT NHẬN';
-                  isActive = false;
-                } else if (!foundActiveIncomplete) {
-                  displayStatus = 'ĐANG THỰC HIỆN';
-                  isActive = true;
-                  foundActiveIncomplete = true;
-                } else {
-                  displayStatus = 'TIẾP THEO';
-                }
-
-                final String stopTitle = isLinehaul
-                    ? (stopType == 'PICKUP' ? 'Điểm xuất sọt trung chuyển' : 'Điểm giao sọt kho đích')
-                    : (stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng');
-
                 final shipmentObj = stop['shipment'];
                 final String rawShipmentStatus = (shipmentObj?['status']?.toString() ?? '').toUpperCase();
                 final transfers = shipmentObj?['shipmentTransfers'] as List?;
+
                 bool isDispatched = false;
-                // Chỉ dựa vào ShipmentTransfer (nguồn chính xác nhất cho Gate Out Approval)
                 if (transfers != null && transfers.isNotEmpty) {
-                  final firstTransfer = transfers.first;
-                  if (firstTransfer != null && (firstTransfer['status'] == 'IN_TRANSIT' || firstTransfer['status'] == 'ARRIVED')) {
+                  if (transfers.any((t) => t['status'] == 'IN_TRANSIT' || t['status'] == 'ARRIVED' || t['status'] == 'COMPLETED')) {
                     isDispatched = true;
                   }
                 }
-                // Fallback: Shipment đã được staff chuyển sang IN_TRANSIT
-                if (!isDispatched && (rawShipmentStatus == 'IN_TRANSIT' || rawShipmentStatus == 'DELIVERED')) {
+                if (!isDispatched && (rawShipmentStatus == 'IN_TRANSIT' || rawShipmentStatus == 'AT_HUB' || rawShipmentStatus == 'ARRIVED_DEST_FACILITY' || rawShipmentStatus == 'DELIVERED')) {
                   isDispatched = true;
                 }
-                // Nếu stop đã DEPARTED/COMPLETED thì đã qua giai đoạn này rồi
                 if (!isDispatched && (rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED')) {
                   isDispatched = true;
                 }
+
+                bool isCompleted = false;
+                String displayStatus = 'CHỜ THỰC HIỆN';
+                bool isActive = false;
+
+                if (isLinehaul) {
+                  if (stopType == 'PICKUP') {
+                    if (isDispatched || rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED') {
+                      isCompleted = true;
+                      displayStatus = 'ĐÃ XUẤT BƯU CỤC';
+                      isActive = false;
+                    } else {
+                      isCompleted = false;
+                      displayStatus = _loadedTotesCount > 0 ? 'ĐÃ BỐC $_loadedTotesCount THÙNG' : 'CHỜ BỐC HÀNG';
+                      isActive = true;
+                    }
+                  } else {
+                    final bool isDestInbounded = rawShipmentStatus == 'AT_HUB' ||
+                        rawShipmentStatus == 'ARRIVED_DEST_FACILITY' ||
+                        rawShipmentStatus == 'DELIVERED' ||
+                        rawStopStatus == 'COMPLETED' ||
+                        (transfers != null && transfers.any((t) => t['status'] == 'COMPLETED'));
+                    if (isDestInbounded) {
+                      isCompleted = true;
+                      displayStatus = 'ĐÃ TỚI KHO ĐÍCH';
+                      isActive = false;
+                    } else if (isDispatched) {
+                      isCompleted = false;
+                      displayStatus = 'ĐANG THỰC HIỆN';
+                      isActive = true;
+                    } else {
+                      isCompleted = false;
+                      displayStatus = 'CHỜ THỰC HIỆN';
+                      isActive = false;
+                    }
+                  }
+                } else {
+                  // Last-mile Shipper logic
+                  if (stopType == 'PICKUP') {
+                    isCompleted = (rawStopStatus == 'COMPLETED' ||
+                        rawStopStatus == 'DEPARTED' ||
+                        rawOrderStatus == 'PICKED_UP' ||
+                        rawOrderStatus == 'ARRIVED_ORIGIN_FACILITY');
+                    if (isCompleted) {
+                      displayStatus = 'ĐÃ LẤY HÀNG';
+                      isActive = false;
+                    }
+                  } else {
+                    isCompleted = (rawStopStatus == 'COMPLETED' ||
+                        rawStopStatus == 'DEPARTED' ||
+                        rawOrderStatus == 'DELIVERED' ||
+                        rawOrderStatus == 'COMPLETED');
+                    if (isCompleted) {
+                      displayStatus = 'ĐÃ GIAO';
+                      isActive = false;
+                    }
+                  }
+
+                  if (!isCompleted) {
+                    if (!_isRouteStarted) {
+                      displayStatus = 'CHỜ QUÉT NHẬN';
+                      isActive = false;
+                    } else if (!foundActiveIncomplete) {
+                      displayStatus = 'ĐANG THỰC HIỆN';
+                      isActive = true;
+                      foundActiveIncomplete = true;
+                    } else {
+                      displayStatus = 'TIẾP THEO';
+                      isActive = false;
+                    }
+                  }
+                }
+
+                final String stopTitle = isLinehaul
+                    ? (stopType == 'PICKUP' ? 'Điểm xuất thùng trung chuyển' : 'Điểm giao thùng kho đích')
+                    : (stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng');
 
                 mappedStops.add({
                   'index': i + 1,
@@ -496,6 +535,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
     final bool effectiveRouteStarted = _isRouteStarted ||
         allCompleted ||
+        _isLinehaulDriverProfile ||
+        _isLinehaulRoute ||
         _driverStops.any((s) => s['isCheckedIn'] == true);
 
     if (!effectiveRouteStarted) {
@@ -517,7 +558,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
             ],
           ),
           content: const Text(
-              'Tài xế chưa quét nhận chuyến xe tại bưu cục. Vui lòng quét mã QR Sọt hàng / Chuyến xe để nhận chuyến trước khi bật Dẫn đường!'),
+              'Tài xế chưa quét nhận chuyến xe tại bưu cục. Vui lòng quét mã QR Thùng hàng / Chuyến xe để nhận chuyến trước khi bật Dẫn đường!'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -559,6 +600,12 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
   // ------ Stop Actions ------
   void _showStopDetailsDialog(Map<String, dynamic> stop) {
+    if (_isLinehaulDriverProfile) {
+      // Đối với tài xế trung chuyển: Bấm vào stop là mở trực tiếp Mã QR Chuyến xe cho kho quét
+      _showShipmentQRModal();
+      return;
+    }
+
     StopDetailsDialog.show(
       context,
       stop: stop,
@@ -595,13 +642,24 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   void _showQRScanner([Map<String, dynamic>? stop, String scanMode = 'ROUTE']) {
+    if (scanMode == 'TOTE' && !_isLinehaulDriverProfile) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chỉ Tài xế trung chuyển (Linehaul) mới có quyền quét nhận Thùng hàng!'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     QrScannerDialog.show(
       context,
       stop: stop,
       activeRouteCode: _activeRouteCode,
       activeRouteId: _activeRouteId,
       scanMode: scanMode,
-      isLinehaulRoute: _isLinehaulDriverProfile || _isLinehaulRoute,
+      isLinehaulRoute: _isLinehaulDriverProfile,
       onRouteCodeUpdated: (newCode) {
         if (newCode != null && newCode.isNotEmpty) {
           setState(() {
@@ -623,6 +681,16 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   void _showToteDetailDialog() {
+    if (!_isLinehaulDriverProfile) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chức năng này chỉ dành cho Tài xế trung chuyển thùng hàng!'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     ToteDetailDialog.show(
       context,
       loadedTotes: _loadedTotes,
@@ -649,32 +717,30 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   Future<void> _completeStop(Map<String, dynamic> stop) async {
-    final shipmentId = stop['shipmentId'];
+    final bool isLinehaul = _isLinehaulDriverProfile;
+    if (isLinehaul) {
+      // Tài xế trung chuyển: Bật Mã QR chuyến xe để nhân viên kho quét duyệt trên Web
+      _showShipmentQRModal();
+      return;
+    }
+
+    // Luồng Shipper Chặng Cuối (Last-Mile)
     final orderCode = stop['orderCode'];
     final bool isPickupStop = stop['isPickup'] == true ||
         stop['stopType'] == 'PICKUP' ||
         stop['title']?.toString().toLowerCase().contains('lay hang') == true ||
-        stop['title']?.toString().toLowerCase().contains('xuat sot') == true ||
         stop['status'] == 'PICKING' ||
         stop['status'] == 'READY_FOR_PICKUP' ||
         stop['status'] == 'PICKUP_ASSIGNED';
-    final bool isLinehaul = _isLinehaulDriverProfile;
-    final String nextStatus = isLinehaul
-        ? (isPickupStop ? 'IN_TRANSIT' : 'AT_HUB')
-        : (isPickupStop ? 'PICKED_UP' : 'DELIVERED');
-    final String reason = isLinehaul
-        ? (isPickupStop
-            ? 'Xe tải đã bốc toàn bộ sọt hàng và xuất kho bưu cục nguồn'
-            : 'Xe tải đã cập bến bưu cục / hub đích, sẵn sàng cho thủ kho quét nhập kho')
-        : (isPickupStop
-            ? 'Shipper đã quét mã bưu kiện và xác nhận lấy hàng từ người gửi thành công'
-            : 'Shipper đã hoàn thành giao hàng cho người nhận');
+
+    final String nextStatus = isPickupStop ? 'PICKED_UP' : 'DELIVERED';
+    final String reason = isPickupStop
+        ? 'Shipper đã quét mã bưu kiện và xác nhận lấy hàng từ người gửi thành công'
+        : 'Shipper đã hoàn thành giao hàng cho người nhận';
 
     setState(() {
       stop['isCheckedIn'] = true;
-      stop['status'] = isLinehaul
-          ? (isPickupStop ? 'ĐÃ LẤY HÀNG' : 'ĐÃ TỚI KHO ĐÍCH')
-          : (isPickupStop ? 'ĐÃ LẤY HÀNG' : 'ĐÃ GIAO');
+      stop['status'] = isPickupStop ? 'ĐÃ LẤY HÀNG' : 'ĐÃ GIAO';
       stop['isActive'] = false;
       final currentIndex = stop['index'] as int;
       final nextStop = _driverStops.firstWhere(
@@ -687,16 +753,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
       }
     });
 
-    if (orderCode != null && orderCode.toString().isNotEmpty && !isLinehaul) {
+    if (orderCode != null && orderCode.toString().isNotEmpty) {
       DriverService.updateOrderStatus(orderCode.toString(), nextStatus, reason: reason);
-    }
-    
-    final String targetShipmentKey = (shipmentId != null && shipmentId.toString().isNotEmpty)
-        ? shipmentId.toString()
-        : (_activeRouteCode ?? _activeRouteId ?? '');
-
-    if (isLinehaul && targetShipmentKey.isNotEmpty) {
-      DriverService.updateShipmentStatus(targetShipmentKey, nextStatus, notes: reason);
     }
 
     if (!mounted) return;
@@ -711,9 +769,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                isLinehaul
-                    ? (isPickupStop ? 'Đã xuất bưu cục thành công!' : 'Đã tới kho đích thành công!')
-                    : (isPickupStop ? 'Đã lấy hàng [${stop['orderCode'] ?? ''}] thành công!' : 'Đã giao hàng [${stop['orderCode'] ?? ''}] thành công!'),
+                isPickupStop
+                    ? 'Đã lấy hàng [${stop['orderCode'] ?? ''}] thành công!'
+                    : 'Đã giao hàng [${stop['orderCode'] ?? ''}] thành công!',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ),
@@ -737,7 +795,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
     if (mounted) {
       setState(() {
         _isDutyLoading = false;
-        if (success) _isRouteFinished = true;
+        if (success) {
+          _activeRouteId = null;
+          _activeRouteCode = null;
+          _driverStops.clear();
+          _roadPolylinePoints.clear();
+          _loadedTotesCount = 0;
+          _totalPackageCount = 0;
+          _loadedTotes.clear();
+          _isRouteFinished = false;
+          _isRouteStarted = false;
+        }
       });
     }
     if (mounted) {
@@ -761,7 +829,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                _initSocketAndFetchRoutes();
+                _initSocketAndFetchRoutes(force: true);
               },
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF166534), foregroundColor: AppColors.pureWhite),
               child: const Text('Đồng ý'),
@@ -882,7 +950,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
         _activeRouteCode != null &&
         !_isRouteFinished &&
         _driverStops.isNotEmpty &&
-        !allCompleted;
+        !allCompleted &&
+        !_isLinehaulDriverProfile &&
+        !_isLinehaulRoute;
 
     final bool showToteActions = _isLinehaulDriverProfile || _isLinehaulRoute;
 
@@ -952,44 +1022,31 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 isDutyLoading: _isDutyLoading,
                 onToggle: _toggleDutyStatus,
               ),
-              // 2. Quick Actions Row ("Quét Nhận Sọt" & "QR Chuyen Xe") - Hidden when last-mile delivery route is active
+              // 2. Quick Action ("Quét Nhận Thùng Hàng") - Only for Linehaul Driver
               if (showToteActions) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          final activeStop = _driverStops.firstWhere(
-                            (s) => s['isCheckedIn'] != true,
-                            orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
-                          );
-                          _showQRScanner(activeStop, 'TOTE');
-                        },
-                        icon: const Icon(Icons.inventory_2, size: 18.0),
-                        label: const Text('Quét Nhận Sọt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.logisticsRed,
-                          foregroundColor: AppColors.pureWhite,
-                          padding: const EdgeInsets.symmetric(vertical: 14.0),
-                          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                        ),
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      final activeStop = _driverStops.firstWhere(
+                        (s) => s['isCheckedIn'] != true,
+                        orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
+                      );
+                      _showQRScanner(activeStop, 'TOTE');
+                    },
+                    icon: const Icon(Icons.inventory_2, size: 20.0),
+                    label: const Text(
+                      'Quét Nhận Thùng Hàng Lên Xe Tải',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(width: 12.0),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _showShipmentQRModal,
-                        icon: const Icon(Icons.qr_code_2, size: 18.0),
-                        label: const Text('QR Chuyen Xe', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.indigo.shade700,
-                          foregroundColor: AppColors.pureWhite,
-                          padding: const EdgeInsets.symmetric(vertical: 14.0),
-                          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                        ),
-                      ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.logisticsRed,
+                      foregroundColor: AppColors.pureWhite,
+                      padding: const EdgeInsets.symmetric(vertical: 14.0),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
                     ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 20.0),
               ],
@@ -1022,7 +1079,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'Tài xế chưa quét nhận chuyến xe. Vui lòng bấm nút bên dưới để quét mã QR Sọt hàng / Chuyến xe tại bưu cục trước khi bắt đầu lộ trình!',
+                        'Tài xế chưa quét nhận chuyến xe. Vui lòng bấm nút bên dưới để quét mã QR Thùng hàng / Chuyến xe tại bưu cục trước khi bắt đầu lộ trình!',
                         style: TextStyle(fontSize: 11, color: Color(0xFF92400E)),
                       ),
                       const SizedBox(height: 10),
@@ -1081,20 +1138,61 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 style: AppTypography.headlineMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.deepOnyx),
               ),
               const SizedBox(height: 12.0),
-              Column(
-                children: _driverStops.map((stop) {
-                  return Column(
+              if (_driverStops.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 20.0),
+                  margin: const EdgeInsets.only(bottom: 20.0),
+                  decoration: BoxDecoration(
+                    color: AppColors.pureWhite,
+                    borderRadius: BorderRadius.circular(16.0),
+                    border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                    boxShadow: AppStyles.ambientShadow,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      StopCard(
-                        stop: stop,
-                        onTap: () => _showStopDetailsDialog(stop),
-                        onShowToteDetails: _showToteDetailDialog,
+                      Container(
+                        padding: const EdgeInsets.all(16.0),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF1F5F9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.assignment_outlined, size: 36, color: Color(0xFF64748B)),
                       ),
-                      const SizedBox(height: 12.0),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Chưa Có Chuyến Xe Nào',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.deepOnyx,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Hiện tại bạn chưa có chuyến xe nào được điều phối. Hãy duy trì trạng thái Trực tuyến để sẵn sàng nhận chuyến mới từ Bưu cục!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: AppColors.secondary, height: 1.4),
+                      ),
                     ],
-                  );
-                }).toList(),
-              ),
+                  ),
+                )
+              else
+                Column(
+                  children: _driverStops.map((stop) {
+                    return Column(
+                      children: [
+                        StopCard(
+                          stop: stop,
+                          onTap: () => _showStopDetailsDialog(stop),
+                          onShowToteDetails: _showToteDetailDialog,
+                        ),
+                        const SizedBox(height: 12.0),
+                      ],
+                    );
+                  }).toList(),
+                ),
             ],
           ),
         ),

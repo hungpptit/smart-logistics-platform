@@ -349,9 +349,50 @@ async function main() {
   // 3. Tạo Nhân viên Kho (bao gồm Kho Bưu cục & Kho Trung chuyển Hub/Sorter)
   console.log('👤 Tạo Nhân viên kho (Staff cho Bưu cục & Kho Trung chuyển)...');
 
-  // Lấy thêm bưu cục Bà Rịa - Vũng Tàu (FAC-000050) nếu có
+  // Lấy thêm các Kho Cấp 1, Cấp 2 và Bưu Cục liên tỉnh
   const facBrvt = await prisma.facility.findFirst({
     where: { OR: [{ facilityCode: 'FAC-000050' }, { facilityName: { contains: 'Xuân Sơn' } }] },
+  });
+  const hubTayNinh = await prisma.facility.findFirst({
+    where: { facilityCode: 'FAC-HUB-PROV-80' },
+  });
+  const hubHN = await prisma.facility.findFirst({
+    where: { facilityCode: 'FAC-HUB-HN' },
+  });
+  const scNorth = await prisma.facility.findFirst({
+    where: { facilityCode: 'FAC-SC-NORTH' },
+  });
+
+  // Bưu Cục Dương Minh Châu (Cấp 3 - Tây Ninh)
+  const wmTayNinh = await prisma.facility.upsert({
+    where: { facilityCode: 'FAC-WM-TAYNINH' },
+    update: { parentFacilityId: hubTayNinh?.id, provinceCode: '80' },
+    create: {
+      facilityCode: 'FAC-WM-TAYNINH',
+      facilityName: 'Bưu Cục Dương Minh Châu - Tây Ninh',
+      facilityTypeId: lastMileFacilityType.id,
+      parentFacilityId: hubTayNinh?.id,
+      provinceCode: '80',
+      addressId: addrHub5.id,
+      operatingStatus: FacilityStatus.ACTIVE,
+      openedAt: new Date('2025-01-01'),
+    }
+  });
+
+  // Bưu Cục Hà Đông (Cấp 3 - Hà Nội)
+  const wmHaDong = await prisma.facility.upsert({
+    where: { facilityCode: 'FAC-WM-HADONG' },
+    update: { parentFacilityId: hubHN?.id, provinceCode: '01' },
+    create: {
+      facilityCode: 'FAC-WM-HADONG',
+      facilityName: 'Bưu Cục Hà Đông - TP. Hà Nội',
+      facilityTypeId: lastMileFacilityType.id,
+      parentFacilityId: hubHN?.id,
+      provinceCode: '01',
+      addressId: addrHub5.id,
+      operatingStatus: FacilityStatus.ACTIVE,
+      openedAt: new Date('2025-01-01'),
+    }
   });
 
   const staffData = [
@@ -364,12 +405,18 @@ async function main() {
     { username: 'stf_sorter_south_1', name: 'Trần Văn Thắng (Thủ kho Tổng Kho Miền Nam Q.12)', facilityId: sortingCenter.id, code: 'STF-HUB-01' },
     { username: 'stf_hub_hcm_1', name: 'Đặng Hoàng Lâm (Thủ kho Kho Tổng TP.HCM Tân Bình)', facilityId: provincialHub.id, code: 'STF-HUB-02' },
     { username: 'stf_hub_brvt_1', name: 'Vũ Đức Anh (Thủ kho Bưu Cục Xuân Sơn BR-VT)', facilityId: facBrvt?.id || hub1.id, code: 'STF-HUB-03' },
+    // Nhân viên Kho Tây Ninh & Hà Nội cho luồng demo
+    { username: 'stf_hub_tayninh_1', name: 'Trần Văn Hòa (Thủ kho Kho Tổng Tây Ninh)', facilityId: hubTayNinh?.id || sortingCenter.id, code: 'STF-TN-01' },
+    { username: 'stf_wm_tayninh_1', name: 'Lê Thị Diệu (Thủ kho Bưu Cục Dương Minh Châu)', facilityId: wmTayNinh.id, code: 'STF-TN-02' },
+    { username: 'stf_sorter_north_1', name: 'Nguyễn Tiến Dũng (Thủ kho Tổng Kho Miền Bắc Long Biên)', facilityId: scNorth?.id || sortingCenter.id, code: 'STF-HN-01' },
+    { username: 'stf_hub_hn_1', name: 'Bùi Đức Thắng (Thủ kho Kho Tổng Hà Nội Cầu Giấy)', facilityId: hubHN?.id || sortingCenter.id, code: 'STF-HN-02' },
+    { username: 'stf_wm_hadong_1', name: 'Hoàng Minh Tuấn (Thủ kho Bưu Cục Hà Đông)', facilityId: wmHaDong.id, code: 'STF-HN-03' },
   ];
 
   for (const s of staffData) {
     const user = await prisma.user.upsert({
       where: { username: s.username },
-      update: {},
+      update: { passwordHash: commonPassHash, status: 'ACTIVE', roleId: staffRole.id },
       create: {
         username: s.username,
         passwordHash: commonPassHash,
@@ -380,7 +427,7 @@ async function main() {
 
     await prisma.staff.upsert({
       where: { employeeCode: s.code },
-      update: {},
+      update: { fullName: s.name, assignedFacilityId: s.facilityId, position: 'WAREHOUSE_STAFF' },
       create: {
         userId: user.id,
         employeeCode: s.code,
@@ -412,9 +459,15 @@ async function main() {
     // Tăng Nhơn Phú (2 Shipper)
     { username: 'shp_tangnhonphu_1', name: 'Đỗ Văn Nam', facilityId: hub5.id, code: 'DRV-TD-08', plate: '59-X1 111.08', isTruck: false, lat: 10.8460, lng: 106.7860 },
     { username: 'shp_tangnhonphu_2', name: 'Trịnh Hoàng Long', facilityId: hub5.id, code: 'DRV-TD-09', plate: '59-X1 111.09', isTruck: false, lat: 10.8470, lng: 106.7870 },
+    // Shipper Dương Minh Châu - Tây Ninh & Hà Đông - Hà Nội
+    { username: 'shp_tayninh_1', name: 'Phan Văn Phú (Shipper Tây Ninh)', facilityId: wmTayNinh.id, code: 'DRV-TN-01', plate: '70-F1 888.01', isTruck: false, lat: 11.3520, lng: 106.1820 },
+    { username: 'shp_hadong_1', name: 'Vũ Đức Thịnh (Shipper Hà Đông)', facilityId: wmHaDong.id, code: 'DRV-HN-01', plate: '29-H1 999.01', isTruck: false, lat: 20.9780, lng: 105.7830 },
 
     // 🚛 TÀI XẾ XE TẢI TRUNG CHUYỂN LIÊN KHO (LINEHAUL TRUCK DRIVERS)
     { username: 'drv_linehaul_hcm', name: 'Phạm Quốc Hùng (Tài xế Xe Tải Kho Tổng TP.HCM)', facilityId: provincialHub.id, code: 'DRV-LH-01', plate: '50H-888.01', isTruck: true, lat: 10.8050, lng: 106.6500 },
+    { username: 'drv_linehaul_hcm_2', name: 'Nguyễn Văn Minh (Tài xế 2 Kho HCM)', facilityId: provincialHub.id, code: 'DRV-LH-04', plate: '50H-999.88', isTruck: true, lat: 10.8060, lng: 106.6510 },
+    { username: 'drv_linehaul_south_1', name: 'Lê Hoàng Long (Tài xế Container Liên Miền 1 - Tổng Kho Miền Nam)', facilityId: sortingCenter.id, code: 'DRV-LH-05', plate: '51D-777.99', isTruck: true, isContainer: true, lat: 10.8520, lng: 106.6200 },
+    { username: 'drv_linehaul_south_2', name: 'Võ Thành Đạt (Tài xế Container Liên Miền 2 - Tổng Kho Miền Nam)', facilityId: sortingCenter.id, code: 'DRV-LH-06', plate: '51D-888.66', isTruck: true, isContainer: true, lat: 10.8530, lng: 106.6210 },
     { username: 'drv_linehaul_dongnai', name: 'Nguyễn Tấn Đạt (Tài xế Xe Tải Tổng Kho Q.12)', facilityId: sortingCenter.id, code: 'DRV-LH-02', plate: '60C-999.02', isTruck: true, lat: 10.8520, lng: 106.6200 },
     { username: 'drv_linehaul_brvt', name: 'Trần Hoàng Nam (Tài xế Xe Tải Bưu Cục BR-VT)', facilityId: facBrvt?.id || hub1.id, code: 'DRV-LH-03', plate: '72C-777.03', isTruck: true, lat: 10.6470, lng: 107.3291 },
   ];
@@ -422,7 +475,7 @@ async function main() {
   for (const sh of shipperData) {
     const user = await prisma.user.upsert({
       where: { username: sh.username },
-      update: {},
+      update: { passwordHash: commonPassHash, status: 'ACTIVE', roleId: shipperRole.id },
       create: {
         username: sh.username,
         passwordHash: commonPassHash,
@@ -433,7 +486,14 @@ async function main() {
 
     const staffObj = await prisma.staff.upsert({
       where: { employeeCode: sh.code },
-      update: {},
+      update: {
+        fullName: sh.name,
+        assignedFacilityId: sh.facilityId,
+        driverLicenseClass: sh.isTruck ? 'C' : 'A1',
+        driverLicenseNumber: `GPLX-${sh.code.replace('DRV-', '')}-7788`,
+        position: 'DRIVER',
+        employmentStatus: DriverEmploymentStatus.ACTIVE,
+      },
       create: {
         userId: user.id,
         employeeCode: sh.code,
@@ -441,7 +501,7 @@ async function main() {
         phone: `09020000${sh.code.slice(-2)}`,
         position: 'DRIVER',
         assignedFacilityId: sh.facilityId,
-        driverLicenseNumber: sh.isTruck ? `GPLX-LH-88${sh.code.slice(-2)}` : `GPLX-TD-99${sh.code.slice(-2)}`,
+        driverLicenseNumber: `GPLX-${sh.code.replace('DRV-', '')}-7788`,
         driverLicenseClass: sh.isTruck ? 'C' : 'A1',
         driverTypes: {
           create: [{ driverType: sh.isTruck ? 'LINEHAUL_TRANSFER' : 'HUB_DELIVERY' }],
@@ -450,21 +510,55 @@ async function main() {
       } as any,
     });
 
-    const vehCode = `VEH-${sh.code}`;
-    const vehicle = await prisma.vehicle.upsert({
-      where: { vehicleCode: vehCode },
-      update: {},
-      create: {
-        vehicleCode: vehCode,
-        plateNumber: sh.plate,
-        vehicleTypeId: sh.isTruck ? (truckType?.id || motorbikeType.id) : motorbikeType.id,
-        assignedFacilityId: sh.facilityId,
-        maxWeight: sh.isTruck ? 15000.0 : 150.0,
-        maxVolume: sh.isTruck ? 45.0 : 0.5,
-        maxLength: sh.isTruck ? 8.5 : 1.2,
-        operatingStatus: VehicleOperatingStatus.ACTIVE,
+    const hasDriverType = await prisma.staffDriverType.findFirst({
+      where: {
+        staffId: staffObj.id,
+        driverType: sh.isTruck ? 'LINEHAUL_TRANSFER' : 'HUB_DELIVERY',
       },
     });
+    if (!hasDriverType) {
+      await prisma.staffDriverType.create({
+        data: {
+          staffId: staffObj.id,
+          driverType: sh.isTruck ? 'LINEHAUL_TRANSFER' : 'HUB_DELIVERY',
+        },
+      });
+    }
+
+    const vehCode = `VEH-${sh.code}`;
+    const isContainer = (sh as any).isContainer === true;
+    let vehicle = await prisma.vehicle.findFirst({
+      where: { OR: [{ vehicleCode: vehCode }, { plateNumber: sh.plate }] },
+    });
+
+    if (vehicle) {
+      vehicle = await prisma.vehicle.update({
+        where: { id: vehicle.id },
+        data: {
+          vehicleCode: vehCode,
+          plateNumber: sh.plate,
+          assignedFacilityId: sh.facilityId,
+          vehicleTypeId: sh.isTruck ? (truckType?.id || motorbikeType.id) : motorbikeType.id,
+          maxWeight: isContainer ? 30000.0 : (sh.isTruck ? 15000.0 : 150.0),
+          maxVolume: isContainer ? 90.0 : (sh.isTruck ? 45.0 : 0.5),
+          maxLength: isContainer ? 12.0 : (sh.isTruck ? 8.5 : 1.2),
+          operatingStatus: VehicleOperatingStatus.ACTIVE,
+        },
+      });
+    } else {
+      vehicle = await prisma.vehicle.create({
+        data: {
+          vehicleCode: vehCode,
+          plateNumber: sh.plate,
+          vehicleTypeId: sh.isTruck ? (truckType?.id || motorbikeType.id) : motorbikeType.id,
+          assignedFacilityId: sh.facilityId,
+          maxWeight: isContainer ? 30000.0 : (sh.isTruck ? 15000.0 : 150.0),
+          maxVolume: isContainer ? 90.0 : (sh.isTruck ? 45.0 : 0.5),
+          maxLength: isContainer ? 12.0 : (sh.isTruck ? 8.5 : 1.2),
+          operatingStatus: VehicleOperatingStatus.ACTIVE,
+        },
+      });
+    }
 
     const existingAssign = await prisma.driverVehicleAssignment.findFirst({
       where: { driverId: staffObj.id, vehicleId: vehicle.id, isActive: true },

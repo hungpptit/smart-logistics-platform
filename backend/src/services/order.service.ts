@@ -390,24 +390,32 @@ export class OrderService {
       const facilityOrConditions: any[] = [];
 
       if (filterScope === 'CURRENT') {
-        facilityOrConditions.push({ package: { currentFacilityId: targetFacilityId } });
+        // Chỉ lấy các đơn hàng THỰC SỰ ĐANG CÓ MẶT TẠI KHO (chưa xuất bến, không đang trên đường IN_TRANSIT hay đã giao)
+        const atFacilityStatuses = [
+          OrderStatus.CREATED,
+          OrderStatus.READY_FOR_PICKUP,
+          OrderStatus.PICKING,
+          OrderStatus.PICKUP_ASSIGNED,
+          OrderStatus.PICKED_UP,
+          OrderStatus.ARRIVED_ORIGIN_FACILITY,
+          OrderStatus.AT_HUB,
+          OrderStatus.READY_FOR_DISPATCH,
+        ];
+
         facilityOrConditions.push({
-          package: {
-            warehouseScans: {
-              some: { facilityId: targetFacilityId },
-            },
-          },
-          status: OrderStatus.AT_HUB,
+          package: { currentFacilityId: targetFacilityId },
+          status: { in: atFacilityStatuses },
         });
         facilityOrConditions.push({
           originFacilityId: targetFacilityId,
-          status: { in: [OrderStatus.CREATED, OrderStatus.READY_FOR_PICKUP, OrderStatus.PICKING, OrderStatus.PICKUP_ASSIGNED, OrderStatus.PICKED_UP, OrderStatus.ARRIVED_ORIGIN_FACILITY] },
+          status: { in: [OrderStatus.CREATED, OrderStatus.READY_FOR_PICKUP, OrderStatus.PICKING, OrderStatus.PICKUP_ASSIGNED, OrderStatus.PICKED_UP, OrderStatus.ARRIVED_ORIGIN_FACILITY, OrderStatus.AT_HUB] },
         });
         facilityOrConditions.push({
           destinationFacilityId: targetFacilityId,
-          status: { in: [OrderStatus.AT_HUB, OrderStatus.READY_FOR_DISPATCH, OrderStatus.OUT_FOR_DELIVERY] },
+          status: { in: [OrderStatus.AT_HUB, OrderStatus.READY_FOR_DISPATCH] },
         });
       } else {
+        // TẤT CẢ LỊCH SỬ ĐƠN KHO: Xuất phát từ kho này, đến kho này, hoặc từng trung chuyển qua kho này
         facilityOrConditions.push({ originFacilityId: targetFacilityId });
         facilityOrConditions.push({ destinationFacilityId: targetFacilityId });
         facilityOrConditions.push({ package: { currentFacilityId: targetFacilityId } });
@@ -418,11 +426,6 @@ export class OrderService {
             },
           },
         });
-      }
-
-      // Only show orders created by this user as fallback if they are STAFF
-      if (!userRoles.includes('ADMIN')) {
-        facilityOrConditions.push({ createdBy: userId });
       }
 
       andConditions.push({
@@ -529,11 +532,77 @@ export class OrderService {
           },
         },
         payment: true,
-        originFacility: true,
-        destinationFacility: true,
+        originFacility: {
+          include: {
+            facilityType: true,
+            province: {
+              include: {
+                administrativeRegion: true,
+              },
+            },
+            address: {
+              include: {
+                wardRelation: {
+                  include: {
+                    province: {
+                      include: {
+                        administrativeRegion: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        destinationFacility: {
+          include: {
+            facilityType: true,
+            province: {
+              include: {
+                administrativeRegion: true,
+              },
+            },
+            address: {
+              include: {
+                wardRelation: {
+                  include: {
+                    province: {
+                      include: {
+                        administrativeRegion: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         pickupAddress: {
           include: {
             customerAddresses: true,
+            wardRelation: {
+              include: {
+                province: {
+                  include: {
+                    administrativeRegion: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        deliveryAddress: {
+          include: {
+            wardRelation: {
+              include: {
+                province: {
+                  include: {
+                    administrativeRegion: true,
+                  },
+                },
+              },
+            },
           },
         },
         statusHistory: {

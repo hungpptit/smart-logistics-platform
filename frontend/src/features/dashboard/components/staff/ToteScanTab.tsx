@@ -18,7 +18,7 @@ import { CONFIG } from '../../../../config';
 interface ScanHistoryItem {
   id: string;
   code: string;
-  type: 'SHIPMENT' | 'ORDER' | 'SỌT HÀNG';
+  type: 'SHIPMENT' | 'ORDER' | 'THÙNG HÀNG' | 'SỌT HÀNG';
   status: string;
   orderCount?: number;
   scannedAt: string;
@@ -228,14 +228,14 @@ export const ToteScanTab: React.FC = () => {
           headers,
           body: JSON.stringify({
             status: targetShipmentStatus,
-            notes: `Nhân viên kho quét Sọt hàng ${cleanCode} xác nhận ${activeTab === 'IN_TRANSIT' ? 'xuất kho' : 'nhập kho'}`,
+            notes: `Nhân viên kho quét Thùng hàng ${cleanCode} xác nhận ${activeTab === 'IN_TRANSIT' ? 'xuất kho' : 'nhập kho'}`,
           }),
         });
 
         const res = await response.json();
 
         if (response.ok && res.success) {
-          setSuccessMsg(`🎯 MÁY QUÉT ĐÃ BẮN MÃ SỌT ${cleanCode}! Toàn bộ đơn hàng bên trong đã tự động cập nhật!`);
+          setSuccessMsg(`🎯 MÁY QUÉT ĐÃ BẮN MÃ THÙNG ${cleanCode}! Toàn bộ đơn hàng bên trong đã tự động cập nhật!`);
           setLastScannedResult({
             code: cleanCode,
             type: 'SHIPMENT',
@@ -251,23 +251,23 @@ export const ToteScanTab: React.FC = () => {
               {
                 id: Date.now().toString(),
                 code: cleanCode,
-                type: 'SỌT HÀNG',
+                type: 'THÙNG HÀNG',
                 status: targetShipmentStatus,
                 orderCount: pkgCount,
                 scannedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-                message: `Xác nhận ${activeTab === 'IN_TRANSIT' ? 'Xuất kho' : 'Nhập kho'} Sọt hàng ${cleanCode} (${pkgCount} bưu kiện)`,
+                message: `Xác nhận ${activeTab === 'IN_TRANSIT' ? 'Xuất kho' : 'Nhập kho'} Thùng hàng ${cleanCode} (${pkgCount} bưu kiện)`,
               },
               ...prev,
             ];
           });
           setScanCode('');
         } else {
-          throw new Error(res.message || 'Cập nhật trạng thái sọt hàng không thành công');
+          throw new Error(res.message || 'Cập nhật trạng thái thùng hàng không thành công');
         }
       }
     } catch (err: any) {
       console.error('Lỗi quét mã nhập/xuất kho:', err);
-      setError(err.response?.data?.message || err.message || 'Không thể cập nhật trạng thái sọt hàng/đơn hàng');
+      setError(err.response?.data?.message || err.message || 'Không thể cập nhật trạng thái thùng hàng/đơn hàng');
     } finally {
       setLoading(false);
     }
@@ -520,8 +520,12 @@ export const ToteScanTab: React.FC = () => {
               <div className="p-5 bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-200 shadow-sm space-y-4 animate-fade-in">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 size={20} className="text-emerald-600" />
-                    <span className="font-extrabold text-slate-800 text-sm">Kết Quả Tiếp Nhận Chuyến Xe Vừa Quét</span>
+                    <CheckCircle2 size={20} className={activeTab === 'IN_TRANSIT' ? 'text-amber-600' : 'text-emerald-600'} />
+                    <span className="font-extrabold text-slate-800 text-sm">
+                      {activeTab === 'IN_TRANSIT'
+                        ? 'Xác Nhận Xuất Bến Chuyến Xe Thành Công'
+                        : 'Tiếp Nhận & Nhập Kho Chuyến Xe Thành Công'}
+                    </span>
                   </div>
                   <span className="font-mono text-xs font-bold bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-300">
                     {lastScannedResult.code}
@@ -530,88 +534,76 @@ export const ToteScanTab: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-4 pt-2 text-xs border-t border-slate-100">
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Thời gian nhập kho:</span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                      {activeTab === 'IN_TRANSIT' ? 'Thời gian xuất kho:' : 'Thời gian nhập kho:'}
+                    </span>
                     <span className="font-semibold text-slate-700">{new Date().toLocaleString('vi-VN')}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Số lượng bưu kiện tiếp nhận:</span>
-                    <span className="font-bold text-emerald-700">{lastScannedResult.details?.shipmentPackages?.length || 1} kiện</span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                      {activeTab === 'IN_TRANSIT' ? 'Số lượng bưu kiện xuất bến:' : 'Số lượng bưu kiện tiếp nhận:'}
+                    </span>
+                    <span className={`font-bold ${activeTab === 'IN_TRANSIT' ? 'text-amber-700' : 'text-emerald-700'}`}>
+                      {lastScannedResult.details?.shipmentPackages?.length || 1} kiện
+                    </span>
                   </div>
                 </div>
 
-                {/* Smart Facility Zone Sorting Recommendation Banner */}
-                {(() => {
-                  const facCode = currentFacility?.facilityCode?.toUpperCase() || '';
-                  const facType = currentFacility?.facilityType || '';
-                  const scannedDetails = lastScannedResult?.details;
-                  const isIntraWardLocal = scannedDetails && (
-                    (scannedDetails.originFacilityId && scannedDetails.destinationFacilityId && scannedDetails.originFacilityId === scannedDetails.destinationFacilityId) ||
-                    (scannedDetails.isLocalDelivery === true)
-                  );
-
-                  // Dynamically resolve Inbound Receiving Zone from database facilityZones
-                  const inboundZone = (facilityZones || []).find((z: any) =>
-                    z && (
-                      z.zoneType === 'RECEIVING' ||
-                      z.zoneType === 'INBOUND' ||
-                      (typeof z.zoneCode === 'string' && (z.zoneCode.includes('INBOUND') || z.zoneCode.includes('UNLOADING')))
-                    )
-                  );
-
-                  const receivingZoneCode = inboundZone?.zoneCode || (
-                    facType === 'SORTING_CENTER'
-                      ? 'ZONE-S-UNLOADING'
-                      : (facType === 'PROVINCIAL_HUB' || facCode.includes('HUB')
-                        ? 'ZONE-P-INBOUND'
-                        : (isIntraWardLocal ? 'ZONE-W-LOCAL-DELIVERY' : 'ZONE-W-PROVINCE-DISPATCH'))
-                  );
-
-                  const receivingZoneName = inboundZone?.zoneName || (
-                    facType === 'SORTING_CENTER'
-                      ? 'Sàn Hạ Bãi Xe Tải Container 15 Tấn'
-                      : (facType === 'PROVINCIAL_HUB' || facCode.includes('HUB')
-                        ? 'Bãi Nhập Hàng Xe Tải Bưu Cục Phường'
-                        : (isIntraWardLocal ? 'Khu Hàng Nội Phường Giao Ngay' : 'Khu Xuất Hàng Trung Chuyển'))
-                  );
-
-                  const facCodeClean = facCode ? facCode.replace(/[^a-zA-Z0-9]/g, '_') : 'FAC_SC_SOUTH';
-                  const receivingToteCode = `TOTE-${facCodeClean}-${receivingZoneCode}-001`;
-
-                  return (
-                    <div className="mt-3 bg-slate-900 rounded-xl p-4 text-white space-y-2.5 border border-slate-800 shadow-md">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                          <Sparkles size={14} />
-                          Phân Khu Lưu Kho Nhập Hàng (Assigned Receiving Zone)
-                        </span>
-                        <span className={`px-3 py-1 rounded text-xs font-extrabold font-mono border ${isIntraWardLocal
-                            ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                          }`}>
-                          {receivingZoneCode}
-                        </span>
-                      </div>
-
-                      <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700 space-y-1.5 text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-slate-300">📍 Phân khu tiếp nhận:</span>
-                          <span className={`font-bold ${isIntraWardLocal ? 'text-blue-400' : 'text-emerald-400'}`}>{receivingZoneName}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-slate-300">📦 Sọt tập kết nhận đơn:</span>
-                          <span className="font-mono font-bold text-amber-400">[{receivingToteCode}]</span>
-                        </div>
-                        <p className="text-[11px] text-slate-300 pt-1.5 border-t border-slate-700/80 mt-1">
-                          {isIntraWardLocal ? (
-                            <>🔵 <strong>Đơn Nội Phường:</strong> Bưu kiện lấy & phát ngay tại địa bàn bưu cục. Đã phân vào sọt Nội Phường <strong>{receivingZoneCode}</strong> để Shipper xe máy đi phát ngay!</>
-                          ) : (
-                            <>👉 <em>Bưu kiện đã được lưu kho thành công tại <strong>{receivingZoneName}</strong>. Chuyển sang tab <strong>"Phân Loại Hàng Vào Zone Kho"</strong> khi chia bưu kiện sang sọt mới.</em></>
-                          )}
-                        </p>
-                      </div>
+                {activeTab === 'IN_TRANSIT' ? (
+                  /* 🚚 GIAO DIỆN XÁC NHẬN XUẤT BẾN TRUNG CHUYỂN (GATE OUT) */
+                  <div className="mt-3 bg-slate-900 rounded-xl p-4 text-white space-y-2.5 border border-slate-800 shadow-md">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Truck size={14} />
+                        Trạng Thái Chuyến Xe: Đang Trung Chuyển (In Transit)
+                      </span>
+                      <span className="px-3 py-1 rounded text-xs font-extrabold font-mono border bg-amber-500/20 text-amber-300 border-amber-500/40">
+                        XUẤT BẾN THÀNH CÔNG
+                      </span>
                     </div>
-                  );
-                })()}
+
+                    <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700 space-y-1.5 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-slate-300">🚚 Nghiệp vụ xuất kho:</span>
+                        <span className="font-bold text-amber-400">Đã cấp phép rời bãi cho Xe tải trung chuyển</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-slate-300">📦 Đơn hàng & Thùng hàng:</span>
+                        <span className="font-bold text-emerald-400">Đã chuyển sang trạng thái "Đang trung chuyển"</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 pt-1.5 border-t border-slate-700/80 mt-1">
+                        👉 <em>Tài xế đã nhận lệnh xuất phát trên ứng dụng di động để di chuyển đến bưu cục / kho nhận tiếp theo.</em>
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  /* 🏢 GIAO DIỆN XÁC NHẬN NHẬP KHO TIẾP NHẬN (GATE IN) */
+                  <div className="mt-3 bg-slate-900 rounded-xl p-4 text-white space-y-2.5 border border-slate-800 shadow-md">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles size={14} />
+                        Trạng Thái Chuyến Xe: Đã Cập Bến Nhập Kho (At Hub)
+                      </span>
+                      <span className="px-3 py-1 rounded text-xs font-extrabold font-mono border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                        TIẾP NHẬN THÀNH CÔNG
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700 space-y-1.5 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-slate-300">🏢 Nghiệp vụ nhập kho:</span>
+                        <span className="font-bold text-emerald-400">Hàng hóa đã được tiếp nhận an toàn vào bãi nhập kho</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-slate-300">📦 Trạng thái bưu kiện:</span>
+                        <span className="font-bold text-emerald-400">Đã cập nhật trạng thái "Tại kho bưu cục"</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 pt-1.5 border-t border-slate-700/80 mt-1">
+                        👉 <em>Chuyển sang tab <strong>"Phân Loại Hàng Vào Zone Kho"</strong> để bắt đầu dỡ hàng và chia bưu kiện sang các sọt/tuyến tiếp theo.</em>
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

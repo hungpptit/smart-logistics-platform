@@ -31,7 +31,7 @@ class StopCard extends StatelessWidget {
         : <String>[];
 
     return GestureDetector(
-      onTap: (isActive || (isLinehaul && status != 'ĐÃ LẤY HÀNG' && status != 'COMPLETED')) ? onTap : null,
+      onTap: (isActive || (isLinehaul && status != 'ĐÃ XUẤT BƯU CỤC' && status != 'ĐÃ TỚI KHO ĐÍCH' && status != 'COMPLETED')) ? onTap : null,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.pureWhite,
@@ -178,8 +178,8 @@ class StopCard extends StatelessWidget {
                                       const SizedBox(width: 4),
                                       Text(
                                         loadedTotes.isNotEmpty
-                                            ? 'Xem chi tiết ${loadedTotes.length} Sọt hàng ›'
-                                            : 'Xem chi tiết Sọt hàng ›',
+                                            ? 'Xem chi tiết ${loadedTotes.length} Thùng hàng ›'
+                                            : 'Xem chi tiết Thùng hàng ›',
                                         style: const TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
@@ -244,15 +244,18 @@ class StopCard extends StatelessWidget {
 
                             // Action button for Linehaul stops (Mobile Driver UI)
                             if (isLinehaul) ...[
-                              if (stop['isPickup'] == true && status != 'ĐÃ LẤY HÀNG' && status != 'COMPLETED') ...[
+                              if (stop['isPickup'] == true &&
+                                  status != 'ĐÃ XUẤT BƯU CỤC' &&
+                                  status != 'ĐÃ LẤY HÀNG' &&
+                                  status != 'COMPLETED') ...[
                                 const SizedBox(height: 10.0),
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
                                     onPressed: onTap,
-                                    icon: const Icon(Icons.local_shipping, size: 16),
+                                    icon: const Icon(Icons.qr_code_2, size: 18),
                                     label: const Text(
-                                      'Xác nhận Khởi hành',
+                                      'Xác nhận & Hiện QR Xuất bến',
                                       style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
                                     ),
                                     style: ElevatedButton.styleFrom(
@@ -264,15 +267,18 @@ class StopCard extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                              ] else if (stop['isPickup'] != true && (isActive || status == 'ĐANG THỰC HIỆN')) ...[
+                              ] else if (stop['isPickup'] != true &&
+                                  (isActive || status == 'ĐANG THỰC HIỆN') &&
+                                  status != 'ĐÃ TỚI KHO ĐÍCH' &&
+                                  status != 'COMPLETED') ...[
                                 const SizedBox(height: 10.0),
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
                                     onPressed: onTap,
-                                    icon: const Icon(Icons.warehouse, size: 16),
+                                    icon: const Icon(Icons.qr_code_2, size: 18),
                                     label: const Text(
-                                      'Xác nhận cập bến Kho Đích',
+                                      'Xác nhận & Hiện QR Cập bến đích',
                                       style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
                                     ),
                                     style: ElevatedButton.styleFrom(

@@ -78,23 +78,29 @@ class StatsBentoCard extends StatelessWidget {
     final double avgMins = _avgStopMinutes;
     final bool isAllFinished = totalCount > 0 && completedCount == totalCount;
 
-    final String statusText = isToteMode
-        ? 'TRUNG CHUYỂN SỌT'
-        : (isAllFinished
-            ? 'HOÀN THÀNH'
-            : (isPendingScan ? 'CHỜ QUÉT NHẬN' : 'HOẠT ĐỘNG'));
+    final String statusText = stops.isEmpty
+        ? 'SẴN SÀNG'
+        : (isToteMode
+            ? 'TRUNG CHUYỂN'
+            : (isAllFinished
+                ? 'HOÀN THÀNH'
+                : (isPendingScan ? 'CHỜ QUÉT NHẬN' : 'HOẠT ĐỘNG')));
 
-    final Color badgeBg = isToteMode
-        ? Colors.indigo.shade50
-        : (isAllFinished
-            ? Colors.blue.shade50
-            : (isPendingScan ? Colors.amber.shade50 : Colors.green.shade50));
+    final Color badgeBg = stops.isEmpty
+        ? Colors.green.shade50
+        : (isToteMode
+            ? Colors.indigo.shade50
+            : (isAllFinished
+                ? Colors.blue.shade50
+                : (isPendingScan ? Colors.amber.shade50 : Colors.green.shade50)));
 
-    final Color badgeTextColor = isToteMode
-        ? Colors.indigo.shade900
-        : (isAllFinished
-            ? Colors.blue.shade900
-            : (isPendingScan ? Colors.amber.shade900 : Colors.green.shade800));
+    final Color badgeTextColor = stops.isEmpty
+        ? Colors.green.shade800
+        : (isToteMode
+            ? Colors.indigo.shade900
+            : (isAllFinished
+                ? Colors.blue.shade900
+                : (isPendingScan ? Colors.amber.shade900 : Colors.green.shade800)));
 
     return Container(
       padding: const EdgeInsets.all(20.0),
@@ -121,7 +127,7 @@ class StatsBentoCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                 decoration: BoxDecoration(
                   color: badgeBg,
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: BorderRadius.circular(20.0),
                 ),
                 child: Text(
                   statusText,
@@ -135,13 +141,13 @@ class StatsBentoCard extends StatelessWidget {
           ),
           const SizedBox(height: 16.0),
 
-          if (isToteMode) ...[
+          if (isToteMode && stops.isNotEmpty) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Sọt hàng đã lên xe', style: AppTypography.bodyMd.copyWith(color: AppColors.secondary)),
+                Text('Hàng đã lên xe', style: AppTypography.bodyMd.copyWith(color: AppColors.secondary)),
                 Text(
-                  '$loadedTotesCount sọt ($totalPackageCount bưu kiện)',
+                  '$loadedTotesCount thùng ($totalPackageCount bưu kiện)',
                   style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold, color: Colors.indigo.shade800),
                 ),
               ],

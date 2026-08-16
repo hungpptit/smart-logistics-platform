@@ -13,7 +13,7 @@
 | `FAC-TD-PHUOCLONG` | **Bưu cục Phước Long** | 85 Đỗ Xuân Hợp, Phường Phước Long B, TP. Thủ Đức | Kho xuất phát gửi (Cust 3 & 4) | 1 Staff (`stf_phuoclong_1`) | **2 Shipper** |
 | `FAC-TD-TANGNHONPHU` | **Bưu cục Tăng Nhơn Phú** | 97 Đường Man Thiện, Phường Tăng Nhơn Phú A, TP. Thủ Đức | Kho xuất phát gửi (Cust 6) | 1 Staff (`stf_tangnhonphu_1`) | **2 Shipper** |
 | `FAC-TD-ANPHU` | **Bưu cục An Phú (Kho xa)** | 25 Song Hành, Phường An Phú, TP. Thủ Đức | Kho xuất phát gửi xa (Cust 5) | - | - |
-| `FAC-000050` | **Bưu Cục Xuân Sơn** | UBND xã Xuân Sơn, Xã Xuân Sơn, Châu Đức, Bà Rịa - Vũng Tàu | Kho nhận chặng cuối (Giao khu vực Châu Đức / BR-VT) | - | - |
+| `FAC-000050` | **Bưu Cục Xuân Sơn** | UBND xã Xuân Sơn, Xã Xuân Sơn, TP. Hồ Chí Minh | Kho nhận chặng cuối (Giao khu vực Xuân Sơn) | - | - |
 
 ---
 
@@ -71,22 +71,32 @@
 
 > **Mật khẩu dùng chung cho tất cả tài khoản test**: `SlpTest@2026`
 
-### 🏢 6.1. Nhân Viên Kho Trung Chuyển Tỉnh & Mega Sorter (`WAREHOUSE_STAFF`)
+### 🏢 6.1. Nhân Viên Kho Bãi Theo Từng Điểm Chạm (`WAREHOUSE_STAFF`)
 
-| Username | Mật khẩu | Họ và Tên | Mã NV | Kho / Bưu Cục Công Tác |
-| :--- | :--- | :--- | :--- | :--- |
-| `stf_sorter_south_1` | `SlpTest@2026` | Trần Văn Thắng | `STF-HUB-01` | **Tổng Kho Miền Nam (Sorting Center Q.12)** |
-| `stf_hub_hcm_1` | `SlpTest@2026` | Đặng Hoàng Lâm | `STF-HUB-02` | **Kho Tổng TP. Hồ Chí Minh (Provincial Hub Tân Bình)** |
-| `stf_hub_brvt_1` | `SlpTest@2026` | Vũ Đức Anh | `STF-HUB-03` | **Bưu Cục Xuân Sơn (Kho Tỉnh Bà Rịa - Vũng Tàu)** |
+| Username | Mật khẩu | Họ và Tên | Mã NV | Kho / Bưu Cục Công Tác | Cấp Kho |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `stf_tangnhonphu_1` | `SlpTest@2026` | Vũ Văn Hoàng | `STF-TD-05` | **Bưu cục Tăng Nhơn Phú (TP. Thủ Đức)** | Cấp 3 (Gốc) |
+| `stf_linhtrung_1` | `SlpTest@2026` | Phạm Văn Bình | `STF-TD-03` | **Bưu cục Linh Trung (TP. Thủ Đức)** | Cấp 3 (Đích - Đơn 1) |
+| `stf_hub_brvt_1` | `SlpTest@2026` | Vũ Đức Anh | `STF-HUB-03` | **Bưu Cục Xuân Sơn (TP. Hồ Chí Minh)** | Cấp 3 (Đích - Đơn 2) |
+| `stf_wm_tayninh_1` | `SlpTest@2026` | Lê Thị Diệu | `STF-TN-02` | **Bưu Cục Dương Minh Châu (Tây Ninh)** | Cấp 3 (Đích - Đơn 3) |
+| `stf_wm_hadong_1` | `SlpTest@2026` | Hoàng Minh Tuấn | `STF-HN-03` | **Bưu Cục Hà Đông (Hà Nội)** | Cấp 3 (Đích - Đơn 4) |
+| `stf_hub_hcm_1` | `SlpTest@2026` | Đặng Hoàng Lâm | `STF-HUB-02` | **Kho Tổng TP. Hồ Chí Minh (Tân Bình)** | Cấp 2 (Kho Tỉnh TP.HCM) |
+| `stf_hub_tayninh_1` | `SlpTest@2026` | Trần Văn Hòa | `STF-TN-01` | **Kho Tổng Tỉnh Tây Ninh (Provincial Hub)** | Cấp 2 (Kho Tỉnh Tây Ninh) |
+| `stf_hub_hn_1` | `SlpTest@2026` | Bùi Đức Thắng | `STF-HN-02` | **Kho Tổng Hà Nội (Provincial Hub Cầu Giấy)** | Cấp 2 (Kho Tỉnh Hà Nội) |
+| `stf_sorter_south_1` | `SlpTest@2026` | Trần Văn Thắng | `STF-HUB-01` | **Tổng Kho Miền Nam (Mega Sorter Q.12)** | Cấp 1 (Kho Miền Nam) |
+| `stf_sorter_north_1` | `SlpTest@2026` | Nguyễn Tiến Dũng | `STF-HN-01` | **Tổng Kho Miền Bắc (Mega Sorter Long Biên)** | Cấp 1 (Kho Miền Bắc) |
 
-### 🚛 6.2. Tài Xế Xe Tải Trung Chuyển Đường Dài (`LINEHAUL_TRANSFER` Driver & Heavy Trucks)
+### 🚛 6.2. Tài Xế Xe Tải Trung Chuyển Đường Dài & Shipper Phát Hàng (`SHIPPER`)
 
-| Username | Mật khẩu | Họ và Tên Tài Xế | Mã Tài Xế | Biển Số Xe Tải | Tải Trọng Max | Kho Quản Lý | Bằng Lái |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `drv_linehaul_hcm` | `SlpTest@2026` | Phạm Quốc Hùng | `DRV-LH-01` | **`50H-888.01`** | **15 Tấn** | Kho Tổng TP. Hồ Chí Minh (Tân Bình) | Bằng C |
-| `drv_linehaul_hcm_2` | `SlpTest@2026` | Nguyễn Văn Minh | `DRV-LH-04` | **`50H-999.88`** | **15 Tấn** | Kho Tổng TP. Hồ Chí Minh (Tân Bình) | Bằng C |
-| `drv_linehaul_dongnai` | `SlpTest@2026` | Nguyễn Tấn Đạt | `DRV-LH-02` | **`60C-999.02`** | **10 Tấn** | Tổng Kho Miền Nam (Q.12) | Bằng C |
-| `drv_linehaul_brvt` | `SlpTest@2026` | Trần Hoàng Nam | `DRV-LH-03` | **`72C-777.03`** | **8 Tấn** | Bưu Cục Xuân Sơn (BR-VT) | Bằng C |
+| Username | Mật khẩu | Họ và Tên Tài Xế | Mã NV | Biển Số Xe | Loại Xe | Nghiệp Vụ Vận Chuyển |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `shp_tangnhonphu_1` | `SlpTest@2026` | Đỗ Văn Nam | `DRV-TD-08` | **`59-X1 111.08`** | Xe máy | Shipper Lấy/Giao Tăng Nhơn Phú |
+| `shp_linhtrung_1` | `SlpTest@2026` | Lê Văn Đức | `DRV-TD-04` | **`59-X1 111.04`** | Xe máy | Shipper Giao Hàng Linh Trung (Đơn 1) |
+| `drv_linehaul_brvt` | `SlpTest@2026` | Trần Hoàng Nam | `DRV-LH-03` | **`72C-777.03`** | Xe tải 8 Tấn | Tài xế tuyến TP.HCM $\rightarrow$ Xuân Sơn (Đơn 2) |
+| `drv_linehaul_hcm` | `SlpTest@2026` | Phạm Quốc Hùng | `DRV-LH-01` | **`50H-888.01`** | Xe tải 15 Tấn | Tài xế tuyến Kho Tổng TP.HCM $\rightarrow$ Sorter Q.12 |
+| `shp_tayninh_1` | `SlpTest@2026` | Phan Văn Phú | `DRV-TN-01` | **`70-F1 888.01`** | Xe máy | Shipper Giao Hàng Tây Ninh (Đơn 3) |
+| `drv_linehaul_south_1` | `SlpTest@2026` | Lê Hoàng Long | `DRV-LH-05` | **`51D-777.99`** | Container 30T | Tài xế Liên Miền Sorter Nam $\rightarrow$ Bắc (Đơn 4) |
+| `shp_hadong_1` | `SlpTest@2026` | Vũ Đức Thịnh | `DRV-HN-01` | **`29-H1 999.01`** | Xe máy | Shipper Giao Hàng Hà Đông - Hà Nội (Đơn 4) |
 
 ---
 

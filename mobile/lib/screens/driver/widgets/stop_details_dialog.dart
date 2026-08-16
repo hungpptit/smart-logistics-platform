@@ -198,7 +198,7 @@ class StopDetailsDialog extends StatelessWidget {
                                 const SizedBox(height: 6.0),
                                 Text(
                                   isPickupStop
-                                      ? '• Đã xuất kho & tiếp nhận toàn bộ sọt hàng lên xe tải.\n• Giao dịch vận chuyển nội bộ hệ thống (Không thu tiền mặt).'
+                                      ? '• Đã xuất kho & tiếp nhận toàn bộ thùng hàng lên xe tải.\n• Giao dịch vận chuyển nội bộ hệ thống (Không thu tiền mặt).'
                                       : '• Trình mã QR Chuyến xe cho Nhân viên Bưu cục đích quét nhập kho.\n• Giao dịch vận chuyển nội bộ hệ thống (Không thu tiền mặt).',
                                   style: const TextStyle(
                                     fontSize: 10.5,
@@ -320,7 +320,7 @@ class StopDetailsDialog extends StatelessWidget {
                         child: Text(
                           isLinehaul
                               ? (isPickupStop
-                                  ? '1. Đã bốc sọt lên xe & xuất bưu cục'
+                                  ? '1. Đã bốc thùng hàng lên xe & xuất bưu cục'
                                   : '1. Trình mã QR Chuyến xe cho Bưu cục đích')
                               : (isPickupStop
                                   ? '1. Quét QR / Barcode Mã Đơn Người Gửi'
@@ -402,80 +402,107 @@ class StopDetailsDialog extends StatelessWidget {
                   ],
                   const SizedBox(height: 24.0),
                   // Action buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: SizedBox(
-                          height: 56.0,
-                          child: ElevatedButton(
-                            onPressed: canComplete
-                                ? () {
-                                    Navigator.pop(context);
-                                    onCompleteStop(stop);
-                                  }
-                                : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.logisticsRed,
-                              foregroundColor: AppColors.pureWhite,
-                              padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 6.0),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            child: Text(
-                              isLinehaul
-                                  ? (isPickupStop ? 'ĐÃ XUẤT BƯU CỤC' : 'ĐÃ TỚI BƯU CỤC ĐÍCH')
-                                  : (isPickupStop ? 'XÁC NHẬN ĐÃ LẤY HÀNG' : 'XÁC NHẬN ĐÃ GIAO HÀNG'),
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, height: 1.15),
+                  if (isLinehaul) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52.0,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          if (onShowShipmentQR != null) {
+                            onShowShipmentQR!();
+                          } else {
+                            ShipmentQrModal.show(context, activeRouteCode: stop['orderCode']?.toString(), activeRouteId: stop['shipmentId']?.toString());
+                          }
+                        },
+                        icon: const Icon(Icons.qr_code_2, size: 22),
+                        label: Text(
+                          isPickupStop
+                              ? 'HIỆN MÃ QR XUẤT BẾN (KHO A QUÉT)'
+                              : 'HIỆN MÃ QR NHẬP KHO (KHO B QUÉT)',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isPickupStop ? const Color(0xFFB91C1C) : const Color(0xFF1E3A8A),
+                          foregroundColor: AppColors.pureWhite,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: SizedBox(
+                            height: 56.0,
+                            child: ElevatedButton(
+                              onPressed: canComplete
+                                  ? () {
+                                      Navigator.pop(context);
+                                      onCompleteStop(stop);
+                                    }
+                                  : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.logisticsRed,
+                                foregroundColor: AppColors.pureWhite,
+                                padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 6.0),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: Text(
+                                isPickupStop ? 'XÁC NHẬN ĐÃ LẤY HÀNG' : 'XÁC NHẬN ĐÃ GIAO HÀNG',
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, height: 1.15),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8.0),
-                      Expanded(
-                        flex: 2,
-                        child: SizedBox(
-                          height: 56.0,
-                          child: OutlinedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              ReportFailureDialog.show(
-                                context,
-                                stop: stop,
-                                onConfirmed: onFailureConfirmed,
-                              );
-                            },
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.error, width: 1.5),
-                              padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.error),
-                                const SizedBox(height: 2),
-                                Text(
-                                  isPickupStop ? 'Báo Lấy Thất Bại' : 'Báo Giao Thất Bại',
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.error,
-                                    fontSize: 11,
-                                    height: 1.1,
+                        const SizedBox(width: 8.0),
+                        Expanded(
+                          flex: 2,
+                          child: SizedBox(
+                            height: 56.0,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                ReportFailureDialog.show(
+                                  context,
+                                  stop: stop,
+                                  onConfirmed: onFailureConfirmed,
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.error, width: 1.5),
+                                padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.error),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isPickupStop ? 'Báo Lấy Thất Bại' : 'Báo Giao Thất Bại',
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.error,
+                                      fontSize: 11,
+                                      height: 1.1,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -474,6 +474,7 @@ export const OrderTab: React.FC = () => {
     if (facilityFilter) {
       const originOrders: Order[] = [];
       const destOrders: Order[] = [];
+      const transitOrders: Order[] = [];
       const selectedFacName = facilities.find(f => f.id === facilityFilter)?.facilityName || 'Kho đang chọn';
 
       orders.forEach((order) => {
@@ -481,6 +482,8 @@ export const OrderTab: React.FC = () => {
           originOrders.push(order);
         } else if (order.destinationFacilityId === facilityFilter) {
           destOrders.push(order);
+        } else {
+          transitOrders.push(order);
         }
       });
 
@@ -489,6 +492,12 @@ export const OrderTab: React.FC = () => {
         result.push({
           facilityName: `📤 Đơn xuất phát từ ${selectedFacName}`,
           list: originOrders
+        });
+      }
+      if (transitOrders.length > 0) {
+        result.push({
+          facilityName: `📦 Đơn đang phân loại / lưu sọt tại ${selectedFacName}`,
+          list: transitOrders
         });
       }
       if (destOrders.length > 0) {

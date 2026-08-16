@@ -92,13 +92,15 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        Bưu cục xử lý hiện tại
+                        {currentTracking.status === 'IN_TRANSIT' ? 'Trạng thái vận chuyển' : 'Bưu cục xử lý hiện tại'}
                       </span>
                       <span className="font-bold text-slate-800 text-xs block leading-snug break-words">
-                        {currentTracking.currentFacilityName ||
-                          currentTracking.originFacilityName ||
-                          currentTracking.destinationFacilityName ||
-                          'Bưu cục tiếp nhận'}
+                        {currentTracking.status === 'IN_TRANSIT'
+                          ? `Đang trung chuyển trên đường (Xuất phát từ ${currentTracking.originFacilityName || 'Bưu cục gửi'})`
+                          : (currentTracking.currentFacilityName ||
+                            currentTracking.originFacilityName ||
+                            currentTracking.destinationFacilityName ||
+                            'Bưu cục tiếp nhận')}
                       </span>
                       {currentTracking.driverName &&
                         (currentTracking.status === 'READY_FOR_DISPATCH' ||

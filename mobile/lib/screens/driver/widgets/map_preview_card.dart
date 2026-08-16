@@ -202,7 +202,7 @@ class MapPreviewCard extends StatelessWidget {
                         Text(
                           stops.isEmpty
                               ? 'Chưa có lộ trình phân công'
-                              : (allCompleted ? 'Quay về Bưu cục bàn giao sọt' : 'Dự kiến điểm dừng tiếp'),
+                              : (allCompleted ? 'Quay về Bưu cục bàn giao thùng hàng' : 'Dự kiến điểm dừng tiếp'),
                           style: AppTypography.labelMd.copyWith(
                             color: stops.isEmpty
                                 ? AppColors.secondary

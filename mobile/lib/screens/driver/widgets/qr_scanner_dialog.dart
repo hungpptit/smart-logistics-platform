@@ -107,11 +107,11 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
         scannedValue.toUpperCase().startsWith('TOT-') ||
         scannedValue.toUpperCase().startsWith('ST-');
 
-    // Chặn Shipper chặng cuối quét sọt của xe tải trung chuyển
+    // Chặn Shipper chặng cuối quét thùng hàng của xe tải trung chuyển
     if (isToteCode && !widget.isLinehaulRoute) {
       setState(() {
         _isProcessing = false;
-        _errorMessage = 'Bạn là Shipper chặng cuối, không thể quét nhận Sọt xe tải!';
+        _errorMessage = 'Bạn là Shipper chặng cuối, không thể quét nhận Thùng hàng xe tải!';
         _successNotice = null;
       });
       return;
@@ -158,12 +158,14 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
                   size: 28,
                 ),
                 const SizedBox(width: 8.0),
-                Text(
-                  consolidatedAdded ? 'Tối Ưu Lộ Trình Tự Động!' : 'Nạp Sọt Hàng Thành Công',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: consolidatedAdded ? const Color(0xFFB91C1C) : AppColors.deepOnyx,
+                Expanded(
+                  child: Text(
+                    consolidatedAdded ? 'Tối Ưu Lộ Trình Tự Động!' : 'Nạp Thùng Hàng Thành Công',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: consolidatedAdded ? const Color(0xFFB91C1C) : AppColors.deepOnyx,
+                    ),
                   ),
                 ),
               ],
@@ -171,8 +173,8 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
             content: Text(
               consolidatedAdded
                   ? 'Tải trọng xe hiện tại < 80% sức chứa.\n\n'
-                    'Hệ thống đã tự động điều phối thêm chặng dừng tại [$intermediateHubName] để ghé bốc thêm sọt hàng tiện đường!'
-                  : 'Sọt hàng [$scannedValue] đã được xác nhận bốc lên xe thành công.',
+                    'Hệ thống đã tự động điều phối thêm chặng dừng tại [$intermediateHubName] để ghé bốc thêm thùng hàng tiện đường!'
+                  : 'Thùng hàng [$scannedValue] đã được xác nhận bốc lên xe thành công.',
               style: const TextStyle(fontSize: 13, height: 1.4),
             ),
             actions: [
@@ -190,7 +192,7 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
       } else {
         setState(() {
           _isProcessing = false;
-          _errorMessage = 'Không thể nạp Sọt Hàng [$scannedValue]. Vui lòng kiểm tra lại mã!';
+          _errorMessage = 'Không thể nạp Thùng Hàng [$scannedValue]. Vui lòng kiểm tra lại mã!';
         });
       }
       return;
@@ -370,16 +372,21 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'QUÉT MÃ QR SỌT HÀNG / BƯU KIỆN',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                  const Expanded(
+                    child: Text(
+                      'QUÉT MÃ QR',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.white),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -444,8 +451,8 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
 
               Text(
                 targetCode != null
-                    ? 'Mã Sọt Hàng / Bưu kiện cần quét: $targetCode'
-                    : 'Tình trạng: Sẵn sàng quét mã sọt nạp xe',
+                    ? 'Mã Thùng Hàng / Bưu kiện cần quét: $targetCode'
+                    : 'Tình trạng: Sẵn sàng quét mã thùng hàng nạp xe',
                 style: const TextStyle(
                   color: Colors.amberAccent,
                   fontWeight: FontWeight.bold,

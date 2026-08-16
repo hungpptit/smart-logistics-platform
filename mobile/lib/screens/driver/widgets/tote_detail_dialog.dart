@@ -83,13 +83,13 @@ class _ToteDetailDialogState extends State<ToteDetailDialog> {
         }
       }
       setState(() {
-        _errorMessage = 'Không thể tải danh sách bưu kiện của Sọt [$toteCode]';
+        _errorMessage = 'Không thể tải danh sách bưu kiện của Thùng [$toteCode]';
         _isLoadingPackages = false;
       });
     } catch (e) {
       debugPrint('💥 Error fetching tote packages: $e');
       setState(() {
-        _errorMessage = 'Lỗi kết nối máy chủ khi lấy dữ liệu Sọt [$toteCode]';
+        _errorMessage = 'Lỗi kết nối máy chủ khi lấy dữ liệu Thùng [$toteCode]';
         _isLoadingPackages = false;
       });
     }
@@ -116,15 +116,15 @@ class _ToteDetailDialogState extends State<ToteDetailDialog> {
     final bool isViewingPackagesList = _selectedToteCode != null && !isViewingPackageDetail;
     final bool isViewingTotesList = _selectedToteCode == null;
 
-    String headerTitle = 'Danh Sách Sọt Trên Chuyến (${widget.loadedTotes.length} sọt)';
+    String headerTitle = 'Danh Sách Thùng Hàng Trên Chuyến (${widget.loadedTotes.length} thùng)';
     String headerSubtitle = 'Tổng bưu kiện: ${widget.totalPackageCount} kiện hàng';
 
     if (isViewingPackageDetail) {
       headerTitle = 'Chi Tiết Đơn Hàng';
       headerSubtitle = 'Mã đơn: ${_selectedPackage!['orderCode'] ?? _selectedPackage!['packageCode'] ?? ''}';
     } else if (isViewingPackagesList) {
-      headerTitle = 'Danh Sách Đơn Trong Sọt';
-      headerSubtitle = 'Mã Sọt: $_selectedToteCode';
+      headerTitle = 'Danh Sách Đơn Trong Thùng';
+      headerSubtitle = 'Mã Thùng: $_selectedToteCode';
     }
 
     return Dialog(
@@ -217,7 +217,7 @@ class _ToteDetailDialogState extends State<ToteDetailDialog> {
                     },
                     icon: const Icon(Icons.arrow_back, size: 18),
                     label: Text(
-                      isViewingPackageDetail ? 'QUAY LẠI DANH SÁCH ĐƠN' : 'QUAY LẠI DANH SÁCH SỌT',
+                      isViewingPackageDetail ? 'QUAY LẠI DANH SÁCH ĐƠN' : 'QUAY LẠI DANH SÁCH THÙNG',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -245,12 +245,12 @@ class _ToteDetailDialogState extends State<ToteDetailDialog> {
               const Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.secondary),
               const SizedBox(height: 12),
               Text(
-                'Chưa có Sọt hàng nào được quét lên xe',
+                'Chưa có Thùng hàng nào được quét lên xe',
                 style: AppTypography.labelLg.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 6),
               const Text(
-                'Vui lòng dùng nút "Quét Nhận Sọt" để nạp các Sọt hàng lên xe tải!',
+                'Vui lòng dùng nút "Quét Nhận Thùng Hàng" để nạp các Thùng hàng lên xe tải!',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: AppColors.secondary),
               ),
@@ -304,7 +304,7 @@ class _ToteDetailDialogState extends State<ToteDetailDialog> {
                       ),
                       const SizedBox(height: 2),
                       const Text(
-                        'Nhấn để xem các đơn hàng trong Sọt này ›',
+                        'Nhấn để xem các đơn hàng trong Thùng này ›',
                         style: TextStyle(fontSize: 11, color: accentCrimson, fontWeight: FontWeight.w600),
                       ),
                     ],
@@ -346,7 +346,7 @@ class _ToteDetailDialogState extends State<ToteDetailDialog> {
       return const Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-          child: Text('Sọt hàng này hiện chưa chứa bưu kiện nào.', style: TextStyle(color: AppColors.secondary, fontSize: 13)),
+          child: Text('Thùng hàng này hiện chưa chứa bưu kiện nào.', style: TextStyle(color: AppColors.secondary, fontSize: 13)),
         ),
       );
     }
