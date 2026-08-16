@@ -269,6 +269,26 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     ? (stopType == 'PICKUP' ? 'Điểm xuất sọt trung chuyển' : 'Điểm giao sọt kho đích')
                     : (stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng');
 
+                final shipmentObj = stop['shipment'];
+                final String rawShipmentStatus = (shipmentObj?['status']?.toString() ?? '').toUpperCase();
+                final transfers = shipmentObj?['shipmentTransfers'] as List?;
+                bool isDispatched = false;
+                // Chỉ dựa vào ShipmentTransfer (nguồn chính xác nhất cho Gate Out Approval)
+                if (transfers != null && transfers.isNotEmpty) {
+                  final firstTransfer = transfers.first;
+                  if (firstTransfer != null && (firstTransfer['status'] == 'IN_TRANSIT' || firstTransfer['status'] == 'ARRIVED')) {
+                    isDispatched = true;
+                  }
+                }
+                // Fallback: Shipment đã được staff chuyển sang IN_TRANSIT
+                if (!isDispatched && (rawShipmentStatus == 'IN_TRANSIT' || rawShipmentStatus == 'DELIVERED')) {
+                  isDispatched = true;
+                }
+                // Nếu stop đã DEPARTED/COMPLETED thì đã qua giai đoạn này rồi
+                if (!isDispatched && (rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED')) {
+                  isDispatched = true;
+                }
+
                 mappedStops.add({
                   'index': i + 1,
                   'id': stop['id'] ?? '$i',
@@ -290,6 +310,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   'loadedTotesCount': loadedTotesCount,
                   'loadedTotes': loadedToteCodes,
                   'isLinehaul': isLinehaul,
+                  'isDispatched': isDispatched,
                   'eta': 'Chờ giao',
                   'distance': 'Theo tuyến',
                   'status': displayStatus,
@@ -653,7 +674,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     setState(() {
       stop['isCheckedIn'] = true;
       stop['status'] = isLinehaul
-          ? (isPickupStop ? 'ĐÃ XUẤT KHO' : 'ĐÃ TỚI KHO ĐÍCH')
+          ? (isPickupStop ? 'ĐÃ LẤY HÀNG' : 'ĐÃ TỚI KHO ĐÍCH')
           : (isPickupStop ? 'ĐÃ LẤY HÀNG' : 'ĐÃ GIAO');
       stop['isActive'] = false;
       final currentIndex = stop['index'] as int;
