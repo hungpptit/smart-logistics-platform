@@ -78,11 +78,19 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
                       <span className="font-bold text-slate-800 text-xs block leading-snug break-words">
                         {currentTracking.driverName || 'Shipper giao hàng'}
                       </span>
-                      {currentTracking.vehiclePlate && (
-                        <span className="font-mono text-slate-500 font-medium text-[11px] block mt-0.5">
-                          Biển số: {currentTracking.vehiclePlate}
+                      {currentTracking.driverPhone && (
+                        <span className="font-mono text-emerald-700 font-bold text-[11px] block mt-0.5">
+                          📞 SĐT: {currentTracking.driverPhone}
                         </span>
                       )}
+                      {currentTracking.vehiclePlate && (
+                        <span className="font-mono text-slate-500 font-medium text-[11px] block mt-0.5">
+                          🏍️ Biển số: {currentTracking.vehiclePlate}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-amber-700 font-bold block mt-1">
+                        ⚠️ Quý khách vui lòng chú ý điện thoại
+                      </span>
                     </div>
                   </div>
                 ) : (
@@ -92,11 +100,11 @@ export const PublicTrackingResult: React.FC<PublicTrackingResultProps> = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        {currentTracking.status === 'IN_TRANSIT' ? 'Trạng thái vận chuyển' : 'Bưu cục xử lý hiện tại'}
+                        {currentTracking.status === 'IN_TRANSIT' ? 'Vận chuyển liên kho (Xe tải 🚚)' : 'Bưu cục xử lý hiện tại'}
                       </span>
                       <span className="font-bold text-slate-800 text-xs block leading-snug break-words">
                         {currentTracking.status === 'IN_TRANSIT'
-                          ? `Đang trung chuyển trên đường (Xuất phát từ ${currentTracking.originFacilityName || 'Bưu cục gửi'})`
+                          ? `Đang trung chuyển từ ${currentTracking.originFacilityName || 'Bưu cục gửi'} đến ${currentTracking.destinationFacilityName || currentTracking.currentFacilityName || 'Kho trung tâm'}`
                           : (currentTracking.currentFacilityName ||
                             currentTracking.originFacilityName ||
                             currentTracking.destinationFacilityName ||

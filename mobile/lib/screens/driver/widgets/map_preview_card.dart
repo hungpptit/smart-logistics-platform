@@ -13,6 +13,7 @@ class MapPreviewCard extends StatelessWidget {
   final List<LatLng> roadPolylinePoints;
   final VoidCallback onStartNavigation;
   final bool isRouteStarted;
+  final bool isLinehaul;
 
   const MapPreviewCard({
     super.key,
@@ -22,10 +23,24 @@ class MapPreviewCard extends StatelessWidget {
     required this.roadPolylinePoints,
     required this.onStartNavigation,
     this.isRouteStarted = true,
+    this.isLinehaul = false,
   });
+
+  String _formatMinutes(int minutes) {
+    if (minutes < 60) {
+      return '$minutes Phút';
+    }
+    final int h = minutes ~/ 60;
+    final int m = minutes % 60;
+    if (m == 0) return '$h giờ';
+    return '$h giờ $m p';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final bool isLinehaulMode = isLinehaul || (stops.isNotEmpty && stops.first['isLinehaul'] == true);
+    final double avgSpeedKmh = isLinehaulMode ? 60.0 : 25.0;
+
     final bool allCompleted = stops.isNotEmpty &&
         stops.every((s) =>
             s['isCheckedIn'] == true ||
@@ -48,7 +63,7 @@ class MapPreviewCard extends StatelessWidget {
         currentLocation.latitude, currentLocation.longitude, hubLat, hubLng,
       );
       distanceKm = distanceMeters / 1000.0;
-      estimatedMinutes = (distanceKm / 25 * 60).round();
+      estimatedMinutes = (distanceKm / avgSpeedKmh * 60).round();
       if (estimatedMinutes < 2) estimatedMinutes = 2;
     } else {
       final activeStop = stops.firstWhere(
@@ -63,7 +78,7 @@ class MapPreviewCard extends StatelessWidget {
           currentLocation.latitude, currentLocation.longitude, lat, lng,
         );
         distanceKm = distanceMeters / 1000.0;
-        estimatedMinutes = (distanceKm / 25 * 60).round();
+        estimatedMinutes = (distanceKm / avgSpeedKmh * 60).round();
         if (estimatedMinutes < 2) estimatedMinutes = 2;
       }
     }
@@ -214,8 +229,8 @@ class MapPreviewCard extends StatelessWidget {
                           stops.isEmpty
                               ? 'Chờ nhận chuyến từ Bưu cục (0.0 km)'
                               : (allCompleted
-                                  ? 'Bưu cục Tăng Nhơn Phú ($estimatedMinutes Phút - ${distanceKm.toStringAsFixed(1)} km)'
-                                  : '$estimatedMinutes Phút (${distanceKm.toStringAsFixed(1)} km)'),
+                                  ? 'Bưu cục Tăng Nhơn Phú (${_formatMinutes(estimatedMinutes)} - ${distanceKm.toStringAsFixed(1)} km)'
+                                  : '${_formatMinutes(estimatedMinutes)} (${distanceKm.toStringAsFixed(1)} km)'),
                           style: AppTypography.bodyMd.copyWith(
                             fontWeight: FontWeight.bold,
                             color: AppColors.deepOnyx,

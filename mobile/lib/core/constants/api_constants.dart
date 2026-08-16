@@ -32,6 +32,7 @@ class ApiConstants {
   static String routeDetail(String id) => '${AppConfig.baseUrl}/routes/$id';
   static String routeStart(String id) => '${AppConfig.baseUrl}/routes/$id/start';
   static String routeComplete(String id) => '${AppConfig.baseUrl}/routes/$id/complete';
+  static String routeReject(String id) => '${AppConfig.baseUrl}/routes/$id/reject';
   static String get dutyStatus => '${AppConfig.baseUrl}/drivers/duty-status';
 
   // Shipment & Tote Endpoints

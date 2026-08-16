@@ -49,20 +49,26 @@ export const matchFacilityZoneByAdminHierarchy = (
     isIntraProvince,
   } = params;
 
-  // 1. CẤP 3: Bưu cục phường / xã (WARD_STATION / LAST_MILE)
-  if (isIntraWard && zones.some((z) => z.zoneCode.includes('LOCAL'))) {
-    return zones.find((z) => z.zoneCode.includes('LOCAL'));
-  }
-  if (zones.some((z) => z.zoneCode.includes('PROVINCE-DISPATCH'))) {
-    return zones.find((z) => z.zoneCode.includes('PROVINCE-DISPATCH'));
+  // 1. CẤP 2: Kho tổng Tỉnh / Thành phố (PROVINCIAL_HUB có INTRA-PROVINCE hoặc INTER-HUB)
+  const isProvincialHub = zones.some((z) => z.zoneCode.includes('INTRA-PROVINCE') || z.zoneCode.includes('INTER-HUB'));
+  if (isProvincialHub) {
+    if (isIntraProvince && zones.some((z) => z.zoneCode.includes('INTRA-PROVINCE'))) {
+      return zones.find((z) => z.zoneCode.includes('INTRA-PROVINCE'));
+    }
+    if (!isIntraProvince && zones.some((z) => z.zoneCode.includes('INTER-HUB'))) {
+      return zones.find((z) => z.zoneCode.includes('INTER-HUB'));
+    }
   }
 
-  // 2. CẤP 2: Kho tổng Tỉnh / Thành phố (PROVINCIAL_HUB)
-  if (isIntraProvince && zones.some((z) => z.zoneCode.includes('INTRA-PROVINCE'))) {
-    return zones.find((z) => z.zoneCode.includes('INTRA-PROVINCE'));
-  }
-  if (!isIntraProvince && zones.some((z) => z.zoneCode.includes('INTER-HUB'))) {
-    return zones.find((z) => z.zoneCode.includes('INTER-HUB'));
+  // 2. CẤP 3: Bưu cục phường / xã (WARD_STATION có LOCAL hoặc PROVINCE-DISPATCH)
+  const isWardStation = zones.some((z) => z.zoneCode.includes('LOCAL') || z.zoneCode.includes('PROVINCE-DISPATCH'));
+  if (isWardStation) {
+    if (isIntraWard && zones.some((z) => z.zoneCode.includes('LOCAL'))) {
+      return zones.find((z) => z.zoneCode.includes('LOCAL'));
+    }
+    if (zones.some((z) => z.zoneCode.includes('PROVINCE-DISPATCH'))) {
+      return zones.find((z) => z.zoneCode.includes('PROVINCE-DISPATCH'));
+    }
   }
 
   // 3. CẤP 1: Mega Sorter / Trung tâm phân loại miền (SORTING_CENTER)
@@ -151,6 +157,7 @@ export const ZoneSortingTab: React.FC = () => {
   const [toteModalLoading, setToteModalLoading] = useState<boolean>(false);
   const [includeLoaded, setIncludeLoaded] = useState<boolean>(false);
   const [currentFacilityId, setCurrentFacilityId] = useState<string>('');
+  const [currentFacility, setCurrentFacility] = useState<any | null>(null);
 
   const getActiveToteCode = (zoneCode: string) => {
     const zoneObj = zoneTotesData.find((z) => z.zoneCode === zoneCode);
@@ -345,6 +352,16 @@ export const ZoneSortingTab: React.FC = () => {
 
         if (facilityId) {
           setCurrentFacilityId(facilityId);
+          try {
+            const facRes = await fetch(`${CONFIG.API_BASE_URL}/facilities/${facilityId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const facData = await facRes.json();
+            if (facData.success && facData.data) {
+              setCurrentFacility(facData.data);
+            }
+          } catch (e) { }
+
           const zonesRes = await fetch(`${CONFIG.API_BASE_URL}/facilities/${facilityId}/zones`, {
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -467,6 +484,11 @@ export const ZoneSortingTab: React.FC = () => {
 
       if (response.ok && res.success) {
         const orderData = res.data;
+        const currentFac = currentFacility;
+        const currentFacilityProvinceCode = currentFac?.provinceCode || currentFac?.province?.code || currentFac?.address?.wardRelation?.provinceCode || '';
+        const currentFacilityWardCode = currentFac?.address?.wardCode || currentFac?.address?.wardRelation?.code || '';
+        const currentFacilityIdVal = currentFac?.id || currentFacilityId;
+
         const destWardCode = orderData.deliveryAddress?.wardCode || orderData.deliveryAddress?.wardRelation?.code || orderData.destinationFacility?.address?.wardCode || orderData.destinationFacility?.address?.wardRelation?.code;
         const originWardCode = orderData.pickupAddress?.wardCode || orderData.pickupAddress?.wardRelation?.code || orderData.originFacility?.address?.wardCode || orderData.originFacility?.address?.wardRelation?.code;
 
@@ -476,12 +498,18 @@ export const ZoneSortingTab: React.FC = () => {
         const destProvinceCodeName = orderData.deliveryAddress?.wardRelation?.province?.codeName || orderData.destinationFacility?.province?.codeName || orderData.destinationFacility?.address?.wardRelation?.province?.codeName;
         const destRegionId = orderData.deliveryAddress?.wardRelation?.province?.administrativeRegionId || orderData.destinationFacility?.province?.administrativeRegionId || orderData.destinationFacility?.address?.wardRelation?.province?.administrativeRegionId;
 
+        // Bưu kiện giao cùng bưu cục (cùng bưu cục đích hoặc cùng xã/phường)
         const isIntraWard = Boolean(
-          (orderData.originFacilityId && orderData.destinationFacilityId && orderData.originFacilityId === orderData.destinationFacilityId) ||
+          (orderData.destinationFacilityId && currentFacilityIdVal && orderData.destinationFacilityId === currentFacilityIdVal) ||
+          (currentFacilityWardCode && destWardCode && currentFacilityWardCode === destWardCode) ||
           (originWardCode && destWardCode && originWardCode === destWardCode)
         );
 
-        const isIntraProvince = Boolean(originProvinceCode && destProvinceCode && originProvinceCode === destProvinceCode);
+        // Bưu kiện giao cùng tỉnh / thành phố với kho hiện tại
+        const isIntraProvince = Boolean(
+          (currentFacilityProvinceCode && destProvinceCode && currentFacilityProvinceCode === destProvinceCode) ||
+          (orderData.destinationFacility?.provinceCode && currentFacilityProvinceCode && orderData.destinationFacility.provinceCode === currentFacilityProvinceCode)
+        );
         const destFacilityName = orderData.destinationFacility?.facilityName || 'Bưu cục đích';
         const destProvinceName = orderData.deliveryAddress?.wardRelation?.province?.name || orderData.destinationFacility?.province?.name || orderData.destinationFacility?.provinceName || 'Tỉnh / TP đích';
 
@@ -571,6 +599,11 @@ export const ZoneSortingTab: React.FC = () => {
 
       if (response.ok && res.success) {
         const orderData = res.data;
+        const currentFac = currentFacility;
+        const currentFacilityProvinceCode = currentFac?.provinceCode || currentFac?.province?.code || currentFac?.address?.wardRelation?.provinceCode || '';
+        const currentFacilityWardCode = currentFac?.address?.wardCode || currentFac?.address?.wardRelation?.code || '';
+        const currentFacilityIdVal = currentFac?.id || currentFacilityId;
+
         const destWardCode = orderData.deliveryAddress?.wardCode || orderData.deliveryAddress?.wardRelation?.code || orderData.destinationFacility?.address?.wardCode || orderData.destinationFacility?.address?.wardRelation?.code;
         const originWardCode = orderData.pickupAddress?.wardCode || orderData.pickupAddress?.wardRelation?.code || orderData.originFacility?.address?.wardCode || orderData.originFacility?.address?.wardRelation?.code;
 
@@ -580,12 +613,18 @@ export const ZoneSortingTab: React.FC = () => {
         const destProvinceCodeName = orderData.deliveryAddress?.wardRelation?.province?.codeName || orderData.destinationFacility?.province?.codeName || orderData.destinationFacility?.address?.wardRelation?.province?.codeName;
         const destRegionId = orderData.deliveryAddress?.wardRelation?.province?.administrativeRegionId || orderData.destinationFacility?.province?.administrativeRegionId || orderData.destinationFacility?.address?.wardRelation?.province?.administrativeRegionId;
 
+        // Bưu kiện giao cùng bưu cục (cùng bưu cục đích hoặc cùng xã/phường)
         const isIntraWard = Boolean(
-          (orderData.originFacilityId && orderData.destinationFacilityId && orderData.originFacilityId === orderData.destinationFacilityId) ||
+          (orderData.destinationFacilityId && currentFacilityIdVal && orderData.destinationFacilityId === currentFacilityIdVal) ||
+          (currentFacilityWardCode && destWardCode && currentFacilityWardCode === destWardCode) ||
           (originWardCode && destWardCode && originWardCode === destWardCode)
         );
 
-        const isIntraProvince = Boolean(originProvinceCode && destProvinceCode && originProvinceCode === destProvinceCode);
+        // Bưu kiện giao cùng tỉnh / thành phố với kho hiện tại
+        const isIntraProvince = Boolean(
+          (currentFacilityProvinceCode && destProvinceCode && currentFacilityProvinceCode === destProvinceCode) ||
+          (orderData.destinationFacility?.provinceCode && currentFacilityProvinceCode && orderData.destinationFacility.provinceCode === currentFacilityProvinceCode)
+        );
         const destFacilityName = orderData.destinationFacility?.facilityName || 'Bưu cục đích';
         const destProvinceName = orderData.deliveryAddress?.wardRelation?.province?.name || orderData.destinationFacility?.province?.name || orderData.destinationFacility?.provinceName || 'Tỉnh / TP đích';
 

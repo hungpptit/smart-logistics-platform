@@ -139,6 +139,7 @@ export class TrackingController {
       // 2. Extract Route ID if assigned
       let activeRouteId: string | null = null;
       let driverName: string = 'Shipper';
+      let driverPhone: string = '';
       let vehiclePlate: string = 'Xe máy chuyên dụng';
 
       if (order.routeStops && order.routeStops.length > 0) {
@@ -149,8 +150,10 @@ export class TrackingController {
             const driverStaff = dva?.driver;
             if (driverStaff && driverStaff.fullName) {
               driverName = driverStaff.fullName;
+              driverPhone = driverStaff.phone || '';
             } else if (driverStaff && driverStaff.user) {
               driverName = driverStaff.user.username;
+              driverPhone = driverStaff.phone || '';
             }
             if (dva?.vehicle) {
               vehiclePlate = dva.vehicle.plateNumber || vehiclePlate;
@@ -183,11 +186,11 @@ export class TrackingController {
       // 4. Comprehensive DB Status Mapping
       const currentStatusInfo = PUBLIC_ORDER_STATUS_MAP[order.status] || { label: String(order.status), chipClass: 'default' };
 
-      // 5. Construct Status History Timeline Events from DB Status History (Filtered consecutive duplicate statuses)
+      // 5. Construct Status History Timeline Events from DB Status History (Preserve distinct status and reasons)
       const rawHistory = order.statusHistory || [];
       const filteredHistory = rawHistory.filter((h: any, idx: number) => {
         if (idx === 0) return true;
-        return h.status !== rawHistory[idx - 1].status;
+        return h.status !== rawHistory[idx - 1].status || (h.reason && h.reason !== rawHistory[idx - 1].reason);
       });
 
       const timelineEvents = filteredHistory.map((h: any) => {
@@ -198,8 +201,10 @@ export class TrackingController {
 
         const subtitle = getOrderStatusSubtitle(h.status, {
           senderName,
+          originFacilityName: order.originFacility?.facilityName || 'Bưu cục gửi',
           facilityName: currentFacName || 'Bưu cục phân phối',
           driverName,
+          driverPhone,
           vehiclePlate,
           receiverName: order.receiverName || '',
           defaultReason: h.reason,
@@ -317,6 +322,7 @@ export class TrackingController {
         destinationFacilityName: order.destinationFacility?.facilityName || 'Bưu cục phân phối',
         currentFacilityName: currentFacilityName,
         driverName,
+        driverPhone,
         vehiclePlate,
         routeId: activeRouteId,
         liveGps,

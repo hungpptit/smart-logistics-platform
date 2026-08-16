@@ -129,20 +129,20 @@ export function resolveZoneClassification(
   if (isIntraWard) {
     return {
       targetZoneType: 'SORTING',
-      suggestedZoneName: 'Khu A: Khu Giao Hàng Nội Phường (Giao Tại Chỗ)',
-      instructionText: `🟢 Bưu kiện giao cùng bưu cục! Giữ tại bưu cục và ném vào Khu A (Xe máy giao ${destFacilityName}).`,
+      suggestedZoneName: 'Khu Giao Hàng Nội Phường (Giao Tại Chỗ)',
+      instructionText: `🟢 Bưu kiện giao cùng bưu cục! Giữ tại bưu cục và phân vào Khu Giao Hàng Nội Phường (Xe máy giao ${destFacilityName}).`,
     };
   } else if (isIntraProvince) {
     return {
-      targetZoneType: 'SHIPPING',
-      suggestedZoneName: `Khu B: Khu Xuất Hàng Đi Kho Tỉnh / TP (${destProvinceName})`,
-      instructionText: `🟡 Bưu kiện giao cùng tỉnh/TP! Ném vào Khu B (Xe Tải 3.5 Tấn đi ${destFacilityName}).`,
+      targetZoneType: 'SORTING',
+      suggestedZoneName: `Khu Phân Loại & Chia Tuyến Nội Tỉnh (${destProvinceName})`,
+      instructionText: `🟡 Bưu kiện giao trong tỉnh ${destProvinceName}! Phân loại vào tuyến nội tỉnh (Xe Tải đi ${destFacilityName}).`,
     };
   } else {
     return {
       targetZoneType: 'SHIPPING',
-      suggestedZoneName: `Khu C: Khu Xuất Hàng Mega Sorter (Liên Miền - ${destProvinceName})`,
-      instructionText: `🔴 Bưu kiện giao liên tỉnh! Ném vào Khu C (Container 15 Tấn đi ${destProvinceName}).`,
+      suggestedZoneName: `Khu Xuất Hàng Sorter Trung Tâm / Liên Tỉnh (${destProvinceName})`,
+      instructionText: `🔴 Bưu kiện giao liên tỉnh! Phân loại vào Khu Xuất Hàng Liên Tỉnh (Container đi ${destProvinceName}).`,
     };
   }
 }

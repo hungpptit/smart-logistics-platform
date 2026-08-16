@@ -21,6 +21,8 @@ import 'widgets/stop_details_dialog.dart';
 import 'widgets/qr_scanner_dialog.dart';
 import 'widgets/shipment_qr_modal.dart';
 import 'widgets/tote_detail_dialog.dart';
+import 'widgets/pickup_assignment_dialog.dart';
+import 'widgets/reject_route_dialog.dart';
 
 /// Driver Dashboard - Main screen for drivers.
 /// All UI widgets extracted to screens/driver/widgets/ directory.
@@ -55,6 +57,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   String _driverEmail = 'driver@velocity.vn';
   String? _activeRouteId;
   String? _activeRouteCode;
+  String? _lastShownPickupDialogRouteId;
   List<LatLng> _roadPolylinePoints = [];
 
   // GPS
@@ -309,7 +312,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
                   if (!isCompleted) {
                     if (!_isRouteStarted) {
-                      displayStatus = 'CHỜ QUÉT NHẬN';
+                      displayStatus = (stopType == 'PICKUP') ? 'CHỜ XÁC NHẬN' : 'CHỜ QUÉT NHẬN';
                       isActive = false;
                     } else if (!foundActiveIncomplete) {
                       displayStatus = 'ĐANG THỰC HIỆN';
@@ -371,6 +374,22 @@ class _DriverDashboardState extends State<DriverDashboard> {
               });
               _roadPolylinePoints.clear();
               Future.microtask(() => _updateGoongPolyline(force: true));
+
+              // Tự động bật Popup phân công lộ trình lấy hàng nếu ĐÚNG LÀ TÀI XẾ CHẶNG CUỐI và có điểm dừng PICKUP
+              final bool hasPickup = mappedStops.any((s) => s['stopType'] == 'PICKUP' || s['isPickup'] == true);
+              if (!_isLinehaulDriverProfile &&
+                  !isLinehaul &&
+                  hasPickup &&
+                  !_isRouteStarted &&
+                  _activeRouteId != null &&
+                  _lastShownPickupDialogRouteId != _activeRouteId) {
+                _lastShownPickupDialogRouteId = _activeRouteId;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && !_isRouteStarted && _activeRouteId != null && !_isLinehaulDriverProfile && !_isLinehaulRoute) {
+                    _showPickupAssignmentDialog();
+                  }
+                });
+              }
             }
           }
         }
@@ -380,6 +399,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
           _activeRouteCode = null;
           _driverStops.clear();
           _roadPolylinePoints.clear();
+          _lastShownPickupDialogRouteId = null;
         });
       }
     } finally {
@@ -540,10 +560,12 @@ class _DriverDashboardState extends State<DriverDashboard> {
         _driverStops.any((s) => s['isCheckedIn'] == true);
 
     if (!effectiveRouteStarted) {
-      final activeStop = _driverStops.firstWhere(
-        (s) => s['isCheckedIn'] != true,
-        orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
-      );
+      final bool isPickup = _driverStops.any((s) => s['stopType'] == 'PICKUP' || s['isPickup'] == true);
+      if (isPickup) {
+        _showPickupAssignmentDialog();
+        return;
+      }
+
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -642,7 +664,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   void _showQRScanner([Map<String, dynamic>? stop, String scanMode = 'ROUTE']) {
-    if (scanMode == 'TOTE' && !_isLinehaulDriverProfile) {
+    final isLinehaul = _isLinehaulDriverProfile || _isLinehaulRoute || scanMode == 'TOTE';
+    if (scanMode == 'TOTE' && !isLinehaul) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Chỉ Tài xế trung chuyển (Linehaul) mới có quyền quét nhận Thùng hàng!'),
@@ -655,11 +678,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
     QrScannerDialog.show(
       context,
-      stop: stop,
+      stop: isLinehaul ? null : stop,
       activeRouteCode: _activeRouteCode,
       activeRouteId: _activeRouteId,
       scanMode: scanMode,
-      isLinehaulRoute: _isLinehaulDriverProfile,
+      isLinehaulRoute: isLinehaul,
       onRouteCodeUpdated: (newCode) {
         if (newCode != null && newCode.isNotEmpty) {
           setState(() {
@@ -805,6 +828,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
           _loadedTotes.clear();
           _isRouteFinished = false;
           _isRouteStarted = false;
+          _lastShownPickupDialogRouteId = null;
         }
       });
     }
@@ -838,6 +862,116 @@ class _DriverDashboardState extends State<DriverDashboard> {
         ),
       );
     }
+  }
+
+  // ------ Last-Mile Pickup Route Assignment Handlers ------
+  void _showPickupAssignmentDialog() {
+    // CHẶN BẢO VỆ: Chỉ áp dụng cho tài xế giao hàng chặng cuối (Last-Mile Shipper), tuyệt đối không hiển thị cho Linehaul
+    if (_isLinehaulDriverProfile || _isLinehaulRoute) return;
+    if (_activeRouteCode == null && _activeRouteId == null) return;
+    if (_driverStops.isEmpty) return;
+
+    PickupAssignmentDialog.show(
+      context,
+      routeCode: _activeRouteCode ?? _activeRouteId ?? '',
+      stops: _driverStops,
+      onAccept: _handleAcceptPickupRoute,
+      onReject: _showRejectPickupRouteDialog,
+    );
+  }
+
+  Future<void> _handleAcceptPickupRoute() async {
+    if (_activeRouteId == null && _activeRouteCode == null) return;
+    final routeIdToStart = _activeRouteId ?? _activeRouteCode!;
+
+    setState(() => _isDutyLoading = true);
+    final success = await DriverService.startRoute(routeIdToStart);
+    if (mounted) {
+      setState(() {
+        _isDutyLoading = false;
+        if (success) {
+          _isRouteStarted = true;
+        }
+      });
+      _initSocketAndFetchRoutes(force: true);
+
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Đã nhận Lộ trình gom hàng [$routeIdToStart] thành công! Đang bắt đầu chuyến...',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF15803D),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  void _showRejectPickupRouteDialog() {
+    if (_activeRouteCode == null && _activeRouteId == null) return;
+    final routeId = _activeRouteId ?? _activeRouteCode!;
+
+    RejectRouteDialog.show(
+      context,
+      routeCode: _activeRouteCode ?? routeId,
+      onConfirmReject: (reason) async {
+        setState(() => _isDutyLoading = true);
+        final success = await DriverService.rejectRoute(routeId, reason);
+        if (mounted) {
+          setState(() {
+            _isDutyLoading = false;
+            if (success) {
+              _activeRouteId = null;
+              _activeRouteCode = null;
+              _driverStops.clear();
+              _roadPolylinePoints.clear();
+              _isRouteStarted = false;
+              _isRouteFinished = false;
+              _lastShownPickupDialogRouteId = null;
+            }
+          });
+          _initSocketAndFetchRoutes(force: true);
+
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.white, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      success
+                          ? 'Đã từ chối lộ trình [$routeId] và gửi báo cáo về bưu cục điều phối.'
+                          : 'Không thể gửi yêu cầu từ chối lộ trình. Vui lòng thử lại.',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: success ? AppColors.deepOnyx : AppColors.error,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              margin: const EdgeInsets.all(16),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      },
+    );
   }
 
   // ------ Location Permission Dialogs ------
@@ -946,13 +1080,26 @@ class _DriverDashboardState extends State<DriverDashboard> {
             s['status'] == 'ĐÃ LẤY HÀNG' ||
             s['status'] == 'COMPLETED');
 
-    final bool showPendingScanBanner = !effectiveRouteStarted &&
+    final bool isPickupRoute = _driverStops.isNotEmpty &&
+        _driverStops.any((s) => s['stopType'] == 'PICKUP' || s['isPickup'] == true);
+
+    final bool showPickupAssignmentBanner = !effectiveRouteStarted &&
         _activeRouteCode != null &&
         !_isRouteFinished &&
         _driverStops.isNotEmpty &&
         !allCompleted &&
         !_isLinehaulDriverProfile &&
-        !_isLinehaulRoute;
+        !_isLinehaulRoute &&
+        isPickupRoute;
+
+    final bool showDeliveryScanBanner = !effectiveRouteStarted &&
+        _activeRouteCode != null &&
+        !_isRouteFinished &&
+        _driverStops.isNotEmpty &&
+        !allCompleted &&
+        !_isLinehaulDriverProfile &&
+        !_isLinehaulRoute &&
+        !isPickupRoute;
 
     final bool showToteActions = _isLinehaulDriverProfile || _isLinehaulRoute;
 
@@ -1051,8 +1198,75 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 const SizedBox(height: 20.0),
               ],
 
-              // 3. Pending Scan Banner (when route is assigned but not yet scanned/started)
-              if (showPendingScanBanner)
+              // 3A. Pickup Assignment Banner (when a Pickup route is assigned to Last-mile driver)
+              if (showPickupAssignmentBanner)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 20.0),
+                  padding: const EdgeInsets.all(14.0),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(12.0),
+                    border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.electric_moped, color: Color(0xFF1D4ED8), size: 24),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Bưu cục điều phối Lộ Trình Gom Hàng [$_activeRouteCode]',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E40AF)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Có ${_driverStops.length} điểm lấy hàng cần gom từ nhà khách/shop. Vui lòng bấm bên dưới để xem chi tiết và xác nhận nhận chuyến hoặc từ chối.',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF1E3A8A), height: 1.3),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: OutlinedButton(
+                              onPressed: _showRejectPickupRouteDialog,
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFFEF4444), width: 1.2),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              child: const Text('TỪ CHỐI', style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.bold, fontSize: 12)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 3,
+                            child: ElevatedButton.icon(
+                              onPressed: _showPickupAssignmentDialog,
+                              icon: const Icon(Icons.assignment_turned_in, size: 16),
+                              label: const Text('XEM & NHẬN LỘ TRÌNH', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF16A34A),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+              // 3B. Delivery Scan Banner (when a Hub Delivery route is assigned with Hub Tote)
+              if (showDeliveryScanBanner)
                 Container(
                   margin: const EdgeInsets.only(bottom: 20.0),
                   padding: const EdgeInsets.all(14.0),
@@ -1129,6 +1343,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 roadPolylinePoints: _roadPolylinePoints,
                 onStartNavigation: _startNavigation,
                 isRouteStarted: effectiveRouteStarted,
+                isLinehaul: _isLinehaulDriverProfile || _isLinehaulRoute,
               ),
               const SizedBox(height: 24.0),
 

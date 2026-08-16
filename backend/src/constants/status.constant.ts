@@ -50,13 +50,13 @@ export const PUBLIC_ORDER_STATUS_MAP: Record<string, PublicStatusInfo> = {
   [OrderStatus.CREATED]: { label: 'ĐÃ TẠO ĐƠN HÀNG', chipClass: 'created' },
   [OrderStatus.READY_FOR_PICKUP]: { label: 'CHỜ LẤY HÀNG', chipClass: 'ready' },
   [OrderStatus.PICKUP_ASSIGNED]: { label: 'ĐÃ PHÂN CÔNG SHIPPER LẤY', chipClass: 'assigned' },
-  [OrderStatus.PICKING]: { label: 'SHIPPER ĐANG ĐẾN LẤY HÀNG (XE MÁY 🏍️)', chipClass: 'picking_up' },
+  [OrderStatus.PICKING]: { label: 'SHIPPER ĐANG ĐẾN LẤY HÀNG', chipClass: 'picking_up' },
   [OrderStatus.PICKED_UP]: { label: 'ĐÃ LẤY HÀNG THÀNH CÔNG', chipClass: 'picked_up' },
   [OrderStatus.ARRIVED_ORIGIN_FACILITY]: { label: 'ĐÃ LƯU KHO BƯU CỤC', chipClass: 'in_facility' },
   [OrderStatus.READY_FOR_DISPATCH]: { label: 'ĐÃ NHẬP KHO - SẴN SÀNG GIAO HÀNG', chipClass: 'ready' },
-  [OrderStatus.IN_TRANSIT]: { label: 'ĐANG TRUNG CHUYỂN GIỮA KHO', chipClass: 'in_transit' },
-  [OrderStatus.AT_HUB]: { label: 'TẠI KHO TRUNG CHUYỂN', chipClass: 'in_facility' },
-  [OrderStatus.OUT_FOR_DELIVERY]: { label: 'SHIPPER ĐANG GIAO HÀNG (XE MÁY)', chipClass: 'out_for_delivery' },
+  [OrderStatus.IN_TRANSIT]: { label: 'ĐANG TRUNG CHUYỂN LIÊN KHO', chipClass: 'in_transit' },
+  [OrderStatus.AT_HUB]: { label: 'TẠI KHO BƯU CỤC', chipClass: 'in_facility' },
+  [OrderStatus.OUT_FOR_DELIVERY]: { label: 'ĐANG GIAO HÀNG ĐẾN BẠN', chipClass: 'out_for_delivery' },
   [OrderStatus.DELIVERED]: { label: 'GIAO HÀNG THÀNH CÔNG', chipClass: 'delivered' },
   [OrderStatus.DELIVERY_FAILED]: { label: 'GIAO HÀNG THẤT BẠI', chipClass: 'failed' },
   [OrderStatus.RETURNING]: { label: 'ĐANG CHUYỂN HOÀN', chipClass: 'returning' },
@@ -67,31 +67,36 @@ export const PUBLIC_ORDER_STATUS_MAP: Record<string, PublicStatusInfo> = {
 
 export function getOrderStatusSubtitle(
   status: string,
-  context: { senderName?: string; facilityName?: string; driverName?: string; vehiclePlate?: string; receiverName?: string; defaultReason?: string }
+  context: { senderName?: string; facilityName?: string; originFacilityName?: string; driverName?: string; driverPhone?: string; vehiclePlate?: string; receiverName?: string; defaultReason?: string }
 ): string {
   if (context.defaultReason && context.defaultReason.trim().length > 0) {
     return context.defaultReason;
   }
+  const driverPhoneStr = context.driverPhone ? ` (${context.driverPhone})` : '';
+  const vehicleStr = context.vehiclePlate ? ` [${context.vehiclePlate}]` : '';
+
   switch (status) {
     case OrderStatus.CREATED:
       return `Đơn hàng đã được tạo thành công bởi ${context.senderName || 'Người gửi'}`;
     case OrderStatus.PICKUP_ASSIGNED:
-      return `Đã phân công Shipper ${context.driverName || 'Tài xế'} (${context.vehiclePlate || 'Xe máy'}) chuẩn bị đến lấy hàng`;
+      return `Đã phân công Shipper ${context.driverName || 'Tài xế'}${driverPhoneStr}${vehicleStr} chuẩn bị đến lấy hàng`;
     case OrderStatus.PICKING:
-      return `Shipper ${context.driverName || 'Tài xế'} (${context.vehiclePlate || 'Xe máy'}) đang di chuyển đến địa chỉ người gửi để lấy hàng`;
+      return `Shipper ${context.driverName || 'Tài xế'}${driverPhoneStr}${vehicleStr} đang di chuyển đến địa chỉ người gửi để lấy hàng. Vui lòng chú ý điện thoại!`;
     case OrderStatus.PICKED_UP:
       return `Shipper ${context.driverName || 'Tài xế'} đã lấy hàng thành công từ người gửi và đang chuyển về bưu cục`;
     case OrderStatus.ARRIVED_ORIGIN_FACILITY:
+      return `Hàng hóa đã được tiếp nhận và nhập kho tại ${context.facilityName || 'Bưu cục gửi'}`;
     case OrderStatus.READY_FOR_DISPATCH:
+      return `Đơn hàng đã được chia chọn vào sọt giao hàng tại ${context.facilityName || 'Bưu cục phát'}`;
     case OrderStatus.AT_HUB:
-      return `Hàng hóa đã phân loại và lưu kho tại ${context.facilityName || 'Bưu cục phân phối'}`;
+      return `Hàng hóa đã đến và nhập kho an toàn tại ${context.facilityName || 'Kho trung chuyển'}`;
     case OrderStatus.IN_TRANSIT:
-      return `Đơn hàng đang trên xe tải trung chuyển đến kho trung tâm`;
+      return `Xe tải${vehicleStr} do Tài xế ${context.driverName || 'trung chuyển'}${driverPhoneStr} điều khiển đang vận chuyển từ ${context.originFacilityName || 'Bưu cục gửi'} đến ${context.facilityName || 'Kho trung tâm'}`;
     case OrderStatus.OUT_FOR_DELIVERY:
-      return `Shipper ${context.driverName || 'Tài xế'} (${context.vehiclePlate || 'Xe máy'}) đang chở sọt hàng đi giao`;
+      return `Shipper ${context.driverName || 'giao hàng'}${driverPhoneStr}${vehicleStr} đang trên đường giao hàng đến bạn. Vui lòng chú ý điện thoại để nhận hàng!`;
     case OrderStatus.DELIVERED:
     case OrderStatus.COMPLETED:
-      return `Đã giao thành công cho người nhận ${context.receiverName || ''}`;
+      return `Shipper đã hoàn thành giao hàng cho người nhận ${context.receiverName || ''}`;
     default:
       return 'Trạng thái được cập nhật trên hệ thống SLP';
   }

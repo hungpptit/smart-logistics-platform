@@ -157,5 +157,23 @@ export class RoutingController {
       next(error);
     }
   };
+
+  public rejectRoute = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body || {};
+      const userId = (req as any).user?.id;
+
+      const result = await this.routingService.rejectRoute(id, userId, reason);
+
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 

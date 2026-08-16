@@ -235,6 +235,34 @@ class DriverService {
     return false;
   }
 
+  /// Reject Assigned Route with reason (POST /routes/:id/reject)
+  static Future<bool> rejectRoute(String routeId, String reason) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || token.isEmpty) return false;
+
+      final url = Uri.parse(ApiConstants.routeReject(routeId));
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonEncode({'reason': reason}),
+      );
+
+      debugPrint('📡 [DriverService] Reject route ($routeId): ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        return body['success'] == true;
+      }
+    } catch (e) {
+      debugPrint('💥 [DriverService] Lỗi rejectRoute: $e');
+    }
+    return false;
+  }
+
   /// Load Tote Bag into Shipment and confirm transit (POST /shipments/load-tote)
   static Future<Map<String, dynamic>?> loadToteIntoShipment(String toteCode) async {
     try {

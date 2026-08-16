@@ -119,7 +119,13 @@ class StopCard extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     color: (status == 'DANG THUC HIEN' || status == 'ĐANG THỰC HIỆN' || status == 'ĐANG BỐC HÀNG')
                                         ? AppColors.logisticsRed.withValues(alpha: 0.1)
-                                        : AppColors.surfaceContainer,
+                                        : (status == 'CHỜ XÁC NHẬN' || status == 'CHO XAC NHAN')
+                                            ? const Color(0xFFEFF6FF)
+                                            : (status == 'ĐÃ GIAO' || status == 'ĐÃ LẤY HÀNG' || status == 'DA GIAO' || status == 'DA LAY HANG')
+                                                ? const Color(0xFFDCFCE7)
+                                                : (status == 'CHỜ QUÉT NHẬN' || status == 'CHO QUET NHAN')
+                                                    ? const Color(0xFFFEF3C7)
+                                                    : AppColors.surfaceContainer,
                                     borderRadius: BorderRadius.circular(4.0),
                                   ),
                                   child: Text(
@@ -127,7 +133,13 @@ class StopCard extends StatelessWidget {
                                     style: TextStyle(
                                       color: (status == 'DANG THUC HIEN' || status == 'ĐANG THỰC HIỆN' || status == 'ĐANG BỐC HÀNG')
                                           ? AppColors.logisticsRed
-                                          : AppColors.secondary,
+                                          : (status == 'CHỜ XÁC NHẬN' || status == 'CHO XAC NHAN')
+                                              ? const Color(0xFF2563EB)
+                                              : (status == 'ĐÃ GIAO' || status == 'ĐÃ LẤY HÀNG' || status == 'DA GIAO' || status == 'DA LAY HANG')
+                                                  ? const Color(0xFF166534)
+                                                  : (status == 'CHỜ QUÉT NHẬN' || status == 'CHO QUET NHAN')
+                                                      ? const Color(0xFFB45309)
+                                                      : AppColors.secondary,
                                       fontSize: 9.0,
                                       fontWeight: FontWeight.bold,
                                     ),

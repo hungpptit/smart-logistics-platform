@@ -58,13 +58,30 @@ class StatsBentoCard extends StatelessWidget {
     return totalMeters / 1000.0;
   }
 
-  double get _avgStopMinutes {
+  /// Tính tổng thời gian dự kiến di chuyển + xử lý bốc dỡ tại các điểm dừng
+  double get _totalEstimatedMinutes {
     if (stops.isEmpty) return 0.0;
     final totalKm = _totalRouteDistanceKm;
-    final totalTravelMinutes = (totalKm / 25.0 * 60.0);
-    final totalServiceMinutes = stops.length * 5.0;
-    final avg = (totalTravelMinutes + totalServiceMinutes) / stops.length;
-    return avg.clamp(3.0, 30.0);
+    final bool isLinehaulMode = isLinehaul || (stops.isNotEmpty && stops.first['isLinehaul'] == true);
+    final double avgSpeedKmh = isLinehaulMode ? 60.0 : 30.0; // Xe tải đường trường/quốc lộ ~60 km/h, Shipper nội thành ~30 km/h
+    final double travelMinutes = (totalKm / avgSpeedKmh) * 60.0;
+    final double serviceMinutesPerStop = isLinehaulMode ? 10.0 : 4.0;
+    final double totalServiceMinutes = stops.length * serviceMinutesPerStop;
+    return travelMinutes + totalServiceMinutes;
+  }
+
+  String get _formattedEstimatedTime {
+    final double totalMins = _totalEstimatedMinutes;
+    if (totalMins <= 0) return '0 phút';
+    if (totalMins < 60) {
+      return '${totalMins.round()} phút';
+    }
+    final int hours = totalMins ~/ 60;
+    final int remainingMins = (totalMins % 60).round();
+    if (remainingMins == 0) {
+      return '$hours giờ';
+    }
+    return '$hours giờ $remainingMins p';
   }
 
   @override
@@ -73,9 +90,11 @@ class StatsBentoCard extends StatelessWidget {
     final totalCount = stops.length;
     final progress = stops.isEmpty ? 0.0 : completedCount / totalCount;
     final bool isToteMode = isLinehaul || loadedTotesCount > 0 || (stops.isNotEmpty && stops.first['isLinehaul'] == true);
-    final bool isPendingScan = !isRouteStarted && stops.isNotEmpty && !isToteMode;
+    final bool hasPickup = stops.isNotEmpty && stops.any((s) => s['isPickup'] == true || s['stopType'] == 'PICKUP');
+    final bool isPendingPickupConfirm = !isRouteStarted && stops.isNotEmpty && !isToteMode && hasPickup;
+    final bool isPendingDeliveryScan = !isRouteStarted && stops.isNotEmpty && !isToteMode && !hasPickup;
     final double totalKm = _totalRouteDistanceKm;
-    final double avgMins = _avgStopMinutes;
+    final String estimatedTimeStr = _formattedEstimatedTime;
     final bool isAllFinished = totalCount > 0 && completedCount == totalCount;
 
     final String statusText = stops.isEmpty
@@ -84,7 +103,9 @@ class StatsBentoCard extends StatelessWidget {
             ? 'TRUNG CHUYỂN'
             : (isAllFinished
                 ? 'HOÀN THÀNH'
-                : (isPendingScan ? 'CHỜ QUÉT NHẬN' : 'HOẠT ĐỘNG')));
+                : (isPendingPickupConfirm
+                    ? 'CHỜ XÁC NHẬN'
+                    : (isPendingDeliveryScan ? 'CHỜ QUÉT NHẬN' : 'HOẠT ĐỘNG'))));
 
     final Color badgeBg = stops.isEmpty
         ? Colors.green.shade50
@@ -92,7 +113,9 @@ class StatsBentoCard extends StatelessWidget {
             ? Colors.indigo.shade50
             : (isAllFinished
                 ? Colors.blue.shade50
-                : (isPendingScan ? Colors.amber.shade50 : Colors.green.shade50)));
+                : (isPendingPickupConfirm
+                    ? const Color(0xFFEFF6FF)
+                    : (isPendingDeliveryScan ? Colors.amber.shade50 : Colors.green.shade50))));
 
     final Color badgeTextColor = stops.isEmpty
         ? Colors.green.shade800
@@ -100,7 +123,9 @@ class StatsBentoCard extends StatelessWidget {
             ? Colors.indigo.shade900
             : (isAllFinished
                 ? Colors.blue.shade900
-                : (isPendingScan ? Colors.amber.shade900 : Colors.green.shade800)));
+                : (isPendingPickupConfirm
+                    ? const Color(0xFF1D4ED8)
+                    : (isPendingDeliveryScan ? Colors.amber.shade900 : Colors.green.shade800))));
 
     return Container(
       padding: const EdgeInsets.all(20.0),
@@ -217,12 +242,12 @@ class StatsBentoCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Dừng trung bình',
+                        'Thời gian dự kiến',
                         style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
                       ),
                       const SizedBox(height: 4.0),
                       Text(
-                        '${avgMins.toStringAsFixed(1)} phút',
+                        estimatedTimeStr,
                         style: AppTypography.headlineMd.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppColors.deepOnyx,

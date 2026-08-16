@@ -4,7 +4,7 @@ import { AssignmentService } from './assignment.service';
 import { VRPService } from './vrp.service';
 import { BadRequestException, NotFoundException } from '../../middlewares/error.middleware';
 import { getTrackingGateway } from '../../gateways/tracking.gateway';
-import { OrderStatus, RouteStatus, RouteStopStatus, DriverEmploymentStatus, TransferStatus } from '@prisma/client';
+import { OrderStatus, RouteStatus, RouteStopStatus, DriverEmploymentStatus, TransferStatus, DispatchTaskStatus } from '@prisma/client';
 
 export class RoutingService {
   private kmeansService = new KMeansService();
@@ -997,6 +997,26 @@ export class RoutingService {
 
       const historyLogs: any[] = [];
 
+      // Lấy thông tin tài xế và phương tiện giao hàng
+      const routeWithDriver = await prisma.route.findUnique({
+        where: { id: route.id },
+        include: {
+          driverVehicleAssignment: {
+            include: {
+              driver: { include: { user: true } },
+              vehicle: true,
+            },
+          },
+        },
+      });
+
+      const driverStaff = routeWithDriver?.driverVehicleAssignment?.driver;
+      const driverVehicle = routeWithDriver?.driverVehicleAssignment?.vehicle;
+      const driverName = driverStaff?.fullName || driverStaff?.user?.username || 'giao hàng';
+      const driverPhone = driverStaff?.phone || '';
+      const driverPhoneStr = driverPhone ? ` (${driverPhone})` : '';
+      const vehiclePlateStr = driverVehicle?.plateNumber ? ` [${driverVehicle.plateNumber}]` : '';
+
       // Update Pickup Orders to OrderStatus.PICKING ("SHIPPER ĐANG ĐẾN LẤY HÀNG")
       if (pickupOrderIds.length > 0) {
         await prisma.order.updateMany({
@@ -1009,12 +1029,12 @@ export class RoutingService {
             orderId,
             status: OrderStatus.PICKING,
             changedByUserId: userId || null,
-            reason: `Tài xế đã nhận tuyến Sọt ${route.routeCode || route.id} và đang di chuyển đến địa chỉ người gửi để lấy hàng`,
+            reason: `Shipper ${driverName}${driverPhoneStr}${vehiclePlateStr} đang di chuyển đến địa chỉ người gửi để lấy hàng. Vui lòng chú ý điện thoại!`,
           });
         });
       }
 
-      // Update Delivery Orders to OrderStatus.OUT_FOR_DELIVERY ("SHIPPER ĐANG GIAO HÀNG")
+      // Update Delivery Orders to OrderStatus.OUT_FOR_DELIVERY ("ĐANG GIAO HÀNG ĐẾN BẠN")
       if (deliveryOrderIds.length > 0) {
         await prisma.order.updateMany({
           where: { id: { in: deliveryOrderIds } },
@@ -1026,7 +1046,7 @@ export class RoutingService {
             orderId,
             status: OrderStatus.OUT_FOR_DELIVERY,
             changedByUserId: userId || null,
-            reason: `Tài xế đã quét mã QR Sọt ${route.routeCode || route.id} và đang di chuyển đi giao hàng cho người nhận`,
+            reason: `Shipper ${driverName}${driverPhoneStr}${vehiclePlateStr} đang trên đường giao hàng đến bạn. Vui lòng chú ý điện thoại để nhận hàng!`,
           });
         });
       }
@@ -1095,6 +1115,147 @@ export class RoutingService {
     getTrackingGateway()?.broadcastRoutesUpdated();
 
     return updatedRoute;
+  }
+
+  /**
+   * Reject Route by Driver (POST /routes/:id/reject)
+   */
+  public async rejectRoute(routeId: string, userId?: string, reason?: string) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isUuid = uuidRegex.test(routeId);
+
+    const route = await prisma.route.findFirst({
+      where: isUuid
+        ? { OR: [{ id: routeId }, { routeCode: routeId }] }
+        : { routeCode: routeId },
+      include: {
+        stops: true,
+        shipments: {
+          include: {
+            shipmentPackages: true,
+          },
+        },
+        driverVehicleAssignment: {
+          include: {
+            driver: true,
+          },
+        },
+      },
+    });
+
+    if (!route) {
+      throw new NotFoundException('Không tìm thấy lộ trình / chuyến đi này');
+    }
+
+    const driverStaff = userId
+      ? await prisma.staff.findFirst({ where: { userId } })
+      : route.driverVehicleAssignment?.driver;
+
+    const rejectionReason = reason || 'Tài xế từ chối nhận lộ trình gom lấy hàng';
+
+    // 1. Create RouteAdjustmentLog for audit
+    const fallbackUser = await prisma.user.findFirst();
+    await prisma.routeAdjustmentLog.create({
+      data: {
+        routeId: route.id,
+        adjustedByUserId: userId || route.driverVehicleAssignment?.driver?.userId || fallbackUser?.id || route.id,
+        oldDriverId: driverStaff?.id || null,
+        newDriverId: null,
+        adjustmentType: 'DRIVER_REJECTED',
+        reason: rejectionReason,
+      },
+    });
+
+    // 2. Update DispatchTask status to REJECTED if any
+    await prisma.dispatchTask.updateMany({
+      where: { routeId: route.id },
+      data: {
+        status: DispatchTaskStatus.REJECTED,
+        completedAt: new Date(),
+      },
+    });
+
+    // 3. Find all orders in this route to revert their status
+    const orderIds: string[] = [];
+    route.stops.forEach((s) => {
+      if (s.orderId) orderIds.push(s.orderId);
+    });
+
+    const uniqueOrderIds = Array.from(new Set(orderIds));
+    if (uniqueOrderIds.length > 0) {
+      const orders = await prisma.order.findMany({
+        where: { id: { in: uniqueOrderIds } },
+      });
+
+      const pickupOrderIds: string[] = [];
+      const deliveryOrderIds: string[] = [];
+
+      orders.forEach((o) => {
+        if (
+          o.status === OrderStatus.PICKUP_ASSIGNED ||
+          o.status === OrderStatus.PICKING ||
+          o.status === OrderStatus.READY_FOR_PICKUP
+        ) {
+          pickupOrderIds.push(o.id);
+        } else {
+          deliveryOrderIds.push(o.id);
+        }
+      });
+
+      // Revert Pickup orders to READY_FOR_PICKUP
+      if (pickupOrderIds.length > 0) {
+        await prisma.order.updateMany({
+          where: { id: { in: pickupOrderIds } },
+          data: { status: OrderStatus.READY_FOR_PICKUP },
+        });
+
+        const historyLogs = pickupOrderIds.map((orderId) => ({
+          orderId,
+          status: OrderStatus.READY_FOR_PICKUP,
+          changedByUserId: userId || null,
+          reason: `Tài xế ${driverStaff?.fullName || 'Tài xế'} đã từ chối nhận lộ trình. Lý do: ${rejectionReason}. Đơn hàng đã quay lại trạng thái Chờ lấy hàng để điều phối lại.`,
+        }));
+        await prisma.orderStatusHistory.createMany({ data: historyLogs as any });
+      }
+
+      // Revert Delivery orders to AT_HUB if any
+      if (deliveryOrderIds.length > 0) {
+        await prisma.order.updateMany({
+          where: { id: { in: deliveryOrderIds } },
+          data: { status: OrderStatus.AT_HUB },
+        });
+
+        const historyLogs = deliveryOrderIds.map((orderId) => ({
+          orderId,
+          status: OrderStatus.AT_HUB,
+          changedByUserId: userId || null,
+          reason: `Tài xế ${driverStaff?.fullName || 'Tài xế'} đã từ chối nhận lộ trình. Lý do: ${rejectionReason}. Đơn hàng đã quay lại trạng thái Tại Bưu cục để điều phối lại.`,
+        }));
+        await prisma.orderStatusHistory.createMany({ data: historyLogs as any });
+      }
+    }
+
+    // 4. Delete TrackingEvents, RouteStops, ShipmentPackages, Shipments, and Route itself so it cleanly unassigns
+    const shipmentIds = route.shipments.map((s) => s.id);
+    await prisma.trackingEvent.deleteMany({ where: { routeStop: { routeId: route.id } } });
+    if (shipmentIds.length > 0) {
+      await prisma.trackingEvent.deleteMany({ where: { shipmentId: { in: shipmentIds } } });
+      await prisma.shipmentTransfer.deleteMany({ where: { shipmentId: { in: shipmentIds } } });
+      await prisma.shipmentPackage.deleteMany({ where: { shipmentId: { in: shipmentIds } } });
+      await prisma.shipment.deleteMany({ where: { id: { in: shipmentIds } } });
+    }
+    await prisma.routeStop.deleteMany({ where: { routeId: route.id } });
+    await prisma.dispatchTask.deleteMany({ where: { routeId: route.id } });
+    await prisma.route.delete({ where: { id: route.id } });
+
+    // 5. Broadcast real-time websocket update
+    getTrackingGateway()?.broadcastRoutesUpdated();
+
+    return {
+      success: true,
+      message: `Đã từ chối và giải phóng lộ trình ${route.routeCode || route.id} thành công!`,
+      revertedOrdersCount: uniqueOrderIds.length,
+    };
   }
 }
 

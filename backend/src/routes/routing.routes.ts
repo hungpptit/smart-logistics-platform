@@ -122,4 +122,10 @@ router.post(
   routingController.completeRoute
 );
 
+router.post(
+  '/:id/reject',
+  requireRoles(['ADMIN', 'STAFF', 'SHIPPER', 'DRIVER', 'LINEHAUL_TRANSFER']),
+  routingController.rejectRoute
+);
+
 export default router;
