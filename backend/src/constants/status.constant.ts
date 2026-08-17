@@ -65,12 +65,38 @@ export const PUBLIC_ORDER_STATUS_MAP: Record<string, PublicStatusInfo> = {
   [OrderStatus.CANCELLED]: { label: 'ĐÃ HỦY ĐƠN HÀNG', chipClass: 'cancelled' },
 };
 
+export function sanitizePublicDescription(text: string): string {
+  if (!text) return '';
+  let sanitized = text;
+
+  // 1. Loại bỏ các mã phân khu kỹ thuật dạng (ZONE-xxx)
+  sanitized = sanitized.replace(/\s*\([A-Z0-9_-]*(?:ZONE|DISPATCH|INTER|INTRA|PROV|HUB|STATION)[A-Z0-9_-]*\)/gi, '');
+
+  // 2. Chuyển đổi thông báo phân bổ sọt hàng AI kỹ thuật sang văn phong thân thiện với khách hàng
+  if (sanitized.includes('phân bổ vào sọt hàng') || sanitized.includes('sẵn sàng giao hàng')) {
+    sanitized = sanitized.replace(/vào sọt hàng\s+[A-Z0-9_-]+/gi, 'vào sọt giao hàng');
+    sanitized = sanitized.replace(/\s*\(Trạng thái:\s*Sẵn sàng giao hàng,\s*chờ Tài xế quét QR mã Sọt để xuất kho\)/gi, '');
+    sanitized = sanitized.replace(/\s*\(chờ Tài xế quét QR mã Sọt để xuất kho\)/gi, '');
+    sanitized = sanitized.replace(/\s*\(Trạng thái:\s*Sẵn sàng giao hàng\)/gi, '');
+    sanitized = 'Đơn hàng đã được chia chọn vào sọt giao hàng tại bưu cục (Sẵn sàng xuất kho đi giao)';
+  }
+
+  // 3. Xóa các mã sọt / mã chuyến xe kỹ thuật RT-xxxx, TOTE-xxxx thừa
+  sanitized = sanitized.replace(/\b(?:RT|TOTE|TOT|ST|TB|BAG)-\d+\b/gi, '');
+  sanitized = sanitized.replace(/\b(?:RT|TOTE|TOT|ST|TB|BAG)-[A-Z0-9_-]+\b/gi, '');
+
+  // 4. Chuẩn hóa khoảng trắng và dấu câu
+  sanitized = sanitized.replace(/\s{2,}/g, ' ').replace(/\s+([.,;:])/g, '$1').trim();
+
+  return sanitized;
+}
+
 export function getOrderStatusSubtitle(
   status: string,
   context: { senderName?: string; facilityName?: string; originFacilityName?: string; driverName?: string; driverPhone?: string; vehiclePlate?: string; receiverName?: string; defaultReason?: string }
 ): string {
   if (context.defaultReason && context.defaultReason.trim().length > 0) {
-    return context.defaultReason;
+    return sanitizePublicDescription(context.defaultReason);
   }
   const driverPhoneStr = context.driverPhone ? ` (${context.driverPhone})` : '';
   const vehicleStr = context.vehiclePlate ? ` [${context.vehiclePlate}]` : '';

@@ -986,11 +986,16 @@ export class RoutingService {
       ordersToUpdate.forEach((o) => {
         if (
           o.status === OrderStatus.READY_FOR_PICKUP ||
-          o.status === OrderStatus.PICKUP_ASSIGNED ||
-          o.status === OrderStatus.PICKING
+          o.status === OrderStatus.PICKUP_ASSIGNED
         ) {
           pickupOrderIds.push(o.id);
-        } else {
+        } else if (
+          o.status !== OrderStatus.OUT_FOR_DELIVERY &&
+          o.status !== OrderStatus.DELIVERED &&
+          o.status !== OrderStatus.COMPLETED &&
+          o.status !== OrderStatus.DELIVERY_FAILED &&
+          o.status !== OrderStatus.CANCELLED
+        ) {
           deliveryOrderIds.push(o.id);
         }
       });

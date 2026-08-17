@@ -1036,7 +1036,16 @@ export const OrderTab: React.FC = () => {
                     Lịch sử hành trình đơn hàng
                   </h4>
                   <div className="flex flex-col gap-4 pl-2 relative border-l border-gray-200 ml-1.5">
-                    {(selectedOrder.statusHistory ? [...selectedOrder.statusHistory].reverse() : []).map((hist) => {
+                    {(selectedOrder.statusHistory
+                      ? [...selectedOrder.statusHistory]
+                          .reverse()
+                          .filter((hist, idx, arr) => {
+                            if (idx === 0) return true;
+                            const prev = arr[idx - 1];
+                            return !(prev.status === hist.status && prev.reason === hist.reason);
+                          })
+                      : []
+                    ).map((hist) => {
                       const statusInfo = STATUS_MAP[hist.status] || { label: hist.status, color: '#374151', bg: '#f3f4f6' };
                       return (
                         <div key={hist.id} className="relative pl-4">

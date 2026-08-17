@@ -6,6 +6,21 @@ interface TimelineStepperProps {
   timestamps?: any;
 }
 
+const cleanCustomerText = (text: string): string => {
+  if (!text) return '';
+  let clean = text;
+  // 1. Loại bỏ các mã phân khu kỹ thuật dạng (ZONE-xxx)
+  clean = clean.replace(/\s*\([A-Z0-9_-]*(?:ZONE|DISPATCH|INTER|INTRA|PROV|HUB|STATION)[A-Z0-9_-]*\)/gi, '');
+  // 2. Chuyển đổi thông báo phân bổ sọt hàng AI kỹ thuật
+  if (clean.includes('phân bổ vào sọt hàng') || clean.includes('sẵn sàng giao hàng')) {
+    clean = 'Đơn hàng đã được chia chọn vào sọt giao hàng tại bưu cục (Sẵn sàng xuất kho đi giao)';
+  }
+  // 3. Xóa các mã sọt / mã chuyến xe kỹ thuật RT-xxxx, TOTE-xxxx thừa
+  clean = clean.replace(/\b(?:RT|TOTE|TOT|ST|TB|BAG)-\d+\b/gi, '');
+  clean = clean.replace(/\b(?:RT|TOTE|TOT|ST|TB|BAG)-[A-Z0-9_-]+\b/gi, '');
+  return clean.replace(/\s{2,}/g, ' ').replace(/\s+([.,;:])/g, '$1').trim();
+};
+
 export const TimelineStepper: React.FC<TimelineStepperProps> = ({ status, timestamps }) => {
   const currentStatus = String(status || '').toUpperCase();
 
@@ -124,7 +139,7 @@ export const TimelineStepper: React.FC<TimelineStepperProps> = ({ status, timest
                 </div>
                 {event.detail && (
                   <p className="text-[11px] text-slate-600 mt-1 leading-snug font-medium italic">
-                    "{event.detail}"
+                    "{cleanCustomerText(event.detail)}"
                   </p>
                 )}
                 <div className="mt-1.5 text-[10px] font-medium text-slate-400 font-mono flex items-center gap-1">
