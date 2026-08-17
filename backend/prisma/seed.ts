@@ -100,7 +100,7 @@ async function main() {
         where: { facilityTypeId: legacy.id },
         data: { facilityTypeId: wardType.id },
       });
-      await prisma.facilityType.delete({ where: { id: legacy.id } }).catch(() => {});
+      await prisma.facilityType.delete({ where: { id: legacy.id } }).catch(() => { });
     }
   }
 
@@ -428,14 +428,14 @@ async function main() {
       console.log('Reading administrative units SQL dump...');
       const sqlContent = fs.readFileSync(sqlPath, 'utf8');
       console.log('Executing administrative units SQL dump... (this might take a few seconds)');
-      
+
       const rawStatements = sqlContent.split(/;\s*[\r\n]+/);
       const statements = rawStatements
         .map(s => s.trim())
         .filter(s => s.length > 0);
 
       console.log(`Found ${statements.length} SQL statements to execute.`);
-      
+
       await prisma.$transaction(async (tx) => {
         for (let i = 0; i < statements.length; i++) {
           const stmt = statements[i];
@@ -454,7 +454,7 @@ async function main() {
 
   // 9. Seed 6 Economic Regions & Link 34 Provinces & Seed 6 Regional Sorting Centers
   console.log('🗺️ Seeding 6 Economic Regions & Linking 34 Provinces to Regional Sorting Centers...');
-  
+
   const regions = [
     { id: 1, name: 'Vùng Trung du và miền núi phía Bắc', nameEn: 'Northern Midlands and Mountains', codeName: 'trung_du_mien_nui_phia_bac', codeNameEn: 'northern_midlands_mountains' },
     { id: 2, name: 'Vùng Đồng bằng sông Hồng', nameEn: 'Red River Delta', codeName: 'dong_bang_song_hong', codeNameEn: 'red_river_delta' },

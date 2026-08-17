@@ -294,25 +294,26 @@ export class ShipmentService {
         },
       });
 
+      // 3. Determine staff facility context
+      let targetFacilityId: string | null = null;
+      const staffUser = await tx.staff.findUnique({ where: { userId } });
+      if (staffUser?.assignedFacilityId) {
+        targetFacilityId = staffUser.assignedFacilityId;
+      } else {
+        const managedFacility = await tx.facility.findFirst({ where: { managerUserId: userId } });
+        if (managedFacility) {
+          targetFacilityId = managedFacility.id;
+        } else if (shipment.destinationFacilityId) {
+          targetFacilityId = shipment.destinationFacilityId;
+        } else if (shipment.originFacilityId) {
+          targetFacilityId = shipment.originFacilityId;
+        }
+      }
+
       // 3. Update all packages parent Order status based on shipment transitions (using Centralized Sync Map)
       const orderSyncMeta = SHIPMENT_TO_ORDER_SYNC_MAP[dto.status];
       if (orderSyncMeta) {
         const reason = orderSyncMeta.getReason(shipment.shipmentCode, dto.notes);
-
-        let targetFacilityId: string | null = null;
-        const staffUser = await tx.staff.findUnique({ where: { userId } });
-        if (staffUser?.assignedFacilityId) {
-          targetFacilityId = staffUser.assignedFacilityId;
-        } else {
-          const managedFacility = await tx.facility.findFirst({ where: { managerUserId: userId } });
-          if (managedFacility) {
-            targetFacilityId = managedFacility.id;
-          } else if (shipment.destinationFacilityId) {
-            targetFacilityId = shipment.destinationFacilityId;
-          } else if (shipment.originFacilityId) {
-            targetFacilityId = shipment.originFacilityId;
-          }
-        }
 
         if (targetFacilityId) {
           const targetFacilityObj = await tx.facility.findUnique({
@@ -500,11 +501,63 @@ export class ShipmentService {
       if (shipment.routeId) {
         if (dto.status === 'IN_TRANSIT') {
           // Khi Nhân viên Kho Web quét xuất bến (IN_TRANSIT):
-          // Hoàn thành RouteStop điểm xuất phát (sequence: 1) sang DEPARTED
-          await tx.routeStop.updateMany({
-            where: { routeId: shipment.routeId, sequence: 1 },
-            data: { status: 'DEPARTED', departedAt: new Date() },
-          });
+          // Cập nhật RouteStop của kho đang quét sang DEPARTED
+          if (targetFacilityId) {
+            await tx.routeStop.updateMany({
+              where: { routeId: shipment.routeId, facilityId: targetFacilityId },
+              data: { status: 'DEPARTED', departedAt: new Date() },
+            });
+
+            // Nếu kho đang quét là trạm ghé trung chuyển (Đà Nẵng), tự động nạp các sọt SEALED tại kho lên xe
+            const localSealedTotes = await tx.toteBag.findMany({
+              where: { facilityId: targetFacilityId, status: 'SEALED' },
+              include: { warehouseScans: { include: { package: true } } },
+            });
+
+            for (const lt of localSealedTotes) {
+              await tx.toteBag.update({
+                where: { id: lt.id },
+                data: { status: 'LOADED' },
+              });
+              await tx.warehouseScan.updateMany({
+                where: { toteBagId: lt.id },
+                data: { shipmentId: shipment.id },
+              });
+              for (const ws of lt.warehouseScans) {
+                if (ws.packageId) {
+                  const existingSP = await tx.shipmentPackage.findFirst({
+                    where: { packageId: ws.packageId },
+                  });
+                  if (existingSP) {
+                    await tx.shipmentPackage.update({
+                      where: { id: existingSP.id },
+                      data: { shipmentId: shipment.id },
+                    });
+                  } else {
+                    await tx.shipmentPackage.create({
+                      data: { shipmentId: shipment.id, packageId: ws.packageId },
+                    });
+                  }
+                  await tx.package.update({
+                    where: { id: ws.packageId },
+                    data: { currentFacilityId: null, currentZoneId: null },
+                  });
+                  if (ws.package?.orderId) {
+                    await tx.order.update({
+                      where: { id: ws.package.orderId },
+                      data: { status: OrderStatus.IN_TRANSIT },
+                    });
+                  }
+                }
+              }
+            }
+          } else {
+            await tx.routeStop.updateMany({
+              where: { routeId: shipment.routeId, sequence: 1 },
+              data: { status: 'DEPARTED', departedAt: new Date() },
+            });
+          }
+
           await tx.route.update({
             where: { id: shipment.routeId },
             data: { status: 'IN_PROGRESS', actualStartAt: new Date() },
@@ -1019,10 +1072,23 @@ export class ShipmentService {
       orderBy: { createdAt: 'desc' },
     });
 
+    let isMidRouteIntermediatePickup = false;
     if (shipment) {
-      const isDifferentFacility = tote.facilityId && shipment.originFacilityId && tote.facilityId !== shipment.originFacilityId;
-      if (isDifferentFacility) {
-        shipment = null; // Force creation of a NEW shipment code for new facility
+      // If shipment is already in progress and the truck is picking up at an intermediate stop
+      if (shipment.routeId && tote.facilityId) {
+        const interStop = await prisma.routeStop.findFirst({
+          where: { routeId: shipment.routeId, facilityId: tote.facilityId, sequence: { gte: 2 }, stopType: 'PICKUP' },
+        });
+        if (interStop) {
+          isMidRouteIntermediatePickup = true;
+        }
+      }
+
+      if (!isMidRouteIntermediatePickup) {
+        const isDifferentFacility = tote.facilityId && shipment.originFacilityId && tote.facilityId !== shipment.originFacilityId && shipment.status !== ShipmentStatus.IN_TRANSIT;
+        if (isDifferentFacility) {
+          shipment = null; // Force creation of a NEW shipment code for new facility
+        }
       }
     }
 
@@ -1220,6 +1286,14 @@ export class ShipmentService {
           shipmentId: shipment.id,
         },
       });
+
+      // Nếu đang bốc hàng tại Trạm Ghé Trung Chuyển (Đà Nẵng), hoàn tất trạm dừng đó
+      if (isMidRouteIntermediatePickup && shipment.routeId && tote.facilityId) {
+        await tx.routeStop.updateMany({
+          where: { routeId: shipment.routeId, facilityId: tote.facilityId, stopType: 'PICKUP' },
+          data: { status: RouteStopStatus.DEPARTED, departedAt: new Date() },
+        });
+      }
 
       // LƯU Ý: Khi tài xế bốc thùng hàng lên xe (LOADED), các đơn hàng VẪN GIỮ TRẠNG THÁI TẠI KHO (AT_HUB)
       // Tuyệt đối KHÔNG tự chuyển sang IN_TRANSIT ở bước này.

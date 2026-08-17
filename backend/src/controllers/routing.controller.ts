@@ -49,25 +49,32 @@ export class RoutingController {
       const { status, facilityId, driverId } = req.query;
       const user = (req as any).user;
 
+      let filterFacilityId = facilityId as string;
       let filterDriverId = driverId as string;
-      if (!filterDriverId && user?.id) {
-        const staffProfile = await prisma.staff.findFirst({
+
+      const isAdmin = user?.roles?.includes('ADMIN');
+      const isStaff = user?.roles?.includes('STAFF') && !isAdmin;
+      const isDriver = user?.roles?.includes('SHIPPER') || user?.roles?.includes('DRIVER') || user?.roles?.includes('LINEHAUL_TRANSFER');
+
+      if (isStaff && user?.id) {
+        const staffProfile = await prisma.staff.findUnique({
           where: { userId: user.id },
         });
-
-        const isDriverOrShipper = user?.roles?.includes('SHIPPER') || user?.roles?.includes('DRIVER');
-        const isAdminOrStaff = user?.roles?.includes('ADMIN');
-
-        if (isDriverOrShipper && !isAdminOrStaff && staffProfile) {
-          filterDriverId = staffProfile.id;
-        } else if (staffProfile && !facilityId && req.query.all !== 'true') {
-          filterDriverId = staffProfile.id;
+        if (staffProfile?.assignedFacilityId) {
+          filterFacilityId = staffProfile.assignedFacilityId; // Khóa chặt phạm vi kho quản lý của Staff
+        }
+      } else if (isDriver && !isAdmin && user?.id) {
+        const driverProfile = await prisma.staff.findFirst({
+          where: { userId: user.id },
+        });
+        if (driverProfile) {
+          filterDriverId = driverProfile.id;
         }
       }
 
       const routes = await this.routingService.getAllRoutes({
         status: status as string,
-        facilityId: facilityId as string,
+        facilityId: filterFacilityId,
         driverId: filterDriverId,
       });
 

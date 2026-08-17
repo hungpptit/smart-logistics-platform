@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { CustomerController } from '../controllers/customer.controller';
 import { validationMiddleware } from '../middlewares/validation.middleware';
-import { authMiddleware, requirePermissions } from '../middlewares/auth.middleware';
+import { authMiddleware, requirePermissions, requireRoles } from '../middlewares/auth.middleware';
 import { CreateCustomerDto, UpdateCustomerDto, CreateAddressDto, UpdateAddressDto } from '../dtos/customer.dto';
 
 const router = Router();
@@ -94,11 +94,11 @@ router.post(
  *       200:
  *         description: Danh sách khách hàng và thông tin phân trang
  *       430:
- *         description: Không có quyền (Yêu cầu permission CUSTOMER_VIEW)
+ *         description: Không có quyền (Yêu cầu vai trò ADMIN hoặc STAFF)
  */
 router.get(
   '/',
-  requirePermissions(['CUSTOMER_VIEW']),
+  requireRoles(['ADMIN', 'STAFF']),
   customerController.getAll
 );
 
