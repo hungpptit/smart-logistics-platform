@@ -6,8 +6,7 @@ import { ServicesGrid } from './features/pricing/components/ServicesGrid';
 import { PricingCalculator } from './features/pricing/components/PricingCalculator';
 import { AdminDashboard } from './features/dashboard/components/AdminDashboard';
 import { Toast } from './components/ui/Toast';
-import { TRACKING_DATABASE, formatMockTimeline } from './features/tracking/services/mockDb';
-import { Search } from 'lucide-react';
+import { Search, ArrowRight } from 'lucide-react';
 import { Header } from './components/Header';
 import { CONFIG } from './config';
 import { io as socketIoClient } from 'socket.io-client';
@@ -25,7 +24,7 @@ const AppContent: React.FC = () => {
   const [isToastVisible, setIsToastVisible] = useState(false);
 
   // Tracking Engine State
-  const [trackingCode, setTrackingCode] = useState('TRK-10029381');
+  const [trackingCode, setTrackingCode] = useState('');
   const [currentTracking, setCurrentTracking] = useState<any>(null);
   const [liveDriverPos, setLiveDriverPos] = useState<[number, number] | null>(null);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
@@ -38,11 +37,6 @@ const AppContent: React.FC = () => {
       setView('landing');
     }
   }, [user]);
-
-  // Default initial tracking data on landing page load
-  useEffect(() => {
-    fetchTrackingData('TRK-10029381');
-  }, []);
 
   const triggerToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(message);
@@ -60,7 +54,7 @@ const AppContent: React.FC = () => {
     setIsTrackingLoading(true);
 
     try {
-      // 1. Query Backend API
+      // Query Backend Public Tracking API
       const res = await fetch(`${CONFIG.API_BASE_URL}/tracking/public/${cleanCode}`);
       const data = await res.json();
 
@@ -70,52 +64,17 @@ const AppContent: React.FC = () => {
         if (payload.coordinates?.currentDriver) {
           setLiveDriverPos([payload.coordinates.currentDriver.lat, payload.coordinates.currentDriver.lng]);
         }
-        triggerToast(`Đã tìm thấy thông tin đơn hàng ${cleanCode}!`, 'success');
+        triggerToast(`Đã tìm thấy thông tin vận đơn ${cleanCode}!`, 'success');
       } else {
-        // 2. Fallback to mock DB for demonstration seed codes
-        const mockData = TRACKING_DATABASE[cleanCode];
-        if (mockData) {
-          setCurrentTracking({
-            code: mockData.code,
-            status: mockData.status,
-            statusLabel: mockData.statusLabel,
-            eta: mockData.eta,
-            destination: mockData.destination,
-            route: mockData.route,
-            coordinates: {
-              sender: { lat: mockData.route[0][0], lng: mockData.route[0][1] },
-              receiver: { lat: mockData.route[mockData.route.length - 1][0], lng: mockData.route[mockData.route.length - 1][1] },
-              currentDriver: { lat: mockData.currentPos[0], lng: mockData.currentPos[1] },
-            },
-            timeline: formatMockTimeline(mockData.timestamps),
-          });
-          setLiveDriverPos([mockData.currentPos[0], mockData.currentPos[1]]);
-          triggerToast(`Đã tìm thấy thông tin đơn hàng mẫu ${cleanCode}!`, 'success');
-        } else {
-          triggerToast(`Không tìm thấy mã vận đơn ${cleanCode} trên hệ thống!`, 'error');
-        }
+        setCurrentTracking(null);
+        setLiveDriverPos(null);
+        triggerToast(data.message || `Không tìm thấy mã đơn / mã vận đơn ${cleanCode} trên hệ thống!`, 'error');
       }
     } catch (err) {
       console.error('Error fetching tracking data:', err);
-      const mockData = TRACKING_DATABASE[cleanCode];
-      if (mockData) {
-        setCurrentTracking({
-          code: mockData.code,
-          status: mockData.status,
-          statusLabel: mockData.statusLabel,
-          eta: mockData.eta,
-          destination: mockData.destination,
-          route: mockData.route,
-          coordinates: {
-            sender: { lat: mockData.route[0][0], lng: mockData.route[0][1] },
-            receiver: { lat: mockData.route[mockData.route.length - 1][0], lng: mockData.route[mockData.route.length - 1][1] },
-            currentDriver: { lat: mockData.currentPos[0], lng: mockData.currentPos[1] },
-          },
-          timeline: formatMockTimeline(mockData.timestamps),
-        });
-      } else {
-        triggerToast(`Không tìm thấy mã vận đơn ${cleanCode}!`, 'error');
-      }
+      setCurrentTracking(null);
+      setLiveDriverPos(null);
+      triggerToast(`Lỗi kết nối khi tra cứu mã ${cleanCode}!`, 'error');
     } finally {
       setIsTrackingLoading(false);
     }
@@ -149,12 +108,6 @@ const AppContent: React.FC = () => {
     if (e.key === 'Enter') {
       handleTrackSubmit();
     }
-  };
-
-  const handleTableTrack = (code: string) => {
-    setTrackingCode(code);
-    fetchTrackingData(code);
-    document.getElementById('tracking')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   // Render Admin Dashboard if user is logged in and view mode is dashboard
@@ -192,23 +145,19 @@ const AppContent: React.FC = () => {
 
               <div className="tracking-box-container">
                 <div className="tracking-search-bar">
-                  <Search className="search-icon" size={18} />
+                  <Search className="search-icon" size={17} />
                   <input
                     type="text"
-                    placeholder="Nhập mã vận đơn cần tra cứu (VD: TRK-10029381 hoặc ORD-66266482)..."
+                    placeholder="Nhập mã vận đơn tra cứu (VD: ORD-0419000003)..."
                     value={trackingCode}
                     onChange={(e) => setTrackingCode(e.target.value)}
                     onKeyPress={handleKeyPress}
                   />
                   <button className="btn btn-primary cursor-pointer disabled:opacity-50" onClick={handleTrackSubmit} disabled={isTrackingLoading}>
-                    {isTrackingLoading ? 'ĐANG TRA CỨU...' : 'TRA CỨU NGAY'}
+                    <span>{isTrackingLoading ? 'Đang tìm...' : 'Tra cứu ngay'}</span>
+                    {!isTrackingLoading && <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />}
                   </button>
                 </div>
-                <p className="search-tip">
-                  Mã vận đơn chạy thử:{' '}
-                  <strong className="cursor-pointer underline" onClick={() => { setTrackingCode('TRK-10029381'); handleTableTrack('TRK-10029381'); }}>TRK-10029381</strong>,{' '}
-                  <strong className="cursor-pointer underline" onClick={() => { setTrackingCode('TRK-20938472'); handleTableTrack('TRK-20938472'); }}>TRK-20938472</strong>
-                </p>
               </div>
             </div>
           </section>

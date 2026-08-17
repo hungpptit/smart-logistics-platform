@@ -38,29 +38,41 @@ class _ProfileTabState extends State<ProfileTab> {
         } else {
           _phone = 'Chưa thiết lập';
         }
-        
-        _addresses = addresses.map((item) {
-          final addrType = item['addressType'] ?? 'HOME';
-          final isDefault = item['isDefault'] ?? false;
-          final addrObj = item['address'] ?? {};
-          final label = addrType == 'HOME' ? 'Địa chỉ nhận hàng (Nhà riêng)' : 'Địa chỉ lấy hàng (Văn phòng)';
-          final addressText = addrObj['formattedAddress'] ?? addrObj['addressLine1'] ?? '';
-          return {
-            'label': label,
-            'address': addressText,
-            'isDefault': isDefault,
-          };
-        }).toList();
+        _addresses = addresses;
       });
     }
   }
 
-  void _showAddAddressDialog() {
-    final addressLineController = TextEditingController();
-    final wardController = TextEditingController();
-    final provinceController = TextEditingController();
-    String selectedType = 'HOME';
-    bool isDefault = false;
+  void _showAddressDialog({Map<String, dynamic>? editItem}) {
+    final bool isEditing = editItem != null;
+    final addrObj = isEditing && editItem['address'] is Map
+        ? editItem['address'] as Map<String, dynamic>
+        : (editItem ?? {});
+
+    final customerId = (editItem?['customerId'] ?? '').toString();
+    final addressId = (editItem?['addressId'] ?? editItem?['id'] ?? addrObj['id'] ?? '').toString();
+
+    final contactNameController = TextEditingController(
+      text: editItem?['contactName'] ?? addrObj['contactName'] ?? _username,
+    );
+    final contactPhoneController = TextEditingController(
+      text: editItem?['contactPhone'] ?? addrObj['contactPhone'] ?? (_phone != 'Chưa thiết lập' ? _phone : ''),
+    );
+    final addressLineController = TextEditingController(
+      text: addrObj['addressLine1'] ?? '',
+    );
+    final wardController = TextEditingController(
+      text: addrObj['wardRelation']?['fullName'] ?? addrObj['wardRelation']?['name'] ?? addrObj['wardName'] ?? addrObj['ward'] ?? '',
+    );
+    final provinceController = TextEditingController(
+      text: addrObj['wardRelation']?['province']?['fullName'] ?? addrObj['wardRelation']?['province']?['name'] ?? addrObj['provinceName'] ?? addrObj['province'] ?? '',
+    );
+
+    String selectedType = editItem?['addressType'] ?? 'HOME';
+    if (selectedType != 'HOME' && selectedType != 'WORK') {
+      selectedType = 'HOME';
+    }
+    bool isDefault = editItem?['isDefault'] == true;
     bool dialogLoading = false;
 
     showDialog(
@@ -72,20 +84,65 @@ class _ProfileTabState extends State<ProfileTab> {
               backgroundColor: AppColors.pureWhite,
               surfaceTintColor: Colors.transparent,
               shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-              title: Text(
-                'Thêm địa chỉ mới',
-                style: AppTypography.headlineMd.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.deepOnyx,
-                ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6.0),
+                    decoration: BoxDecoration(
+                      color: AppColors.logisticsRed.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isEditing ? Icons.edit_location_alt : Icons.add_location_alt,
+                      color: AppColors.logisticsRed,
+                      size: 20.0,
+                    ),
+                  ),
+                  const SizedBox(width: 8.0),
+                  Text(
+                    isEditing ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ mới',
+                    style: AppTypography.headlineMd.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.deepOnyx,
+                      fontSize: 16.0,
+                    ),
+                  ),
+                ],
               ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Contact Name
+                    Text('Tên người liên hệ', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
+                    const SizedBox(height: 6.0),
+                    TextField(
+                      controller: contactNameController,
+                      decoration: InputDecoration(
+                        hintText: 'VD: Nguyễn Văn A',
+                        border: OutlineInputBorder(borderRadius: AppStyles.roundedLg),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                      ),
+                    ),
+                    const SizedBox(height: 12.0),
+
+                    // Contact Phone
+                    Text('Số điện thoại liên hệ', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
+                    const SizedBox(height: 6.0),
+                    TextField(
+                      controller: contactPhoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        hintText: 'VD: 0901234567',
+                        border: OutlineInputBorder(borderRadius: AppStyles.roundedLg),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                      ),
+                    ),
+                    const SizedBox(height: 12.0),
+
                     // Address Line 1
-                    Text('Địa chỉ (Số nhà, tên đường)', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
+                    Text('Địa chỉ (Số nhà, tên đường) *', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
                     const SizedBox(height: 6.0),
                     TextField(
                       controller: addressLineController,
@@ -98,7 +155,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     const SizedBox(height: 12.0),
 
                     // Ward
-                    Text('Phường / Xã', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
+                    Text('Phường / Xã *', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
                     const SizedBox(height: 6.0),
                     TextField(
                       controller: wardController,
@@ -111,7 +168,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     const SizedBox(height: 12.0),
 
                     // Province
-                    Text('Tỉnh / Thành phố', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
+                    Text('Tỉnh / Thành phố *', style: AppTypography.labelMd.copyWith(color: AppColors.deepOnyx)),
                     const SizedBox(height: 6.0),
                     TextField(
                       controller: provinceController,
@@ -134,7 +191,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       ),
                       items: const [
                         DropdownMenuItem(value: 'HOME', child: Text('Nhà riêng')),
-                        DropdownMenuItem(value: 'WORK', child: Text('Văn phòng')),
+                        DropdownMenuItem(value: 'WORK', child: Text('Văn phòng / Kho')),
                       ],
                       onChanged: (val) {
                         if (val != null) {
@@ -181,6 +238,8 @@ class _ProfileTabState extends State<ProfileTab> {
                           final addrLine = addressLineController.text.trim();
                           final ward = wardController.text.trim();
                           final prov = provinceController.text.trim();
+                          final cName = contactNameController.text.trim();
+                          final cPhone = contactPhoneController.text.trim();
 
                           if (addrLine.isEmpty || ward.isEmpty || prov.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -193,21 +252,38 @@ class _ProfileTabState extends State<ProfileTab> {
                             dialogLoading = true;
                           });
 
-                          final res = await AuthService.addAddress(
-                            addressLine1: addrLine,
-                            ward: ward,
-                            province: prov,
-                            addressType: selectedType,
-                            isDefault: isDefault,
-                          );
+                          Map<String, dynamic> res;
+                          if (isEditing && customerId.isNotEmpty && addressId.isNotEmpty) {
+                            res = await AuthService.updateAddress(
+                              customerId: customerId,
+                              addressId: addressId,
+                              addressLine1: addrLine,
+                              ward: ward,
+                              province: prov,
+                              contactName: cName,
+                              contactPhone: cPhone,
+                              addressType: selectedType,
+                              isDefault: isDefault,
+                            );
+                          } else {
+                            res = await AuthService.addAddress(
+                              addressLine1: addrLine,
+                              ward: ward,
+                              province: prov,
+                              contactName: cName,
+                              contactPhone: cPhone,
+                              addressType: selectedType,
+                              isDefault: isDefault,
+                            );
+                          }
 
                           if (context.mounted) {
-                            Navigator.pop(context); // close dialog
+                            Navigator.pop(context);
                             if (res['success'] == true) {
-                              _loadProfileData(); // Reload list!
+                              _loadProfileData();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(res['message'] ?? 'Thêm địa chỉ thành công!'),
+                                  content: Text(res['message'] ?? (isEditing ? 'Cập nhật địa chỉ thành công!' : 'Thêm địa chỉ thành công!')),
                                   backgroundColor: Colors.green,
                                 ),
                               );
@@ -231,11 +307,80 @@ class _ProfileTabState extends State<ProfileTab> {
                           height: 20.0,
                           child: CircularProgressIndicator(color: AppColors.pureWhite, strokeWidth: 2.0),
                         )
-                      : Text('Lưu', style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite)),
+                      : Text(isEditing ? 'Cập nhật' : 'Lưu', style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite)),
                 ),
               ],
             );
           },
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteAddress(Map<String, dynamic> item) {
+    final customerId = (item['customerId'] ?? '').toString();
+    final addressId = (item['addressId'] ?? item['id'] ?? item['address']?['id'] ?? '').toString();
+
+    if (customerId.isEmpty || addressId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tìm thấy mã định danh địa chỉ để xóa')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppColors.pureWhite,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
+          title: Text(
+            'Xác nhận xóa',
+            style: AppTypography.headlineMd.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppColors.deepOnyx,
+            ),
+          ),
+          content: const Text(
+            'Bạn có chắc chắn muốn xóa địa chỉ này khỏi sổ địa chỉ không?',
+            style: TextStyle(fontSize: 14.0),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Hủy', style: AppTypography.labelLg.copyWith(color: AppColors.secondary)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final res = await AuthService.deleteAddress(customerId: customerId, addressId: addressId);
+                if (mounted) {
+                  if (res['success'] == true) {
+                    _loadProfileData();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(res['message'] ?? 'Xóa địa chỉ thành công!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(res['message'] ?? 'Xóa địa chỉ thất bại'),
+                        backgroundColor: AppColors.logisticsRed,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.logisticsRed,
+                shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
+              ),
+              child: Text('Xóa', style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite)),
+            ),
+          ],
         );
       },
     );
@@ -351,24 +496,33 @@ class _ProfileTabState extends State<ProfileTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Sổ địa chỉ mặc định',
+                'Sổ địa chỉ đã lưu (${_addresses.length})',
                 style: AppTypography.headlineMd.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.deepOnyx,
                   fontSize: 18.0,
                 ),
               ),
-              if (_addresses.isNotEmpty)
-                GestureDetector(
-                  onTap: _showAddAddressDialog,
-                  child: Text(
-                    'Quản lý',
-                    style: AppTypography.labelMd.copyWith(
-                      color: AppColors.logisticsRed,
-                      fontWeight: FontWeight.bold,
-                    ),
+              InkWell(
+                onTap: () => _showAddressDialog(),
+                borderRadius: BorderRadius.circular(6.0),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.add, size: 16.0, color: AppColors.logisticsRed),
+                      const SizedBox(width: 4.0),
+                      Text(
+                        'Thêm mới',
+                        style: AppTypography.labelMd.copyWith(
+                          color: AppColors.logisticsRed,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 12.0),
@@ -386,12 +540,8 @@ class _ProfileTabState extends State<ProfileTab> {
                     itemCount: _addresses.length,
                     separatorBuilder: (context, index) => const Divider(height: 1.0, color: AppColors.surfaceContainer),
                     itemBuilder: (context, index) {
-                      final addr = _addresses[index];
-                      return _buildAddressRow(
-                        addr['label'] ?? '',
-                        addr['address'] ?? '',
-                        isDefault: addr['isDefault'] ?? false,
-                      );
+                      final item = _addresses[index];
+                      return _buildAddressRow(item);
                     },
                   ),
                 )
@@ -433,7 +583,7 @@ class _ProfileTabState extends State<ProfileTab> {
                         height: 36.0,
                         child: OutlinedButton.icon(
                           onPressed: () {
-                            _showAddAddressDialog();
+                            _showAddressDialog();
                           },
                           icon: const Icon(Icons.add, size: 16.0, color: AppColors.logisticsRed),
                           label: Text(
@@ -544,59 +694,133 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildAddressRow(String label, String address, {required bool isDefault}) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.location_on, color: AppColors.secondary, size: 20.0),
-          const SizedBox(width: 12.0),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8.0,
-                  runSpacing: 4.0,
-                  children: [
-                    Text(
-                      label,
-                      style: AppTypography.labelLg.copyWith(
-                        color: AppColors.deepOnyx,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (isDefault) ...[
+  Widget _buildAddressRow(Map<String, dynamic> item) {
+    final addrObj = item['address'] is Map ? item['address'] as Map<String, dynamic> : item;
+    final isDefault = item['isDefault'] == true;
+    final addrType = item['addressType'] ?? 'HOME';
+    final contactName = item['contactName'] ?? addrObj['contactName'] ?? '';
+    final contactPhone = item['contactPhone'] ?? addrObj['contactPhone'] ?? '';
+
+    final wardStr = addrObj['wardRelation']?['fullName'] ?? addrObj['wardRelation']?['name'] ?? addrObj['wardName'] ?? addrObj['ward'] ?? '';
+    final provStr = addrObj['wardRelation']?['province']?['fullName'] ?? addrObj['wardRelation']?['province']?['name'] ?? addrObj['provinceName'] ?? addrObj['province'] ?? '';
+    final line1 = addrObj['addressLine1'] ?? '';
+    final fullAddress = [line1, wardStr, provStr].where((s) => s.toString().trim().isNotEmpty).join(', ');
+
+    return InkWell(
+      onTap: () => _showAddressDialog(editItem: item),
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                color: isDefault ? AppColors.logisticsRed.withValues(alpha: 0.1) : AppColors.surfaceContainerLow,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.location_on,
+                color: isDefault ? AppColors.logisticsRed : AppColors.secondary,
+                size: 18.0,
+              ),
+            ),
+            const SizedBox(width: 12.0),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      if (isDefault)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                          margin: const EdgeInsets.only(right: 6.0),
+                          decoration: BoxDecoration(
+                            color: AppColors.logisticsRed,
+                            borderRadius: BorderRadius.circular(4.0),
+                          ),
+                          child: const Text(
+                            'Mặc định',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9.0,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                        margin: const EdgeInsets.only(right: 6.0),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryContainer.withValues(alpha: 0.1),
+                          color: AppColors.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(4.0),
+                          border: Border.all(color: AppColors.surfaceContainerHigh),
                         ),
                         child: Text(
-                          'Mặc định',
-                          style: AppTypography.labelMd.copyWith(
-                            color: AppColors.logisticsRed,
-                            fontSize: 8.0,
+                          addrType == 'HOME' ? 'Nhà riêng' : 'Văn phòng / Kho',
+                          style: const TextStyle(
+                            color: AppColors.secondary,
+                            fontSize: 9.0,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
+                      if (contactName.toString().isNotEmpty)
+                        Expanded(
+                          child: Text(
+                            contactName,
+                            style: AppTypography.labelLg.copyWith(
+                              color: AppColors.deepOnyx,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12.0,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                     ],
+                  ),
+                  const SizedBox(height: 6.0),
+                  Text(
+                    fullAddress.isNotEmpty ? fullAddress : 'Chưa có địa chỉ chi tiết',
+                    style: AppTypography.bodyMd.copyWith(
+                      color: AppColors.deepOnyx,
+                      fontSize: 12.5,
+                      height: 1.3,
+                    ),
+                  ),
+                  if (contactPhone.toString().isNotEmpty) ...[
+                    const SizedBox(height: 4.0),
+                    Text(
+                      'SĐT: $contactPhone',
+                      style: AppTypography.labelMd.copyWith(color: AppColors.secondary, fontSize: 11.0),
+                    ),
                   ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 4.0),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: () => _showAddressDialog(editItem: item),
+                  icon: const Icon(Icons.edit_outlined, size: 18.0, color: AppColors.secondary),
+                  tooltip: 'Chỉnh sửa',
+                  padding: const EdgeInsets.all(6.0),
+                  constraints: const BoxConstraints(),
                 ),
-                const SizedBox(height: 4.0),
-                Text(
-                  address,
-                  style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
+                IconButton(
+                  onPressed: () => _confirmDeleteAddress(item),
+                  icon: const Icon(Icons.delete_outline, size: 18.0, color: AppColors.logisticsRed),
+                  tooltip: 'Xóa',
+                  padding: const EdgeInsets.all(6.0),
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
-          ),
-          const Icon(Icons.chevron_right, color: AppColors.secondary, size: 18.0),
-        ],
+          ],
+        ),
       ),
     );
   }

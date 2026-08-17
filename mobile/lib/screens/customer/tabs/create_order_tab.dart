@@ -13,12 +13,14 @@ import '../../../core/theme/app_styles.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../services/location_service.dart';
 import '../../../services/order_service.dart';
+import '../../../services/auth_service.dart';
 import 'create_order/order_step_indicator.dart';
 import 'create_order/form_section_header.dart';
 import 'create_order/service_option_card.dart';
 import 'create_order/map_preview_widget.dart';
 import 'create_order/segmented_toggle.dart';
 import 'create_order/price_summary_card.dart';
+import 'create_order/saved_address_selector.dart';
 
 class CreateOrderTab extends StatefulWidget {
   final VoidCallback onOrderCreated;
@@ -65,6 +67,11 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
   String _feePayer = 'SENDER'; // 'SENDER', 'RECEIVER'
   String _paymentMethodCode = 'CASH'; // 'CASH', 'COD', 'BANK_TRANSFER', 'E_WALLET'
   String _serviceLevel = 'EXPRESS'; // 'EXPRESS', 'STANDARD', 'SAVING', 'COLD_CHAIN'
+
+  // Saved Addresses Quick Selector States (Shopee Style)
+  List<Map<String, dynamic>> _savedAddresses = [];
+  bool _loadingSavedAddresses = false;
+  String? _selectedSenderAddressId;
 
   // Address Autocomplete Suggestions
   List<AddressPrediction> _senderSuggestions = [];
@@ -170,6 +177,125 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
 
     _initAddressListeners();
     _initDataAndLocate();
+    _loadSavedAddressesAndProfile();
+  }
+
+  Future<void> _loadSavedAddressesAndProfile() async {
+    if (!mounted) return;
+    setState(() {
+      _loadingSavedAddresses = true;
+    });
+    try {
+      final addrs = await AuthService.fetchAddresses();
+      if (mounted) {
+        setState(() {
+          _savedAddresses = addrs;
+          _loadingSavedAddresses = false;
+        });
+
+        if (addrs.isNotEmpty) {
+          final defaultAddr = addrs.firstWhere(
+            (a) => a['isDefault'] == true,
+            orElse: () => addrs.first,
+          );
+          if (_senderAddressController.text.isEmpty && _senderNameController.text.isEmpty) {
+            _applySavedAddressToSender(defaultAddr);
+          }
+        } else {
+          final username = await AuthService.getStoredUsername();
+          final phone = await AuthService.getStoredPhone();
+          if (_senderNameController.text.isEmpty && username != null && username.isNotEmpty) {
+            _senderNameController.text = username;
+          }
+          if (_senderPhoneController.text.isEmpty && phone != null && phone.isNotEmpty) {
+            _senderPhoneController.text = phone;
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingSavedAddresses = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _applySavedAddressToSender(Map<String, dynamic> item) async {
+    final itemId = (item['addressId'] ?? item['id'] ?? item['address']?['id'])?.toString();
+    setState(() {
+      _selectedSenderAddressId = itemId;
+    });
+
+    final addr = (item['address'] is Map) ? item['address'] as Map<String, dynamic> : item;
+    final wardCode = addr['wardCode'] ?? addr['wardRelation']?['code']?.toString() ?? '';
+    final provinceCode = addr['wardRelation']?['provinceCode']?.toString() ??
+        addr['wardRelation']?['province']?['code']?.toString() ??
+        addr['provinceCode']?.toString() ??
+        '';
+    final wardName = addr['wardRelation']?['fullName'] ??
+        addr['wardRelation']?['name'] ??
+        addr['wardName'] ??
+        addr['ward'] ??
+        '';
+    final provinceName = addr['wardRelation']?['province']?['fullName'] ??
+        addr['wardRelation']?['province']?['name'] ??
+        addr['provinceName'] ??
+        addr['province'] ??
+        '';
+
+    String rawAddressLine1 = (addr['addressLine1'] ?? '').toString();
+    if (wardName.isNotEmpty) {
+      rawAddressLine1 = rawAddressLine1.replaceAll(RegExp(',\\s*${RegExp.escape(wardName)}', caseSensitive: false), '');
+    }
+    if (provinceName.isNotEmpty) {
+      rawAddressLine1 = rawAddressLine1.replaceAll(RegExp(',\\s*${RegExp.escape(provinceName)}', caseSensitive: false), '');
+    }
+    final cleanedAddressLine1 = rawAddressLine1.trim();
+
+    final contactName = (item['contactName'] ?? addr['contactName'] ?? '').toString().trim();
+    final contactPhone = (item['contactPhone'] ?? addr['contactPhone'] ?? '').toString().trim();
+    final storedName = await AuthService.getStoredUsername() ?? '';
+    final storedPhone = await AuthService.getStoredPhone() ?? '';
+
+    _senderNameController.text = contactName.isNotEmpty ? contactName : storedName;
+    _senderPhoneController.text = contactPhone.isNotEmpty ? contactPhone : storedPhone;
+    _senderAddressController.text = cleanedAddressLine1;
+
+    if (provinceCode.isNotEmpty) {
+      _senderProvinceCode = provinceCode;
+      final w = await LocationService.fetchWards(provinceCode);
+      if (mounted) {
+        setState(() {
+          _senderWards = w;
+          if (wardCode.isNotEmpty) {
+            _senderWardCode = wardCode;
+          }
+        });
+      }
+    }
+
+    if (addr['latitude'] != null && addr['longitude'] != null) {
+      final lat = (addr['latitude'] as num).toDouble();
+      final lng = (addr['longitude'] as num).toDouble();
+      if (lat != 0 && lng != 0) {
+        setState(() {
+          _senderLat = lat;
+          _senderLng = lng;
+        });
+        try {
+          _senderMapController.move(LatLng(lat, lng), 15.0);
+        } catch (_) {}
+      }
+    }
+
+    _calculatePrice();
+  }
+
+  void _clearSelectedSavedAddress() {
+    setState(() {
+      _selectedSenderAddressId = null;
+    });
   }
 
   Future<void> _initDataAndLocate() async {
@@ -1283,6 +1409,15 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
                   if (_currentStep == 0) ...[
                     // Section 1: Pickup Info
                     const FormSectionHeader(num: 1, title: 'Thong tin nguoi gui & diem lay hang'),
+                    const SizedBox(height: 12.0),
+                    SavedAddressSelector(
+                      savedAddresses: _savedAddresses,
+                      selectedAddressId: _selectedSenderAddressId,
+                      isLoading: _loadingSavedAddresses,
+                      onSelectAddress: (item) => _applySavedAddressToSender(item),
+                      onSelectManual: _clearSelectedSavedAddress,
+                      onRefreshAddresses: _loadSavedAddressesAndProfile,
+                    ),
                     const SizedBox(height: 12.0),
                     FormCard(
                       children: [

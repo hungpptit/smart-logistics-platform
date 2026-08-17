@@ -417,8 +417,13 @@ class AuthService {
     required String addressLine1,
     required String ward,
     required String province,
+    String? wardCode,
+    String? contactName,
+    String? contactPhone,
     required String addressType,
     required bool isDefault,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       final token = await getToken();
@@ -436,10 +441,13 @@ class AuthService {
           'addressLine1': addressLine1,
           'ward': ward,
           'province': province,
+          if (wardCode != null && wardCode.isNotEmpty) 'wardCode': wardCode,
+          if (contactName != null && contactName.isNotEmpty) 'contactName': contactName,
+          if (contactPhone != null && contactPhone.isNotEmpty) 'contactPhone': contactPhone,
           'addressType': addressType,
           'isDefault': isDefault,
-          'latitude': 10.7725, // default HCM city center coords
-          'longitude': 106.6980,
+          'latitude': latitude ?? 10.7725,
+          'longitude': longitude ?? 106.6980,
         }),
       );
 
@@ -453,6 +461,107 @@ class AuthService {
         return {
           'success': false,
           'message': _extractErrorMessage(responseData, 'Thêm địa chỉ thất bại'),
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.',
+      };
+    }
+  }
+
+  // Update address in customer address book
+  static Future<Map<String, dynamic>> updateAddress({
+    required String customerId,
+    required String addressId,
+    required String addressLine1,
+    required String ward,
+    required String province,
+    String? wardCode,
+    String? contactName,
+    String? contactPhone,
+    required String addressType,
+    required bool isDefault,
+    double? latitude,
+    double? longitude,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'message': 'Yêu cầu đăng nhập'};
+      }
+
+      final url = ApiConstants.customerAddressDetail(customerId, addressId);
+      final response = await http.put(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'addressLine1': addressLine1,
+          'ward': ward,
+          'province': province,
+          if (wardCode != null && wardCode.isNotEmpty) 'wardCode': wardCode,
+          if (contactName != null && contactName.isNotEmpty) 'contactName': contactName,
+          if (contactPhone != null && contactPhone.isNotEmpty) 'contactPhone': contactPhone,
+          'addressType': addressType,
+          'isDefault': isDefault,
+          'latitude': latitude ?? 10.7725,
+          'longitude': longitude ?? 106.6980,
+        }),
+      );
+
+      final responseData = jsonDecode(response.body);
+      if ((response.statusCode == 200 || response.statusCode == 201) && responseData['success'] == true) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Cập nhật địa chỉ thành công',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': _extractErrorMessage(responseData, 'Cập nhật địa chỉ thất bại'),
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.',
+      };
+    }
+  }
+
+  // Delete address from customer address book
+  static Future<Map<String, dynamic>> deleteAddress({
+    required String customerId,
+    required String addressId,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'message': 'Yêu cầu đăng nhập'};
+      }
+
+      final url = ApiConstants.customerAddressDetail(customerId, addressId);
+      final response = await http.delete(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = jsonDecode(response.body);
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Xóa địa chỉ thành công',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': _extractErrorMessage(responseData, 'Xóa địa chỉ thất bại'),
         };
       }
     } catch (e) {

@@ -4,7 +4,7 @@ export class GeocodingService {
    */
   public async geocode(address: string): Promise<{ latitude: number; longitude: number; formattedAddress: string }> {
     const GOONG_API_KEY = process.env.GOONG_API_KEY;
-    
+
     if (GOONG_API_KEY) {
       try {
         const url = `https://rsapi.goong.io/Geocode?address=${encodeURIComponent(address)}&api_key=${GOONG_API_KEY}`;
@@ -28,7 +28,7 @@ export class GeocodingService {
     try {
       // Gọi thử API Nominatim (OpenStreetMap) - miễn phí và không cần API key
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
-      
+
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'SmartLogisticsPlatform/1.0'
@@ -53,11 +53,11 @@ export class GeocodingService {
     // Cơ chế Fallback: Sinh tọa độ ngẫu nhiên gần Hà Nội hoặc TP.HCM dựa trên từ khóa trong địa chỉ
     const addrLower = address.toLowerCase();
     const isHCMC = addrLower.includes('hồ chí minh') || addrLower.includes('hcm') || addrLower.includes('sài gòn') || addrLower.includes('hơi') || addrLower.includes('bình dương');
-    
+
     // Tọa độ gốc
     const baseLat = isHCMC ? 10.8231 : 21.0285;
     const baseLng = isHCMC ? 106.6297 : 105.8542;
-    
+
     // Offset nhỏ tránh trùng lặp tọa độ tuyệt đối
     const randomOffsetLat = (Math.random() - 0.5) * 0.05;
     const randomOffsetLng = (Math.random() - 0.5) * 0.05;
@@ -76,12 +76,12 @@ export class GeocodingService {
     const R = 6371; // Bán kính Trái Đất (km)
     const dLat = this.deg2rad(lat2 - lat1);
     const dLon = this.deg2rad(lon2 - lon1);
-    
-    const a = 
+
+    const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) * 
+      Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      
+
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const d = R * c; // Khoảng cách (km)
     return parseFloat(d.toFixed(2));

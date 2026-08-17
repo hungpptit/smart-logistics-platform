@@ -3,7 +3,7 @@ import '../config/app_config.dart';
 /// Centralized API Endpoints & Third-Party API Keys for Mobile App
 class ApiConstants {
   // Third-Party API Keys
-  static const String goongApiKey = 'eTwacoQyptGn7akdN8psZ68iNvMGD4xFd45Vu4X9';
+  static const String goongApiKey = 'eMakQnqI4WmtsVb5KNRIuRBQE5S9YxTbedZYs8CE';
 
   // Base Socket Gateway Server URL
   static String get socketServerUrl =>
@@ -41,6 +41,8 @@ class ApiConstants {
   static String totePackages(String toteCode) => '${AppConfig.baseUrl}/orders/tote/$toteCode/packages';
 
   static String get customerAddresses => '${AppConfig.baseUrl}/customers/me/addresses';
+  static String customerAddressDetail(String customerId, String addressId) =>
+      '${AppConfig.baseUrl}/customers/$customerId/addresses/$addressId';
   static String get forgotPassword => '${AppConfig.baseUrl}/auth/forgot-password';
 
   // Location Endpoints
