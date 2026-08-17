@@ -550,14 +550,28 @@ export class ShipmentService {
       let intermediateFacilityName = '';
 
       if (dto.status === 'IN_TRANSIT' && shipment.routeId && shipment.originFacilityId && shipment.destinationFacilityId) {
-        const originFac = await tx.facility.findUnique({ where: { id: shipment.originFacilityId } });
-        const destFac = await tx.facility.findUnique({ where: { id: shipment.destinationFacilityId } });
+        const originFac = await tx.facility.findUnique({
+          where: { id: shipment.originFacilityId },
+          include: { facilityType: true },
+        });
+        const destFac = await tx.facility.findUnique({
+          where: { id: shipment.destinationFacilityId },
+          include: { facilityType: true },
+        });
 
-        if (originFac?.regionSequence && destFac?.regionSequence) {
-          const seqA = originFac.regionSequence;
-          const seqB = destFac.regionSequence;
+        // 🛡️ CHỈ ÁP DỤNG DUY NHẤT CHO TUYẾN LIÊN MIỀN GIỮA 2 TỔNG KHO MIỀN (SORTING_CENTER - CẤP 1)
+        // Tuyệt đối KHÔNG áp dụng cho tuyến Cấp 3 (Bưu cục) hoặc Cấp 2 (Kho Tổng Tỉnh/TP)
+        const isInterRegionSortingCenter =
+          originFac?.facilityType?.typeCode === 'SORTING_CENTER' &&
+          destFac?.facilityType?.typeCode === 'SORTING_CENTER' &&
+          originFac?.regionSequence != null &&
+          destFac?.regionSequence != null;
 
-          // Check if non-adjacent regions (|seqA - seqB| > 1) e.g. South -> North
+        if (isInterRegionSortingCenter) {
+          const seqA = originFac.regionSequence!;
+          const seqB = destFac.regionSequence!;
+
+          // Check if non-adjacent regions (|seqA - seqB| > 1) e.g. South (2) -> North (5)
           if (Math.abs(seqA - seqB) > 1) {
             const scans = await tx.warehouseScan.findMany({
               where: { shipmentId: shipment.id, toteBagId: { not: null } },
@@ -569,6 +583,7 @@ export class ShipmentService {
             if (loadedTotesCount < 4) {
               const intermediateHubs = await tx.facility.findMany({
                 where: {
+                  facilityType: { typeCode: 'SORTING_CENTER' },
                   regionSequence: {
                     gt: Math.min(seqA, seqB),
                     lt: Math.max(seqA, seqB),
@@ -577,6 +592,7 @@ export class ShipmentService {
                 },
                 include: {
                   address: true,
+                  toteBags: { where: { status: 'SEALED' } },
                 },
                 orderBy: {
                   regionSequence: seqA < seqB ? 'asc' : 'desc',
@@ -584,7 +600,7 @@ export class ShipmentService {
               });
 
               if (intermediateHubs.length > 0) {
-                const targetHub = intermediateHubs[0];
+                const targetHub = intermediateHubs.find(h => h.toteBags.length > 0) || intermediateHubs[0];
                 const existingStop = await tx.routeStop.findFirst({
                   where: { routeId: shipment.routeId, facilityId: targetHub.id },
                 });
@@ -598,6 +614,7 @@ export class ShipmentService {
                   await tx.routeStop.create({
                     data: {
                       routeId: shipment.routeId,
+                      shipmentId: shipment.id,
                       sequence: 2,
                       facilityId: targetHub.id,
                       stopType: 'PICKUP',
@@ -606,6 +623,11 @@ export class ShipmentService {
                       latitude: targetHub.address?.latitude || 16.0678,
                       longitude: targetHub.address?.longitude || 108.2208,
                     },
+                  });
+
+                  await tx.route.update({
+                    where: { id: shipment.routeId },
+                    data: { totalStops: 3 },
                   });
 
                   consolidatedAdded = true;
@@ -684,8 +706,30 @@ export class ShipmentService {
       include: {
         order: {
           include: {
-            destinationFacility: { include: { address: true } },
-            originFacility: { include: { address: true } },
+            destinationFacility: {
+              include: {
+                address: true,
+                facilityType: true,
+                parentFacility: {
+                  include: {
+                    facilityType: true,
+                    parentFacility: true,
+                  },
+                },
+              },
+            },
+            originFacility: {
+              include: {
+                address: true,
+                facilityType: true,
+                parentFacility: {
+                  include: {
+                    facilityType: true,
+                    parentFacility: true,
+                  },
+                },
+              },
+            },
             pickupAddress: {
               include: {
                 wardRelation: {
@@ -788,85 +832,139 @@ export class ShipmentService {
       const senderProvCode = senderWard?.provinceCode || sampleOrder.originFacility?.provinceCode;
       const receiverProvCode = receiverWard?.provinceCode || sampleOrder.destinationFacility?.provinceCode;
 
-      // 2. Tìm các cơ sở kho trên từng nấc thang phân cấp:
-      // Cấp 3 gửi (Bưu cục gửi):
-      const wsOrigin = sampleOrder.originFacilityId
-        ? await prisma.facility.findUnique({ where: { id: sampleOrder.originFacilityId }, include: { facilityType: true } })
-        : (senderWardCode ? await prisma.facility.findFirst({ where: { address: { wardCode: senderWardCode } }, include: { facilityType: true } }) : null);
+      // 2. Phân cấp cơ sở kho Xuất Phát (Origin Side)
+      let wsOrigin: any = null;
+      let hubOrigin: any = null;
+      let scOrigin: any = null;
 
-      // Cấp 3 nhận (Bưu cục nhận):
-      const wsDest = sampleOrder.destinationFacilityId
-        ? await prisma.facility.findUnique({ where: { id: sampleOrder.destinationFacilityId }, include: { facilityType: true } })
-        : (receiverWardCode ? await prisma.facility.findFirst({ where: { address: { wardCode: receiverWardCode } }, include: { facilityType: true } }) : null);
+      const origFac = sampleOrder.originFacility;
+      if (origFac) {
+        const origType = origFac.facilityType?.typeCode;
+        if (origType === 'WARD_STATION' || origType === 'LAST_MILE_STATION' || origType === 'MICRO_HUB') {
+          wsOrigin = origFac;
+          hubOrigin = origFac.parentFacility;
+          scOrigin = origFac.parentFacility?.parentFacility;
+        } else if (origType === 'PROVINCIAL_HUB') {
+          hubOrigin = origFac;
+          scOrigin = origFac.parentFacility;
+        } else if (origType === 'SORTING_CENTER') {
+          scOrigin = origFac;
+        }
+      }
 
-      // Cấp 2 gửi (Kho Tổng Tỉnh gửi):
-      const hubOrigin = wsOrigin?.parentFacilityId
-        ? await prisma.facility.findUnique({ where: { id: wsOrigin.parentFacilityId }, include: { facilityType: true } })
-        : (senderProvCode ? await prisma.facility.findFirst({ where: { provinceCode: senderProvCode, facilityType: { typeCode: 'PROVINCIAL_HUB' }, operatingStatus: 'ACTIVE' }, include: { facilityType: true } }) : null);
+      // Fallbacks if not linked via hierarchy
+      if (!hubOrigin && senderProvCode) {
+        hubOrigin = await prisma.facility.findFirst({
+          where: { provinceCode: senderProvCode, facilityType: { typeCode: 'PROVINCIAL_HUB' }, operatingStatus: 'ACTIVE' },
+          include: { facilityType: true, parentFacility: true },
+        });
+      }
+      if (!scOrigin) {
+        if (hubOrigin?.parentFacilityId) {
+          scOrigin = await prisma.facility.findUnique({ where: { id: hubOrigin.parentFacilityId }, include: { facilityType: true } });
+        } else if (senderProvCode) {
+          scOrigin = await prisma.facility.findFirst({
+            where: { provinceCode: senderProvCode, facilityType: { typeCode: 'SORTING_CENTER' }, operatingStatus: 'ACTIVE' },
+            include: { facilityType: true },
+          });
+        }
+      }
 
-      // Cấp 2 nhận (Kho Tổng Tỉnh nhận):
-      const hubDest = wsDest?.parentFacilityId
-        ? await prisma.facility.findUnique({ where: { id: wsDest.parentFacilityId }, include: { facilityType: true } })
-        : (receiverProvCode ? await prisma.facility.findFirst({ where: { provinceCode: receiverProvCode, facilityType: { typeCode: 'PROVINCIAL_HUB' }, operatingStatus: 'ACTIVE' }, include: { facilityType: true } }) : null);
+      // 3. Phân cấp cơ sở kho Đích Đến (Destination Side)
+      let wsDest: any = null;
+      let hubDest: any = null;
+      let scDest: any = null;
 
-      // Cấp 1 gửi (Tổng Kho Miền gửi):
-      const scOrigin = hubOrigin?.parentFacilityId
-        ? await prisma.facility.findUnique({ where: { id: hubOrigin.parentFacilityId }, include: { facilityType: true } })
-        : (senderProvCode ? await prisma.facility.findFirst({ where: { provinceCode: senderProvCode, facilityType: { typeCode: 'SORTING_CENTER' }, operatingStatus: 'ACTIVE' }, include: { facilityType: true } }) : null);
+      const destFac = sampleOrder.destinationFacility;
+      if (destFac) {
+        const destType = destFac.facilityType?.typeCode;
+        if (destType === 'WARD_STATION' || destType === 'LAST_MILE_STATION' || destType === 'MICRO_HUB') {
+          wsDest = destFac;
+          hubDest = destFac.parentFacility;
+          scDest = destFac.parentFacility?.parentFacility;
+        } else if (destType === 'PROVINCIAL_HUB') {
+          hubDest = destFac;
+          scDest = destFac.parentFacility;
+        } else if (destType === 'SORTING_CENTER') {
+          scDest = destFac;
+        }
+      }
 
-      // Cấp 1 nhận (Tổng Kho Miền nhận):
-      const scDest = hubDest?.parentFacilityId
-        ? await prisma.facility.findUnique({ where: { id: hubDest.parentFacilityId }, include: { facilityType: true } })
-        : (receiverProvCode ? await prisma.facility.findFirst({ where: { provinceCode: receiverProvCode, facilityType: { typeCode: 'SORTING_CENTER' }, operatingStatus: 'ACTIVE' }, include: { facilityType: true } }) : null);
+      // Fallbacks for Destination
+      if (!hubDest && receiverProvCode) {
+        hubDest = await prisma.facility.findFirst({
+          where: { provinceCode: receiverProvCode, facilityType: { typeCode: 'PROVINCIAL_HUB' }, operatingStatus: 'ACTIVE' },
+          include: { facilityType: true, parentFacility: true },
+        });
+      }
+      if (!scDest) {
+        if (hubDest?.parentFacilityId) {
+          scDest = await prisma.facility.findUnique({ where: { id: hubDest.parentFacilityId }, include: { facilityType: true } });
+        } else if (receiverProvCode) {
+          scDest = await prisma.facility.findFirst({
+            where: { provinceCode: receiverProvCode, facilityType: { typeCode: 'SORTING_CENTER' }, operatingStatus: 'ACTIVE' },
+            include: { facilityType: true },
+          });
+        }
+      }
 
-      // 3. Xây dựng Chuỗi Trạm Dừng (Pipeline) linh hoạt theo đúng 4 Kịch Bản:
+      // 4. Xây dựng Chuỗi Trạm Dừng (Pipeline) linh hoạt theo đúng 4 Kịch Bản:
       const senderRegionId = senderWard?.province?.administrativeRegionId || sampleOrder.pickupAddress?.wardRelation?.province?.administrativeRegionId;
       const receiverRegionId = receiverWard?.province?.administrativeRegionId || sampleOrder.deliveryAddress?.wardRelation?.province?.administrativeRegionId;
 
       const isSameRegion = (senderRegionId && receiverRegionId && senderRegionId === receiverRegionId) ||
                            (scOrigin && scDest && scOrigin.id === scDest.id);
 
-      let pipeline: (any | null)[] = [];
+      let rawPipeline: (any | null)[] = [];
 
       // CASE 1: Cùng Phường/Xã (3 - 3) -> Giao nội bộ bưu cục
-      if (senderWardCode && receiverWardCode && senderWardCode === receiverWardCode) {
-        pipeline = [wsOrigin || wsDest];
+      if (senderWardCode && receiverWardCode && senderWardCode === receiverWardCode && (wsOrigin?.id === wsDest?.id)) {
+        rawPipeline = [wsOrigin || wsDest];
       }
       // CASE 2: Khác Phường/Xã cùng Tỉnh/TP (3 - 2 - 3) -> Qua Kho Tổng Tỉnh
       else if (senderProvCode && receiverProvCode && senderProvCode === receiverProvCode) {
-        pipeline = [wsOrigin, hubOrigin || hubDest, wsDest];
+        rawPipeline = [wsOrigin, hubOrigin || hubDest, wsDest];
       }
       // CASE 3: Khác Tỉnh/TP cùng Miền (3 - 2 - 1 - 2 - 3) -> Qua 1 Tổng Kho Miền
       else if (isSameRegion) {
-        pipeline = [wsOrigin, hubOrigin, scOrigin || scDest, hubDest, wsDest];
+        rawPipeline = [wsOrigin, hubOrigin, scOrigin || scDest, hubDest, wsDest];
       }
       // CASE 4: Khác Miền (3 - 2 - 1 - 1 - 2 - 3) -> Qua 2 Tổng Kho Miền (Trục Bắc - Nam)
       else {
-        pipeline = [wsOrigin, hubOrigin, scOrigin, scDest, hubDest, wsDest];
+        rawPipeline = [wsOrigin, hubOrigin, scOrigin, scDest, hubDest, wsDest];
       }
 
       // Lọc bỏ null và các trạm trùng lặp liên tiếp trong pipeline
       const validPipeline: any[] = [];
-      for (const node of pipeline) {
+      for (const node of rawPipeline) {
         if (node && (!validPipeline.length || validPipeline[validPipeline.length - 1].id !== node.id)) {
           validPipeline.push(node);
         }
       }
 
-      // 4. Tìm vị trí của Kho hiện tại (originFac) trong Pipeline để xác định trạm tiếp theo:
-      let currentIdx = validPipeline.findIndex((node) => node.id === originFac.id);
+      // 5. Tìm vị trí của Kho hiện tại (originFac) trong Pipeline để xác định trạm tiếp theo theo chiều tịnh tiến (Forward progression):
+      let currentIdx = -1;
+      const matchingIndices: number[] = [];
+      validPipeline.forEach((node, idx) => {
+        if (node.id === originFac.id) matchingIndices.push(idx);
+      });
 
-      // Nếu không tìm thấy chính xác theo ID (ví dụ kho hiện tại là FAC-SC-NORTH nhưng pipeline ghi nhận FAC-SC-REGION2):
-      // So khớp theo cấp độ kho (facilityType) và provinceCode
-      if (currentIdx === -1) {
+      if (matchingIndices.length === 1) {
+        currentIdx = matchingIndices[0];
+      } else if (matchingIndices.length > 1) {
+        currentIdx = matchingIndices[0];
+      } else {
         const originType = originFac.facilityType?.typeCode;
-        if (originType === 'WARD_STATION') {
-          currentIdx = 0;
+        if (originType === 'WARD_STATION' || originType === 'LAST_MILE_STATION' || originType === 'MICRO_HUB') {
+          currentIdx = validPipeline.findIndex(p => p.id === wsOrigin?.id);
         } else if (originType === 'PROVINCIAL_HUB') {
-          currentIdx = (senderProvCode === originFac.provinceCode) ? 1 : (validPipeline.length - 2);
+          currentIdx = (senderProvCode === originFac.provinceCode)
+            ? validPipeline.findIndex(p => p.id === hubOrigin?.id)
+            : validPipeline.findIndex(p => p.id === hubDest?.id);
         } else if (originType === 'SORTING_CENTER') {
-          // Nếu ở miền nhận -> trạm Cấp 1 nhận
-          currentIdx = (receiverProvCode === originFac.provinceCode || originFac.facilityCode?.includes('NORTH')) ? (validPipeline.length - 3) : 2;
+          currentIdx = (receiverProvCode === originFac.provinceCode || originFac.facilityCode?.includes('NORTH'))
+            ? validPipeline.findIndex(p => p.id === scDest?.id)
+            : validPipeline.findIndex(p => p.id === scOrigin?.id);
         }
       }
 
@@ -1024,7 +1122,7 @@ export class ShipmentService {
         });
       }
 
-      // Ensure RouteStops exist and point to the correct Destination Facility
+      // Ensure standard 2 RouteStops (Origin -> Destination) exist while loading
       const existingStops = await tx.routeStop.findMany({
         where: { routeId: route.id },
         orderBy: { sequence: 'asc' },
@@ -1062,18 +1160,23 @@ export class ShipmentService {
               addressSnapshot: destFac
                 ? `${destFac.facilityName} - ${destFac.address?.addressLine1 || ''}`
                 : 'Bưu cục / Hub nhận hàng trung chuyển',
-              latitude: destFac.address?.latitude ? Number(destFac.address.latitude) : 11.3520,
-              longitude: destFac.address?.longitude ? Number(destFac.address.longitude) : 106.1820,
+              latitude: destFac.address?.latitude ? Number(destFac.address.latitude) : 21.0285,
+              longitude: destFac.address?.longitude ? Number(destFac.address.longitude) : 105.8542,
               status: RouteStopStatus.PENDING,
             },
           });
         }
+
+        await tx.route.update({
+          where: { id: route.id },
+          data: { totalStops: 2 },
+        });
       } else {
         // Update destination stop sequence 2 if destFac changed
-        const stop2 = existingStops.find((s) => s.sequence === 2);
-        if (stop2 && destFac && stop2.facilityId !== destFac.id) {
+        const lastStop = existingStops[existingStops.length - 1];
+        if (lastStop && destFac && lastStop.facilityId !== destFac.id) {
           await tx.routeStop.update({
-            where: { id: stop2.id },
+            where: { id: lastStop.id },
             data: {
               facilityId: destFac.id,
               addressSnapshot: `${destFac.facilityName} - ${destFac.address?.addressLine1 || ''}`,

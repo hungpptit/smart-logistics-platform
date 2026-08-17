@@ -12,6 +12,7 @@
     "db:clean": "tsx prisma/reset_all_test_data.ts",
     "db:reset-test": "tsx prisma/reset_all_test_data.ts",
     "db:restore-totes": "tsx scripts/restore_totes_and_orders.ts",
+    "db:restore-south-hub": "tsx scripts/restore_south_sorting_center_inbound.ts",
     "reset:demo": "tsx scripts/reset_route_demo_data.ts"
   },
   "prisma": {
