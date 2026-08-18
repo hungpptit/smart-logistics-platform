@@ -32,42 +32,37 @@
 Hệ thống **Smart Logistics Platform (SLP)** được thiết kế theo mô hình **Kiến trúc Hướng Sự kiện chịu tải cao (High-Performance Event-Driven Architecture - EDA)**, phân tách rõ ràng thành các tầng độc lập nhưng liên kết chặt chẽ thông qua giao thức REST API và WebSockets.
 
 ```mermaid
-graph TD
-    %% Clients
+flowchart TD
     subgraph Clients ["1. LỚP GIAO DIỆN NGƯỜI DÙNG (CLIENT LAYER)"]
-        Web["💻 Web Admin / Command Center<br/>(React 19 + TypeScript + Vite + Tailwind CSS)"]
-        Mobile["📱 Mobile App Shipper<br/>(Flutter / Dart - Background GPS & QR Scanner)"]
-        CustomerWeb["🌐 Public Tracking Landing Page<br/>(Tra cứu đơn Live Radar không cần đăng nhập)"]
+        Web["Web Admin / Command Center<br/>(React 19 + TypeScript + Vite + Tailwind)"]
+        Mobile["Mobile App Shipper<br/>(Flutter - Background GPS & QR Scan)"]
+        CustomerWeb["Public Tracking Landing Page<br/>(Tra cứu đơn Live Radar công khai)"]
     end
 
-    %% Gateway & Core
     subgraph BackendGateway ["2. LỚP ĐIỀU PHỐI & BACKEND (BACKEND LAYER)"]
-        Express["🚀 REST API Gateway (Express.js + TypeScript)"]
-        SocketIO["⚡ Real-time Streaming Server (Socket.io)"]
-        Prisma["🛡️ Prisma ORM (Type-Safe Data Mapping)"]
+        Express["REST API Gateway<br/>(Express.js + TypeScript)"]
+        SocketIO["Real-time Streaming Server<br/>(Socket.io)"]
+        Prisma["Prisma ORM<br/>(Type-Safe Data Mapping)"]
     end
 
-    %% AI Microservice
-    subgraph AIService ["3. LÕI TỐI ƯU HÓA TRÍ TUỆ NHÂN TẠO (AI ENGINE)"]
-        Clustering["📍 AI Clustering Service (K-Means / DBSCAN)"]
-        VRP["🧠 AI Routing Optimization (Genetic CVRP + VRPTW)"]
+    subgraph AIService ["3. LÕI TỐI ƯU HÓA AI (AI ENGINE)"]
+        Clustering["AI Clustering Service<br/>(K-Means / DBSCAN)"]
+        VRP["AI Routing Optimization<br/>(Genetic CVRP & VRPTW)"]
     end
 
-    %% Data Layer
-    subgraph DataStorage ["4. LỚP LƯU TRỮ DỮ LIỆU & CACHE (DATA LAYER)"]
-        PG[("🐘 PostgreSQL 15 + PostGIS<br/>(Persistent Storage 38 bảng & Geospatial)")]
-        Redis[("⚡ Redis 7 In-Memory Cache<br/>(High-Frequency GPS Stream & Pub/Sub)")]
-        RabbitMQ[("🐰 RabbitMQ Broker<br/>(Async Event Message Queues)")]
+    subgraph DataStorage ["4. LỚP LƯU TRỮ & CACHE (DATA LAYER)"]
+        PG[("PostgreSQL 15 + PostGIS<br/>(38 Bảng Quan Hệ & Geospatial)")]
+        Redis[("Redis 7 In-Memory Cache<br/>(High-Frequency GPS Stream)")]
+        RabbitMQ[("RabbitMQ Broker<br/>(Async Event Queues)")]
     end
 
-    %% Connections
-    Web <-->|REST API & WebSockets| Express
-    CustomerWeb <-->|REST API & Live Radar Stream| SocketIO
-    Mobile <-->|Socket.io GPS 3s/lần & REST API| SocketIO
-    SocketIO <-->|Ghi / Đọc GPS tọa độ tức thì (< 1ms)| Redis
+    Web <-->|"REST API & WebSockets"| Express
+    CustomerWeb <-->|"Live Radar Stream"| SocketIO
+    Mobile <-->|"GPS Stream 3s & REST"| SocketIO
+    SocketIO <-->|"Ghi / Đọc GPS tức thì (dưới 1ms)"| Redis
     Express --> Prisma --> PG
-    Express <-->|Trigger Clustering & VRP Jobs| AIService
-    Express -.->|Publish Async Events| RabbitMQ
+    Express <-->|"Kích hoạt Gom cụm & VRP"| AIService
+    Express -.->|"Bắn sự kiện Async"| RabbitMQ
 ```
 
 ---
@@ -242,21 +237,22 @@ Xây dựng giao diện web Single Page Application (SPA) hiện đại phục v
 
 ```mermaid
 flowchart TD
-    A["Tập dữ liệu đơn hàng trong ngày<br/>(Kèm tọa độ Geocoding & Giờ hẹn)"] --> B["AI Phân Cụm (K-Means / DBSCAN)<br/>Gom đơn theo địa giới từng phường"]
+    A["Tập dữ liệu đơn hàng trong ngày<br/>(Tọa độ Geocoding & Khung giờ hẹn)"] --> B["AI Phân Cụm (K-Means / DBSCAN)<br/>Gom đơn theo địa giới từng phường"]
     B --> C["Tập cụm đơn hàng cho từng Shipper"]
-    C --> D["Lõi Tối Ưu Lộ Trình (Genetic Algorithm)"]
+    C --> D1["1. Khởi tạo quần thể lộ trình ngẫu nhiên"]
     
-    subgraph GA_Engine ["Quá Trình Tiến Hóa Di Truyền (GA Engine)"]
-        D1["Khởi tạo quần thể lộ trình ngẫu nhiên"] --> D2["Đánh giá Hàm thích nghi (Fitness Function)"]
-        D2 --> D3{"Kiểm tra Ràng Buộc Cứng<br/>1. Tải trọng xe máy (CVRP)<br/>2. Khung giờ hẹn khách (VRPTW)"}
-        D3 -- "Vi phạm" --> D4["Áp mức điểm phạt cực lớn (Penalty Function)"]
-        D3 -- "Thỏa mãn" --> D5["Đánh giá chi phí quãng đường / thời gian"]
-        D4 & D5 --> D6["Chọn lọc tự nhiên (Selection)"]
-        D6 --> D7["Lai ghép (Crossover) & Đột biến (Mutation)"]
-        D7 -->|Lặp qua N thế hệ| D2
+    subgraph GA_Engine ["QUÁ TRÌNH TIẾN HÓA DI TRUYỀN (GENETIC ALGORITHM)"]
+        D1 --> D2["2. Đánh giá Hàm thích nghi (Fitness Function)"]
+        D2 --> D3{"3. Kiểm tra Ràng Buộc Cứng:<br/>• Tải trọng xe máy (CVRP)<br/>• Khung giờ hẹn khách (VRPTW)"}
+        D3 -->|"Vi phạm"| D4["Áp mức điểm phạt cực lớn (Penalty Function)"]
+        D3 -->|"Thỏa mãn"| D5["Đánh giá chi phí quãng đường & thời gian"]
+        D4 --> D6["4. Chọn lọc tự nhiên (Tournament Selection)"]
+        D5 --> D6
+        D6 --> D7["5. Lai ghép (Crossover) & Đột biến (Mutation)"]
+        D7 -->|"Lặp qua N thế hệ"| D2
     end
 
-    GA_Engine --> E["Lộ trình tối ưu nhất (Near-optimal Route)<br/>Đảm bảo đúng tải trọng & 100% đúng giờ hẹn"]
+    D7 --> E["Lộ trình tối ưu nhất (Near-optimal Route)<br/>Đảm bảo đúng tải trọng & 100% đúng giờ hẹn"]
 ```
 
 #### 💡 Lý do lựa chọn Thuật toán Di truyền (Genetic Algorithm) kết hợp Hàm phạt (Penalty Function):
