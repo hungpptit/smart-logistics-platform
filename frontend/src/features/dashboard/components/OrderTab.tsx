@@ -167,7 +167,7 @@ export const OrderTab: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState<boolean>(false);
   const [isOptimizationModalOpen, setIsOptimizationModalOpen] = useState<boolean>(false);
-  const [selectedAiRouteType, setSelectedAiRouteType] = useState<'ALL' | 'PICKUP' | 'DELIVERY'>('ALL');
+  const [selectedAiRouteType, setSelectedAiRouteType] = useState<'ALL' | 'PICKUP' | 'DELIVERY'>('DELIVERY');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [optimizing] = useState<boolean>(false);
 
@@ -221,7 +221,7 @@ export const OrderTab: React.FC = () => {
   const userAssignedFacilityId = user?.staffProfile?.assignedFacilityId;
   const canOperateOnCurrentFacility = isAdmin || (isStaffOnly && facilityFilter === userAssignedFacilityId);
 
-  const handleRunAiOptimization = (type: 'ALL' | 'PICKUP' | 'DELIVERY' = 'ALL') => {
+  const handleRunAiOptimization = (type: 'ALL' | 'PICKUP' | 'DELIVERY' = 'DELIVERY') => {
     setSelectedAiRouteType(type);
     setIsOptimizationModalOpen(true);
   };
@@ -624,7 +624,7 @@ export const OrderTab: React.FC = () => {
             {isAdminOrStaff && canOperateOnCurrentFacility && (
               <>
                 <button
-                  onClick={() => handleRunAiOptimization('ALL')}
+                  onClick={() => handleRunAiOptimization('DELIVERY')}
                   disabled={optimizing}
                   className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3.5 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
                   title="Kích hoạt thuật toán AI K-Means & VRP gom cụm lộ trình phân đơn cho tài xế"

@@ -1,12 +1,32 @@
 import { Request, Response, NextFunction } from 'express';
 import { DriverService } from '../services/driver.service';
 import { getTrackingGateway } from '../gateways/tracking.gateway';
+import { prisma } from '../config/prisma';
 
 export class DriverController {
   private driverService = new DriverService();
 
   public create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const user = (req as any).user;
+      const isAdmin = user?.roles?.includes('ADMIN');
+      const isStaff = user?.roles?.includes('STAFF') && !isAdmin;
+
+      if (isStaff && user?.id) {
+        const staffProfile = await prisma.staff.findUnique({
+          where: { userId: user.id },
+        });
+        if (!staffProfile?.assignedFacilityId) {
+          res.status(403).json({
+            success: false,
+            message: 'Tài khoản nhân viên chưa được gán bưu cục làm việc, không thể tạo hồ sơ tài xế.',
+          });
+          return;
+        }
+        // Force driver to be created only in staff's own assigned facility
+        req.body.homeFacilityId = staffProfile.assignedFacilityId;
+      }
+
       const result = await this.driverService.createDriver(req.body);
       res.status(201).json({
         success: true,
@@ -47,6 +67,28 @@ export class DriverController {
 
   public update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const user = (req as any).user;
+      const isAdmin = user?.roles?.includes('ADMIN');
+      const isStaff = user?.roles?.includes('STAFF') && !isAdmin;
+
+      if (isStaff && user?.id) {
+        const staffProfile = await prisma.staff.findUnique({
+          where: { userId: user.id },
+        });
+        const driver = await prisma.staff.findUnique({
+          where: { id: req.params.id },
+        });
+        if (!staffProfile?.assignedFacilityId || driver?.assignedFacilityId !== staffProfile.assignedFacilityId) {
+          res.status(403).json({
+            success: false,
+            message: 'Bạn chỉ có quyền quản lý tài xế thuộc bưu cục/kho được phân công.',
+          });
+          return;
+        }
+        // Staff cannot re-assign driver to another facility
+        req.body.homeFacilityId = staffProfile.assignedFacilityId;
+      }
+
       const result = await this.driverService.updateDriver(req.params.id, req.body);
       res.status(200).json({
         success: true,

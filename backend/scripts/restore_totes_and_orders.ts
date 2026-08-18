@@ -1,17 +1,16 @@
-/// <reference types="node" />
-import { PrismaClient, ToteStatus, OrderStatus } from '@prisma/client';
+import { PrismaClient, ToteStatus, OrderStatus, FeePayer, PickupType, PaymentMethod, PaymentStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function restoreState() {
-  console.log('🔄 Restoring Totes, Orders, and wiping ALL driver routes...');
+  console.log('🔄 Cleaning up database: Removing all routes, extra orders, and restoring pristine 5 demo orders...');
 
   const tote1Code = 'TOTE-FAC_TD_TANGNHONPHU-ZONE-W-PROVINCE-DISPATCH-001';
   const tote2Code = 'TOTE-FAC_TD_TANGNHONPHU-ZONE-W-PROVINCE-DISPATCH-002';
   const toteScNorthCode = 'TOTE-SC-NORTH-TEST01';
 
-  const orderCodes = [
+  const keepOrderCodes = [
     'ORD-0182000004',
     'ORD-9782000002',
     'ORD-1314000001',
@@ -19,6 +18,46 @@ async function restoreState() {
     'ORD-TEST-SEALED-001',
   ];
 
+  // 1. Wipe ALL Routes, RouteStops, DispatchTasks, TrackingEvents, Shipments, ShipmentTransfers, ShipmentPackages, WarehouseScans
+  console.log('🧹 1. Deleting all Routes, RouteStops, TrackingEvents, Shipments, and DispatchTasks...');
+  await prisma.trackingEvent.deleteMany({});
+  await prisma.routeStop.deleteMany({});
+  await prisma.dispatchTask.deleteMany({});
+  await prisma.shipmentTransfer.deleteMany({});
+  await prisma.shipmentPackage.deleteMany({});
+  await prisma.warehouseScan.deleteMany({});
+  await prisma.deliveryProof.deleteMany({});
+  await prisma.shipment.deleteMany({});
+  await prisma.route.deleteMany({});
+  await prisma.routeOptimization.deleteMany({});
+
+  // 2. Delete ALL orders NOT in keepOrderCodes
+  console.log('🗑️ 2. Deleting all non-demo orders from database...');
+  const otherOrders = await prisma.order.findMany({
+    where: { orderCode: { notIn: keepOrderCodes } },
+    select: { id: true, orderCode: true },
+  });
+  const otherOrderIds = otherOrders.map(o => o.id);
+
+  if (otherOrderIds.length > 0) {
+    await prisma.orderStatusHistory.deleteMany({
+      where: { orderId: { in: otherOrderIds } },
+    });
+    await prisma.orderPayment.deleteMany({
+      where: { orderId: { in: otherOrderIds } },
+    });
+    await prisma.package.deleteMany({
+      where: { orderId: { in: otherOrderIds } },
+    });
+    await prisma.order.deleteMany({
+      where: { id: { in: otherOrderIds } },
+    });
+    console.log(`✅ Deleted ${otherOrderIds.length} extra orders and their associated packages/histories.`);
+  } else {
+    console.log('ℹ️ No extra orders to delete.');
+  }
+
+  // 3. Find target facilities
   const tangNhonPhuFac = await prisma.facility.findUnique({
     where: { facilityCode: 'FAC-TD-TANGNHONPHU' },
   });
@@ -39,7 +78,8 @@ async function restoreState() {
     include: { facilityZones: true },
   });
 
-  // 1. Restore Tote Bags to SEALED
+  // 4. Restore Tote Bags to SEALED
+  console.log('📦 3. Restoring Tote Bags to SEALED...');
   await prisma.toteBag.updateMany({
     where: { toteCode: { in: [tote1Code, tote2Code] } },
     data: {
@@ -80,9 +120,8 @@ async function restoreState() {
       },
     });
   }
-  console.log('✅ Restored Totes status to SEALED (including TOTE-SC-NORTH-TEST01 at FAC-SC-REGION4 Đà Nẵng)');
 
-  // 2. Restore Orders to AT_HUB with originFacility = Bưu cục Tăng Nhơn Phú & Destination Facilities
+  // 5. Restore 4 Tăng Nhơn Phú Orders
   if (tangNhonPhuFac) {
     await prisma.order.updateMany({
       where: { orderCode: { in: ['ORD-9782000002', 'ORD-1314000001', 'ORD-0419000003'] } },
@@ -95,7 +134,11 @@ async function restoreState() {
     if (linhTrungFac) {
       await prisma.order.update({
         where: { orderCode: 'ORD-0182000004' },
-        data: { destinationFacilityId: linhTrungFac.id, status: OrderStatus.READY_FOR_PICKUP },
+        data: {
+          originFacilityId: tangNhonPhuFac.id,
+          destinationFacilityId: linhTrungFac.id,
+          status: OrderStatus.READY_FOR_PICKUP,
+        },
       });
     }
     if (xuanSonFac) {
@@ -129,15 +172,18 @@ async function restoreState() {
     });
   }
 
-  // Restore ORD-TEST-SEALED-001 at FAC-SC-REGION4 (Tổng Kho Miền 4 - Đà Nẵng)
+  // 6. Restore ORD-TEST-SEALED-001 at FAC-SC-REGION4 (Tổng Kho Miền 4 - Đà Nẵng)
   if (scRegion4Fac && haDongFac) {
     const customer = await prisma.customer.findFirst({ include: { user: true } });
-    const service = await prisma.service.findFirst();
+    const standardService = await prisma.service.findFirst({
+      where: { serviceCode: 'STANDARD' },
+    }) || await prisma.service.findFirst();
     const zone = scRegion4Fac.facilityZones.find(z => z.zoneCode === 'ZONE-OUTBOUND-NORTH') || scRegion4Fac.facilityZones[0];
 
     const orderTest = await prisma.order.upsert({
       where: { orderCode: 'ORD-TEST-SEALED-001' },
       update: {
+        serviceId: standardService?.id || '',
         status: OrderStatus.AT_HUB,
         originFacilityId: scRegion4Fac.id,
         destinationFacilityId: haDongFac.id,
@@ -149,11 +195,15 @@ async function restoreState() {
         deliveryAddressText: 'Học viện Công nghệ Bưu chính Viễn thông, Km 10 Trần Phú, Mộ Lao, Hà Đông, Hà Nội',
         deliveryLatitude: 20.9806,
         deliveryLongitude: 105.7876,
+        estimatedShippingFee: 35000,
+        estimatedInsuranceFee: 3000,
+        estimatedCodAmount: 500000,
+        pickupType: PickupType.PICKUP,
       },
       create: {
         orderCode: 'ORD-TEST-SEALED-001',
         customerId: customer?.id || '',
-        serviceId: service?.id || '',
+        serviceId: standardService?.id || '',
         status: OrderStatus.AT_HUB,
         originFacilityId: scRegion4Fac.id,
         destinationFacilityId: haDongFac.id,
@@ -165,34 +215,58 @@ async function restoreState() {
         deliveryAddressText: 'Học viện Công nghệ Bưu chính Viễn thông, Km 10 Trần Phú, Mộ Lao, Hà Đông, Hà Nội',
         deliveryLatitude: 20.9806,
         deliveryLongitude: 105.7876,
-        estimatedShippingFee: 45000,
-        estimatedInsuranceFee: 5000,
+        estimatedShippingFee: 35000,
+        estimatedInsuranceFee: 3000,
         estimatedCodAmount: 500000,
+        pickupType: PickupType.PICKUP,
       },
     });
 
-    const pkgTest = await prisma.package.upsert({
+    await prisma.package.upsert({
       where: { packageCode: 'PKG-TEST-SEALED-001' },
       update: {
         orderId: orderTest.id,
         currentFacilityId: scRegion4Fac.id,
         currentZoneId: zone?.id || null,
-        weight: 12.5,
+        description: 'Set đặc sản Miền Trung (Bánh khô mè, Mực rim me, Trà Sâm Dứa Đà Nẵng)',
+        weight: 2.5,
         length: 30,
-        width: 25,
-        height: 20,
-        volume: 0.015,
+        width: 20,
+        height: 15,
+        volume: 0.009,
       },
       create: {
         packageCode: 'PKG-TEST-SEALED-001',
         orderId: orderTest.id,
         currentFacilityId: scRegion4Fac.id,
         currentZoneId: zone?.id || null,
-        weight: 12.5,
+        description: 'Set đặc sản Miền Trung (Bánh khô mè, Mực rim me, Trà Sâm Dứa Đà Nẵng)',
+        weight: 2.5,
         length: 30,
-        width: 25,
-        height: 20,
-        volume: 0.015,
+        width: 20,
+        height: 15,
+        volume: 0.009,
+      },
+    });
+
+    await prisma.orderPayment.upsert({
+      where: { orderId: orderTest.id },
+      update: {
+        finalShippingFee: 35000,
+        finalInsuranceFee: 3000,
+        finalCodAmount: 500000,
+        feePayer: FeePayer.SENDER,
+        paymentMethod: PaymentMethod.COD,
+        paymentStatus: PaymentStatus.UNPAID,
+      },
+      create: {
+        orderId: orderTest.id,
+        finalShippingFee: 35000,
+        finalInsuranceFee: 3000,
+        finalCodAmount: 500000,
+        feePayer: FeePayer.SENDER,
+        paymentMethod: PaymentMethod.COD,
+        paymentStatus: PaymentStatus.UNPAID,
       },
     });
 
@@ -226,13 +300,13 @@ async function restoreState() {
     }
   }
 
+  // 7. Clean and recreate pristine initial status history for the 5 kept orders
   const restoredOrders = await prisma.order.findMany({
-    where: { orderCode: { in: orderCodes } },
+    where: { orderCode: { in: keepOrderCodes } },
     select: { id: true, orderCode: true },
   });
   const restoredOrderIds = restoredOrders.map(o => o.id);
 
-  // Clean ALL old orderStatusHistory
   await prisma.orderStatusHistory.deleteMany({
     where: {
       orderId: { in: restoredOrderIds },
@@ -318,20 +392,7 @@ async function restoreState() {
     }
   }
 
-  console.log('✅ Restored clean initial status history for all orders');
-
-  // 3. Wipe ALL Shipments, ShipmentPackages, DispatchTasks, RouteStops, Routes, and TrackingEvents
-  await prisma.trackingEvent.deleteMany({});
-  await prisma.shipmentTransfer.deleteMany({});
-  await prisma.shipmentPackage.deleteMany({});
-  await prisma.warehouseScan.deleteMany({});
-  await prisma.dispatchTask.deleteMany({});
-  await prisma.routeStop.deleteMany({});
-  await prisma.shipment.deleteMany({});
-  await prisma.route.deleteMany({});
-  console.log('🧹 Cleaned up ALL test Shipments, ShipmentTransfers, Routes, RouteStops, TrackingEvents, and DispatchTasks 100%');
-
-  // 3.1 Re-link WarehouseScans linking packages to totes
+  // 8. Re-link WarehouseScans linking packages to totes
   const adminUser = await prisma.user.findFirst();
   const scannedUserId = adminUser?.id || '00000000-0000-0000-0000-000000000000';
 
@@ -384,33 +445,8 @@ async function restoreState() {
       },
     });
   }
-  console.log('✅ Re-linked packages inside Tote 1, Tote 2, and Tote SC-North');
 
-  // 4. Restore ORD-0182000004 to READY_FOR_PICKUP (CHỜ LẤY HÀNG)
-  const targetOrder = await prisma.order.findUnique({
-    where: { orderCode: 'ORD-0182000004' },
-    select: { id: true },
-  });
-
-  if (targetOrder) {
-    await prisma.order.update({
-      where: { id: targetOrder.id },
-      data: {
-        status: OrderStatus.READY_FOR_PICKUP,
-      },
-    });
-
-    await prisma.orderStatusHistory.deleteMany({
-      where: {
-        orderId: targetOrder.id,
-        status: { in: [OrderStatus.PICKUP_ASSIGNED, OrderStatus.PICKING, OrderStatus.PICKED_UP, OrderStatus.IN_TRANSIT] },
-      },
-    });
-
-    console.log('✅ Restored ORD-0182000004 status to READY_FOR_PICKUP (CHỜ LẤY HÀNG) & cleared driver assignment');
-  }
-
-  console.log('🎉 Full restoration complete! All Totes are SEALED, Orders are AT_HUB / READY_FOR_PICKUP, and ALL driver routes cleared 100%.');
+  console.log('🎉 Full database cleanup & restoration complete! Only 5 pristine demo orders kept. All routes wiped. Ready for Demo!');
 }
 
 restoreState().finally(() => prisma.$disconnect());

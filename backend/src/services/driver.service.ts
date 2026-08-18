@@ -37,19 +37,27 @@ export class DriverService {
       }
     }
 
-    // Generate unique employee code by finding the highest current code
-    const latestDriver = await prisma.staff.findFirst({
-      orderBy: { employeeCode: 'desc' },
+    // Generate unique employee code for Driver (DRV-XXXXXX)
+    const allDrivers = await prisma.staff.findMany({
+      where: { employeeCode: { startsWith: 'DRV-' } },
+      select: { employeeCode: true },
     });
 
-    let nextNumber = 1;
-    if (latestDriver) {
-      const match = latestDriver.employeeCode.match(/DRV-(\d+)/);
+    let maxNum = 0;
+    for (const d of allDrivers) {
+      const match = d.employeeCode.match(/DRV-(\d+)/);
       if (match) {
-        nextNumber = parseInt(match[1], 10) + 1;
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
       }
     }
-    const employeeCode = `DRV-${String(nextNumber).padStart(6, '0')}`;
+    let nextNumber = maxNum + 1;
+    let employeeCode = `DRV-${String(nextNumber).padStart(6, '0')}`;
+
+    while (await prisma.staff.findUnique({ where: { employeeCode } })) {
+      nextNumber++;
+      employeeCode = `DRV-${String(nextNumber).padStart(6, '0')}`;
+    }
 
     // Always check if email already exists in staff
     const emailExists = await prisma.staff.findFirst({

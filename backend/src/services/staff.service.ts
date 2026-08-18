@@ -254,17 +254,27 @@ export class StaffService {
       throw new BadRequestException('Hệ thống chưa cấu hình vai trò Nhân viên (STAFF)');
     }
 
-    const latestStaff = await prisma.staff.findFirst({
-      orderBy: { employeeCode: 'desc' },
+    // Generate unique employee code for Staff (STF-XXXXXX)
+    const allStaff = await prisma.staff.findMany({
+      where: { employeeCode: { startsWith: 'STF-' } },
+      select: { employeeCode: true },
     });
-    let nextStaffNum = 1;
-    if (latestStaff && latestStaff.employeeCode) {
-      const match = latestStaff.employeeCode.match(/STF-(\d+)/);
+
+    let maxStaffNum = 0;
+    for (const s of allStaff) {
+      const match = s.employeeCode.match(/STF-(\d+)/);
       if (match) {
-        nextStaffNum = parseInt(match[1], 10) + 1;
+        const num = parseInt(match[1], 10);
+        if (num > maxStaffNum) maxStaffNum = num;
       }
     }
-    const employeeCode = `STF-${String(nextStaffNum).padStart(6, '0')}`;
+    let nextStaffNum = maxStaffNum + 1;
+    let employeeCode = `STF-${String(nextStaffNum).padStart(6, '0')}`;
+
+    while (await prisma.staff.findUnique({ where: { employeeCode } })) {
+      nextStaffNum++;
+      employeeCode = `STF-${String(nextStaffNum).padStart(6, '0')}`;
+    }
 
     const newStaff = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({

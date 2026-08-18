@@ -14,9 +14,11 @@ export class RoutingService {
   /**
    * Triggers the AI routing optimization pipeline for a facility.
    */
-  public async optimizeRoutesForFacility(facilityId: string, creatorId: string, routeType: string = 'ALL') {
-    // 0. Automatically reset previous PLANNED routes for this facility to ensure all 50 orders are restored to AT_HUB / READY_FOR_PICKUP
-    await this.resetFacilityAi(facilityId);
+  public async optimizeRoutesForFacility(facilityId: string, creatorId: string, routeType: string = 'ALL', preview: boolean = false) {
+    // 0. Automatically reset previous PLANNED routes for this facility if not in preview mode
+    if (!preview) {
+      await this.resetFacilityAi(facilityId);
+    }
 
     // 1. Fetch the facility and its primary address
     const facility = await prisma.facility.findUnique({
@@ -155,6 +157,75 @@ export class RoutingService {
 
     if (assignments.length === 0) {
       throw new BadRequestException('Không thể phân bổ tài xế cho các cụm đơn hàng');
+    }
+
+    // If preview mode is requested, return the calculated routes and assignments WITHOUT saving anything to DB
+    if (preview) {
+      const previewRoutes = assignments.map((assignment, index) => {
+        const driver = availableDrivers.find((d) => d.id === assignment.driverId);
+        const cluster = clusters[assignment.clusterId] || clusters.find((c: any) => c.id === assignment.clusterId);
+        if (!driver || !cluster || !cluster.orders || cluster.orders.length === 0) return null;
+
+        const sortedOrders = cluster.orders;
+        let plannedDistanceMeters = 0;
+        let prevLoc = facilityLocation;
+
+        for (const order of sortedOrders) {
+          const isPickup = order.status !== OrderStatus.AT_HUB && order.status !== OrderStatus.OUT_FOR_DELIVERY && order.status !== OrderStatus.DELIVERED;
+          const lat = (isPickup ? order.pickupLatitude : order.deliveryLatitude) || facilityLocation.lat;
+          const lng = (isPickup ? order.pickupLongitude : order.deliveryLongitude) || facilityLocation.lng;
+          const orderLoc = { lat, lng };
+          plannedDistanceMeters += this.kmeansService.haversineDistance(
+            prevLoc.lat,
+            prevLoc.lng,
+            orderLoc.lat,
+            orderLoc.lng
+          ) * 1000;
+          prevLoc = orderLoc;
+        }
+        plannedDistanceMeters += this.kmeansService.haversineDistance(
+          prevLoc.lat,
+          prevLoc.lng,
+          facilityLocation.lat,
+          facilityLocation.lng
+        ) * 1000;
+
+        let plannedDistanceKm = Number((plannedDistanceMeters / 1000).toFixed(2));
+        if (isNaN(plannedDistanceKm)) plannedDistanceKm = 0;
+        let plannedDurationMin = Math.round((plannedDistanceKm / 30) * 60 + sortedOrders.length * 10);
+        if (isNaN(plannedDurationMin)) plannedDurationMin = 30;
+
+        return {
+          id: `preview-${index + 1}`,
+          routeCode: `AI-GỢI Ý TUYẾN ${index + 1}`,
+          driver: {
+            id: driver.id,
+            fullName: driver.fullName,
+            phoneNumber: driver.phone,
+            position: driver.position,
+          },
+          plannedDistanceKm,
+          plannedDurationMin,
+          totalStops: sortedOrders.length,
+          orders: sortedOrders.map((o: any, sIdx: number) => ({
+            id: o.id,
+            trackingNumber: o.trackingNumber,
+            recipientName: o.recipientName,
+            senderName: o.senderName,
+            address: (o.status === OrderStatus.READY_FOR_PICKUP ? o.pickupAddressText : o.deliveryAddressText) || 'Địa chỉ',
+            type: o.status === OrderStatus.READY_FOR_PICKUP ? 'PICKUP' : 'DELIVERY',
+            status: o.status,
+            sequence: sIdx + 1,
+          })),
+        };
+      }).filter(Boolean);
+
+      return {
+        isPreview: true,
+        routes: previewRoutes,
+        totalOrders: orders.length,
+        totalRoutes: previewRoutes.length,
+      };
     }
 
     const createdRoutes: any[] = [];

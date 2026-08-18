@@ -911,7 +911,7 @@ class _CreateOrderTabState extends State<CreateOrderTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ ${result['message'] ?? 'Không thể tạo đơn hàng. Vui lòng thử lại.'}'),
+            content: Text('${result['message'] ?? 'Không thể tạo đơn hàng. Vui lòng thử lại.'}'),
             backgroundColor: Colors.red.shade700,
             duration: const Duration(seconds: 4),
           ),

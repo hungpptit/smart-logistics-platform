@@ -13,6 +13,14 @@
     "db:reset-test": "tsx prisma/reset_all_test_data.ts",
     "db:restore-totes": "tsx scripts/restore_totes_and_orders.ts",
     "db:restore-south-hub": "tsx scripts/restore_south_sorting_center_inbound.ts",
+    "db:seed-case1": "tsx scripts/seed_case1_test_orders.ts",
+    "db:clean-case1": "tsx scripts/clean_case1_test_orders.ts",
+    "db:seed-case2": "tsx scripts/seed_case2_test_orders.ts",
+    "db:clean-case2": "tsx scripts/clean_case2_test_orders.ts",
+    "db:seed-case3": "tsx scripts/seed_case3_test_orders.ts",
+    "db:clean-case3": "tsx scripts/clean_case3_test_orders.ts",
+    "db:seed-case4": "tsx scripts/seed_case4_test_orders.ts",
+    "db:clean-case4": "tsx scripts/clean_case4_test_orders.ts",
     "reset:demo": "tsx scripts/reset_route_demo_data.ts"
   },
   "prisma": {

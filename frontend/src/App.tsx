@@ -159,7 +159,7 @@ const AppContent: React.FC = () => {
                   <Search className="search-icon" size={17} />
                   <input
                     type="text"
-                    placeholder="Nhập mã vận đơn tra cứu (VD: ORD-0419000003)..."
+                    placeholder="Nhập mã vận đơn tra cứu (VD: ORD-xxxxxxxxxx)..."
                     value={trackingCode}
                     onChange={(e) => {
                       const val = e.target.value;

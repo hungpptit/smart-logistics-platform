@@ -38,7 +38,12 @@ export class CustomerService {
 
     // Generate unique customer code
     const count = await prisma.customer.count();
-    const customerCode = `CUST-${String(count + 1).padStart(6, '0')}`;
+    let nextCustNum = count + 1;
+    let customerCode = `CUST-${String(nextCustNum).padStart(6, '0')}`;
+    while (await prisma.customer.findUnique({ where: { customerCode } })) {
+      nextCustNum++;
+      customerCode = `CUST-${String(nextCustNum).padStart(6, '0')}`;
+    }
 
     // Generate or check unique username
     let username = dto.username?.trim();

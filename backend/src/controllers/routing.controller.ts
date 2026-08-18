@@ -7,7 +7,7 @@ export class RoutingController {
 
   public optimize = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { facilityId, routeType = 'ALL' } = req.body;
+      const { facilityId, routeType = 'ALL', preview = false } = req.body;
       const creatorId = (req as any).user?.id;
 
       if (!facilityId) {
@@ -26,17 +26,20 @@ export class RoutingController {
         if (staffProfile && staffProfile.assignedFacilityId !== facilityId) {
           return res.status(403).json({
             success: false,
-            message: '❌ Bạn chỉ có quyền kích hoạt AI gom cụm tại Bưu cục được phân công quản lý!',
+            message: 'Bạn chỉ có quyền kích hoạt AI gom cụm tại Bưu cục được phân công quản lý!',
           });
         }
       }
 
-      const routes = await this.routingService.optimizeRoutesForFacility(facilityId, creatorId, routeType);
+      const isPreview = Boolean(preview);
+      const routes = await this.routingService.optimizeRoutesForFacility(facilityId, creatorId, routeType, isPreview);
 
       const typeDesc = routeType === 'PICKUP' ? 'Lấy Hàng' : routeType === 'DELIVERY' ? 'Giao Hàng' : 'Cờ Kép Lấy & Giao';
       return res.status(200).json({
         success: true,
-        message: `Tối ưu lộ trình AI (${typeDesc}) thành công`,
+        message: isPreview
+          ? `Tính toán xem trước lộ trình AI (${typeDesc}) thành công (Chưa lưu vào DB)`
+          : `Tối ưu lộ trình AI (${typeDesc}) và lưu vào hệ thống thành công`,
         data: routes,
       });
     } catch (error) {
@@ -114,7 +117,7 @@ export class RoutingController {
         if (staffProfile && staffProfile.assignedFacilityId !== facilityId) {
           return res.status(403).json({
             success: false,
-            message: '❌ Bạn chỉ có quyền hoàn tác dữ liệu AI tại Bưu cục được phân công quản lý!',
+            message: 'Bạn chỉ có quyền hoàn tác dữ liệu AI tại Bưu cục được phân công quản lý!',
           });
         }
       }

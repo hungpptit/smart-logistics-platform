@@ -1,5 +1,4 @@
-/// <reference types="node" />
-import { PrismaClient, ToteStatus, OrderStatus, FacilityZoneType } from '@prisma/client';
+import { PrismaClient, ToteStatus, OrderStatus, FacilityZoneType, FeePayer, PickupType, PaymentMethod, PaymentStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -197,10 +196,14 @@ async function restoreSouthSCInboundState() {
 
   // 4.4 ĐƠN ORD-TEST-SEALED-001 (Đang ở Tổng Kho Miền 4 Đà Nẵng - Sẵn sàng cho xe ghé bốc)
   const customer = await prisma.customer.findFirst();
-  const service = await prisma.service.findFirst();
+  const standardService = await prisma.service.findFirst({
+    where: { serviceCode: 'STANDARD' },
+  }) || await prisma.service.findFirst();
+
   const orderTestDaNang = await prisma.order.upsert({
     where: { orderCode: 'ORD-TEST-SEALED-001' },
     update: {
+      serviceId: standardService?.id || '',
       status: OrderStatus.AT_HUB,
       originFacilityId: scRegion4Fac.id,
       destinationFacilityId: haDongFac.id,
@@ -212,11 +215,15 @@ async function restoreSouthSCInboundState() {
       deliveryAddressText: 'Học viện Công nghệ Bưu chính Viễn thông, Km 10 Trần Phú, Mộ Lao, Hà Đông, Hà Nội',
       deliveryLatitude: 20.9806,
       deliveryLongitude: 105.7876,
+      estimatedShippingFee: 35000,
+      estimatedInsuranceFee: 3000,
+      estimatedCodAmount: 500000,
+      pickupType: PickupType.PICKUP,
     },
     create: {
       orderCode: 'ORD-TEST-SEALED-001',
       customerId: customer?.id || '',
-      serviceId: service?.id || '',
+      serviceId: standardService?.id || '',
       status: OrderStatus.AT_HUB,
       originFacilityId: scRegion4Fac.id,
       destinationFacilityId: haDongFac.id,
@@ -228,9 +235,10 @@ async function restoreSouthSCInboundState() {
       deliveryAddressText: 'Học viện Công nghệ Bưu chính Viễn thông, Km 10 Trần Phú, Mộ Lao, Hà Đông, Hà Nội',
       deliveryLatitude: 20.9806,
       deliveryLongitude: 105.7876,
-      estimatedShippingFee: 45000,
-      estimatedInsuranceFee: 5000,
+      estimatedShippingFee: 35000,
+      estimatedInsuranceFee: 3000,
       estimatedCodAmount: 500000,
+      pickupType: PickupType.PICKUP,
     },
   });
 
@@ -240,22 +248,45 @@ async function restoreSouthSCInboundState() {
       orderId: orderTestDaNang.id,
       currentFacilityId: scRegion4Fac.id,
       currentZoneId: zoneDaNangNorth.id,
-      weight: 12.5,
+      description: 'Set đặc sản Miền Trung (Bánh khô mè, Mực rim me, Trà Sâm Dứa Đà Nẵng)',
+      weight: 2.5,
       length: 30,
-      width: 25,
-      height: 20,
-      volume: 0.015,
+      width: 20,
+      height: 15,
+      volume: 0.009,
     },
     create: {
       packageCode: 'PKG-TEST-SEALED-001',
       orderId: orderTestDaNang.id,
       currentFacilityId: scRegion4Fac.id,
       currentZoneId: zoneDaNangNorth.id,
-      weight: 12.5,
+      description: 'Set đặc sản Miền Trung (Bánh khô mè, Mực rim me, Trà Sâm Dứa Đà Nẵng)',
+      weight: 2.5,
       length: 30,
-      width: 25,
-      height: 20,
-      volume: 0.015,
+      width: 20,
+      height: 15,
+      volume: 0.009,
+    },
+  });
+
+  await prisma.orderPayment.upsert({
+    where: { orderId: orderTestDaNang.id },
+    update: {
+      finalShippingFee: 35000,
+      finalInsuranceFee: 3000,
+      finalCodAmount: 500000,
+      feePayer: FeePayer.SENDER,
+      paymentMethod: PaymentMethod.COD,
+      paymentStatus: PaymentStatus.UNPAID,
+    },
+    create: {
+      orderId: orderTestDaNang.id,
+      finalShippingFee: 35000,
+      finalInsuranceFee: 3000,
+      finalCodAmount: 500000,
+      feePayer: FeePayer.SENDER,
+      paymentMethod: PaymentMethod.COD,
+      paymentStatus: PaymentStatus.UNPAID,
     },
   });
 

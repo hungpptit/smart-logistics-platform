@@ -104,6 +104,8 @@ export const DriverTab: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const isAdmin = currentUser?.roles.includes('ADMIN');
+  const isStaff = currentUser?.roles.includes('STAFF') && !isAdmin;
   const canManage = currentUser?.roles.includes('ADMIN') || currentUser?.roles.includes('STAFF') || currentUser?.permissions.includes('DRIVER_MANAGE');
 
   useEffect(() => {
@@ -192,7 +194,7 @@ export const DriverTab: React.FC = () => {
       driverType: 'HUB_DELIVERY',
       driverTypes: ['HUB_DELIVERY'],
       employmentStatus: 'ACTIVE',
-      homeFacilityId: '',
+      homeFacilityId: isStaff ? (userAssignedFacilityId || '') : (facilityFilter || ''),
       createUser: false,
       email: '',
       username: ''
@@ -218,7 +220,9 @@ export const DriverTab: React.FC = () => {
       driverType: existingTypes[0] || 'HUB_DELIVERY',
       driverTypes: existingTypes as any,
       employmentStatus: driver.employmentStatus,
-      homeFacilityId: driver.assignedFacilityId || driver.homeFacilityId || driver.assignedFacility?.id || driver.homeFacility?.id || '',
+      homeFacilityId: isStaff
+        ? (userAssignedFacilityId || '')
+        : (driver.assignedFacilityId || driver.homeFacilityId || driver.assignedFacility?.id || driver.homeFacility?.id || ''),
       createUser: false,
       email: driver.email || driver.user?.email || '',
       username: driver.user?.username || ''
@@ -239,9 +243,11 @@ export const DriverTab: React.FC = () => {
     setActionLoading(true);
     setActionError(null);
 
+    const targetFacilityId = isStaff ? userAssignedFacilityId : (formData.homeFacilityId === '' ? undefined : formData.homeFacilityId);
+
     const payload = {
       ...formData,
-      homeFacilityId: formData.homeFacilityId === '' ? undefined : formData.homeFacilityId,
+      homeFacilityId: targetFacilityId,
       username: isEditing ? undefined : formData.username,
       email: isEditing ? undefined : formData.email,
     };
@@ -661,17 +667,32 @@ export const DriverTab: React.FC = () => {
 
                 {/* Home Facility (Warehouse) */}
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Kho / Bưu cục trực thuộc *</label>
-                  <SearchableSelect
-                    required
-                    value={formData.homeFacilityId}
-                    onChange={(val) => setFormData({ ...formData, homeFacilityId: val })}
-                    placeholder="-- Chọn kho bãi hoạt động --"
-                    options={facilities.map((fac) => ({
-                      value: fac.id,
-                      label: `${fac.facilityName} (${fac.facilityCode})`
-                    }))}
-                  />
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                    Kho / Bưu cục trực thuộc <span className="text-[#bc0100]">*</span>
+                  </label>
+                  {isStaff && userAssignedFacilityId ? (
+                    <div className="space-y-1">
+                      <div className="w-full px-3 py-2 border border-slate-300 bg-slate-100 rounded text-xs text-slate-800 font-semibold flex items-center justify-between shadow-inner">
+                        <span className="truncate">
+                          {facilities.find((f) => f.id === userAssignedFacilityId)?.facilityName || 'Bưu cục phân công của bạn'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        * Nhân viên chỉ có quyền thêm và quản lý tài xế thuộc bưu cục mình công tác.
+                      </p>
+                    </div>
+                  ) : (
+                    <SearchableSelect
+                      required
+                      value={formData.homeFacilityId}
+                      onChange={(val) => setFormData({ ...formData, homeFacilityId: val })}
+                      placeholder="-- Chọn kho bãi hoạt động --"
+                      options={facilities.map((fac) => ({
+                        value: fac.id,
+                        label: `${fac.facilityName} (${fac.facilityCode})`
+                      }))}
+                    />
+                  )}
                 </div>
 
                 {/* License class */}
