@@ -21,6 +21,8 @@
     "db:clean-case3": "tsx scripts/clean_case3_test_orders.ts",
     "db:seed-case4": "tsx scripts/seed_case4_test_orders.ts",
     "db:clean-case4": "tsx scripts/clean_case4_test_orders.ts",
+    "db:seed-case5": "tsx scripts/seed_case5_test_orders.ts",
+    "db:clean-case5": "tsx scripts/clean_case5_test_orders.ts",
     "reset:demo": "tsx scripts/reset_route_demo_data.ts"
   },
   "prisma": {

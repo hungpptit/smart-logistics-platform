@@ -251,14 +251,20 @@ case3_order = [
 ]
 
 # -------------------------------------------------------------
-# 4. DATA CASE 4: 1 ĐƠN LIÊN MIỀN (Gửi từ 97 Man Thiện TP.HCM giao PTIT Hà Đông - Hà Nội)
+# 4. DATA CASE 4: 2 ĐƠN LIÊN MIỀN (1 Đơn TP.HCM ➔ Hà Nội & 1 Đơn Đà Nẵng ➔ Hà Nội)
 # -------------------------------------------------------------
-case4_order = [
+case4_orders = [
     [
         "PTIT HCM 1", "0987654321", "97 Man Thiện", "Phường Tăng Nhơn Phú", "Thành phố Hồ Chí Minh",
         "Phạm Tuấn Hưng", "0988112233", "Học viện Công nghệ Bưu chính Viễn thông, Km 10 Trần Phú, Mộ Lao", "Phường Hà Đông", "Thành phố Hà Nội",
         "Kiện tài liệu & quà lưu niệm Hội nghị PTIT Bắc - Nam", 1.0, 30, 20, 10, 500000, "Không", "Thường",
         "STANDARD (Tiêu chuẩn)", "PICKUP (Shipper lấy tận nơi)", "Hôm nay", "Ca Sáng (08:00 - 12:00)", "SENDER (Người gửi trả)", "CASH (Tiền mặt)", 0, "Giao giờ hành chính tại Phòng Đào tạo PTIT Hà Nội"
+    ],
+    [
+        "Đặc sản Miền Trung", "0904000004", "Số 24 Đường Nguyễn Văn Linh", "Phường Nam Dương", "Thành phố Đà Nẵng",
+        "Trần Thị Bích Ngọc", "0987654321", "Học viện Công nghệ Bưu chính Viễn thông, Km 10 Trần Phú, Mộ Lao", "Phường Hà Đông", "Thành phố Hà Nội",
+        "Set đặc sản Miền Trung (Bánh khô mè, Mực rim me, Trà Sâm Dứa)", 2.5, 30, 20, 15, 800000, "Không", "Thường",
+        "STANDARD (Tiêu chuẩn)", "PICKUP (Shipper lấy tận nơi)", "Hôm nay", "Ca Sáng (08:00 - 12:00)", "SENDER (Người gửi trả)", "COD (Thu hộ COD)", 500000, "Giao giờ hành chính tại Hà Đông"
     ]
 ]
 
@@ -276,7 +282,7 @@ build_excel_workbook("Case 3 - Don Lien Tinh (1 Don)", case3_order, path_case3)
 
 # Generate Case 4 Excel
 path_case4 = "d:/smart-logistics-platform/DATA_TEST_CASE4_LIEN_MIEN_1_DON.xlsx"
-build_excel_workbook("Case 4 - Don Lien Mien (1 Don)", case4_order, path_case4)
+build_excel_workbook("Case 4 - Don Lien Mien (2 Don)", case4_orders, path_case4)
 
 # Copy to frontend/public for instant UI download
 shutil.copy(path_case1, "d:/smart-logistics-platform/frontend/public/DATA_TEST_CASE1_NOI_HAT_1_DON.xlsx")
