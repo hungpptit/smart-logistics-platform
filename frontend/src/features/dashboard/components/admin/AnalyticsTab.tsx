@@ -99,44 +99,51 @@ export const AnalyticsTab: React.FC = () => {
     fetchAnalytics();
   }, [token, timeRange, facilityFilter]);
 
-  const revenueData = data?.revenueChartData || [
-    { label: 'Thứ 2', revenue: 142.5, cost: 42.0, orders: 420 },
-    { label: 'Thứ 3', revenue: 168.0, cost: 48.5, orders: 510 },
-    { label: 'Thứ 4', revenue: 195.2, cost: 52.0, orders: 630 },
-    { label: 'Thứ 5', revenue: 210.8, cost: 58.0, orders: 710 },
-    { label: 'Thứ 6', revenue: 245.0, cost: 65.0, orders: 850 },
-    { label: 'Thứ 7', revenue: 280.4, cost: 72.0, orders: 940 },
-    { label: 'Chủ Nhật', revenue: 185.0, cost: 49.0, orders: 580 },
+  interface VrptwHourlyItem {
+    hour: string;
+    total: number;
+    onTime: number;
+  }
+
+  const defaultWeeklyData = [
+    { label: 'Thứ 2', revenue: 0, cost: 0, orders: 0 },
+    { label: 'Thứ 3', revenue: 0, cost: 0, orders: 0 },
+    { label: 'Thứ 4', revenue: 0, cost: 0, orders: 0 },
+    { label: 'Thứ 5', revenue: 0, cost: 0, orders: 0 },
+    { label: 'Thứ 6', revenue: 0, cost: 0, orders: 0 },
+    { label: 'Thứ 7', revenue: 0, cost: 0, orders: 0 },
+    { label: 'Chủ Nhật', revenue: 0, cost: 0, orders: 0 },
   ];
 
-  const maxRevenue = Math.max(...revenueData.map(d => d.revenue), 10);
+  const revenueData = data?.revenueChartData && data.revenueChartData.length > 0
+    ? data.revenueChartData
+    : defaultWeeklyData;
 
-  const vrptwHourlyData = [
-    { hour: '07:00 - 09:00', onTime: 98.4, total: 320 },
-    { hour: '09:00 - 11:00', onTime: 96.2, total: 450 },
-    { hour: '11:00 - 13:00', onTime: 94.8, total: 380 },
-    { hour: '13:00 - 15:00', onTime: 97.5, total: 490 },
-    { hour: '15:00 - 17:00', onTime: 95.1, total: 530 },
-    { hour: '17:00 - 19:00', onTime: 93.6, total: 410 },
-  ];
+  const maxRevenue = Math.max(...revenueData.map(d => d.revenue), 0.01);
 
-  const topDrivers = data?.topDrivers || [
-    { rank: 1, name: 'Nguyễn Văn Mạnh', code: 'DRV_1001', completed: 342, distance: '640 km', rating: 4.95, onTime: '99.1%' },
-    { rank: 2, name: 'Trần Quốc Bảo', code: 'DRV_1002', completed: 318, distance: '590 km', rating: 4.92, onTime: '98.5%' },
-    { rank: 3, name: 'Lê Hoàng Nam', code: 'DRV_1003', completed: 295, distance: '540 km', rating: 4.88, onTime: '97.8%' },
-    { rank: 4, name: 'Phạm Minh Tuấn', code: 'DRV_1004', completed: 276, distance: '510 km', rating: 4.85, onTime: '96.9%' },
-  ];
+  const vrptwHourlyData: VrptwHourlyItem[] = (data as any)?.vrptwHourlyData && (data as any).vrptwHourlyData.length > 0
+    ? (data as any).vrptwHourlyData
+    : [
+      { hour: '07:00 - 09:00', onTime: 100, total: 0 },
+      { hour: '09:00 - 11:00', onTime: 100, total: 0 },
+      { hour: '11:00 - 13:00', onTime: 100, total: 0 },
+      { hour: '13:00 - 15:00', onTime: 100, total: 0 },
+      { hour: '15:00 - 17:00', onTime: 100, total: 0 },
+      { hour: '17:00 - 19:00', onTime: 100, total: 0 },
+    ];
+
+  const topDrivers = data?.topDrivers || [];
 
   const kpis: AnalyticsData['kpis'] = data?.kpis || {
-    totalRevenueVnd: 1425800000,
-    totalRevenueMillion: 1425.80,
-    totalOrdersCount: 10235,
-    completedOrdersCount: 8420,
-    inProgressOrdersCount: 1210,
-    failedOrdersCount: 605,
-    deliverySuccessRate: 98.2,
-    totalDistanceKm: 14850,
-    vrptwOnTimeRate: 96.8,
+    totalRevenueVnd: 0,
+    totalRevenueMillion: 0,
+    totalOrdersCount: 0,
+    completedOrdersCount: 0,
+    inProgressOrdersCount: 0,
+    failedOrdersCount: 0,
+    deliverySuccessRate: 0,
+    totalDistanceKm: 0,
+    vrptwOnTimeRate: 100,
   };
 
   return (
@@ -187,8 +194,8 @@ export const AnalyticsTab: React.FC = () => {
                 key={range}
                 onClick={() => setTimeRange(range)}
                 className={`px-3 py-1.5 rounded-md transition-all cursor-pointer text-xs ${timeRange === range
-                    ? 'bg-white text-[#bc0100] shadow-sm font-black'
-                    : 'text-slate-600 hover:text-slate-900 font-semibold'
+                  ? 'bg-white text-[#bc0100] shadow-sm font-black'
+                  : 'text-slate-600 hover:text-slate-900 font-semibold'
                   }`}
               >
                 {range === '7d' ? '7 Ngày' : range === '30d' ? '30 Ngày' : range === '90d' ? 'Quý này' : 'Năm nay'}
@@ -284,7 +291,7 @@ export const AnalyticsTab: React.FC = () => {
             <h3 className="text-2xl font-black text-slate-800">{kpis.vrptwOnTimeRate}%</h3>
             <div className="flex items-center gap-1.5 mt-2 text-[11px] text-amber-600 font-semibold">
               <ArrowUpRight size={14} />
-              <span>Đạt chuẩn khung giờ hẹn (Time-Window)</span>
+              <span>Đạt chuẩn khung giờ hẹn</span>
             </div>
           </div>
         </div>
@@ -310,28 +317,36 @@ export const AnalyticsTab: React.FC = () => {
           {/* SVG/HTML Bar Chart Representation */}
           <div className="h-64 flex items-end justify-between gap-3 pt-6 pb-2 px-2 border-b border-gray-100">
             {revenueData.map((d, i) => {
-              const revHeight = Math.min((d.revenue / maxRevenue) * 100, 100);
-              const costHeight = Math.min((d.cost / maxRevenue) * 100, 100);
+              const revHeight = d.revenue > 0 ? Math.min((d.revenue / maxRevenue) * 100, 100) : 0;
+              const costHeight = d.cost > 0 ? Math.min((d.cost / maxRevenue) * 100, 100) : 0;
 
               return (
                 <div key={i} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
                   <div className="w-full flex justify-center items-end gap-1.5 h-full relative">
                     {/* Tooltip on hover */}
                     <div className="absolute -top-12 bg-slate-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap shadow-lg">
-                      <div>{d.label}: {d.revenue} Tr.đ</div>
+                      <div>{d.label}: {d.revenue.toLocaleString('vi-VN')} Tr.đ</div>
                       <div className="text-gray-300">Đơn hàng: {d.orders}</div>
                     </div>
 
                     {/* Revenue Bar */}
                     <div
-                      style={{ height: `${Math.max(revHeight, 8)}%` }}
-                      className="w-1/2 bg-gradient-to-t from-[#bc0100] to-red-500 rounded-t-md transition-all group-hover:brightness-110 shadow-sm"
+                      style={{ height: `${revHeight > 0 ? Math.max(revHeight, 4) : 0}%` }}
+                      className={`w-1/2 rounded-t-md transition-all group-hover:brightness-110 ${
+                        revHeight > 0
+                          ? 'bg-gradient-to-t from-[#bc0100] to-red-500 shadow-sm'
+                          : 'bg-transparent'
+                      }`}
                     ></div>
 
                     {/* Cost Bar */}
                     <div
-                      style={{ height: `${Math.max(costHeight, 4)}%` }}
-                      className="w-1/2 bg-slate-300 rounded-t-md transition-all group-hover:bg-slate-400"
+                      style={{ height: `${costHeight > 0 ? Math.max(costHeight, 2) : 0}%` }}
+                      className={`w-1/2 rounded-t-md transition-all ${
+                        costHeight > 0
+                          ? 'bg-slate-300 group-hover:bg-slate-400'
+                          : 'bg-transparent'
+                      }`}
                     ></div>
                   </div>
                   <span className="text-[11px] font-bold text-slate-600 font-mono mt-1">{d.label}</span>
@@ -349,59 +364,62 @@ export const AnalyticsTab: React.FC = () => {
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-5">
           <div className="border-b border-gray-100 pb-3">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <PieChart size={16} className="text-[#bc0100]" /> Tỉ lệ Hoàn thành Đơn hàng
+              <PieChart size={16} className="text-[#bc0100]" /> Tỉ lệ hoàn thành đơn hàng
             </h3>
             <p className="text-[11px] text-gray-400 mt-0.5">Phân bổ trạng thái xử lý trên toàn mạng lưới</p>
           </div>
 
-          <div className="space-y-4">
-            {/* Donut Progress Ring Simulation */}
-            <div className="relative w-40 h-40 mx-auto flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-slate-100"
-                  strokeWidth="3.8"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-emerald-500"
-                  strokeDasharray={`${kpis.deliverySuccessRate}, 100`}
-                  strokeWidth="3.8"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-              </svg>
-              <div className="absolute flex flex-col items-center justify-center text-center">
+          {/* Donut Simulation with Pure CSS */}
+          <div className="flex flex-col items-center justify-center py-2">
+            <div className="relative w-36 h-36 rounded-full border-8 border-slate-100 flex items-center justify-center shadow-inner">
+              <div className="text-center">
                 <span className="text-2xl font-black text-slate-800">{kpis.deliverySuccessRate}%</span>
-                <span className="text-[10px] font-bold text-emerald-600 uppercase">Thành công</span>
+                <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Thành công</span>
               </div>
+              <div
+                className="absolute inset-0 rounded-full border-8 border-emerald-500 border-t-transparent border-r-transparent -rotate-45"
+                style={{ opacity: kpis.deliverySuccessRate > 0 ? 1 : 0 }}
+              ></div>
             </div>
+          </div>
 
-            {/* Progress breakdown list */}
-            <div className="space-y-2.5 pt-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="flex items-center gap-2 text-slate-700 font-semibold">
-                  <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span> Giao thành công
-                </span>
-                <span className="font-bold text-slate-800">{kpis.completedOrdersCount} đơn</span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="flex items-center gap-2 text-slate-700 font-semibold">
-                  <span className="w-2.5 h-2.5 bg-amber-500 rounded-full"></span> Đang xử lý / Giao lại
-                </span>
-                <span className="font-bold text-slate-800">{kpis.inProgressOrdersCount} đơn</span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="flex items-center gap-2 text-slate-700 font-semibold">
-                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full"></span> Giao thất bại / Hủy
-                </span>
-                <span className="font-bold text-slate-800">{kpis.failedOrdersCount} đơn</span>
-              </div>
-            </div>
+          {/* Legend breakdown list */}
+          <div className="space-y-2 pt-2 border-t border-gray-100">
+            {data?.orderStatusDistribution ? (
+              data.orderStatusDistribution.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
+                    <span className="text-slate-600 font-medium">{item.label}</span>
+                  </div>
+                  <span className="font-bold text-slate-800">{item.count.toLocaleString('vi-VN')} đơn</span>
+                </div>
+              ))
+            ) : (
+              <>
+                <div className="flex justify-between items-center text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span className="text-slate-600 font-medium">Giao thành công</span>
+                  </div>
+                  <span className="font-bold text-slate-800">{kpis.completedOrdersCount.toLocaleString('vi-VN')} đơn</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    <span className="text-slate-600 font-medium">Đang xử lý / Luân chuyển</span>
+                  </div>
+                  <span className="font-bold text-slate-800">{kpis.inProgressOrdersCount.toLocaleString('vi-VN')} đơn</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                    <span className="text-slate-600 font-medium">Giao thất bại / Hủy</span>
+                  </div>
+                  <span className="font-bold text-slate-800">{kpis.failedOrdersCount.toLocaleString('vi-VN')} đơn</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -412,7 +430,7 @@ export const AnalyticsTab: React.FC = () => {
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
           <div className="border-b border-gray-100 pb-3">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <Clock size={16} className="text-[#bc0100]" /> Tỉ lệ Giao hàng Đúng Hạn VRPTW Theo Khung Giờ
+              <Clock size={16} className="text-[#bc0100]" /> Tỉ lệ Giao hàng Đúng Hạn Theo Khung Giờ
             </h3>
             <p className="text-[11px] text-gray-400 mt-0.5">Đánh giá mức độ đáp ứng ràng buộc mốc giờ (Time Window Constraints)</p>
           </div>
@@ -422,11 +440,13 @@ export const AnalyticsTab: React.FC = () => {
               <div key={idx} className="space-y-1">
                 <div className="flex justify-between text-xs font-semibold text-slate-700">
                   <span>Khung giờ: {item.hour}</span>
-                  <span className="text-[#bc0100] font-bold">{item.onTime}% ({item.total} đơn)</span>
+                  <span className="text-[#bc0100] font-bold">
+                    {item.total > 0 ? `${item.onTime}% (${item.total} đơn)` : <span className="text-gray-400 font-normal">N/A (0 đơn)</span>}
+                  </span>
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    style={{ width: `${item.onTime}%` }}
+                    style={{ width: `${item.total > 0 ? item.onTime : 0}%` }}
                     className="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full"
                   ></div>
                 </div>
@@ -440,11 +460,11 @@ export const AnalyticsTab: React.FC = () => {
           <div className="border-b border-gray-100 pb-3 flex justify-between items-center">
             <div>
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <Award size={16} className="text-amber-500" /> Bảng Xếp Hạng Năng Suất Tài Xế Xuất Sắc
+                <Award size={16} className="text-amber-500" /> Bảng Xếp Hạng Năng Suất Tài Xế
               </h3>
-              <p className="text-[11px] text-gray-400 mt-0.5">Dựa trên số đơn giao thành công & tỷ lệ VRPTW đúng hạn</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Dựa trên số đơn giao thành công & quãng đường di chuyển</p>
             </div>
-            <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-bold px-2 py-0.5 rounded uppercase">Top Performers</span>
+            <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-bold px-2 py-0.5 rounded uppercase">Thực tế CSDL</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -459,25 +479,37 @@ export const AnalyticsTab: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {topDrivers.map((driver) => (
-                  <tr key={driver.rank} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-2.5 font-bold">
-                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] ${driver.rank === 1 ? 'bg-amber-500 text-white font-black shadow-sm' :
+                {topDrivers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-xs text-gray-400 italic">
+                      Chưa có dữ liệu chuyến xe của tài xế trong kỳ báo cáo
+                    </td>
+                  </tr>
+                ) : (
+                  topDrivers.map((driver) => (
+                    <tr key={driver.rank} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-2.5 font-bold">
+                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] ${driver.rank === 1 ? 'bg-amber-500 text-white font-black shadow-sm' :
                           driver.rank === 2 ? 'bg-slate-300 text-slate-800 font-bold' :
                             driver.rank === 3 ? 'bg-amber-700 text-white font-bold' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                        {driver.rank}
-                      </span>
-                    </td>
-                    <td className="py-2.5">
-                      <div className="font-bold text-slate-800">{driver.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{driver.code} • {driver.distance}</div>
-                    </td>
-                    <td className="py-2.5 text-center font-bold text-slate-800">{driver.completed} đơn</td>
-                    <td className="py-2.5 text-center font-bold text-emerald-600">{driver.onTime}</td>
-                    <td className="py-2.5 text-right font-bold text-amber-600">⭐ {driver.rating}</td>
-                  </tr>
-                ))}
+                          }`}>
+                          {driver.rank}
+                        </span>
+                      </td>
+                      <td className="py-2.5">
+                        <div className="font-bold text-slate-800">{driver.name}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{driver.code} • {driver.distance}</div>
+                      </td>
+                      <td className="py-2.5 text-center font-bold text-slate-800">{driver.completed} đơn</td>
+                      <td className="py-2.5 text-center font-bold text-emerald-600">
+                        {driver.completed > 0 ? driver.onTime : <span className="text-gray-400 font-normal">N/A</span>}
+                      </td>
+                      <td className="py-2.5 text-right font-bold text-amber-600">
+                        {driver.completed > 0 && driver.rating ? `⭐ ${driver.rating}` : <span className="text-gray-400 font-normal">N/A</span>}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

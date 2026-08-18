@@ -84,6 +84,7 @@
 | `stf_hub_tayninh_1` | `SlpTest@2026` | Trần Văn Hòa | `STF-TN-01` | **Kho Tổng Tỉnh Tây Ninh (Provincial Hub)** | Cấp 2 (Kho Tỉnh Tây Ninh) |
 | `stf_hub_hn_1` | `SlpTest@2026` | Bùi Đức Thắng | `STF-HN-02` | **Kho Tổng Hà Nội (Provincial Hub Cầu Giấy)** | Cấp 2 (Kho Tỉnh Hà Nội) |
 | `stf_sorter_south_1` | `SlpTest@2026` | Trần Văn Thắng | `STF-HUB-01` | **Tổng Kho Miền Nam (Mega Sorter Q.12)** | Cấp 1 (Kho Miền Nam) |
+| `stf_sorter_danang_1` | `SlpTest@2026` | Trần Văn An | `STF-DN-01` | **Tổng Kho Miền 4 (Đà Nẵng - FAC-SC-REGION4)** | Cấp 1 (Kho Miền Trung) |
 | `stf_sorter_north_1` | `SlpTest@2026` | Nguyễn Tiến Dũng | `STF-HN-01` | **Tổng Kho Miền Bắc (Mega Sorter Long Biên)** | Cấp 1 (Kho Miền Bắc) |
 
 ### 🚛 6.2. Tài Xế Xe Tải Trung Chuyển Đường Dài & Shipper Phát Hàng (`SHIPPER`)

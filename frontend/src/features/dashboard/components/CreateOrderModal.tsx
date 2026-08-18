@@ -948,16 +948,22 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               <select
                 value={customerId}
                 onChange={(e) => {
-                  setCustomerId(e.target.value);
+                  const val = e.target.value;
+                  setCustomerId(val);
                   if (errors.customerId) setErrors(prev => ({ ...prev, customerId: false }));
+                  const found = customers.find((c: any) => c.id === val);
+                  if (found) {
+                    if (!senderName) setSenderName(found.fullName || found.companyName || '');
+                    if (!senderPhone && found.phone) setSenderPhone(found.phone);
+                  }
                 }}
                 className={`w-full px-3 py-2 border rounded bg-white font-medium outline-none ${getFieldErrorClass('customerId')}`}
                 required
               >
-                <option value="">-- Chọn khách hàng --</option>
+                <option value="">-- Chọn khách hàng thanh toán ({customers.length} khách hàng) --</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.fullName || c.companyName || c.user?.username || 'N/A'} ({c.customerCode}) - {c.email || 'N/A'}
+                    [{c.customerCode}] {c.fullName || c.companyName || c.user?.username || 'N/A'}{c.phone ? ` - SĐT: ${c.phone}` : ''}{c.email ? ` (${c.email})` : ''}
                   </option>
                 ))}
               </select>

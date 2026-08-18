@@ -150,11 +150,30 @@ class _DriverDashboardState extends State<DriverDashboard> {
             }
           }
           if (stopsRaw.isNotEmpty) {
-            int loadedTotesCount = 0;
+            final Set<String> allToteCodes = {};
             int totalPkgCount = 0;
-            List<String> loadedToteCodes = [];
             bool isLinehaul = _isLinehaulDriverProfile;
 
+            // 1. Accumulate from firstRoute shipments
+            final routeShipments = firstRoute['shipments'] as List?;
+            if (routeShipments != null) {
+              for (final sh in routeShipments) {
+                final pkgs = sh['shipmentPackages'] as List?;
+                if (pkgs != null) totalPkgCount += pkgs.length;
+                final scans = sh['warehouseScans'] as List?;
+                if (scans != null) {
+                  for (final scan in scans) {
+                    final tote = scan['toteBag'];
+                    if (tote != null && tote['toteCode'] != null) {
+                      allToteCodes.add(tote['toteCode'].toString());
+                      isLinehaul = true;
+                    }
+                  }
+                }
+              }
+            }
+
+            // 2. Accumulate from stop shipments
             for (final s in stopsRaw) {
               final shipment = s['shipment'];
               if (shipment != null) {
@@ -164,21 +183,19 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 }
                 final scans = shipment['warehouseScans'] as List?;
                 if (scans != null) {
-                  final Set<String> toteSet = {};
                   for (final scan in scans) {
                     final tote = scan['toteBag'];
                     if (tote != null && tote['toteCode'] != null) {
-                      toteSet.add(tote['toteCode'].toString());
+                      allToteCodes.add(tote['toteCode'].toString());
+                      isLinehaul = true;
                     }
-                  }
-                  if (toteSet.isNotEmpty) {
-                    loadedToteCodes = toteSet.toList();
-                    loadedTotesCount = toteSet.length;
-                    isLinehaul = true;
                   }
                 }
               }
             }
+
+            final int loadedTotesCount = allToteCodes.length;
+            final List<String> loadedToteCodes = allToteCodes.toList();
 
             final List<Map<String, dynamic>> mappedStops = [];
             bool foundActiveIncomplete = false;
@@ -253,13 +270,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   isDispatched = true;
                 }
 
+                final bool isFirstStop = (i == 0);
+                final bool isLastStop = (i == stopsRaw.length - 1);
+                final bool isIntermediateStop = !isFirstStop && !isLastStop;
+
                 bool isCompleted = false;
                 String displayStatus = 'CHỜ THỰC HIỆN';
                 bool isActive = false;
 
                 if (isLinehaul) {
-                  if (stopType == 'PICKUP') {
-                    if (isDispatched || rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED') {
+                  if (isFirstStop) {
+                    if (rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED' || isDispatched) {
                       isCompleted = true;
                       displayStatus = 'ĐÃ XUẤT BƯU CỤC';
                       isActive = false;
@@ -268,16 +289,15 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       displayStatus = _loadedTotesCount > 0 ? 'ĐÃ BỐC $_loadedTotesCount THÙNG' : 'CHỜ BỐC HÀNG';
                       isActive = true;
                     }
-                  } else {
-                    final bool isDestInbounded = rawShipmentStatus == 'AT_HUB' ||
-                        rawShipmentStatus == 'ARRIVED_DEST_FACILITY' ||
-                        rawShipmentStatus == 'DELIVERED' ||
-                        rawStopStatus == 'COMPLETED' ||
-                        (transfers != null && transfers.any((t) => t['status'] == 'COMPLETED'));
-                    if (isDestInbounded) {
+                  } else if (isIntermediateStop) {
+                    if (rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED') {
                       isCompleted = true;
-                      displayStatus = 'ĐÃ TỚI KHO ĐÍCH';
+                      displayStatus = 'ĐÃ BỐC & RỜI TRẠM GHÉ';
                       isActive = false;
+                    } else if (rawStopStatus == 'ARRIVED' || rawStopStatus == 'IN_PROGRESS') {
+                      isCompleted = false;
+                      displayStatus = 'ĐANG BỐC HÀNG TẠI TRẠM';
+                      isActive = true;
                     } else if (isDispatched) {
                       isCompleted = false;
                       displayStatus = 'ĐANG THỰC HIỆN';
@@ -286,6 +306,32 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       isCompleted = false;
                       displayStatus = 'CHỜ THỰC HIỆN';
                       isActive = false;
+                    }
+                  } else {
+                    // Last Destination Stop
+                    final bool isDestInbounded = rawShipmentStatus == 'AT_HUB' ||
+                        rawShipmentStatus == 'ARRIVED_DEST_FACILITY' ||
+                        rawShipmentStatus == 'DELIVERED' ||
+                        rawStopStatus == 'COMPLETED' ||
+                        rawStopStatus == 'DEPARTED' ||
+                        (transfers != null && transfers.any((t) => t['status'] == 'COMPLETED'));
+                    if (isDestInbounded) {
+                      isCompleted = true;
+                      displayStatus = 'ĐÃ TỚI KHO ĐÍCH';
+                      isActive = false;
+                    } else {
+                      final bool prevStopsDone = (stopsRaw.length > 2)
+                          ? (stopsRaw[1]['status'] == 'DEPARTED' || stopsRaw[1]['status'] == 'COMPLETED')
+                          : isDispatched;
+                      if (prevStopsDone && isDispatched) {
+                        isCompleted = false;
+                        displayStatus = 'ĐANG THỰC HIỆN';
+                        isActive = true;
+                      } else {
+                        isCompleted = false;
+                        displayStatus = 'CHỜ THỰC HIỆN';
+                        isActive = false;
+                      }
                     }
                   }
                 } else {
@@ -326,7 +372,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 }
 
                 final String stopTitle = isLinehaul
-                    ? (stopType == 'PICKUP' ? 'Điểm xuất thùng trung chuyển' : 'Điểm giao thùng kho đích')
+                    ? (isFirstStop
+                        ? 'Điểm xuất thùng trung chuyển'
+                        : isIntermediateStop
+                            ? 'Điểm ghé trung chuyển (Bốc thêm hàng)'
+                            : 'Điểm giao thùng kho đích')
                     : (stopType == 'PICKUP' ? 'Điểm lấy hàng' : 'Điểm giao hàng');
 
                 mappedStops.add({
@@ -342,6 +392,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   'totalToCollect': totalToCollect,
                   'stopType': stopType,
                   'isPickup': (stopType == 'PICKUP'),
+                  'isFirstStop': isFirstStop,
+                  'isLastStop': isLastStop,
+                  'isIntermediate': isIntermediateStop,
                   'title': stopTitle,
                   'address': address,
                   'latitude': lat,

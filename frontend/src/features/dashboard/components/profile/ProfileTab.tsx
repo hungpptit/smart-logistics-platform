@@ -71,12 +71,15 @@ export const ProfileTab: React.FC = () => {
     }
   };
 
+  const isCustomer = user?.roles?.includes('CUSTOMER') || (!user?.roles?.includes('ADMIN') && !user?.roles?.includes('STAFF') && !user?.roles?.includes('SHIPPER') && !user?.roles?.includes('DRIVER'));
+
   useEffect(() => {
+    if (!isCustomer) return;
     if (user?.customerProfile?.addresses && user.customerProfile.addresses.length > 0) {
       setCustomerAddresses(user.customerProfile.addresses);
     }
     fetchAddresses();
-  }, [user]);
+  }, [user, isCustomer]);
 
   if (!user) {
     return <div className="p-6 text-gray-400">Không tìm thấy thông tin tài khoản.</div>;
@@ -338,129 +341,131 @@ export const ProfileTab: React.FC = () => {
           </div>
         </div>
 
-        {/* Khối hiển thị Địa chỉ Khách hàng */}
-        <div>
-          <div className="flex items-center justify-between border-b border-[#e8e8e8] pb-2">
-            <h3 className="text-sm font-bold text-[#161D25] uppercase tracking-wider flex items-center gap-2">
-              <MapPin size={16} className="text-[#bc0100]" />
-              Sổ địa chỉ nhận / gửi hàng
-            </h3>
-            <div className="flex items-center gap-2.5">
-              {customerAddresses.length > 0 && (
-                <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
-                  {customerAddresses.length} địa chỉ
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={handleOpenAddAddress}
-                className="flex items-center gap-1 text-xs font-bold bg-[#bc0100] text-white hover:bg-[#a00100] transition-colors px-3 py-1.5 rounded-md shadow-sm"
-              >
-                <Plus size={14} />
-                Thêm địa chỉ
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-3">
-            {loadingAddresses && customerAddresses.length === 0 ? (
-              <div className="text-xs text-gray-400 py-4 text-center">Đang tải sổ địa chỉ...</div>
-            ) : customerAddresses.length === 0 ? (
-              <div className="bg-[#F8FAFC] border border-dashed border-[#cbd5e1] rounded-lg p-5 text-center flex flex-col items-center gap-2">
-                <MapPin size={24} className="text-gray-300" />
-                <p className="text-xs text-gray-600 font-semibold">Chưa có địa chỉ nào trong sổ địa chỉ</p>
-                <p className="text-[11px] text-gray-400 max-w-sm">Bấm nút "Thêm địa chỉ" ở trên hoặc các địa chỉ lấy/giao hàng sẽ được tự động lưu lại khi bạn tạo đơn hàng mới.</p>
+        {/* Khối hiển thị Địa chỉ Khách hàng (Chỉ hiển thị cho vai trò Khách hàng, ẩn cho Admin/Staff) */}
+        {isCustomer && (
+          <div>
+            <div className="flex items-center justify-between border-b border-[#e8e8e8] pb-2">
+              <h3 className="text-sm font-bold text-[#161D25] uppercase tracking-wider flex items-center gap-2">
+                <MapPin size={16} className="text-[#bc0100]" />
+                Sổ địa chỉ nhận / gửi hàng
+              </h3>
+              <div className="flex items-center gap-2.5">
+                {customerAddresses.length > 0 && (
+                  <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
+                    {customerAddresses.length} địa chỉ
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={handleOpenAddAddress}
-                  className="mt-1 flex items-center gap-1.5 text-xs font-bold bg-[#161D25] text-white hover:bg-[#bc0100] transition-colors px-4 py-2 rounded-md"
+                  className="flex items-center gap-1 text-xs font-bold bg-[#bc0100] text-white hover:bg-[#a00100] transition-colors px-3 py-1.5 rounded-md shadow-sm"
                 >
                   <Plus size={14} />
-                  Thêm địa chỉ ngay
+                  Thêm địa chỉ
                 </button>
               </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {customerAddresses.map((item: any, idx: number) => {
-                  const addr = item.address || item;
-                  const ward = addr.wardRelation?.fullName || addr.wardRelation?.name || addr.wardName || addr.ward || item.ward || '';
-                  const province = addr.wardRelation?.province?.fullName || addr.wardRelation?.province?.name || addr.provinceName || addr.province || item.province || '';
+            </div>
 
-                  const addressParts = [
-                    addr.addressLine1,
-                    ward,
-                    province,
-                  ].filter(Boolean);
+            <div className="mt-3">
+              {loadingAddresses && customerAddresses.length === 0 ? (
+                <div className="text-xs text-gray-400 py-4 text-center">Đang tải sổ địa chỉ...</div>
+              ) : customerAddresses.length === 0 ? (
+                <div className="bg-[#F8FAFC] border border-dashed border-[#cbd5e1] rounded-lg p-5 text-center flex flex-col items-center gap-2">
+                  <MapPin size={24} className="text-gray-300" />
+                  <p className="text-xs text-gray-600 font-semibold">Chưa có địa chỉ nào trong sổ địa chỉ</p>
+                  <p className="text-[11px] text-gray-400 max-w-sm">Bấm nút "Thêm địa chỉ" ở trên hoặc các địa chỉ lấy/giao hàng sẽ được tự động lưu lại khi bạn tạo đơn hàng mới.</p>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddAddress}
+                    className="mt-1 flex items-center gap-1.5 text-xs font-bold bg-[#161D25] text-white hover:bg-[#bc0100] transition-colors px-4 py-2 rounded-md"
+                  >
+                    <Plus size={14} />
+                    Thêm địa chỉ ngay
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {customerAddresses.map((item: any, idx: number) => {
+                    const addr = item.address || item;
+                    const ward = addr.wardRelation?.fullName || addr.wardRelation?.name || addr.wardName || addr.ward || item.ward || '';
+                    const province = addr.wardRelation?.province?.fullName || addr.wardRelation?.province?.name || addr.provinceName || addr.province || item.province || '';
 
-                  const fullAddressStr = addressParts.join(', ') || addr.fullAddress || 'Chi tiết địa chỉ chưa cập nhật';
+                    const addressParts = [
+                      addr.addressLine1,
+                      ward,
+                      province,
+                    ].filter(Boolean);
 
-                  const typeLabel =
-                    item.addressType === 'HOME' ? 'Nhà riêng' :
-                    item.addressType === 'OFFICE' ? 'Văn phòng' :
-                    item.addressType === 'WAREHOUSE' ? 'Kho hàng' :
-                    item.addressType === 'RETURN' ? 'Trả hàng' :
-                    item.addressType || 'Địa chỉ';
+                    const fullAddressStr = addressParts.join(', ') || addr.fullAddress || 'Chi tiết địa chỉ chưa cập nhật';
 
-                  return (
-                    <div
-                      key={item.id || idx}
-                      className={`p-3.5 rounded-md border transition-all duration-200 ${
-                        item.isDefault
-                          ? 'border-[#bc0100]/40 bg-[#bc0100]/[0.02] shadow-sm'
-                          : 'border-[#e2e8f0] bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-gray-100 text-gray-700 border border-gray-200">
-                            {typeLabel}
-                          </span>
-                          {item.isDefault && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-[#bc0100] text-white">
-                              Mặc định
+                    const typeLabel =
+                      item.addressType === 'HOME' ? 'Nhà riêng' :
+                      item.addressType === 'OFFICE' ? 'Văn phòng' :
+                      item.addressType === 'WAREHOUSE' ? 'Kho hàng' :
+                      item.addressType === 'RETURN' ? 'Trả hàng' :
+                      item.addressType || 'Địa chỉ';
+
+                    return (
+                      <div
+                        key={item.id || idx}
+                        className={`p-3.5 rounded-md border transition-all duration-200 ${
+                          item.isDefault
+                            ? 'border-[#bc0100]/40 bg-[#bc0100]/[0.02] shadow-sm'
+                            : 'border-[#e2e8f0] bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-gray-100 text-gray-700 border border-gray-200">
+                              {typeLabel}
                             </span>
-                          )}
-                        </div>
+                            {item.isDefault && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-[#bc0100] text-white">
+                                Mặc định
+                              </span>
+                            )}
+                          </div>
 
-                        <div className="flex items-center gap-3">
-                          {(item.contactName || item.contactPhone) && (
-                            <span className="text-xs font-semibold text-[#161D25]">
-                              {item.contactName} {item.contactPhone ? <span className="text-gray-500 font-normal">({item.contactPhone})</span> : ''}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-3">
+                            {(item.contactName || item.contactPhone) && (
+                              <span className="text-xs font-semibold text-[#161D25]">
+                                {item.contactName} {item.contactPhone ? <span className="text-gray-500 font-normal">({item.contactPhone})</span> : ''}
+                              </span>
+                            )}
 
-                          <div className="flex items-center gap-1 border-l border-gray-200 pl-2">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditAddress(item)}
-                              className="p-1 text-gray-400 hover:text-[#161D25] transition-colors rounded"
-                              title="Chỉnh sửa địa chỉ"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteAddress(item.addressId || item.id)}
-                              className="p-1 text-gray-400 hover:text-[#bc0100] transition-colors rounded"
-                              title="Xóa địa chỉ"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            <div className="flex items-center gap-1 border-l border-gray-200 pl-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditAddress(item)}
+                                className="p-1 text-gray-400 hover:text-[#161D25] transition-colors rounded"
+                                title="Chỉnh sửa địa chỉ"
+                              >
+                                <Pencil size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteAddress(item.addressId || item.id)}
+                                className="p-1 text-gray-400 hover:text-[#bc0100] transition-colors rounded"
+                                title="Xóa địa chỉ"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-start gap-2 text-xs text-[#2d3748] mt-1 font-medium">
-                        <MapPin size={14} className="text-[#bc0100] shrink-0 mt-0.5" />
-                        <span className="leading-relaxed">{fullAddressStr}</span>
+                        <div className="flex items-start gap-2 text-xs text-[#2d3748] mt-1 font-medium">
+                          <MapPin size={14} className="text-[#bc0100] shrink-0 mt-0.5" />
+                          <span className="leading-relaxed">{fullAddressStr}</span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Modal đổi mật khẩu */}
@@ -569,15 +574,17 @@ export const ProfileTab: React.FC = () => {
       </Modal>
 
       {/* Address Create/Edit Modal */}
-      <AddressModal
-        isOpen={showAddressModal}
-        onClose={() => setShowAddressModal(false)}
-        isEditing={isEditingAddress}
-        addressFormData={addressFormData}
-        setAddressFormData={setAddressFormData}
-        onSubmit={handleSaveAddress}
-        actionLoading={actionLoading}
-      />
+      {isCustomer && (
+        <AddressModal
+          isOpen={showAddressModal}
+          onClose={() => setShowAddressModal(false)}
+          isEditing={isEditingAddress}
+          addressFormData={addressFormData}
+          setAddressFormData={setAddressFormData}
+          onSubmit={handleSaveAddress}
+          actionLoading={actionLoading}
+        />
+      )}
     </div>
   );
 };

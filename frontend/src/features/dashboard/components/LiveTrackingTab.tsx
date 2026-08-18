@@ -628,16 +628,28 @@ export const LiveTrackingTab: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <select
-              value={facilityFilter}
-              onChange={(e) => setFacilityFilter(e.target.value)}
-              className="px-2 py-1.5 border border-[#e2e8f0] rounded text-[10px] font-bold outline-none bg-white text-gray-600"
-            >
-              <option value="">Tất cả bưu cục</option>
-              {facilities.map(fac => (
-                <option key={fac.id} value={fac.id}>{fac.facilityName}</option>
-              ))}
-            </select>
+            {isStaffOnly ? (
+              <div
+                className="px-2 py-1.5 border border-[#e2e8f0] bg-slate-50 rounded text-[10px] font-bold text-gray-700 flex items-center gap-1.5 truncate shadow-xs"
+                title="Phạm vi giám sát cố định: Bưu cục được phân công quản lý"
+              >
+                <Building2 size={13} className="text-[#bc0100] shrink-0" />
+                <span className="truncate">
+                  {facilities.find(f => f.id === userAssignedFacilityId)?.facilityName || 'Bưu cục phân công'}
+                </span>
+              </div>
+            ) : (
+              <select
+                value={facilityFilter}
+                onChange={(e) => setFacilityFilter(e.target.value)}
+                className="px-2 py-1.5 border border-[#e2e8f0] rounded text-[10px] font-bold outline-none bg-white text-gray-600 focus:border-[#bc0100]"
+              >
+                <option value="">Tất cả bưu cục ({facilities.length})</option>
+                {facilities.map(fac => (
+                  <option key={fac.id} value={fac.id}>{fac.facilityName}</option>
+                ))}
+              </select>
+            )}
 
             <select
               value={statusFilter}

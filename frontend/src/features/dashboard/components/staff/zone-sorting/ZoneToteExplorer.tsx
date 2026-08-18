@@ -14,7 +14,7 @@ interface ZoneToteExplorerProps {
   setActiveExplorerZone: (zoneCode: string) => void;
   zoneTotesData: any[];
   getActiveToteCode: (zoneCode: string) => string;
-  fetchZoneTotes: () => void;
+  fetchZoneTotes?: () => void;
   handleOpenToteDetailModal: (toteCode: string) => void;
   includeLoaded?: boolean;
   onToggleIncludeLoaded?: (include: boolean) => void;
@@ -26,10 +26,10 @@ export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
   setActiveExplorerZone,
   zoneTotesData,
   getActiveToteCode,
-  fetchZoneTotes,
+  fetchZoneTotes: _fetchZoneTotes,
   handleOpenToteDetailModal,
   includeLoaded = false,
-  onToggleIncludeLoaded,
+  onToggleIncludeLoaded: _onToggleIncludeLoaded,
 }) => {
   const getZoneTheme = (zoneCode: string, zoneType: string) => {
     const code = zoneCode.toUpperCase();
@@ -37,7 +37,7 @@ export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
     // Inbound / Unloading Receiving
     if (code.includes('UNLOADING') || code.includes('INBOUND') || zoneType === 'RECEIVING') {
       return {
-        categoryLabel: '📥 SÀN HẠ NHẬP KHO',
+        categoryLabel: 'SÀN HẠ NHẬP KHO',
         activeClass: 'bg-emerald-500/10 border-emerald-500/60 ring-2 ring-emerald-500/30 shadow-md',
         inactiveClass: 'bg-emerald-50/40 hover:bg-emerald-50/80 border-emerald-200/80',
         badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -48,7 +48,7 @@ export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
     // Regional Long-Haul Dispatch (Đi Các Miền)
     if (code.includes('REGION') || code.includes('NORTH-DISPATCH') || code.includes('CENTRAL-DISPATCH') || code.includes('SOUTH-DISPATCH')) {
       return {
-        categoryLabel: '🌍 TUYẾN LIÊN MIỀN',
+        categoryLabel: 'TUYẾN LIÊN MIỀN',
         activeClass: 'bg-purple-500/10 border-purple-500/60 ring-2 ring-purple-500/30 shadow-md',
         inactiveClass: 'bg-purple-50/40 hover:bg-purple-50/80 border-purple-200/80',
         badgeBg: 'bg-purple-100 text-purple-800 border-purple-300',
@@ -59,7 +59,7 @@ export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
     // Province Dispatch (Đi Các Tỉnh Nội Vùng)
     if (code.includes('DISPATCH-') || code.includes('INTRA') || code.includes('PROVINCE')) {
       return {
-        categoryLabel: '🚚 TUYẾN TỈNH NỘI VÙNG',
+        categoryLabel: 'TUYẾN TỈNH NỘI VÙNG',
         activeClass: 'bg-sky-500/10 border-sky-500/60 ring-2 ring-sky-500/30 shadow-md',
         inactiveClass: 'bg-sky-50/40 hover:bg-sky-50/80 border-sky-200/80',
         badgeBg: 'bg-sky-100 text-sky-800 border-sky-300',
@@ -69,7 +69,7 @@ export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
 
     // Holding / Buffer Storage
     return {
-      categoryLabel: '🔒 KHO LƯU ĐỆM CHỜ XE',
+      categoryLabel: 'KHO LƯU ĐỆM CHỜ XE',
       activeClass: 'bg-amber-500/10 border-amber-500/60 ring-2 ring-amber-500/30 shadow-md',
       inactiveClass: 'bg-amber-50/40 hover:bg-amber-50/80 border-amber-200/80',
       badgeBg: 'bg-amber-100 text-amber-800 border-amber-300',
@@ -80,51 +80,13 @@ export const ZoneToteExplorer: React.FC<ZoneToteExplorerProps> = ({
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
       {/* Explorer Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-3 gap-3">
-        <div>
-          <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">
-            DANH SÁCH {facilityZones.length} PHÂN KHU KHO & QUẢN LÝ SỌT HÀNG (ZONES & TOTES EXPLORER)
-          </h3>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            Bấm chọn Phân khu để xem các Sọt Hàng (`toteCode`). Cuộn xuống để xem trọn bộ {facilityZones.length} phân khu kho.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Toggle View Mode */}
-          <div className="bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex items-center text-xs">
-            <button
-              type="button"
-              onClick={() => onToggleIncludeLoaded && onToggleIncludeLoaded(false)}
-              className={`px-2.5 py-1 rounded-md font-bold transition text-[11px] cursor-pointer ${
-                !includeLoaded
-                  ? 'bg-white text-emerald-700 shadow-sm border border-emerald-200'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              🟢 Sọt tại sàn kho
-            </button>
-            <button
-              type="button"
-              onClick={() => onToggleIncludeLoaded && onToggleIncludeLoaded(true)}
-              className={`px-2.5 py-1 rounded-md font-bold transition text-[11px] cursor-pointer ${
-                includeLoaded
-                  ? 'bg-white text-indigo-700 shadow-sm border border-indigo-200'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              📋 Lịch sử tất cả sọt
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={fetchZoneTotes}
-            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition self-start sm:self-center cursor-pointer"
-          >
-            Làm Mới Sọt
-          </button>
-        </div>
+      <div className="border-b border-slate-100 pb-3">
+        <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">
+          DANH SÁCH {facilityZones.length} PHÂN KHU KHO & QUẢN LÝ SỌT HÀNG (ZONES & TOTES EXPLORER)
+        </h3>
+        <p className="text-[11px] text-slate-500 mt-0.5">
+          Bấm chọn Phân khu để xem các Sọt Hàng (`toteCode`). Cuộn xuống để xem trọn bộ {facilityZones.length} phân khu kho.
+        </p>
       </div>
 
       {/* Zone Cards Scrollable Grid Container */}

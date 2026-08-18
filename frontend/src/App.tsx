@@ -6,7 +6,7 @@ import { ServicesGrid } from './features/pricing/components/ServicesGrid';
 import { PricingCalculator } from './features/pricing/components/PricingCalculator';
 import { AdminDashboard } from './features/dashboard/components/AdminDashboard';
 import { Toast } from './components/ui/Toast';
-import { Search, ArrowRight } from 'lucide-react';
+import { Search, ArrowRight, X } from 'lucide-react';
 import { Header } from './components/Header';
 import { CONFIG } from './config';
 import { io as socketIoClient } from 'socket.io-client';
@@ -28,6 +28,7 @@ const AppContent: React.FC = () => {
   const [currentTracking, setCurrentTracking] = useState<any>(null);
   const [liveDriverPos, setLiveDriverPos] = useState<[number, number] | null>(null);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   // Auto-redirect to dashboard when logged in, or landing when logged out
   useEffect(() => {
@@ -49,9 +50,14 @@ const AppContent: React.FC = () => {
 
   const fetchTrackingData = async (codeToSearch: string) => {
     const cleanCode = codeToSearch.trim().toUpperCase();
-    if (!cleanCode) return;
+    if (!cleanCode) {
+      setSearchError('Vui lòng nhập mã vận đơn để tra cứu!');
+      triggerToast('Vui lòng nhập mã vận đơn để tra cứu!', 'error');
+      return;
+    }
 
     setIsTrackingLoading(true);
+    setSearchError(null);
 
     try {
       // Query Backend Public Tracking API
@@ -61,20 +67,25 @@ const AppContent: React.FC = () => {
       if (res.ok && data.success && data.data) {
         const payload = data.data;
         setCurrentTracking(payload);
+        setSearchError(null);
         if (payload.coordinates?.currentDriver) {
           setLiveDriverPos([payload.coordinates.currentDriver.lat, payload.coordinates.currentDriver.lng]);
         }
         triggerToast(`Đã tìm thấy thông tin vận đơn ${cleanCode}!`, 'success');
       } else {
+        const err = data.message || `Không tìm thấy mã đơn / mã vận đơn "${cleanCode}" trên hệ thống!`;
         setCurrentTracking(null);
         setLiveDriverPos(null);
-        triggerToast(data.message || `Không tìm thấy mã đơn / mã vận đơn ${cleanCode} trên hệ thống!`, 'error');
+        setSearchError(err);
+        triggerToast(err, 'error');
       }
     } catch (err) {
       console.error('Error fetching tracking data:', err);
+      const networkErr = `Lỗi kết nối khi tra cứu mã "${cleanCode}". Vui lòng thử lại!`;
       setCurrentTracking(null);
       setLiveDriverPos(null);
-      triggerToast(`Lỗi kết nối khi tra cứu mã ${cleanCode}!`, 'error');
+      setSearchError(networkErr);
+      triggerToast(networkErr, 'error');
     } finally {
       setIsTrackingLoading(false);
     }
@@ -150,15 +161,48 @@ const AppContent: React.FC = () => {
                     type="text"
                     placeholder="Nhập mã vận đơn tra cứu (VD: ORD-0419000003)..."
                     value={trackingCode}
-                    onChange={(e) => setTrackingCode(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTrackingCode(val);
+                      if (!val.trim()) {
+                        setCurrentTracking(null);
+                        setLiveDriverPos(null);
+                        setSearchError(null);
+                      } else if (searchError) {
+                        setSearchError(null);
+                      }
+                    }}
                     onKeyPress={handleKeyPress}
                   />
+                  {trackingCode && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTrackingCode('');
+                        setCurrentTracking(null);
+                        setLiveDriverPos(null);
+                        setSearchError(null);
+                      }}
+                      className="p-1 mr-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                      title="Xóa tìm kiếm"
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
                   <button className="btn btn-primary cursor-pointer disabled:opacity-50" onClick={handleTrackSubmit} disabled={isTrackingLoading}>
                     <span>{isTrackingLoading ? 'Đang tìm...' : 'Tra cứu ngay'}</span>
                     {!isTrackingLoading && <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />}
                   </button>
                 </div>
               </div>
+
+              {/* Inline Error Notice OUTSIDE the capsule */}
+              {searchError && (
+                <div className="mt-3.5 inline-flex items-center gap-2 bg-rose-950/85 border border-rose-500/40 text-rose-200 text-xs px-4 py-2 rounded-full font-medium shadow-lg backdrop-blur-md animate-fade-in">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping shrink-0"></span>
+                  <span>{searchError}</span>
+                </div>
+              )}
             </div>
           </section>
 

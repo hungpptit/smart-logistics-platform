@@ -95,16 +95,30 @@ class StopCard extends StatelessWidget {
                                     padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
                                     decoration: BoxDecoration(
                                       color: isLinehaul
-                                          ? const Color(0xFFFEF2F2)
+                                          ? (stop['isIntermediate'] == true
+                                              ? const Color(0xFFFEF3C7)
+                                              : (stop['isFirstStop'] == true
+                                                  ? const Color(0xFFFEF2F2)
+                                                  : const Color(0xFFEFF6FF)))
                                           : AppColors.logisticsRed.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(4.0),
                                     ),
                                     child: Text(
                                       isLinehaul
-                                          ? (stop['isPickup'] == true ? 'ĐIỂM XUẤT PHÁT' : 'ĐIỂM ĐẾN')
+                                          ? (stop['isIntermediate'] == true
+                                              ? 'TRẠM GHÉ TRUNG CHUYỂN'
+                                              : (stop['isFirstStop'] == true
+                                                  ? 'ĐIỂM XUẤT PHÁT'
+                                                  : 'ĐIỂM ĐẾN'))
                                           : (stop['orderCode'] ?? 'ORD-66266482'),
                                       style: TextStyle(
-                                        color: isLinehaul ? const Color(0xFF991B1B) : AppColors.logisticsRed,
+                                        color: isLinehaul
+                                            ? (stop['isIntermediate'] == true
+                                                ? const Color(0xFFB45309)
+                                                : (stop['isFirstStop'] == true
+                                                    ? const Color(0xFF991B1B)
+                                                    : const Color(0xFF1D4ED8)))
+                                            : AppColors.logisticsRed,
                                         fontSize: 10.0,
                                         fontWeight: FontWeight.bold,
                                         fontFamily: 'monospace',
@@ -257,7 +271,9 @@ class StopCard extends StatelessWidget {
                             // Action button for Linehaul stops (Mobile Driver UI)
                             if (isLinehaul) ...[
                               if (stop['isPickup'] == true &&
+                                  stop['isCheckedIn'] != true &&
                                   status != 'ĐÃ XUẤT BƯU CỤC' &&
+                                  status != 'ĐÃ BỐC & RỜI TRẠM GHÉ' &&
                                   status != 'ĐÃ LẤY HÀNG' &&
                                   status != 'COMPLETED') ...[
                                 const SizedBox(height: 10.0),
@@ -265,13 +281,20 @@ class StopCard extends StatelessWidget {
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
                                     onPressed: onTap,
-                                    icon: const Icon(Icons.qr_code_2, size: 18),
-                                    label: const Text(
-                                      'Xác nhận & Hiện QR Xuất bến',
-                                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                    icon: Icon(
+                                      stop['isIntermediate'] == true ? Icons.add_box_outlined : Icons.qr_code_2,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      stop['isIntermediate'] == true
+                                          ? 'Xác nhận & Bốc thêm hàng tại trạm ghé'
+                                          : 'Xác nhận & Hiện QR Xuất bến',
+                                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFB91C1C),
+                                      backgroundColor: stop['isIntermediate'] == true
+                                          ? const Color(0xFFD97706)
+                                          : const Color(0xFFB91C1C),
                                       foregroundColor: AppColors.pureWhite,
                                       padding: const EdgeInsets.symmetric(vertical: 9.0),
                                       elevation: 2,
@@ -280,6 +303,7 @@ class StopCard extends StatelessWidget {
                                   ),
                                 ),
                               ] else if (stop['isPickup'] != true &&
+                                  stop['isCheckedIn'] != true &&
                                   (isActive || status == 'ĐANG THỰC HIỆN') &&
                                   status != 'ĐÃ TỚI KHO ĐÍCH' &&
                                   status != 'COMPLETED') ...[

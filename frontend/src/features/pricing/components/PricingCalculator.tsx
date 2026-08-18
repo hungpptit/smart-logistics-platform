@@ -99,6 +99,15 @@ export const PricingCalculator: React.FC = () => {
     fetchServices();
   }, []);
 
+  const maxAllowedDistance = selectedServiceCode === 'EXPRESS' ? 20 : 2000;
+
+  const handleSelectService = (code: string) => {
+    setSelectedServiceCode(code);
+    if (code === 'EXPRESS' && distanceKm > 20) {
+      setDistanceKm(10);
+    }
+  };
+
   const activeService = services.find((s) => s.serviceCode === selectedServiceCode) || services[0] || FALLBACK_SERVICES[0];
 
   // Pricing formula matching pricing.service.ts
@@ -138,37 +147,38 @@ export const PricingCalculator: React.FC = () => {
             <p className="text-sm text-gray-500">Điền thông tin khoảng cách & trọng lượng để ước tính chi phí chính xác nhất.</p>
           </div>
 
-          {/* Service Cards selection grid */}
+          {/* Service Selector Grid */}
           <div className="flex flex-col gap-3">
-            <label className="text-sm font-semibold text-[#161D25] uppercase tracking-wider">Chọn Gói Dịch Vụ</label>
+            <label className="text-sm font-semibold text-[#161D25] uppercase tracking-wider">Chọn gói dịch vụ</label>
+            
             {loading ? (
-              <div className="text-sm text-gray-400 py-2">Đang tải dữ liệu bảng giá dịch vụ...</div>
+              <div className="p-6 text-center text-xs text-gray-400">Đang tải bảng giá dịch vụ...</div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {services.map((svc) => {
                   const isSelected = svc.serviceCode === selectedServiceCode;
                   return (
                     <button
-                      key={svc.id}
                       type="button"
-                      onClick={() => setSelectedServiceCode(svc.serviceCode)}
-                      className={`p-4 text-left border rounded-md transition-all flex flex-col gap-1 cursor-pointer bg-white relative overflow-hidden ${
+                      key={svc.id}
+                      onClick={() => handleSelectService(svc.serviceCode)}
+                      className={`p-4 rounded-md border text-left flex flex-col justify-between gap-2 transition-all relative cursor-pointer ${
                         isSelected
-                          ? 'border-[#bc0100] shadow-medium bg-[#bc0100]/[0.02]'
-                          : 'border-[#e2e8f0] hover:border-gray-400'
+                          ? 'border-[#bc0100] ring-1 ring-[#bc0100] bg-white'
+                          : 'border-[#e2e8f0] hover:border-gray-300 bg-white'
                       }`}
-                      style={{ borderLeftWidth: isSelected ? '4px' : '1px' }}
                     >
                       {isSelected && (
-                        <div className="absolute top-0 right-0 w-8 h-8 bg-[#bc0100] text-white flex items-center justify-center rounded-bl-lg">
-                          <i className="fa-solid fa-check text-xs"></i>
+                        <div className="absolute top-2 right-2 w-5 h-5 bg-[#bc0100] text-white rounded-full flex items-center justify-center text-xs font-bold">
+                          ✓
                         </div>
                       )}
-                      <span className="font-bold text-sm text-[#161D25]">{svc.serviceName}</span>
-                      <span className="text-xs text-gray-400 line-clamp-1 pr-6">{svc.description}</span>
-                      <span className="text-xs font-bold text-[#bc0100] mt-1">
-                        Giá mở cửa: {formatVND(Number(svc.basePrice))}
-                      </span>
+                      <div>
+                        <span className="font-bold text-sm text-[#161D25] block">{svc.serviceName}</span>
+                        <span className="text-xs text-[#bc0100] font-semibold mt-1 block">
+                          Giá mở cửa: {formatVND(Number(svc.basePrice))}
+                        </span>
+                      </div>
                     </button>
                   );
                 })}
@@ -177,32 +187,38 @@ export const PricingCalculator: React.FC = () => {
           </div>
 
           {/* Sliders and Numeric Inputs */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {/* Distance Input */}
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-semibold text-[#161D25] flex items-center gap-1.5 uppercase tracking-wider">
-                  <MapPin size={16} className="text-[#bc0100]" /> Khoảng cách (km)
-                </label>
+          <div className={`grid ${pricePerKm > 0 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'} gap-6`}>
+            {/* Distance Input (Chỉ hiển thị khi gói dịch vụ có tính cước km) */}
+            {pricePerKm > 0 && (
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-semibold text-[#161D25] flex items-center gap-1.5 uppercase tracking-wider">
+                    <MapPin size={16} className="text-[#bc0100]" /> Khoảng cách (km)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={maxAllowedDistance}
+                    value={distanceKm}
+                    onChange={(e) => setDistanceKm(Math.min(maxAllowedDistance, Math.max(1, Number(e.target.value))))}
+                    className="w-20 p-1 text-center border border-[#e2e8f0] rounded focus:outline-none focus:border-[#bc0100] focus:ring-1 focus:ring-[#bc0100] text-sm font-bold text-[#161D25]"
+                  />
+                </div>
                 <input
-                  type="number"
+                  type="range"
                   min="1"
-                  max="1000"
+                  max={maxAllowedDistance}
                   value={distanceKm}
-                  onChange={(e) => setDistanceKm(Math.max(1, Number(e.target.value)))}
-                  className="w-20 p-1 text-center border border-[#e2e8f0] rounded focus:outline-none focus:border-[#bc0100] focus:ring-1 focus:ring-[#bc0100] text-sm font-bold text-[#161D25]"
+                  onChange={(e) => setDistanceKm(Number(e.target.value))}
+                  className="w-full h-1.5 bg-[#F4F4F4] rounded-lg appearance-none cursor-pointer accent-[#bc0100]"
                 />
+                {selectedServiceCode === 'EXPRESS' && (
+                  <span className="text-[10px] text-amber-600 font-semibold">
+                    * Hỏa tốc 2h áp dụng phạm vi tối đa 20 km nội thành
+                  </span>
+                )}
               </div>
-              <input
-                type="range"
-                min="1"
-                max="500"
-                value={distanceKm}
-                onChange={(e) => setDistanceKm(Number(e.target.value))}
-                className="w-full h-1.5 bg-[#F4F4F4] rounded-lg appearance-none cursor-pointer accent-[#bc0100]"
-              />
-              <span className="text-[10px] text-gray-400">Miễn phí {freeDistanceKm} km đầu tiên</span>
-            </div>
+            )}
 
             {/* Weight Input */}
             <div className="flex flex-col gap-2">
@@ -236,7 +252,7 @@ export const PricingCalculator: React.FC = () => {
           {/* Options: Fragile & COD */}
           <div className="border-t border-[#e8e8e8] pt-4 flex flex-col gap-4">
             <label className="text-sm font-semibold text-[#161D25] uppercase tracking-wider">Dịch vụ bổ sung</label>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Fragile Surcharge option */}
               <label className="flex items-center gap-3 p-3 border border-[#e2e8f0] rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
@@ -279,7 +295,7 @@ export const PricingCalculator: React.FC = () => {
         <div className="lg:col-span-5 p-6 md:p-8 bg-[#F4F4F4] flex flex-col justify-between gap-6">
           <div className="flex flex-col gap-4">
             <h3 className="text-xl font-bold text-[#161D25] uppercase tracking-wider border-b border-gray-300 pb-3">Chi tiết cước tạm tính</h3>
-            
+
             <div className="flex flex-col gap-3 text-sm">
               <div className="flex justify-between items-center">
                 <span className="text-gray-500">Gói cước:</span>
@@ -289,10 +305,12 @@ export const PricingCalculator: React.FC = () => {
                 <span className="text-gray-500">Cước cơ bản (mở cửa):</span>
                 <span className="font-semibold text-[#161D25]">{formatVND(basePrice)}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500">Phí khoảng cách ({distanceKm} km):</span>
-                <span className="font-semibold text-[#161D25]">{formatVND(distanceFee)}</span>
-              </div>
+              {pricePerKm > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Phí khoảng cách ({distanceKm} km):</span>
+                  <span className="font-semibold text-[#161D25]">{formatVND(distanceFee)}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-gray-500">Phí khối lượng ({weightKg} kg):</span>
                 <span className="font-semibold text-[#161D25]">{formatVND(weightFee)}</span>
@@ -317,7 +335,7 @@ export const PricingCalculator: React.FC = () => {
               <span className="text-base font-bold text-[#161D25] uppercase tracking-wider">Tổng cước tạm tính:</span>
               <span className="text-2xl font-extrabold text-[#bc0100]">{formatVND(totalAmount)}</span>
             </div>
-            
+
             <div className="text-[11px] text-gray-400 bg-white/70 p-3 rounded border border-gray-200 flex gap-2">
               <HelpCircle size={14} className="text-[#bc0100] shrink-0" />
               <span>Giá cước trên chỉ là tạm tính dựa trên khoảng cách đường chim bay, chưa bao gồm các phụ phí xăng dầu hoặc điều kiện đặc biệt khác.</span>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
-import { 
-  Search, RefreshCw, Plus, Edit2, Trash2, ShieldAlert, AlertTriangle, 
-  Phone, ChevronLeft, ChevronRight, X, Loader2, Compass, Eye 
+import {
+  Search, RefreshCw, Plus, Edit2, Trash2, ShieldAlert, AlertTriangle,
+  Phone, ChevronLeft, ChevronRight, X, Loader2, Compass, Eye
 } from 'lucide-react';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
 
@@ -247,8 +247,8 @@ export const DriverTab: React.FC = () => {
     };
 
     try {
-      const url = isEditing 
-        ? `${CONFIG.API_BASE_URL}/drivers/${selectedDriverId}` 
+      const url = isEditing
+        ? `${CONFIG.API_BASE_URL}/drivers/${selectedDriverId}`
         : `${CONFIG.API_BASE_URL}/drivers`;
       const method = isEditing ? 'PUT' : 'POST';
 
@@ -458,21 +458,20 @@ export const DriverTab: React.FC = () => {
                               {dt.driverType === 'HUB_DELIVERY'
                                 ? 'Bưu cục'
                                 : dt.driverType === 'LINEHAUL_TRANSFER'
-                                ? 'Trung chuyển'
-                                : 'Tức thì'}
+                                  ? 'Trung chuyển'
+                                  : 'Tức thì'}
                             </span>
                           ))}
                         </div>
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
-                        drv.employmentStatus === 'ACTIVE'
-                          ? 'bg-green-50 text-green-700 border border-green-200'
-                          : drv.employmentStatus === 'SUSPENDED'
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${drv.employmentStatus === 'ACTIVE'
+                        ? 'bg-green-50 text-green-700 border border-green-200'
+                        : drv.employmentStatus === 'SUSPENDED'
                           ? 'bg-red-50 text-red-700 border border-red-200'
                           : 'bg-gray-100 text-gray-600 border border-gray-200'
-                      }`}>
+                        }`}>
                         {drv.employmentStatus === 'ACTIVE' ? '🟢 Trực tuyến' : drv.employmentStatus === 'SUSPENDED' ? '🔴 Bị đình chỉ' : '⚪ Ngoại tuyến'}
                       </span>
                     </td>
@@ -827,18 +826,17 @@ export const DriverTab: React.FC = () => {
                 <div>
                   <h4 className="font-bold text-sm text-gray-800">{selectedDriverDetail.fullName}</h4>
                   <p className="text-[10px] font-mono text-gray-500 mt-0.5">Mã số: {selectedDriverDetail.employeeCode}</p>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold mt-1.5 uppercase ${
-                    selectedDriverDetail.employmentStatus === 'ACTIVE'
-                      ? 'bg-green-50 text-green-700 border border-green-200'
-                      : selectedDriverDetail.employmentStatus === 'SUSPENDED'
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold mt-1.5 uppercase ${selectedDriverDetail.employmentStatus === 'ACTIVE'
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : selectedDriverDetail.employmentStatus === 'SUSPENDED'
                       ? 'bg-red-50 text-red-700 border border-red-200'
                       : 'bg-gray-100 text-gray-600 border border-gray-200'
-                  }`}>
+                    }`}>
                     {selectedDriverDetail.employmentStatus === 'ACTIVE'
-                      ? 'Đang hoạt động'
+                      ? '🟢 Trực tuyến (Sẵn sàng)'
                       : selectedDriverDetail.employmentStatus === 'SUSPENDED'
-                      ? 'Đình chỉ'
-                      : 'Ngoại tuyến'}
+                        ? '🔴 Bị đình chỉ'
+                        : '⚪ Ngoại tuyến (Chưa bật ca)'}
                   </span>
                 </div>
               </div>
@@ -901,7 +899,7 @@ export const DriverTab: React.FC = () => {
 
               {/* Grid 3: Account Credentials */}
               <div>
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-wider">Tài khoản đăng nhập</h4>
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-wider">Tài khoản đăng nhập hệ thống</h4>
                 <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded border border-gray-100">
                   {selectedDriverDetail.user ? (
                     <>
@@ -910,19 +908,18 @@ export const DriverTab: React.FC = () => {
                         <span className="font-semibold text-gray-800">{selectedDriverDetail.user.username}</span>
                       </div>
                       <div>
-                        <span className="block text-[9px] font-bold text-gray-400 uppercase">Email</span>
+                        <span className="block text-[9px] font-bold text-gray-400 uppercase">Email liên kết</span>
                         <span className="font-semibold text-gray-800 break-all">
                           {selectedDriverDetail.email || selectedDriverDetail.user?.email || 'Chưa liên kết'}
                         </span>
                       </div>
                       <div className="col-span-2">
-                        <span className="block text-[9px] font-bold text-gray-400 uppercase">Trạng thái tài khoản</span>
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-extrabold mt-1 uppercase ${
-                          selectedDriverDetail.user.status === 'ACTIVE'
-                            ? 'bg-green-50 text-green-700 border border-green-200'
-                            : 'bg-red-50 text-red-700 border border-red-200'
-                        }`}>
-                          {selectedDriverDetail.user.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm khóa / Vô hiệu hóa'}
+                        <span className="block text-[9px] font-bold text-gray-400 uppercase">Tình trạng tài khoản</span>
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-extrabold mt-1 uppercase ${selectedDriverDetail.user.status === 'ACTIVE'
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : 'bg-red-50 text-red-700 border border-red-200'
+                          }`}>
+                          {selectedDriverDetail.user.status === 'ACTIVE' ? 'Đã kích hoạt' : 'Bị khóa'}
                         </span>
                       </div>
                     </>
