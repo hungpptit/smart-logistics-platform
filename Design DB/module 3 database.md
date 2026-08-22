@@ -1,98 +1,82 @@
-# MODULE 3 - Facility Network Management
+# MODULE 3 - Facility Network Management (Mạng lưới Bưu cục & Kho bãi)
 
 ## 🎯 Mục tiêu Module
 
-Module này chịu trách nhiệm quản lý toàn bộ mạng lưới vật lý (Backbone Network) của hệ thống Logistics. 
-
-Mạng lưới này được tổ chức theo cấu trúc hình cây phân cấp nhiều tầng:
-```mermaid
-graph TD
-    MD[Main Depot / Tổng kho] --> RW[Regional Warehouse / Kho vùng]
-    RW --> H[Hub / Kho trung chuyển]
-    H --> MH[Micro Hub / Trạm giao nhận]
-```
-
-Mọi thực thể quản trị sau này như tồn kho (`Inventory`), vận chuyển (`Shipments`), định tuyến (`Routes`), phương tiện (`Vehicles`), và tài xế (`Drivers`) đều sẽ được ánh xạ trực tiếp hoặc gián tiếp với các cơ sở (`Facilities`) trong module này.
+Module này quản lý toàn bộ mạng lưới cơ sở vật lý (Backbone Network) của hệ thống Smart Logistics Platform:
+* Tổ chức mạng lưới bưu cục theo cây phân cấp đa tầng (Tổng kho / Trung tâm chia chọn $\rightarrow$ Kho tỉnh $\rightarrow$ Bưu cục phát chặng cuối).
+* Quản lý thông tin vị trí địa lý, địa chỉ (`address_id`), tỉnh thành (`province_code`), quản lý bưu cục (`manager_user_id`) và trạng thái hoạt động.
+* Quản lý các phân khu chức năng (`facility_zones`) bên trong bưu cục/kho (Khu nhận `RECEIVING`, Khu chia chọn `SORTING`, Khu chờ xuất hàng `SHIPPING`, Khu lưu kho `STORAGE`, Khu hàng hoàn `RETURN`, Khu cách ly `QUARANTINE`).
 
 ---
 
 ## 📊 Các Bảng Trong Module (3 Bảng)
 
-| STT | Bảng | Chức năng |
-| :--- | :--- | :--- |
-| 1 | `Facilities` | Quản lý danh sách các cơ sở logistics (tích hợp `address_id`) |
-| 2 | `FacilityTypes` | Danh mục loại hình cơ sở (Tổng kho, Hub, Kho trung chuyển...) |
-| 3 | `FacilityZones` | Các khu vực chức năng bên trong cơ sở (Nhận hàng, lưu trữ, phân loại...) |
+| STT | Model Prisma | Tên Bảng DB (`@map`) | Chức Năng Cốt Lõi |
+| :--- | :--- | :--- | :--- |
+| 1 | `FacilityType` | `facility_types` | Danh mục loại hình cơ sở (Trung tâm chia chọn, Hub tỉnh, Bưu cục phát...) |
+| 2 | `Facility` | `facilities` | Quản lý danh sách các bưu cục / kho bãi logistics trong mạng lưới |
+| 3 | `FacilityZone` | `facility_zones` | Quản lý các phân khu nghiệp vụ bên trong từng bưu cục / kho |
 
 ---
 
-## 🗺️ ERD Module
+## 🗺️ ERD Module 3
 
 ```mermaid
-graph TD
-    Addresses[Addresses] -->|1..N| Facilities[Facilities]
-    Facilities -->|1..N| FacilityZones[FacilityZones]
-    FacilityTypes[FacilityTypes] -->|1..N| Facilities
-    Facilities -->|parent_facility_id| Facilities
+erDiagram
+    facility_types ||--o{ facilities : "categorizes"
+    facilities ||--o{ facilities : "parent_hierarchy"
+    provinces ||--o{ facilities : "located_in_province"
+    users ||--o| facilities : "managed_by"
+    addresses ||--o| facilities : "has_address"
+    facilities ||--o{ facility_zones : "contains"
+
+    facility_types {
+        uuid id PK
+        varchar type_code UK
+        varchar type_name
+        timestamptz created_at
+    }
+
+    facilities {
+        uuid id PK
+        varchar facility_code UK
+        varchar facility_name
+        uuid facility_type_id FK
+        uuid parent_facility_id FK
+        uuid manager_user_id FK
+        varchar province_code FK
+        uuid address_id FK
+        FacilityStatus operating_status
+        integer region_sequence
+        date opened_at
+        date closed_at
+        timestamptz created_at
+    }
+
+    facility_zones {
+        uuid id PK
+        uuid facility_id FK
+        varchar zone_code
+        varchar zone_name
+        FacilityZoneType zone_type
+        integer capacity
+        timestamptz created_at
+    }
 ```
 
 ---
 
 ## 🗄️ Chi Tiết Thiết Kế Các Bảng
 
-### BẢNG 1 — Facilities
-Bảng dữ liệu trung tâm của mạng lưới logistics, tổ chức cấu trúc đệ quy đa cấp.
+### BẢNG 1 — `facility_types` (Danh mục Loại hình Cơ sở)
+Danh mục các loại hình cơ sở logistics trong hệ thống mạng lưới.
 
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính. |
-| `facility_code` | VARCHAR(30) | ❌ | Mã cơ sở duy nhất (Ví dụ: `WH001`, `HUB102`). |
-| `facility_name` | VARCHAR(255) | ❌ | Tên cơ sở (Ví dụ: `Tổng kho miền Nam`). |
-| `facility_type_id` | UUID | ❌ | FK → `FacilityTypes(id)` (ON DELETE RESTRICT). |
-| `parent_facility_id`| UUID | ✅ | FK → `Facilities(id)`. Nếu bằng `NULL` thì đây là Tổng kho (Main Depot). |
-| `manager_user_id` | UUID | ✅ | FK → `Users(id)` (nullable). Người chịu trách nhiệm quản lý cơ sở. |
-| `address_id` | UUID | ✅ | FK → `Addresses(id)` (nullable). Mã địa chỉ của bưu cục/kho bãi. |
-| `latitude` | DOUBLE PRECISION | ❌ | Vĩ độ định vị GPS của Hub/Bưu cục. |
-| `longitude` | DOUBLE PRECISION | ❌ | Kinh độ định vị GPS của Hub/Bưu cục. |
-| `operating_status` | `facility_status_enum` | ❌ | Trạng thái hoạt động (`ACTIVE`, `INACTIVE`, `MAINTENANCE`, `CLOSED`). |
-| `opened_at` | DATE | ❌ | Ngày bắt đầu hoạt động. |
-| `closed_at` | DATE | ✅ | Ngày đóng cửa kho/bưu cục (khi status = CLOSED). |
-| `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo. |
-| `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật. |
-
-* **Định nghĩa ENUMs:**
-  ```sql
-  CREATE TYPE facility_status_enum AS ENUM ('ACTIVE', 'INACTIVE', 'MAINTENANCE', 'CLOSED');
-  ```
-
-* **Indexes & Constraints:**
-  ```sql
-  PRIMARY KEY (id)
-  UNIQUE (facility_code)
-  CREATE INDEX idx_facilities_parent ON Facilities(parent_facility_id);
-  CREATE INDEX idx_facilities_status ON Facilities(operating_status);
-  ```
-
-* **Business Rules Quan Trọng:**
-  1. `parent_facility_id` chỉ được bằng `NULL` đối với các cơ sở cao nhất (Tổng kho).
-  2. **Không được có vòng lặp tham chiếu (Circular Reference):** Ví dụ Kho A là cha Kho B, Kho B là cha Kho C, nhưng Kho C lại là cha Kho A. Logic kiểm tra này sẽ được kiểm soát ở tầng Backend (NestJS) trước khi ghi dữ liệu.
-
----
-
-### BẢNG 2 — FacilityTypes
-Danh mục các loại hình cơ sở logistics để dễ dàng mở rộng và phân nhóm chức năng.
-
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính. |
-| `type_code` | VARCHAR(30) | ❌ | Mã loại duy nhất (Ví dụ: `MAIN_DEPOT`, `REGIONAL_WAREHOUSE`, `HUB`, `MICRO_HUB`, `FULFILLMENT_CENTER`). |
-| `type_name` | VARCHAR(100) | ❌ | Tên hiển thị loại cơ sở (Ví dụ: `Kho trung chuyển`). |
-| `description` | TEXT | ✅ | Mô tả vai trò của loại cơ sở. |
-| `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo. |
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `id` | String | UUID | ❌ | Khóa chính (Primary Key), `@default(uuid())`. |
+| `type_code` | String | VARCHAR(30) | ❌ | Mã loại cơ sở duy nhất (`@unique`). VD: `SORTING_CENTER`, `HUB`, `WARD_STATION`. |
+| `type_name` | String | VARCHAR(100) | ❌ | Tên hiển thị loại cơ sở (`@map("type_name")`). VD: `Trung tâm chia chọn cấp 1`. |
+| `created_at` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm khởi tạo (`@default(now())`). |
 
 * **Indexes & Constraints:**
   ```sql
@@ -102,89 +86,58 @@ Danh mục các loại hình cơ sở logistics để dễ dàng mở rộng và
 
 ---
 
-### BẢNG 3 — FacilityAddresses ⭐
-Bảng liên kết các cơ sở với bảng địa chỉ dùng chung (`Addresses`). Một cơ sở có thể có nhiều loại địa chỉ khác nhau (Địa chỉ lấy hàng, địa chỉ thanh toán hóa đơn...).
+### BẢNG 2 — `facilities` (Mạng lưới Bưu cục & Kho bãi)
+Bảng dữ liệu trung tâm của mạng lưới logistics, tổ chức theo cấu trúc hình cây đệ quy đa cấp.
 
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính. |
-| `facility_id` | UUID | ❌ | FK → `Facilities(id)` (ON DELETE CASCADE). |
-| `address_id` | UUID | ❌ | FK → `Addresses(id)` (ON DELETE RESTRICT). |
-| `address_type` | `facility_address_type_enum` | ❌ | Loại địa chỉ (`MAIN`, `BILLING`, `RETURN`, `PICKUP`). |
-| `is_primary` | BOOLEAN | ❌ | Địa chỉ giao dịch chính (Mặc định `false`). |
-| `created_at` | TIMESTAMPTZ | ❌ | Thời điểm liên kết. |
-
-* **Định nghĩa ENUMs:**
-  ```sql
-  CREATE TYPE facility_address_type_enum AS ENUM ('MAIN', 'BILLING', 'RETURN', 'PICKUP');
-  ```
-  > [!TIP]
-  > Việc phân tách riêng `facility_address_type_enum` của Module 3 và `customer_address_type_enum` của Module 2 đảm bảo tính đóng gói (Encapsulation) miền nghiệp vụ (Domain Domain) rõ ràng, tránh xung đột logic.
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `id` | String | UUID | ❌ | Khóa chính (Primary Key), `@default(uuid())`. |
+| `facility_code` | String | VARCHAR(30) | ❌ | Mã bưu cục duy nhất (`@unique`). VD: `FAC-HCM-001`, `HUB-HN-002`. |
+| `facility_name` | String | VARCHAR(255) | ❌ | Tên bưu cục / kho bãi (`@map("facility_name")`). |
+| `facility_type_id` | String | UUID | ❌ | FK $\rightarrow$ `facility_types(id)` (ON DELETE RESTRICT). |
+| `parent_facility_id`| String? | UUID | ✅ | FK $\rightarrow$ `facilities(id)` (Bưu cục cấp trên, ON DELETE SET NULL). |
+| `manager_user_id` | String? | UUID | ✅ | FK $\rightarrow$ `users(id)` (Quản lý bưu cục, ON DELETE SET NULL). |
+| `province_code` | String? | VARCHAR(20) | ✅ | FK $\rightarrow$ `provinces(code)` (Tỉnh/Thành phố, ON DELETE SET NULL). |
+| `address_id` | String? | UUID | ✅ | FK $\rightarrow$ `addresses(id)` (Địa chỉ chi tiết bưu cục, ON DELETE SET NULL). |
+| `operating_status` | FacilityStatus | Enum | ❌ | Trạng thái: `ACTIVE`, `INACTIVE`, `MAINTENANCE`, `CLOSED`. |
+| `region_sequence` | Int? | INTEGER | ✅ | Thứ tự định tuyến theo vùng miền. |
+| `opened_at` | DateTime | DATE | ❌ | Ngày bắt đầu mở cửa hoạt động bưu cục. |
+| `closed_at` | DateTime? | DATE | ✅ | Ngày đóng cửa (nếu trạng thái là `CLOSED`). |
+| `created_at` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm tạo bản ghi (`@default(now())`). |
 
 * **Indexes & Constraints:**
   ```sql
   PRIMARY KEY (id)
-  UNIQUE (facility_id, address_id) -- Tránh liên kết trùng lặp.
-  CREATE INDEX idx_facility_addr_fac ON FacilityAddresses(facility_id);
+  UNIQUE (facility_code)
+  CREATE INDEX idx_facilities_parent ON facilities(parent_facility_id);
+  CREATE INDEX idx_facilities_province ON facilities(province_code);
+  CREATE INDEX idx_facilities_status ON facilities(operating_status);
+  FOREIGN KEY (facility_type_id) REFERENCES facility_types(id) ON DELETE RESTRICT
+  FOREIGN KEY (parent_facility_id) REFERENCES facilities(id) ON DELETE SET NULL
+  FOREIGN KEY (manager_user_id) REFERENCES users(id) ON DELETE SET NULL
+  FOREIGN KEY (province_code) REFERENCES provinces(code) ON DELETE SET NULL
+  FOREIGN KEY (address_id) REFERENCES addresses(id) ON DELETE SET NULL
   ```
 
 ---
 
-### BẢNG 4 — FacilityZones
-Quản lý các phân khu chức năng bên trong một cơ sở logistics (Ví dụ: Khu phân loại, Khu chứa hàng dễ cháy, Khu đông lạnh...). Đây là tiền đề để quản lý vị trí kho chi tiết (Inventory Slotting) ở các phase tiếp theo.
+### BẢNG 3 — `facility_zones` (Phân khu Chức năng trong Kho)
+Quản lý các khu vực nghiệp vụ chuyên biệt bên trong từng bưu cục / kho hàng.
 
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính. |
-| `facility_id` | UUID | ❌ | FK → `Facilities(id)` (ON DELETE CASCADE). |
-| `zone_code` | VARCHAR(30) | ❌ | Mã phân khu (Ví dụ: `RECV`, `SORT`, `STOR_A`). |
-| `zone_name` | VARCHAR(100) | ❌ | Tên phân khu (Ví dụ: `Khu vực phân loại`). |
-| `zone_type` | `facility_zone_type_enum` | ❌ | Phân loại phân khu (`RECEIVING`, `SORTING`, `STORAGE`, `SHIPPING`, `RETURN`, `QUARANTINE`). |
-| `capacity` | INTEGER | ✅ | Sức chứa tối đa của phân khu (đơn vị: Kiện hàng, m3 hoặc pallets). |
-| `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo. |
-| `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật. |
-
-* **Định nghĩa ENUMs:**
-  ```sql
-  CREATE TYPE facility_zone_type_enum AS ENUM ('RECEIVING', 'SORTING', 'STORAGE', 'DISPATCH', 'RETURN', 'QUARANTINE');
-  ```
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `id` | String | UUID | ❌ | Khóa chính (Primary Key), `@default(uuid())`. |
+| `facility_id` | String | UUID | ❌ | FK $\rightarrow$ `facilities(id)` (ON DELETE CASCADE). |
+| `zone_code` | String | VARCHAR(30) | ❌ | Mã phân khu (`@map("zone_code")`). VD: `ZONE-REC-01`, `ZONE-SORT-A`. |
+| `zone_name` | String | VARCHAR(100) | ❌ | Tên phân khu (`@map("zone_name")`). VD: `Khu vực Nhập hàng`. |
+| `zone_type` | FacilityZoneType | Enum | ❌ | Loại phân khu: `RECEIVING`, `SORTING`, `SHIPPING`, `STORAGE`, `RETURN`, `QUARANTINE`. |
+| `capacity` | Int? | INTEGER | ✅ | Sức chứa tối đa (số kiện hàng). |
+| `created_at` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm tạo phân khu (`@default(now())`). |
 
 * **Indexes & Constraints:**
   ```sql
   PRIMARY KEY (id)
-  UNIQUE (facility_id, zone_code) -- Mã phân khu chỉ cần là duy nhất trong cùng 1 cơ sở
-  CREATE INDEX idx_facility_zones_fac ON FacilityZones(facility_id);
+  UNIQUE (facility_id, zone_code)
+  CREATE INDEX idx_facility_zones_fac ON facility_zones(facility_id);
+  FOREIGN KEY (facility_id) REFERENCES facilities(id) ON DELETE CASCADE
   ```
-
-* **Business Rules Quan Trọng:**
-  * Không được phép xóa phân khu (`FacilityZones`) nếu phân khu đó đang chứa hàng tồn kho (Logic này sẽ được bắt bởi module Quản lý tồn kho - Inventory ở phase sau).
-
----
-
-## 💡 Đề Xuất Cơ Chế Trigger PostgreSQL Đảm Bảo Duy Nhất 1 Địa Chỉ Chính
-
-Tương tự như Module 2, để đảm bảo nghiệp vụ *"Mỗi cơ sở logistics chỉ có duy nhất 1 địa chỉ chính (`is_primary = true`)"*, ta tạo trigger tự động cập nhật:
-
-```sql
-CREATE OR REPLACE FUNCTION handle_facility_primary_address()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.is_primary = TRUE THEN
-        UPDATE FacilityAddresses
-        SET is_primary = FALSE
-        WHERE facility_id = NEW.facility_id AND id <> NEW.id;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_unique_facility_primary_address
-BEFORE INSERT OR UPDATE OF is_primary ON FacilityAddresses
-FOR EACH ROW
-WHEN (NEW.is_primary = TRUE)
-EXECUTE FUNCTION handle_facility_primary_address();
-```

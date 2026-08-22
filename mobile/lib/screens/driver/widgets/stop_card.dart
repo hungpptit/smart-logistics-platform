@@ -281,13 +281,13 @@ class StopCard extends StatelessWidget {
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
                                     onPressed: onTap,
-                                    icon: Icon(
-                                      stop['isIntermediate'] == true ? Icons.add_box_outlined : Icons.qr_code_2,
+                                    icon: const Icon(
+                                      Icons.qr_code_2,
                                       size: 18,
                                     ),
                                     label: Text(
                                       stop['isIntermediate'] == true
-                                          ? 'Xác nhận & Bốc thêm hàng tại trạm ghé'
+                                          ? 'Xác nhận & Hiện QR Bàn giao rời trạm ghé'
                                           : 'Xác nhận & Hiện QR Xuất bến',
                                       style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
                                     ),

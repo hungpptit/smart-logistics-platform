@@ -212,15 +212,20 @@ class PickupAssignmentDialog extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
                                       orderCode,
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.deepOnyx),
                                     ),
-                                    Text(
-                                      receiverName,
-                                      style: const TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.w500),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        receiverName,
+                                        style: const TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.w500),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.end,
+                                      ),
                                     ),
                                   ],
                                 ),

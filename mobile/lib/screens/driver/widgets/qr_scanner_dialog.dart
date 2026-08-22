@@ -483,34 +483,41 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
                     children: [
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF15803D),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.check_circle, color: Colors.white, size: 14),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isPickupStop ? 'ĐÃ KHỚP ĐIỂM LẤY HÀNG' : 'ĐÃ KHỚP ĐƠN GIAO HÀNG',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF15803D),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.check_circle, color: Colors.white, size: 14),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      isPickupStop ? 'ĐÃ KHỚP ĐIỂM LẤY' : 'ĐÃ KHỚP ĐƠN GIAO',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 8),
                           Text(
                             stop['orderCode'] ?? '',
                             style: const TextStyle(
                               color: Color(0xFF60A5FA),
                               fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                              fontSize: 12.5,
                               fontFamily: 'monospace',
                             ),
                           ),
@@ -566,14 +573,20 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
                             'Tiền thu hộ COD:',
                             style: TextStyle(color: Colors.white70, fontSize: 12),
                           ),
-                          Text(
-                            _formatCurrency(stop['totalToCollect'] ?? stop['codAmount'] ?? stop['cod']),
-                            style: TextStyle(
-                              color: ((num.tryParse((stop['totalToCollect'] ?? stop['codAmount'] ?? '0').toString()) ?? 0) > 0)
-                                  ? const Color(0xFFF97316)
-                                  : const Color(0xFF22C55E),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13.5,
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              _formatCurrency(stop['totalToCollect'] ?? stop['codAmount'] ?? stop['cod']),
+                              style: TextStyle(
+                                color: ((num.tryParse((stop['totalToCollect'] ?? stop['codAmount'] ?? '0').toString()) ?? 0) > 0)
+                                    ? const Color(0xFFF97316)
+                                    : const Color(0xFF22C55E),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
                             ),
                           ),
                         ],

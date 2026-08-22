@@ -1,128 +1,207 @@
-# MODULE 6 - Fleet & Driver Management
+# MODULE 6 - Fleet & Driver Management (Đội xe & Nhân sự Vận hành)
 
 ## 🎯 Mục tiêu Module
 
-Module Fleet & Driver Management chịu trách nhiệm quản lý toàn bộ nguồn lực vận tải vật lý (Resources) của hệ thống Logistics bao gồm tài xế, đội xe phương tiện và vị trí thời gian thực.
-
-Module này cung cấp thông tin đầu vào quan trọng cho **Module 5 (Shipment)** để gán tài xế nhận nhiệm vụ và **Module 8 (Routing Engine)** để tối ưu hóa tải trọng xe và tính toán quãng đường định tuyến thực tế.
-
----
-
-## 📊 Các Bảng Trong Module (5 Bảng)
-
-| STT | Bảng | Chức năng |
-| :--- | :--- | :--- |
-| 1 | `Drivers` | Lưu trữ hồ sơ nghiệp vụ tài xế (shipper) |
-| 2 | `Vehicles` | Hồ sơ chi tiết các phương tiện vận tải |
-| 3 | `VehicleTypes` | Danh mục loại phương tiện (Xe máy, Xe tải, Container...) |
-| 4 | `DriverVehicleAssignments`| Liên kết lịch sử phân phối và gán tài xế với phương tiện |
-| 5 | `DriverLocations` | Tọa độ GPS thời gian thực hiện tại của tài xế |
+Module Fleet & Driver Management quản lý toàn bộ nguồn lực vận tải vật lý (Resources) của hệ thống Logistics:
+* Quản lý hồ sơ nhân sự vận hành hợp nhất (`staff`), bao gồm nhân viên văn phòng, thủ kho, điều phối viên và tài xế giao hàng (lưu bằng lái, hạng bằng, trạng thái ca).
+* Quản lý đăng ký loại hình giao hàng của tài xế (`staff_driver_types`): Giao chặng cuối `HUB_DELIVERY`, Trung chuyển `LINEHAUL_TRANSFER`, Giao hỏa tốc `ON_DEMAND`.
+* Quản lý danh mục phương tiện vận tải (`vehicles`) và loại phương tiện (`vehicle_types`).
+* Quản lý phân công phương tiện cho tài xế (`driver_vehicle_assignments`).
+* Quản lý tọa độ định vị GPS thời gian thực hiện tại của tài xế (`driver_locations`).
 
 ---
 
-## 🗺️ ERD Module
+## 📊 Các Bảng Trong Module (6 Bảng)
+
+| STT | Model Prisma | Tên Bảng DB (`@map`) | Chức Năng Cốt Lõi |
+| :--- | :--- | :--- | :--- |
+| 1 | `Staff` | `staff` | Hồ sơ nhân sự hợp nhất (Admin, Kho, Điều phối, Tài xế) |
+| 2 | `StaffDriverType` | `staff_driver_types` | Loại hình giao hàng tài xế đăng ký đảm nhận |
+| 3 | `Vehicle` | `vehicles` | Hồ sơ chi tiết các phương tiện vận tải trong đội xe |
+| 4 | `VehicleType` | `vehicle_types` | Danh mục loại phương tiện (Xe máy, Xe tải 1.5T, Xe Van...) |
+| 5 | `DriverVehicleAssignment`| `driver_vehicle_assignments`| Phân công phương tiện cho tài xế theo ca hoạt động |
+| 6 | `DriverLocation` | `driver_locations` | Tọa độ GPS thời gian thực mới nhất của tài xế |
+
+---
+
+## 🗺️ ERD Module 6
 
 ```mermaid
-graph TD
-    VehicleTypes[VehicleTypes] -->|1..N| Vehicles[Vehicles]
-    Vehicles -->|1..N| DriverVehicleAssignments[DriverVehicleAssignments]
-    Drivers[Drivers] -->|1..N| DriverVehicleAssignments
-    Drivers -->|1..1| DriverLocations[DriverLocations]
+erDiagram
+    users ||--o| staff : "has_profile"
+    facilities ||--o| staff : "assigned_to_facility"
+    staff ||--o{ staff_driver_types : "has_driver_types"
+
+    vehicle_types ||--o{ vehicles : "categorizes"
+    facilities ||--o| vehicles : "assigned_facility"
+
+    staff ||--o{ driver_vehicle_assignments : "assigned_driver"
+    vehicles ||--o{ driver_vehicle_assignments : "assigned_vehicle"
+
+    staff ||--o| driver_locations : "has_current_location"
+
+    staff {
+        uuid id PK
+        uuid user_id FK, UK
+        varchar employee_code UK
+        varchar full_name
+        varchar phone
+        varchar email
+        varchar citizen_id UK
+        varchar position
+        uuid assigned_facility_id FK
+        varchar driver_license_number UK
+        varchar driver_license_class
+        DriverEmploymentStatus employment_status
+        date hire_date
+        timestamptz created_at
+    }
+
+    staff_driver_types {
+        uuid id PK
+        uuid staff_id FK
+        DriverType driver_type
+        timestamptz created_at
+    }
+
+    vehicles {
+        uuid id PK
+        varchar vehicle_code UK
+        varchar plate_number UK
+        uuid vehicle_type_id FK
+        uuid assigned_facility_id FK
+        decimal max_weight
+        decimal max_volume
+        decimal max_length
+        boolean is_refrigerated
+        VehicleOperatingStatus operating_status
+        timestamptz created_at
+    }
+
+    vehicle_types {
+        uuid id PK
+        varchar type_code UK
+        varchar type_name
+        timestamptz created_at
+    }
+
+    driver_vehicle_assignments {
+        uuid id PK
+        uuid driver_id FK
+        uuid vehicle_id FK
+        timestamptz assigned_from
+        timestamptz assigned_to
+        boolean is_active
+    }
+
+    driver_locations {
+        uuid driver_id PK, FK
+        double_precision latitude
+        double_precision longitude
+        timestamptz recorded_at
+    }
 ```
 
 ---
 
 ## 🗄️ Chi Tiết Thiết Kế Các Bảng
 
-### BẢNG 1 — Drivers
-Hồ sơ nghiệp vụ tài xế. Tách biệt với bảng `Users` (Authentication) nhưng liên kết qua `user_id` để đăng nhập ứng dụng tài xế.
+### BẢNG 1 — `staff` (Hồ Sơ Hợp Nhất Nhân Viên & Tài Xế)
+Hồ sơ nhân sự toàn diện, liên kết 1-1 với tài khoản `users` qua `user_id UNIQUE`.
 
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính. |
-| `user_id` | UUID | ✅ | FK → `Users(id)` (ON DELETE RESTRICT). Tài khoản đăng nhập ứng dụng shipper. |
-| `employee_code` | VARCHAR(30) | ❌ | Mã nhân viên/tài xế duy nhất (Ví dụ: `DRV0001`). |
-| `full_name` | VARCHAR(150) | ❌ | Họ và tên tài xế. |
-| `phone` | VARCHAR(20) | ❌ | Số điện thoại liên hệ (Duy nhất). |
-| `citizen_id` | VARCHAR(20) | ✅ | Số căn cước công dân của tài xế (Duy nhất). |
-| `driver_license_number`| VARCHAR(50)| ❌ | Số giấy phép lái xe (GPLX). |
-| `driver_license_class` | VARCHAR(10) | ❌ | Hạng GPLX (Ví dụ: `A1`, `A2`, `B2`, `C`, `FC`). |
-| `hire_date` | DATE | ❌ | Ngày ký hợp đồng/bắt đầu làm việc. |
-| `employment_status` | `driver_employment_status_enum`| ❌ | Trạng thái công việc (`ACTIVE`, `OFFLINE`, `SUSPENDED`). |
-| `driver_type` | `driver_type_enum` | ❌ | Phân loại nhóm shipper (`HUB_DELIVERY` / `ON_DEMAND`). |
-| `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo. |
-| `deleted_at` | TIMESTAMPTZ | ✅ | Xóa mềm hồ sơ tài xế. |
-
-* **Định nghĩa ENUMs:**
-  ```sql
-  CREATE TYPE driver_employment_status_enum AS ENUM ('ACTIVE', 'OFFLINE', 'SUSPENDED');
-  CREATE TYPE driver_type_enum AS ENUM ('HUB_DELIVERY', 'ON_DEMAND');
-  ```
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `id` | String | UUID | ❌ | Khóa chính (Primary Key), `@default(uuid())`. |
+| `user_id` | String | UUID | ❌ | Khóa ngoại 1-1 duy nhất (`@unique`), FK $\rightarrow$ `users(id)` (ON DELETE CASCADE). |
+| `employee_code` | String | VARCHAR(30) | ❌ | Mã nhân viên duy nhất (`@unique`). VD: `STF-000001`, `DRV-000001`. |
+| `full_name` | String | VARCHAR(150) | ❌ | Họ và tên nhân viên / tài xế (`@map("full_name")`). |
+| `phone` | String | VARCHAR(20) | ❌ | Số điện thoại làm việc. |
+| `email` | String? | VARCHAR(255) | ✅ | Email nội bộ / liên hệ. |
+| `citizen_id` | String? | VARCHAR(20) | ✅ | Số CCCD duy nhất (`@unique`, `@map("citizen_id")`). |
+| `position` | String | VARCHAR(100) | ❌ | Chức vụ: `ADMIN`, `DISPATCHER`, `WAREHOUSE_STAFF`, `DRIVER`. |
+| `assigned_facility_id`| String?| UUID | ✅ | FK $\rightarrow$ `facilities(id)` (Bưu cục công tác, ON DELETE SET NULL). |
+| `driver_license_number`| String?| VARCHAR(50)| ✅ | Số bằng lái xe GPLX (`@unique`, chỉ có khi là Driver). |
+| `driver_license_class`| String?| VARCHAR(10)| ✅ | Hạng bằng lái: `A1`, `B2`, `C`, `FC`... |
+| `employment_status` | DriverEmploymentStatus?| Enum | ✅ | Trạng thái: `ACTIVE`, `OFFLINE`, `SUSPENDED`, `DISABLED` (`@default(ACTIVE)`). |
+| `hire_date` | DateTime?| DATE | ✅ | Ngày chính thức vào làm. |
+| `created_at` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm tạo hồ sơ (`@default(now())`). |
 
 * **Indexes & Constraints:**
   ```sql
   PRIMARY KEY (id)
+  UNIQUE (user_id)
   UNIQUE (employee_code)
-  UNIQUE (phone)
   UNIQUE (citizen_id)
-  UNIQUE (user_id) -- Một tài khoản user chỉ liên kết với tối đa 1 hồ sơ tài xế
-  CREATE INDEX idx_drivers_status ON Drivers(employment_status);
-  CREATE INDEX idx_drivers_home ON Drivers(home_facility_id);
+  UNIQUE (driver_license_number)
+  CREATE INDEX idx_staff_status ON staff(employment_status);
+  CREATE INDEX idx_staff_facility ON staff(assigned_facility_id);
+  CREATE INDEX idx_staff_phone ON staff(phone);
+  CREATE INDEX idx_staff_email ON staff(email);
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (assigned_facility_id) REFERENCES facilities(id) ON DELETE SET NULL
   ```
 
 ---
 
-### BẢNG 2 — Vehicles
-Quản lý hồ sơ phương tiện vận tải trong mạng lưới.
+### BẢNG 2 — `staff_driver_types` (Phân Loại Hình Giao Hàng Cho Tài Xế)
+Bảng trung gian quản lý các loại hình dịch vụ giao hàng mà tài xế đăng ký chạy.
 
-* **Các trường dữ liệu:**
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `id` | String | UUID | ❌ | Khóa chính (Primary Key), `@default(uuid())`. |
+| `staff_id` | String | UUID | ❌ | FK $\rightarrow$ `staff(id)` (ON DELETE CASCADE). |
+| `driver_type` | DriverType | Enum | ❌ | Loại hình: `HUB_DELIVERY`, `LINEHAUL_TRANSFER`, `ON_DEMAND`. |
+| `created_at` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm gán (`@default(now())`). |
 
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính. |
-| `vehicle_code` | VARCHAR(30) | ❌ | Mã phương tiện duy nhất để kiểm soát (Ví dụ: `VEH001`). |
-| `license_plate` | VARCHAR(20) | ❌ | Biển số xe duy nhất (Ví dụ: `29C-123.45`). |
-| `vehicle_type_id` | UUID | ❌ | FK → `VehicleTypes(id)` (ON DELETE RESTRICT). |
-| `home_facility_id` | UUID | ✅ | FK → `Facilities(id)` (ON DELETE SET NULL). Trạm/Kho đỗ mặc định của xe. |
-| `max_weight` | NUMERIC(10,2) | ❌ | Tải trọng tối đa cho phép (kg). |
-| `max_volume` | NUMERIC(10,4) | ❌ | Thể tích thùng hàng tối đa (m3). |
-| `max_length` | NUMERIC(6,2) | ✅ | Chiều dài tối đa của thùng hàng (cm), dùng để lọc xe chở hàng quá khổ. |
-| `refrigeration_supported`| BOOLEAN | ❌ | Có hỗ trợ đông lạnh hay không (Mặc định `false`). |
-| `gps_device_id` | VARCHAR(100) | ✅ | Mã định danh thiết bị định vị GPS lắp trên xe (nếu có). |
-| `operating_status` | `vehicle_operating_status_enum`| ❌ | Trạng thái xe (`ACTIVE`, `MAINTENANCE`, `RETIRED`). |
-| `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo. |
-| `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật. |
-
-* **Định nghĩa ENUMs:**
+* **Indexes & Constraints:**
   ```sql
-  CREATE TYPE vehicle_operating_status_enum AS ENUM ('ACTIVE', 'MAINTENANCE', 'RETIRED');
+  PRIMARY KEY (id)
+  UNIQUE (staff_id, driver_type)
+  CREATE INDEX idx_staff_driver_types_staff ON staff_driver_types(staff_id);
+  CREATE INDEX idx_staff_driver_types_type ON staff_driver_types(driver_type);
+  FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
   ```
+
+---
+
+### BẢNG 3 — `vehicles` (Hồ Sơ Phương Tiện Vận Tải)
+Quản lý các phương tiện trong đội xe giao nhận và trung chuyển.
+
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `id` | String | UUID | ❌ | Khóa chính (Primary Key), `@default(uuid())`. |
+| `vehicle_code` | String | VARCHAR(30) | ❌ | Mã phương tiện duy nhất (`@unique`). VD: `VEH-TRK-001`. |
+| `plate_number` | String | VARCHAR(20) | ❌ | Biển số xe duy nhất (`@unique`, `@map("plate_number")`). VD: `59C-123.45`. |
+| `vehicle_type_id` | String | UUID | ❌ | FK $\rightarrow$ `vehicle_types(id)` (ON DELETE RESTRICT). |
+| `assigned_facility_id`| String?| UUID | ✅ | FK $\rightarrow$ `facilities(id)` (Bưu cục quản lý xe, ON DELETE SET NULL). |
+| `max_weight` | Decimal | DECIMAL(10,2) | ❌ | Tải trọng tối đa cho phép (kg). |
+| `max_volume` | Decimal | DECIMAL(10,4) | ❌ | Thể tích thùng hàng tối đa ($m^3$). |
+| `max_length` | Decimal? | DECIMAL(6,2) | ✅ | Chiều dài lòng thùng xe tối đa (m). |
+| `is_refrigerated` | Boolean | BOOLEAN | ❌ | Hỗ trợ thùng bảo ôn / đông lạnh (`@default(false)`). |
+| `operating_status`| VehicleOperatingStatus| Enum | ❌ | Trạng thái: `ACTIVE`, `MAINTENANCE`, `RETIRED`. |
+| `created_at` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm tạo bản ghi (`@default(now())`). |
 
 * **Indexes & Constraints:**
   ```sql
   PRIMARY KEY (id)
   UNIQUE (vehicle_code)
-  UNIQUE (license_plate)
-  CREATE INDEX idx_vehicles_type ON Vehicles(vehicle_type_id);
+  UNIQUE (plate_number)
+  CREATE INDEX idx_vehicles_type ON vehicles(vehicle_type_id);
+  FOREIGN KEY (vehicle_type_id) REFERENCES vehicle_types(id) ON DELETE RESTRICT
+  FOREIGN KEY (assigned_facility_id) REFERENCES facilities(id) ON DELETE SET NULL
   ```
 
 ---
 
-### BẢNG 3 — VehicleTypes
-Bảng danh mục các loại phương tiện, lưu trữ thông số giới hạn tải trọng tiêu chuẩn làm tham số đầu vào cho thuật toán gom đơn/phân xe tự động.
+### BẢNG 4 — `vehicle_types` (Danh Mục Loại Phương Tiện)
+Bảng danh mục các loại xe và tải trọng tiêu chuẩn phục vụ thuật toán phân xe của AI Routing.
 
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính. |
-| `type_code` | VARCHAR(30) | ❌ | Mã loại duy nhất (Ví dụ: `MOTORBIKE`, `VAN`, `TRUCK_1T5`, `CONTAINER`, `REFRIGERATED_TRUCK`). |
-| `type_name` | VARCHAR(100) | ❌ | Tên hiển thị loại phương tiện (Ví dụ: `Xe tải 1.5 Tấn`). |
-| `max_default_weight`| NUMERIC(10,2) | ❌ | Tải trọng tiêu chuẩn mặc định của loại xe này (kg). |
-| `description` | TEXT | ✅ | Mô tả loại phương tiện. |
-| `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo. |
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `id` | String | UUID | ❌ | Khóa chính (Primary Key), `@default(uuid())`. |
+| `type_code` | String | VARCHAR(30) | ❌ | Mã loại xe duy nhất (`@unique`). VD: `MOTORBIKE`, `VAN_500KG`, `TRUCK_1.5T`. |
+| `type_name` | String | VARCHAR(100) | ❌ | Tên hiển thị loại xe (`@map("type_name")`). VD: `Xe tải 1.5 Tấn`. |
+| `created_at` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm khởi tạo (`@default(now())`). |
 
 * **Indexes & Constraints:**
   ```sql
@@ -132,83 +211,42 @@ Bảng danh mục các loại phương tiện, lưu trữ thông số giới h�
 
 ---
 
-### BẢNG 4 — DriverVehicleAssignments ⭐
-Bảng liên kết động giữa tài xế và phương tiện.
-> [!IMPORTANT]
-> **Giải pháp lịch sử gán:** Không lưu `vehicle_id` trực tiếp trong bảng `Drivers` nhằm tránh mất vết lịch sử. Lịch sử gán xe được lưu hoàn toàn ở bảng này. 
-> Tại một thời điểm, một tài xế chỉ được phân công hoạt động trên **duy nhất 1 phương tiện** (`is_active = true`) và phương tiện đó cũng chỉ có **duy nhất 1 tài xế** đang điều khiển.
+### BẢNG 5 — `driver_vehicle_assignments` (Phân Công Xe Cho Tài Xế)
+Quản lý lịch sử và trạng thái gán phương tiện cho tài xế theo ca làm việc.
 
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính. |
-| `driver_id` | UUID | ❌ | FK → `Drivers(id)` (ON DELETE CASCADE). |
-| `vehicle_id` | UUID | ❌ | FK → `Vehicles(id)` (ON DELETE CASCADE). |
-| `assigned_from` | TIMESTAMPTZ | ❌ | Thời điểm bắt đầu gán bàn giao xe. |
-| `assigned_to` | TIMESTAMPTZ | ✅ | Thời điểm kết thúc bàn giao xe (Khi thu hồi/đổi xe). |
-| `is_active` | BOOLEAN | ❌ | Đang kích hoạt sử dụng chặng hiện tại (Mặc định `true`). |
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `id` | String | UUID | ❌ | Khóa chính (Primary Key), `@default(uuid())`. |
+| `driver_id` | String | UUID | ❌ | FK $\rightarrow$ `staff(id)` (Tài xế, ON DELETE CASCADE). |
+| `vehicle_id` | String | UUID | ❌ | FK $\rightarrow$ `vehicles(id)` (Phương tiện, ON DELETE CASCADE). |
+| `assigned_from` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm bắt đầu giao xe. |
+| `assigned_to` | DateTime? | TIMESTAMPTZ | ✅ | Thời điểm kết thúc bàn giao / trả xe. |
+| `is_active` | Boolean | BOOLEAN | ❌ | Trạng thái hiệu lực hiện tại (`@default(true)`). |
 
 * **Indexes & Constraints:**
   ```sql
   PRIMARY KEY (id)
-  CREATE INDEX idx_dva_driver_active ON DriverVehicleAssignments(driver_id) WHERE (is_active = true);
-  CREATE INDEX idx_dva_vehicle_active ON DriverVehicleAssignments(vehicle_id) WHERE (is_active = true);
+  CREATE INDEX idx_dva_driver_active ON driver_vehicle_assignments(driver_id);
+  CREATE INDEX idx_dva_vehicle_active ON driver_vehicle_assignments(vehicle_id);
+  FOREIGN KEY (driver_id) REFERENCES staff(id) ON DELETE CASCADE
+  FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
   ```
 
 ---
 
-### BẢNG 5 — DriverLocations
-Bảng lưu trữ tọa độ định vị GPS hiện tại thời gian thực của tài xế. Bảng này có quan hệ 1..1 chặt chẽ với `Drivers`.
+### BẢNG 6 — `driver_locations` (Tọa Độ Định Vị GPS Hiện Tại Của Tài Xế)
+Lưu trữ vị trí tọa độ GPS mới nhất thời gian thực của tài xế.
 
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `driver_id` | UUID | ❌ | Khóa chính và đồng thời là FK → `Drivers(id)` (ON DELETE CASCADE). |
-| `latitude` | DOUBLE PRECISION | ❌ | Vĩ độ GPS hiện tại. |
-| `longitude` | DOUBLE PRECISION | ❌ | Kinh độ GPS hiện tại. |
-| `heading` | REAL | ✅ | Hướng di chuyển (Góc từ 0 đến 360 độ). |
-| `speed` | REAL | ✅ | Vận tốc di chuyển tức thời (km/h). |
-| `accuracy` | REAL | ✅ | Sai số bán kính định vị GPS (mét). |
-| `recorded_at` | TIMESTAMPTZ | ❌ | Thời điểm thiết bị cập nhật tọa độ cuối cùng. |
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `driver_id` | String | UUID | ❌ | Khóa chính (Primary Key), đồng thời là FK $\rightarrow$ `staff(id)` (ON DELETE CASCADE). |
+| `latitude` | Float | DOUBLE PRECISION| ❌ | Vĩ độ GPS hiện tại. |
+| `longitude` | Float | DOUBLE PRECISION| ❌ | Kinh độ GPS hiện tại. |
+| `recorded_at` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm thiết bị ghi nhận tọa độ GPS. |
 
 * **Indexes & Constraints:**
   ```sql
-  PRIMARY KEY (driver_id) -- Đảm bảo quan hệ 1..1, mỗi driver chỉ duy nhất 1 bản ghi vị trí hiện tại
-  CREATE INDEX idx_drv_loc_coords ON DriverLocations(latitude, longitude);
+  PRIMARY KEY (driver_id)
+  CREATE INDEX idx_drv_loc_coords ON driver_locations(latitude, longitude);
+  FOREIGN KEY (driver_id) REFERENCES staff(id) ON DELETE CASCADE
   ```
-
-* **Luồng dữ liệu Realtime (Redis sync):**
-  1. Driver App liên tục gửi tọa độ GPS lên server mỗi **10 giây/lần**.
-  2. Server ghi nhận trực tiếp vào **Redis Cache** (tốc độ cao, giảm tải cho ổ cứng SQL).
-  3. Định kỳ chạy một worker ngầm (Background Job) để đồng bộ (Bulk Upsert) từ Redis về bảng `DriverLocations` trong PostgreSQL phục vụ báo cáo và lưu vết lịch sử di chuyển (nếu cần ở Phase sau).
-
----
-
-## 💡 Đề Xuất Trigger PostgreSQL Tự Động Hạ Cờ Phân Công Xe Cũ
-
-Để đảm bảo quy tắc nghiệp vụ *"Một tài xế/phương tiện chỉ có tối đa 1 liên kết hoạt động ở trạng thái `is_active = true`"*, ta sử dụng trigger sau:
-
-```sql
-CREATE OR REPLACE FUNCTION handle_driver_vehicle_assignment()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.is_active = TRUE THEN
-        -- Hạ cờ active của phương tiện cũ hoặc tài xế cũ trong các bản ghi khác
-        UPDATE DriverVehicleAssignments
-        SET is_active = FALSE, assigned_to = NOW()
-        WHERE (driver_id = NEW.driver_id OR vehicle_id = NEW.vehicle_id)
-          AND id <> NEW.id 
-          AND is_active = TRUE;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_unique_active_assignment
-BEFORE INSERT OR UPDATE OF is_active ON DriverVehicleAssignments
-FOR EACH ROW
-WHEN (NEW.is_active = TRUE)
-EXECUTE FUNCTION handle_driver_vehicle_assignment();
-```

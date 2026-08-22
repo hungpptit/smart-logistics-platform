@@ -1287,11 +1287,17 @@ export class ShipmentService {
         },
       });
 
-      // Nếu đang bốc hàng tại Trạm Ghé Trung Chuyển (Đà Nẵng), hoàn tất trạm dừng đó
+      // Khi tài xế bốc thùng hàng tại Trạm Ghé Trung Chuyển (Đà Nẵng), cập nhật trạm dừng sang ARRIVED (đang xếp dỡ)
+      // KHÔNG tự động chuyển sang DEPARTED ở đây để tài xế có thể quét nhiều sọt và hiện mã QR bàn giao cho thủ kho quét xác nhận rời bến.
       if (isMidRouteIntermediatePickup && shipment.routeId && tote.facilityId) {
         await tx.routeStop.updateMany({
-          where: { routeId: shipment.routeId, facilityId: tote.facilityId, stopType: 'PICKUP' },
-          data: { status: RouteStopStatus.DEPARTED, departedAt: new Date() },
+          where: {
+            routeId: shipment.routeId,
+            facilityId: tote.facilityId,
+            stopType: 'PICKUP',
+            status: { not: RouteStopStatus.DEPARTED },
+          },
+          data: { status: RouteStopStatus.ARRIVED, arrivedAt: new Date() },
         });
       }
 

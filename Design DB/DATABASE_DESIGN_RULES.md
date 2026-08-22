@@ -200,36 +200,46 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO app_admin_user;
 Khi tiến hành refactor các Module tiếp theo, hãy áp dụng trực tiếp danh sách kiểm tra (Checklist) sau:
 
 ### 👤 Module 1 & 2: Users & Profiles (Tài khoản & Hồ sơ)
-- [x] Bảng `customers` & `staff`: Loại bỏ hoàn toàn `deleted_at` và `updated_at` (Hồ sơ tĩnh chỉ giữ `created_at`).
+- [x] Bảng `customers` & `staff`: Phân tách thông tin PII liên lạc (`full_name`, `phone`, `email`) khỏi bảng `users` thuần túy credentials.
+- [x] Sổ địa chỉ `customer_addresses`: Tích hợp người liên hệ kho (`contact_name`, `contact_phone`).
 
-### 📦 Module 3: Facilities & Warehouses (Quản lý Mạng lưới Kho bãi)
-- [x] Bảng `facilities`: Tích hợp trực tiếp `address_id` (trỏ `addresses.id`), loại bỏ bảng trung gian `facility_addresses`.
-- [x] Bảng `facilities`: Dùng `operating_status` (`ACTIVE`, `INACTIVE`, `MAINTENANCE`, `CLOSED`) thay `deleted_at`.
-- [x] Quan hệ Quản lý Kho: Kho trỏ tới `manager_user_id` trong `users` hoặc `staff_id` trong `staff`.
-- [x] Quan hệ Nhân viên Kho: Bảng `staff` có `assigned_facility_id` trỏ về `facilities(id)`.
+### 🏭 Module 3: Facilities & Warehouses (Quản lý Mạng lưới Kho bãi)
+- [x] Bảng `facilities`: Tích hợp trực tiếp `address_id` (trỏ `addresses.id`) và `province_code` (trỏ `provinces.code`), loại bỏ bảng trung gian `facility_addresses`.
+- [x] Bảng `facilities`: Dùng `operating_status` (`ACTIVE`, `INACTIVE`, `MAINTENANCE`, `CLOSED`) quản lý vòng đời bưu cục.
+- [x] Bảng `facility_zones`: Quản lý phân khu kho (`RECEIVING`, `SORTING`, `SHIPPING`, `STORAGE`, `RETURN`, `QUARANTINE`).
 
 ### 📦 Module 4: Orders & Packages (Quản lý Đơn hàng & Kiện hàng)
-- [x] Bảng `orders`: Trỏ `customer_id` trực tiếp về `customers(id)`. Lưu thông tin người gửi/người nhận (`sender_name`, `sender_phone`, `receiver_name`, `receiver_phone`, `pickup_address_text`, `delivery_address_text`) trực tiếp snapshot trong `orders` để bảo đảm tính lịch sử.
-- [x] Bảng `orders`: Loại bỏ hoàn toàn `deleted_at` và `is_hidden`. Quản lý vòng đời đơn bằng `status` (`CREATED`, ..., `CANCELLED`).
-
-### 🚛 Module 4: Fleet & Vehicles (Quản lý Đội xe & Phương tiện)
-- [ ] Bảng `driver_vehicle_assignments`: Trỏ `driver_id` về `staff(id)` (thay vì bảng `drivers` cũ).
-- [ ] Bảng `driver_locations`: Trỏ `driver_id` về `staff(id)`.
+- [x] Bảng `orders`: Trỏ `customer_id` trực tiếp về `customers(id)`. Lưu thông tin snapshot (`scheduled_pickup_at`, `pickup_address_text`, `delivery_address_text`, `receiver_name`, `receiver_phone`, `estimated_shipping_fee`, `estimated_cod_amount`).
+- [x] Bảng `packages`: Lưu kích thước, khối lượng, thể tích, yêu cầu xe chuyên dụng, giá trị khai giá và vị trí phân khu kho hiện tại (`current_facility_id`, `current_zone_id`).
 
 ### 🚚 Module 5: Shipment Management (Quản lý Vận đơn & Trung chuyển)
-- [x] Bảng `shipments`: Loại bỏ hoàn toàn `deleted_at`, bổ sung `CANCELLED` vào Enum `ShipmentStatus` để quản lý việc hủy chuyến xe.
+- [x] Bảng `shipments`: Bổ sung `origin_facility_id` và `destination_facility_id`. Enum `ShipmentStatus` hỗ trợ đầy đủ `DELIVERY_FAILED` và `CANCELLED`.
 - [x] Bảng `shipment_packages`: Ràng buộc `@unique([package_id])` đảm bảo 1 kiện hàng chỉ nằm trên 1 vận đơn active tại một thời điểm.
+- [x] Bảng `shipment_transfers`: Quản lý xuất/nhập kho giữa 2 bưu cục liên kho.
 
-### 🗺️ Module 6: Routing (Tuyến đường AI & Điều phối)
-- [ ] Bảng `dispatch_tasks`: Trỏ `assigned_to` về `staff(id)`.
-- [ ] Bảng `routes`: Trỏ tới `driver_vehicle_assignment_id` kết nối tới `staff`.
+### 🏎️ Module 6: Fleet & Vehicles (Quản lý Đội xe & Phương tiện)
+- [x] Bảng `staff`: Hợp nhất hồ sơ nhân sự (văn phòng, kho, điều phối, tài xế), lưu thông tin bằng lái cho tài xế.
+- [x] Bảng `staff_driver_types`: Quản lý loại hình giao hàng (`HUB_DELIVERY`, `LINEHAUL_TRANSFER`, `ON_DEMAND`).
+- [x] Bảng `driver_vehicle_assignments`: Quản lý phân công xe theo ca làm việc giữa `staff` và `vehicles`.
+- [x] Bảng `driver_locations`: Tọa độ GPS thời gian thực của tài xế.
 
-### 📸 Module 7: Tracking & POD (Xác thực Bàn giao & Barcode)
-- [ ] Bảng `driver_check_ins`: Trỏ `driver_id` về `staff(id)`.
-- [ ] Bảng `barcode_scans`: Trỏ `scanned_by` về `user_id` hoặc `staff_id`.
+### 🗺️ Module 7: Routing (Tuyến đường AI & Điều phối)
+- [x] Bảng `routes`: `driver_vehicle_assignment_id` là Nullable cho phép AI tạo tuyến trước khi gán tài xế.
+- [x] Bảng `route_stops`: Hỗ trợ đa dạng điểm dừng (`PICKUP`, `HUB`, `DELIVERY`) liên kết tới `orders`, `shipments`, `facilities`.
+- [x] Bảng `dispatch_tasks`: Phân công nhiệm vụ chạy tuyến cho tài xế.
+- [x] Bảng `route_adjustment_logs`: Audit log ghi vết can thiệp thủ công khi có sự cố trên đường.
 
-### ⚙️ Module 8 & 9: Pricing, Billing & System Config
-- [ ] Bảng `system_settings`: Phân quyền `REVOKE ALL` đối với `app_staff_user` và `app_customer_user`. Chỉ `app_admin_user` được phép sửa cấu hình AI/hệ thống.
+### 📸 Module 8: Tracking & POD (Giám sát, Quét kho & Bằng chứng Giao hàng)
+- [x] Bảng `tracking_events`: Dòng thời gian sự kiện tracking công khai.
+- [x] Bảng `warehouse_scans`: Nhật ký quét mã bưu kiện, vận đơn và sọt gom tại bưu cục.
+- [x] Bảng `tote_bags`: Quản lý sọt gom & bao tải trung chuyển.
+- [x] Bảng `delivery_proofs`: Bằng chứng giao hàng điện tử (POD), ảnh chứng từ và số tiền COD thực thu.
+
+### ⚙️ Module 9: System Configuration
+- [x] Bảng `system_settings`: Quản lý cấu hình động Key-Value (`AI`, `ROUTING`, `GPS`, `SYSTEM`, `MOBILE`, `BUSINESS`) phân quyền cập nhật qua `updated_by`.
+
+### 🗺️ Module 10: Vietnamese Administrative Units
+- [x] Quản lý dữ liệu địa chính quốc gia 2 cấp: `administrative_regions`, `administrative_units`, `provinces`, `wards`.
 
 ---
 *Tài liệu này được lưu trữ chính thức tại `Design DB/DATABASE_DESIGN_RULES.md` để toàn bộ đội ngũ phát triển tuân thủ trong suốt quá trình nâng cấp và mở rộng hệ thống SLP.*

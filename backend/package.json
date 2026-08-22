@@ -24,7 +24,10 @@
     "db:seed-case5": "tsx scripts/seed_case5_test_orders.ts",
     "db:clean-case5": "tsx scripts/clean_case5_test_orders.ts",
     "db:clean-totes": "tsx scripts/clean_totes.ts",
-    "reset:demo": "tsx scripts/reset_route_demo_data.ts"
+    "reset:demo": "tsx scripts/reset_route_demo_data.ts",
+    "test:ai": "tsx src/scripts/test_ai_pipeline.ts",
+    "test:case2": "tsx src/scripts/test_case2_ai_pipeline.ts",
+    "test:master": "tsx src/scripts/run_master_test_suite.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

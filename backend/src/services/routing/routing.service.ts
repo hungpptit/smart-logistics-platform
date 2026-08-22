@@ -235,7 +235,7 @@ export class RoutingService {
     // 5b. Create a single RouteOptimization record for the entire AI Optimization session
     const optimization = await prisma.routeOptimization.create({
       data: {
-        algorithmName: 'KMeans + Hungarian + GeneticAlgorithm',
+        algorithmName: 'DBSCAN + KMeans + Hungarian + GeneticAlgorithm',
         inputShipmentCount: orders.length,
         outputRouteCount: 0,
         optimizationStatus: 'SUCCESS',

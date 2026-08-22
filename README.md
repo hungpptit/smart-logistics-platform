@@ -1,190 +1,390 @@
-# 🚚 Smart Logistics Platform (SLP)
+# 🚚 Smart Logistics Platform (SLP) — Enterprise Logistics & AI Routing Engine
 
-> Hệ thống Quản lý Vận tải & Tối ưu Lộ trình thời gian thực (Real-time Vehicle Routing Problem & Telemetry Engine).
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Express.js](https://img.shields.io/badge/Express.js-4.x-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Prisma ORM](https://img.shields.io/badge/Prisma-5.x-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![Redis](https://img.shields.io/badge/Redis-7.x-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Socket.io](https://img.shields.io/badge/Socket.io-4.x-010101?logo=socket.io&logoColor=white)](https://socket.io/)
 
-Smart Logistics Platform (SLP) là giải pháp Enterprise-grade hỗ trợ số hóa toàn diện quy trình logistics từ khâu nhận đơn, xử lý kho bãi, gom cụm đơn hàng, tối ưu tuyến đường di chuyển (AI Routing) và theo dõi hành trình thời gian thực của tài xế thông qua thiết bị định vị/Mobile App.
+A production-grade, distributed logistics management platform designed with **Clean Architecture** and **Domain-Driven Design (DDD)** principles. The system orchestrates end-to-end supply chain operations, featuring multi-echelon warehouse network routing, AI-powered Capacitated Vehicle Routing Problem (CVRP) optimization, low-latency GPS telemetry streaming, and tamper-resistant digital Proof of Delivery (POD).
 
 ---
 
-## 🏗️ Kiến Trúc Hệ Thống (Tech Stack)
+## 📌 Table of Contents
 
-| Phân hệ | Công nghệ sử dụng | Vai trò |
+1. [Architectural Overview](#-architectural-overview)
+2. [Key Engineering Highlights](#-key-engineering-highlights)
+3. [Database Architecture & Domain Modules](#-database-architecture--domain-modules)
+4. [System Architecture Diagram](#-system-architecture-diagram)
+5. [End-to-End Fulfillment Lifecycle](#-end-to-end-fulfillment-lifecycle)
+6. [Technology Stack](#-technology-stack)
+7. [Repository Structure](#-repository-structure)
+8. [Getting Started & Local Development](#-getting-started--local-development)
+9. [API Surface & Postman Collection](#-api-surface--postman-collection)
+10. [Engineering Standards & Best Practices](#-engineering-standards--best-practices)
+
+---
+
+## 🏛️ Architectural Overview
+
+Smart Logistics Platform is built as a highly modular, decoupled backend service engineered to handle mission-critical logistics pipelines:
+
+* **Layered Clean Architecture**: Separation of concerns across Controller, DTO Validation, Service/Domain Logic, and Data Access Layers.
+* **Separation of PII (Defense-in-Depth Security)**: User authentication credentials (`users`) are decoupled from Personally Identifiable Information (PII) profiles (`customers`, `staff`), preventing unauthorized data exposure and enabling 1-query bulk lookups without joins.
+* **In-Memory Telemetry Pipeline**: High-frequency driver GPS coordinates are ingested via WebSockets, buffered and geo-indexed in Redis In-Memory hashes, and asynchronously persisted to PostgreSQL in batches to prevent database write saturation.
+* **Algorithmic Routing Solver**: Multi-stop route generation utilizing K-Means Spatial Clustering, Hungarian Bipartite Matching for driver affinity, and Genetic Algorithms for vehicle routing optimization under capacity and time-window constraints.
+* **Strict State Transition Safety**: Stateful finite state machines (FSM) managing order and shipment transitions with audit logging (`order_status_history`, `route_adjustment_logs`, `tracking_events`).
+
+---
+
+## ⚙️ Key Engineering Highlights
+
+### 1. High-Concurrency Telemetry & Real-Time Geospatial Indexing
+* **Telemetry Decoupling**: Drivers stream GPS coordinates every 5 seconds. The backend writes directly to Redis geospatial structures (`GEOADD`, `HSET`), providing sub-millisecond retrieval for dispatchers and real-time live map tracking via Socket.io rooms.
+* **Geospatial Processing**: PostGIS and Goong/MapLibre APIs calculate accurate road-network distances, ETA projections, and bounding boxes for spatial queries.
+
+### 2. Algorithmic Optimization & Heuristic VRP Engine
+* **K-Means Spatial Clustering**: Partitions large sets of delivery packages into geographically dense clusters based on origin and destination coordinates.
+* **Capacitated VRP Solver**: Solves vehicle-load constraints (volume $m^3$, weight $kg$, vehicle temperature specifications) to produce optimized route sequences (`route_stops`).
+* **Dynamic Route Intervention**: Supports mid-trip driver reassignment, stop sequence modification, and automated exception triggers with comprehensive audit trail logging (`route_adjustment_logs`).
+
+### 3. Supply Chain State Machine & Inter-Hub Handshakes
+* **Strict Package Isolation**: Unique constraint enforcement (`package_id UNIQUE` on `shipment_packages`) guarantees a package cannot be simultaneously assigned to multiple active transit shipments.
+* **Inter-Hub Custody Transfers**: Multi-party confirmation workflows for inter-facility transfers (`shipment_transfers`) with dispatch timestamps, arrival verification, and warehouse scan audits (`warehouse_scans`, `tote_bags`).
+* **Digital Proof of Delivery (POD)**: Multi-factor delivery verification supporting geofenced GPS coordinate validation, image proof attachments, digital recipient confirmation, and on-site Cash-on-Delivery (`actual_cod_collected`) financial reconciliation.
+
+---
+
+## 🗄️ Database Architecture & Domain Modules
+
+The database schema is structured into **10 core domain modules** comprising **38 normalized tables** in PostgreSQL via Prisma ORM:
+
+```mermaid
+graph LR
+    subgraph Core["Core & Identity"]
+        M1["Module 1: Auth & RBAC<br/>(users, roles, permissions)"]
+        M2["Module 2: Customers & Addresses<br/>(customers, addresses, customer_addresses)"]
+    end
+    
+    subgraph Network["Logistics Network"]
+        M3["Module 3: Facility Network<br/>(facilities, facility_types, facility_zones)"]
+        M6["Module 6: Fleet & Resource<br/>(staff, vehicles, driver_assignments, driver_locations)"]
+        M10["Module 10: Administrative Units<br/>(regions, units, provinces, wards)"]
+    end
+
+    subgraph Operations["Execution & Routing"]
+        M4["Module 4: Orders & Packages<br/>(orders, packages, order_payments, history)"]
+        M5["Module 5: Shipments & Transfers<br/>(shipments, shipment_packages, transfers)"]
+        M7["Module 7: Routing & AI Engine<br/>(routes, route_stops, dispatch_tasks, optimizations)"]
+        M8["Module 8: Tracking & POD<br/>(tracking_events, warehouse_scans, tote_bags, proofs)"]
+        M9["Module 9: System Configuration<br/>(system_settings)"]
+    end
+
+    M1 --> M2
+    M2 --> M4
+    M3 --> M4
+    M4 --> M5
+    M5 --> M7
+    M6 --> M7
+    M7 --> M8
+```
+
+| Module | Purpose | Key Models (`schema.prisma`) |
 | :--- | :--- | :--- |
-| **Backend Core** | Node.js (TypeScript) + Express.js | API Gateway, Quản lý Nghiệp vụ & Điều phối |
-| **Database** | PostgreSQL 15 + PostGIS Extension | Lưu trữ dữ liệu quan hệ và tính toán hình học bản đồ (Geospatial) |
-| **Realtime Telemetry** | Redis 7 + Socket.io | Lưu cache GPS tần suất cao, đồng bộ realtime vị trí tài xế |
-| **ORM Layer** | Prisma ORM (Schema-Driven) | Type-safe Database Mapping & Migration |
-| **AI Routing Engine** | OR-Tools / Genetic Algorithm | Giải bài toán tối ưu hóa tuyến đường nhiều điểm đỗ (VRP) |
+| **Module 1: Auth & RBAC** | Identity authentication & fine-grained role-based permissions | `User`, `Role`, `Permission`, `RolePermission` |
+| **Module 2: Customers & Addresses** | B2B/B2C profiles & normalized master address registry | `Customer`, `Address`, `CustomerAddress` |
+| **Module 3: Facility Network** | Hierarchical warehouse tree & functional warehouse zones | `Facility`, `FacilityType`, `FacilityZone` |
+| **Module 4: Orders & Services** | Order lifecycle snapshots, package metrics & financial auditing | `Order`, `Package`, `Service`, `OrderPayment`, `OrderStatusHistory` |
+| **Module 5: Shipment Management** | Inter-facility transfer lots & strict package-to-shipment batches | `Shipment`, `ShipmentPackage`, `ShipmentTransfer` |
+| **Module 6: Fleet & Drivers** | Fleet management, driver vehicle assignments & live telemetry | `Staff`, `StaffDriverType`, `Vehicle`, `VehicleType`, `DriverVehicleAssignment`, `DriverLocation` |
+| **Module 7: Routing & AI Engine** | AI-optimized routes, stop sequencing, dispatching & audit logs | `Route`, `RouteStop`, `DispatchTask`, `RouteOptimization`, `RouteAdjustmentLog` |
+| **Module 8: Tracking, Scan & POD** | Event timelines, warehouse barcode scans, tote containers & POD | `TrackingEvent`, `WarehouseScan`, `ToteBag`, `DeliveryProof` |
+| **Module 9: System Configuration** | Dynamic runtime parameters (AI hyperparameters, GPS intervals) | `SystemSetting` |
+| **Module 10: Administrative Units** | Standardized 2-tier national administrative divisions | `AdministrativeRegion`, `AdministrativeUnit`, `Province`, `Ward` |
 
 ---
 
-## 📂 Cấu Trúc Thư Mục Dự Án
+## 📐 System Architecture Diagram
 
-```text
-smart-logistics-platform/
-├── backend/                  # Mã nguồn Backend API Service (Express + TypeScript)
-│   ├── prisma/               # Cấu hình Prisma (Schema & Seeding)
-│   │   ├── migrations/       # Nhật ký lịch sử thay đổi Database Schema
-│   │   ├── schema.prisma     # File schema tối hậu chứa 38 bảng dữ liệu
-│   │   └── seed.ts           # Script nạp dữ liệu Master/Lookup ban đầu
-│   ├── src/                  # Mã nguồn TypeScript chính
-│   │   ├── controllers/      # Bộ tiếp nhận request và trả response
-│   │   ├── services/         # Tầng xử lý logic nghiệp vụ chính
-│   │   ├── index.ts          # Điểm khởi chạy server (Express + Socket.io)
-│   │   └── ...
-│   ├── package.json          # Quản lý dependencies & scripts chạy dự án
-│   └── tsconfig.json         # Cấu hình trình biên dịch TypeScript
-├── Design DB/                # Tài liệu thiết kế chi tiết 9 Module Database
-├── docker-compose.yml        # Orchestration file cho Postgres (PostGIS) & Redis
-├── setup.md                  # Tài liệu kiến trúc và tech stack tối hậu
-└── README.md                 # Hướng dẫn cài đặt và vận hành này
+```mermaid
+flowchart TD
+    ClientWeb["Web Admin / Dispatch Portal (React + Vite)"]
+    ClientMobile["Driver / Customer App (Flutter)"]
+    
+    subgraph GatewayLayer["API & Ingestion Layer"]
+        APIGateway["Express.js HTTP Gateway (Port 3000)"]
+        WSServer["WebSocket / Socket.io Real-time Hub"]
+    end
+
+    subgraph ServiceLayer["Core Backend Business Services"]
+        AuthSvc["Auth & RBAC Service"]
+        OrderSvc["Order Fulfillment Service"]
+        ShipmentSvc["Shipment & Transfer Service"]
+        RoutingSvc["Routing & Dispatch Service"]
+        TrackingSvc["Tracking & Telemetry Service"]
+        FacilitySvc["Facility & Inventory Service"]
+    end
+
+    subgraph AsyncPipeline["Asynchronous & Optimization Engine"]
+        RedisCache["Redis 7 (In-Memory Cache & Geospatial Index)"]
+        RabbitMQ["RabbitMQ Message Broker"]
+        AIOptimizer["AI Service / OR-Tools VRP Solver"]
+    end
+
+    subgraph PersistenceLayer["Data Persistence"]
+        PrismaORM["Prisma ORM Client"]
+        PostgreSQL[("PostgreSQL 15 + PostGIS Database")]
+    end
+
+    ClientWeb -->|REST API| APIGateway
+    ClientMobile -->|REST API| APIGateway
+    ClientMobile -->|High-frequency GPS Ping| WSServer
+    
+    APIGateway --> ServiceLayer
+    WSServer --> TrackingSvc
+    
+    TrackingSvc -->|Real-time Cache & GEOADD| RedisCache
+    ServiceLayer -->|Async Event Publishing| RabbitMQ
+    RabbitMQ --> AIOptimizer
+    AIOptimizer -->|Optimized Routes| RoutingSvc
+
+    ServiceLayer --> PrismaORM
+    PrismaORM --> PostgreSQL
 ```
 
 ---
 
-## ⚡ Hướng Dẫn Cài Đặt & Chạy Dự Án (Quick Start)
+## 🔄 End-to-End Fulfillment Lifecycle
 
-### 📌 Yêu cầu hệ thống tối thiểu:
-* **Docker Desktop** (Đã bật và đang chạy)
-* **Node.js** (Phiên bản `>= 18.x` hoặc `>= 20.x`)
-* **NPM** (Đi kèm Node.js)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Customer as Customer / Shop
+    actor ShipperPickup as Pickup Driver
+    participant Backend as Backend Core Service
+    participant AI as AI Routing Engine
+    participant Hub as Origin Facility / Hub
+    actor ShipperDelivery as Delivery Driver
+    actor Recipient as End Recipient
 
----
-
-### Bước 1: Khởi động Hạ tầng Container (Postgres + Redis)
-
-Dự án sử dụng Docker Compose để quản lý cơ sở dữ liệu Postgres (tích hợp PostGIS) và bộ nhớ đệm Redis nhằm đơn giản hóa cài đặt môi trường.
-
-1. Mở Terminal tại thư mục gốc của dự án (`smart-logistics-platform/`).
-2. Chạy lệnh dựng container chạy ngầm:
-   ```bash
-   docker compose up -d
-   ```
-3. Kiểm tra xem các container đã chạy thành công chưa:
-   ```bash
-   docker compose ps
-   ```
-   *Bạn sẽ thấy hai container `slp-postgres` (port `5432`) và `slp-redis` (port `6379`) ở trạng thái Up.*
-
----
-
-### Bước 2: Cấu hình Môi trường Backend
-
-1. Di chuyển vào thư mục `backend/`:
-   ```bash
-   cd backend
-   ```
-2. Copy file cấu hình môi trường mẫu:
-   ```bash
-   cp .env.example .env
-   ```
-3. Mở file `.env` vừa tạo và chỉnh sửa các thông số kết nối (đã được cấu hình khớp mặc định với Docker Compose):
-   ```env
-   # Kết nối Postgres
-   DATABASE_URL="postgresql://postgres:admin_password@localhost:5432/smart_logistics_db?schema=public"
-
-   # Kết nối Redis
-   REDIS_HOST="localhost"
-   REDIS_PORT=6379
-   REDIS_PASSWORD="redis_password"
-   ```
+    Customer ->> Backend: 1. Place Order (ORD-xxx, Pickup & Delivery details)
+    Backend ->> AI: 2. Request Optimal Pickup Route & Stop Sequence
+    AI -->> Backend: Return Optimized Route (RouteStops, Sequences, ETAs)
+    Backend ->> ShipperPickup: 3. Dispatch Pickup Task via Mobile App
+    ShipperPickup ->> Customer: Arrive & Scan Barcode on Package (PKG-xxx)
+    ShipperPickup ->> Hub: 4. Inbound Handover & Scan at Origin Facility
+    Hub ->> Backend: Facility Sorting & Aggregate into Shipment Batch (SHP-xxx)
+    Backend ->> Backend: Inter-Hub Linehaul Transfer (ShipmentTransfer)
+    Backend ->> ShipperDelivery: 5. Assign Last-Mile Delivery Route
+    ShipperDelivery ->> Recipient: 6. Handover Package, Collect COD & Upload POD Proof
+    ShipperDelivery ->> Backend: 7. Submit DeliveryProof (Photo, Signature, Verified GPS, COD)
+    Backend ->> Customer: 8. Broadcast DELIVERED status & Reconcile COD
+```
 
 ---
 
-### Bước 3: Cài đặt Dependencies & Khởi Tạo Database
+## 🛠️ Technology Stack
 
-Vẫn ở trong thư mục `backend/`, thực hiện tuần tự các lệnh sau:
-
-1. Cài đặt toàn bộ thư viện cần thiết:
-   ```bash
-   npm install
-   ```
-2. Đồng bộ hóa Schema và tạo các bảng trong PostgreSQL:
-   ```bash
-   npx prisma db push
-   ```
-   *(Hoặc chạy `npx prisma migrate dev --name init` nếu muốn lưu vết phiên bản migration mới).*
-3. Nạp dữ liệu cấu hình mặc định (Master/Lookup Data):
-   ```bash
-   npx prisma db seed
-   ```
-   *Lệnh này sẽ tự động nạp các dữ liệu mặc định như: Quyền hạn, Loại xe, Gói cước vận chuyển, Loại kho bãi, và các tham số siêu cấu hình cho thuật toán AI.*
+| Layer | Technology | Key Capabilities |
+| :--- | :--- | :--- |
+| **Backend Runtime** | Node.js (v20+ LTS), TypeScript 5.x | Strongly typed business logic, asynchronous non-blocking I/O |
+| **Framework & API** | Express.js, `class-validator`, `class-transformer` | Layered architecture, declarative DTO validation, centralized error handling |
+| **Relational Database** | PostgreSQL 15 | 38 normalized 3NF tables, transactional integrity, foreign key cascades |
+| **ORM & Migrations** | Prisma ORM 5.x | Declarative schema mapping, type-safe query building, automated database seeders |
+| **Caching & In-Memory** | Redis 7 | Sub-millisecond GPS caching, geospatial indexing (`GEOADD`/`GEORADIUS`), rate limiting |
+| **Real-time Streaming** | Socket.io 4.x | Bidirectional telemetry streaming, room-based broadcast for live tracking |
+| **Message Broker** | RabbitMQ / Redis PubSub | Asynchronous task decoupling for compute-heavy AI optimization |
+| **Optimization Solver** | Python / OR-Tools / TypeScript Heuristics | Capacitated VRP Solver, K-Means Clustering, Genetic Algorithm |
+| **Geospatial & Maps** | Goong Maps API / MapLibre GL / PostGIS | Reverse geocoding, distance matrix calculation, route polyline geometry |
+| **Containerization** | Docker, Docker Compose | Multi-container environment orchestration for database and cache services |
 
 ---
 
-### Bước 4: Khởi chạy Server Backend
+## 📂 Repository Structure
 
-Khởi chạy server ở chế độ phát triển (Development Mode) tự động reload khi thay đổi code:
+```text
+smart-logistics-platform/
+├── backend/                         # Core Backend API Service (TypeScript + Express)
+│   ├── prisma/
+│   │   ├── migrations/              # Automated database migration history
+│   │   ├── schema.prisma            # Comprehensive 38-table Prisma Schema
+│   │   └── seed.ts                  # Production-ready Master & Lookup Data Seeder
+│   ├── src/
+│   │   ├── config/                  # Environment & connection configurations (DB, Redis, Logger)
+│   │   ├── constants/               # System enums, error codes, and business constants
+│   │   ├── controllers/             # HTTP Route handlers & Request/Response coordination
+│   │   ├── dtos/                    # Input Data Transfer Objects with validation rules
+│   │   ├── gateways/                # Socket.io Real-time Telemetry gateways
+│   │   ├── middlewares/             # Auth JWT, RBAC guards, rate-limiters, global error handler
+│   │   ├── routes/                  # Express REST API route definitions
+│   │   ├── services/                # Core business logic (Order, Shipment, Routing, Pricing)
+│   │   ├── utils/                   # Coordinate projection, math utilities, response formatters
+│   │   ├── workers/                 # Background task workers & queue processors
+│   │   └── index.ts                 # Server entrypoint (HTTP + Socket.io Server)
+│   ├── package.json
+│   └── tsconfig.json
+├── ai-service/                      # AI Routing & VRP Optimization Service
+├── frontend/                        # Web Operations & Dispatch Portal (React + Vite + TailwindCSS)
+├── mobile/                          # Driver & Field Execution Mobile App (Flutter)
+├── Design DB/                       # Formal Database Design & Data Dictionary Documentation
+│   ├── database_dictionary.md       # Complete 38-table Data Dictionary
+│   ├── STATUS_ENUMS_EXPLANATION.md  # Detailed documentation of all 28 System Enums
+│   ├── DATABASE_DESIGN_RULES.md     # 3NF normalization & PII separation rules
+│   ├── erd_diagram.mmd              # Mermaid Entity-Relationship Diagram
+│   └── module 1..10 database.md     # Module-by-module technical specification files
+├── docker-compose.yml               # Container orchestration (PostgreSQL 15, Redis 7)
+├── development_standards.md         # Engineering & code quality standards
+└── README.md                        # Primary project documentation
+```
+
+---
+
+## 🚀 Getting Started & Local Development
+
+### Prerequisites
+
+Ensure the following tools are installed on your workstation:
+* **Docker Desktop** (Engine 24.x+)
+* **Node.js** (`>= 18.x` or `>= 20.x LTS`) & **npm** (`>= 9.x`)
+
+---
+
+### Step 1: Spin Up Infrastructure Containers (PostgreSQL & Redis)
+
+Start the containerized PostgreSQL and Redis services via Docker Compose:
+
+```bash
+# From the root directory
+docker compose up -d
+
+# Verify container health status
+docker compose ps
+```
+
+* **PostgreSQL** runs on port `5432` (`smart_logistics_db`)
+* **Redis** runs on port `6379`
+
+---
+
+### Step 2: Configure Environment Variables
+
+Navigate to the `backend/` directory and configure `.env`:
+
+```bash
+cd backend
+cp .env.example .env
+```
+
+Ensure the configuration matches your local container credentials:
+
+```env
+# Application
+NODE_ENV=development
+PORT=3000
+
+# Database Connection (PostgreSQL)
+DATABASE_URL="postgresql://postgres:admin_password@localhost:5432/smart_logistics_db?schema=public"
+
+# Redis Cache & Telemetry
+REDIS_HOST="localhost"
+REDIS_PORT=6379
+REDIS_PASSWORD="redis_password"
+
+# JWT Secret & Expiry
+JWT_SECRET="super_secret_enterprise_jwt_key_2026"
+JWT_EXPIRES_IN="7d"
+
+# External Maps API
+GOONG_API_KEY="your_goong_maps_api_key"
+```
+
+---
+
+### Step 3: Install Dependencies & Run Database Migrations
+
+```bash
+# Install backend dependencies
+npm install
+
+# Push schema to database and generate Prisma Client
+npx prisma db push
+
+# Execute database seeder (Seeds Roles, Permissions, Vehicle Types, Services, Facilities)
+npx prisma db seed
+```
+
+---
+
+### Step 4: Launch Backend Server
+
+Start the development server with live reload:
 
 ```bash
 npm run dev
 ```
 
-* Server API sẽ chạy tại: `http://localhost:3000`
-* Server Realtime Socket.io cũng được tích hợp sẵn trên cùng cổng `3000`.
+* **REST API Gateway**: `http://localhost:3000/api/v1`
+* **Real-time WebSocket**: `ws://localhost:3000`
 
 ---
 
-### 🔍 Bước 5: Xem & Quản Lý Dữ Liệu Trực Quan (Prisma Studio)
+### Step 5: Visual Data Management (Prisma Studio)
 
-Để duyệt nhanh cơ sở dữ liệu, kiểm tra các bảng và thay đổi dữ liệu mà không cần phần mềm quản trị (DBeaver, pgAdmin):
+Launch Prisma Studio to inspect, query, and manage database records interactively:
 
-1. Trong thư mục `backend/`, khởi chạy Prisma Studio:
-   ```bash
-   npx prisma studio
-   ```
-2. Mở trình duyệt và truy cập: **`http://localhost:5555`**
+```bash
+npx prisma studio
+```
 
----
-
-### 🔄 Hướng dẫn vận hành hàng ngày (Daily Run Guide)
-
-Từ những lần chạy sau, bạn không cần cấu hình lại từ đầu mà chỉ cần bật/tắt nhanh bằng các lệnh sau:
-
-1. **Khởi động nhanh Database & Redis (Docker)**:
-   ```bash
-   docker compose start
-   ```
-   *(Cuối ngày khi nghỉ làm việc, tắt các container bằng lệnh `docker compose stop` để giải phóng RAM mà vẫn giữ nguyên dữ liệu).*
-
-2. **Khởi động Backend**:
-   ```bash
-   cd backend
-   npm run dev
-   ```
-
-> [!NOTE]
-> Bạn chỉ cần chạy lại `npm install` hoặc `npx prisma db push` khi kéo code mới từ Git về (git pull) có cập nhật thư viện mới hoặc sửa đổi cấu trúc bảng.
+Access the web interface at **`http://localhost:5555`**.
 
 ---
 
-## 🗄️ Danh sách 9 Module Database đã cấu hình
+## 📡 API Surface & Postman Collection
 
-Hệ thống đã được thiết kế hoàn tất với cấu trúc 38 bảng liên kết chặt chẽ:
-1. **Module 1: Authentication & Authorization** (Quản lý User, Roles, Permissions chuẩn RBAC).
-2. **Module 2: Customers & Addresses** (Thông tin khách hàng B2C/B2B và Sổ địa chỉ chuẩn hóa).
-3. **Module 3: Facility Network** (Mạng lưới tổng kho, kho khu vực, trạm giao nhận và phân khu kho).
-4. **Module 4: Orders & Services** (Đơn hàng, gói cước dịch vụ và kiện hàng nhỏ lẻ).
-5. **Module 5: Shipment Management** (Vận đơn chặng giữa, kiểm soát xuất nhập kho chặng).
-6. **Module 6: Fleet & Driver Management** (Tài xế, đội xe, tải trọng xe và GPS thời gian thực).
-7. **Module 7: Routing & Dispatch Engine** (Tuyến giao hàng tối ưu, thứ tự điểm dừng và log di chuyển của xe).
-8. **Module 8: Tracking, Scan & POD** (Bằng chứng giao hàng POD: ảnh chụp, chữ ký, OTP; nhật ký quét barcode kiểm kho).
-9. **Module 9: System Configuration** (Cấu hình tham số AI & nghiệp vụ động, không hard-code).
+The API follows RESTful specifications (RFC 7231) with consistent JSON response wrappers:
+
+```json
+{
+  "success": true,
+  "message": "Operation executed successfully",
+  "data": { ... },
+  "errors": []
+}
+```
+
+### Core API Endpoints
+
+| Resource | Method | Endpoint | Description |
+| :--- | :---: | :--- | :--- |
+| **Auth** | `POST` | `/api/v1/auth/login` | Authenticate user credentials & issue JWT |
+| **Auth** | `GET` | `/api/v1/auth/me` | Retrieve active authenticated user profile |
+| **Orders** | `POST` | `/api/v1/orders` | Create new delivery order with snapshot freeze |
+| **Orders** | `GET` | `/api/v1/orders/:id` | Fetch order details, financial breakdown & tracking status |
+| **Orders** | `PATCH` | `/api/v1/orders/:id/status` | Transition order status with history audit logging |
+| **Shipments** | `POST` | `/api/v1/shipments` | Create consolidated shipment batch for linehaul transit |
+| **Shipments** | `POST` | `/api/v1/shipments/:id/transfers` | Initiate inter-hub warehouse custody transfer |
+| **Routing** | `POST` | `/api/v1/routing/optimize` | Trigger AI VRP optimization for pending shipments |
+| **Routing** | `GET` | `/api/v1/routes/:id` | Retrieve planned route stops, sequences, and polyline |
+| **Drivers** | `POST` | `/api/v1/drivers/location` | Telemetry endpoint for GPS coordinate sync |
+| **POD** | `POST` | `/api/v1/deliveries/proof` | Submit digital Proof of Delivery with GPS & COD verification |
+
+*A complete Postman Collection is provided in the repository at [Design DB/velocity_api_collection.json](file:///d:/smart-logistics-platform/Design%20DB/velocity_api_collection.json).*
 
 ---
 
-## 💡 Lưu ý cho Lập Trình Viên (Developer Rules)
+## 🏆 Engineering Standards & Best Practices
 
-1. **Thay đổi cấu trúc bảng**: 
-   Nếu cần sửa đổi trường thông tin hoặc thêm bảng mới, hãy sửa file [schema.prisma](file:///d:/smart-logistics-platform/backend/prisma/schema.prisma) sau đó chạy lệnh dưới đây để tạo file migration mới:
-   ```bash
-   npx prisma migrate dev --name <ten_migration_goi_nho>
-   ```
-2. **Seeding dữ liệu thử nghiệm**:
-   Bất kỳ dữ liệu danh mục tĩnh nào cần có sẵn khi chạy hệ thống mới, hãy bổ sung vào file [seed.ts](file:///d:/smart-logistics-platform/backend/prisma/seed.ts) để đồng bộ cho toàn bộ đội ngũ phát triển.
-3. **Mã hóa tọa độ**:
-   Cột tọa độ địa lý `latitude` và `longitude` trên bảng `addresses` luôn yêu cầu độ chính xác kiểu số thực (`Float` / `Double Precision`) để đảm bảo thuật toán AI Routing và Google Maps hoạt động chính xác.
+* **Schema-Driven Type Safety**: 100% strict TypeScript types generated from Prisma Schema models and DTO class validators.
+* **Database Normalization (3NF)**: Zero data anomalies, isolated PII profiles, parameterized SQL queries via Prisma to eliminate SQL Injection risks.
+* **ISO 8601 UTC-0 Timestamps**: All server and database timestamps are strictly recorded in UTC-0 to prevent cross-timezone daylight synchronization issues.
+* **Deterministic Auditing**: State changes emit immutable historical events recorded in `OrderStatusHistory`, `RouteAdjustmentLog`, and `TrackingEvent` tables.
 
 ---
 
-Chúc nhóm **Hưng, Kiều và Quý** xây dựng đồ án thành công xuất sắc! 🚀
+## 📄 License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

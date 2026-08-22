@@ -86,23 +86,44 @@ export class AssignmentService {
 
     if (N === 0 || K === 0) return [];
 
-    // Calculate total weights for each cluster using a single batch query
-    const allOrderIds = clusters.flatMap((c) => c.orders.map((o) => o.id));
-    const allPackages = await prisma.package.findMany({
-      where: { orderId: { in: allOrderIds } },
-      select: { orderId: true, weight: true },
-    });
-
+    // Calculate total weights for each cluster using in-memory package data with DB fallback
     const weightByOrderId = new Map<string, number>();
-    for (const pkg of allPackages) {
-      const current = weightByOrderId.get(pkg.orderId) || 0;
-      weightByOrderId.set(pkg.orderId, current + Number(pkg.weight || 0));
+    const missingOrderIds: string[] = [];
+
+    for (const cluster of clusters) {
+      for (const order of cluster.orders) {
+        const pkg = (order as any).package;
+        const pkgs = (order as any).packages;
+        if (pkg) {
+          weightByOrderId.set(order.id, Number(pkg.weight) || 0);
+        } else if (pkgs && pkgs.length > 0) {
+          const sumW = pkgs.reduce((s: number, p: any) => s + (Number(p.weight) || 0), 0);
+          weightByOrderId.set(order.id, sumW);
+        } else {
+          missingOrderIds.push(order.id);
+        }
+      }
+    }
+
+    if (missingOrderIds.length > 0) {
+      try {
+        const dbPackages = await prisma.package.findMany({
+          where: { orderId: { in: missingOrderIds } },
+          select: { orderId: true, weight: true },
+        });
+        for (const pkg of dbPackages) {
+          const current = weightByOrderId.get(pkg.orderId) || 0;
+          weightByOrderId.set(pkg.orderId, current + Number(pkg.weight || 0));
+        }
+      } catch (err) {
+        console.warn('⚠️ [AssignmentService] Could not reach DB for package weights, using default 1.0kg');
+      }
     }
 
     const clusterWeights = clusters.map((cluster) => {
       let totalWeight = 0;
       for (const order of cluster.orders) {
-        totalWeight += weightByOrderId.get(order.id) || 0;
+        totalWeight += weightByOrderId.get(order.id) || 1.0;
       }
       return totalWeight;
     });

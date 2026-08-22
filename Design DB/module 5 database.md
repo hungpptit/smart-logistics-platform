@@ -1,223 +1,149 @@
-# MODULE 5 - Shipment Management
+# MODULE 5 - Shipment Management (Quản lý Vận đơn & Trung chuyển)
 
 ## 🎯 Mục tiêu Module
 
-Module Shipment Management quản lý toàn bộ quá trình vận chuyển thực tế của hàng hóa (từ khi các kiện hàng được xuất kho gửi chặng giữa đến khi được giao chặng cuối thành công hoặc hoàn hàng). 
-
-Nhiệm vụ của module bắt đầu khi:
-1. Đơn hàng đạt trạng thái `READY_FOR_DISPATCH` ở Module 4.
-2. Hệ thống (hoặc AI Routing Engine) gom các kiện hàng (`Packages`) vào một Phiếu vận chuyển (`Shipment`).
-3. Điều phối viên hoặc AI gán tài xế, phương tiện và theo dõi quá trình hàng luân chuyển qua các kho trung chuyển (`Facilities`) cho đến khi hoàn tất.
+Module Shipment Management quản lý toàn bộ quá trình vận chuyển thực tế của hàng hóa từ khi các kiện hàng được xuất kho gửi chặng giữa đến khi được giao chặng cuối thành công hoặc chuyển hoàn:
+* Quản lý phiếu Vận đơn (`shipments`) đại diện cho các chuyến gom hàng di chuyển giữa các bưu cục hoặc giao chặng cuối.
+* Quản lý liên kết gom kiện hàng vào vận đơn (`shipment_packages`) với ràng buộc 1 Kiện chỉ thuộc 1 Vận đơn active tại một thời điểm (`package_id UNIQUE`).
+* Quản lý luồng điều chuyển / xuất nhập kho liên bưu cục giữa kho gửi và kho nhận (`shipment_transfers`).
 
 ---
 
-## 📊 Các Bảng Trong Module (4 Bảng)
+## 📊 Các Bảng Trong Module (3 Bảng)
 
-| STT | Bảng | Chức năng |
-| :--- | :--- | :--- |
-| 1 | `Shipments` | Phiếu vận chuyển (Quản lý trạng thái chuyến đi) |
-| 2 | `ShipmentPackages` | Liên kết Nhiều-Nhiều giữa Shipment và các kiện hàng Package |
-| 3 | `ShipmentEvents` | Nhật ký hành trình chi tiết của Shipment (Audit Trail / Timeline) |
-| 4 | `ShipmentTransfers` | Quản lý luân chuyển hàng hóa giữa các kho (Nhập/Xuất kho liên kết) |
+| STT | Model Prisma | Tên Bảng DB (`@map`) | Chức Năng Cốt Lõi |
+| :--- | :--- | :--- | :--- |
+| 1 | `Shipment` | `shipments` | Phiếu vận đơn gom hàng / Chuyến xe vận chuyển |
+| 2 | `ShipmentPackage` | `shipment_packages` | Bảng trung gian gom kiện hàng vào Vận đơn (1 Kiện ↔ 1 Vận đơn) |
+| 3 | `ShipmentTransfer` | `shipment_transfers` | Quản lý điều chuyển và giao nhận hàng hóa giữa các Bưu cục |
 
 ---
 
-## 🗺️ ERD Module
+## 🗺️ ERD Module 5
 
 ```mermaid
-graph TD
-    Shipments[Shipments] -->|1..N| ShipmentPackages[ShipmentPackages]
-    Shipments -->|1..N| ShipmentEvents[ShipmentEvents]
-    Shipments -->|1..N| ShipmentTransfers[ShipmentTransfers]
-    
-    ShipmentPackages --> Packages[Packages]
-    ShipmentTransfers --> Facilities[Facilities]
+erDiagram
+    routes ||--o| shipments : "assigned_route"
+    facilities ||--o| shipments : "origin_facility"
+    facilities ||--o| shipments : "destination_facility"
+    users ||--o| shipments : "created_by"
+    users ||--o| shipments : "updated_by"
+
+    shipments ||--o{ shipment_packages : "contains"
+    packages ||--|| shipment_packages : "assigned_to_shipment"
+
+    shipments ||--o{ shipment_transfers : "has_transfers"
+    facilities ||--o{ shipment_transfers : "from_facility"
+    facilities ||--o{ shipment_transfers : "to_facility"
+    users ||--o| shipment_transfers : "received_by"
+
+    shipments {
+        uuid id PK
+        varchar shipment_code UK
+        ShipmentStatus status
+        uuid route_id FK
+        uuid origin_facility_id FK
+        uuid destination_facility_id FK
+        uuid created_by FK
+        uuid updated_by FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    shipment_packages {
+        uuid id PK
+        uuid shipment_id FK
+        uuid package_id FK, UK
+        timestamptz created_at
+    }
+
+    shipment_transfers {
+        uuid id PK
+        uuid shipment_id FK
+        uuid from_facility_id FK
+        uuid to_facility_id FK
+        TransferStatus status
+        timestamptz dispatched_at
+        timestamptz arrived_at
+        uuid received_by FK
+    }
 ```
 
 ---
 
 ## 🗄️ Chi Tiết Thiết Kế Các Bảng
 
-### BẢNG 1 — Shipments ⭐
-Bảng trung tâm đại diện cho "Một lần vận chuyển hàng hóa". Một Shipment có thể gom nhiều kiện hàng (`Packages`) của nhiều đơn hàng (`Orders`) khác nhau nếu chúng có cùng tuyến đường chặng giữa hoặc cùng khu vực giao hàng chặng cuối.
+### BẢNG 1 — `shipments` (Phiếu Vận Đơn / Chuyến Gom Hàng)
+Bảng trung tâm quản lý các chuyến vận chuyển hàng hóa giữa các kho hoặc giao chặng cuối.
 
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính. |
-| `shipment_code` | VARCHAR(30) | ❌ | Mã phiếu vận chuyển duy nhất (Ví dụ: `SHP000001`). |
-| `status` | `shipment_status_enum` | ❌ | Trạng thái của Shipment. |
-| `route_id` | UUID | ✅ | FK → `Routes(id)` (nullable). Tuyến đường do AI chỉ định (Module 7). |
-| `origin_facility_id`| UUID | ✅ | FK → `Facilities(id)`. Kho/Bưu cục xuất phát của vận đơn. |
-| `destination_facility_id`| UUID | ✅ | FK → `Facilities(id)`. Kho/Bưu cục đích đến của vận đơn. |
-| `created_by` | UUID | ✅ | FK → `Users(id)` (ON DELETE SET NULL). Người tạo phiếu vận chuyển. |
-| `updated_by` | UUID | ✅ | FK → `Users(id)` (ON DELETE SET NULL). Người cập nhật cuối cùng. |
-| `created_at` | TIMESTAMPTZ | ❌ | Thời điểm tạo phiếu. |
-| `updated_at` | TIMESTAMPTZ | ❌ | Thời điểm cập nhật. |
-
-* **Định nghĩa ENUMs:**
-  ```sql
-  CREATE TYPE shipment_status_enum AS ENUM (
-      'CREATED',           -- Phiếu vận chuyển mới tạo
-      'ASSIGNED',          -- Đã gán tài xế & phương tiện
-      'IN_TRANSIT',         -- Hàng đang đi trên đường
-      'AT_HUB',             -- Hàng đã cập bến một kho trung chuyển
-      'OUT_FOR_DELIVERY',   -- Tài xế đang đi giao chặng cuối cho khách nhận
-      'DELIVERED',          -- Đã giao hàng thành công
-      'FAILED',             -- Giao hàng thất bại
-      'RETURNING',          -- Đang trên đường chuyển hoàn lại cho người gửi
-      'RETURNED',           -- Đã chuyển hoàn xong cho người gửi
-      'CANCELLED'           -- Chuyến xe / Phiếu vận chuyển bị HỦY (Thay thế deleted_at)
-  );
-  ```
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `id` | String | UUID | ❌ | Khóa chính (Primary Key), `@default(uuid())`. |
+| `shipment_code` | String | VARCHAR(30) | ❌ | Mã vận đơn duy nhất (`@unique`). VD: `SHP-20260724-001`. |
+| `status` | ShipmentStatus | Enum | ❌ | Trạng thái: `CREATED`, `ASSIGNED`, `IN_TRANSIT`, `AT_HUB`, `OUT_FOR_DELIVERY`, `DELIVERED`, `DELIVERY_FAILED`, `RETURNING`, `RETURNED`, `CANCELLED`. |
+| `route_id` | String? | UUID | ✅ | FK $\rightarrow$ `routes(id)` (Lộ trình do AI chỉ định, ON DELETE SET NULL). |
+| `origin_facility_id`| String? | UUID | ✅ | FK $\rightarrow$ `facilities(id)` (Bưu cục xuất phát, ON DELETE SET NULL). |
+| `destination_facility_id`| String?| UUID | ✅ | FK $\rightarrow$ `facilities(id)` (Bưu cục đích đến, ON DELETE SET NULL). |
+| `created_by` | String? | UUID | ✅ | FK $\rightarrow$ `users(id)` (Người tạo, ON DELETE SET NULL). |
+| `updated_by` | String? | UUID | ✅ | FK $\rightarrow$ `users(id)` (Người cập nhật, ON DELETE SET NULL). |
+| `created_at` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm tạo phiếu (`@default(now())`). |
+| `updated_at` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm cập nhật (`@updatedAt`). |
 
 * **Indexes & Constraints:**
   ```sql
   PRIMARY KEY (id)
   UNIQUE (shipment_code)
-  CREATE INDEX idx_shipments_status ON Shipments(status);
+  CREATE INDEX idx_shipments_status ON shipments(status);
+  FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE SET NULL
+  FOREIGN KEY (origin_facility_id) REFERENCES facilities(id) ON DELETE SET NULL
+  FOREIGN KEY (destination_facility_id) REFERENCES facilities(id) ON DELETE SET NULL
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+  FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
   ```
 
 ---
 
-### BẢNG 2 — ShipmentPackages
-Bảng trung gian liên kết Nhiều-Nhiều giữa Shipment và Packages. 
-> [!NOTE]
-> Một Kiện hàng (`Package`) có thể trải qua nhiều chuyến xe/chặng vận chuyển khác nhau (Ví dụ: Chuyến xe 1 đưa hàng từ Kho A đến Hub B, Chuyến xe 2 đưa hàng từ Hub B đến Micro Hub C). Do đó, một Package có thể liên kết với nhiều Shipment khác nhau theo thời gian, nhưng tại một thời điểm hoạt động chỉ nằm trên tối đa một Shipment có trạng thái `IN_TRANSIT`.
+### BẢNG 2 — `shipment_packages` (Gom Kiện Hàng Vào Vận Đơn)
+Bảng trung gian gom kiện hàng vật lý vào vận đơn chuyến xe. Ràng buộc duy nhất `package_id UNIQUE` đảm bảo 1 kiện hàng chỉ nằm trên 1 vận đơn tại một thời điểm.
 
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính đơn lẻ. |
-| `shipment_id` | UUID | ❌ | FK → `Shipments(id)` (ON DELETE CASCADE). |
-| `package_id` | UUID | ❌ | FK → `Packages(id)` (ON DELETE RESTRICT). |
-| `created_at` | TIMESTAMPTZ | ❌ | Thời điểm đưa kiện hàng vào Shipment. |
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `id` | String | UUID | ❌ | Khóa chính (Primary Key), `@default(uuid())`. |
+| `shipment_id` | String | UUID | ❌ | FK $\rightarrow$ `shipments(id)` (ON DELETE CASCADE). |
+| `package_id` | String | UUID | ❌ | Khóa ngoại duy nhất (`@unique`), FK $\rightarrow$ `packages(id)` (ON DELETE RESTRICT). |
+| `created_at` | DateTime | TIMESTAMPTZ | ❌ | Thời điểm đưa kiện vào vận đơn (`@default(now())`). |
 
 * **Indexes & Constraints:**
   ```sql
   PRIMARY KEY (id)
-  UNIQUE (shipment_id, package_id) -- Ngăn chặn chèn trùng lặp một kiện trong cùng một chuyến xe
-  CREATE INDEX idx_shp_pkg_package ON ShipmentPackages(package_id);
+  UNIQUE (package_id)
+  UNIQUE (shipment_id, package_id)
+  FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE
+  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE RESTRICT
   ```
 
 ---
 
-### BẢNG 3 — ShipmentEvents
-Bảng Audit Trail ghi nhận toàn bộ hành trình thời gian thực của hàng hóa để phục vụ tra cứu thông tin (Tracking Timeline) cho khách hàng và quản lý.
+### BẢNG 3 — `shipment_transfers` (Luân Chuyển Hàng Giữa Các Bưu Cục)
+Quản lý luồng xuất/nhập kho chặng giữa. Theo dõi quá trình xe xuất phát từ Kho A và cập bến Kho B.
 
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính. |
-| `shipment_id` | UUID | ❌ | FK → `Shipments(id)` (ON DELETE CASCADE). |
-| `event_type` | `shipment_event_type_enum` | ❌ | Mã loại sự kiện hành trình. |
-| `facility_id` | UUID | ✅ | FK → `Facilities(id)` (nullable, nếu sự kiện diễn ra tại một kho). |
-| `latitude` | DOUBLE PRECISION | ✅ | Tọa độ GPS ghi nhận thực tế khi xảy ra sự kiện. |
-| `longitude` | DOUBLE PRECISION | ✅ | Tọa độ GPS ghi nhận thực tế khi xảy ra sự kiện. |
-| `event_time` | TIMESTAMPTZ | ❌ | Thời gian sự kiện diễn ra. |
-| `created_by` | UUID | ✅ | FK → `Users(id)` (nullable). Người quét mã hoặc kích hoạt sự kiện. |
-| `notes` | TEXT | ✅ | Ghi chú bổ sung (Ví dụ: "Xe gặp sự cố hỏng lốp", "Quét mã vạch tại băng chuyền 2"). |
-
-* **Định nghĩa ENUMs:**
-  ```sql
-  CREATE TYPE shipment_event_type_enum AS ENUM (
-      'CREATED',
-      'DRIVER_ASSIGNED',
-      'DEPARTED_FACILITY',
-      'ARRIVED_FACILITY',
-      'OUT_FOR_DELIVERY',
-      'DELIVERY_SUCCESS',
-      'DELIVERY_FAIL',
-      'RETURN_STARTED',
-      'EXCEPTION_OCCURRED'
-  );
-  ```
+| Field | Prisma Type | PostgreSQL Type | Nullable | Ràng buộc & Chức năng |
+| :--- | :--- | :--- | :---: | :--- |
+| `id` | String | UUID | ❌ | Khóa chính (Primary Key), `@default(uuid())`. |
+| `shipment_id` | String | UUID | ❌ | FK $\rightarrow$ `shipments(id)` (ON DELETE CASCADE). |
+| `from_facility_id` | String | UUID | ❌ | FK $\rightarrow$ `facilities(id)` (Bưu cục xuất phát, ON DELETE RESTRICT). |
+| `to_facility_id` | String | UUID | ❌ | FK $\rightarrow$ `facilities(id)` (Bưu cục đích đến, ON DELETE RESTRICT). |
+| `status` | TransferStatus | Enum | ❌ | Trạng thái: `PENDING`, `IN_TRANSIT`, `ARRIVED`, `REJECTED`. |
+| `dispatched_at` | DateTime? | TIMESTAMPTZ | ✅ | Thời điểm xe xuất phát rời kho gửi. |
+| `arrived_at` | DateTime? | TIMESTAMPTZ | ✅ | Thời điểm xe cập bến và nhập kho đích. |
+| `received_by` | String? | UUID | ✅ | FK $\rightarrow$ `users(id)` (Thủ kho nhận hàng, ON DELETE SET NULL). |
 
 * **Indexes & Constraints:**
   ```sql
   PRIMARY KEY (id)
-  CREATE INDEX idx_shipment_events_ship ON ShipmentEvents(shipment_id);
+  CREATE INDEX idx_shp_trans_ship ON shipment_transfers(shipment_id);
+  FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE
+  FOREIGN KEY (from_facility_id) REFERENCES facilities(id) ON DELETE RESTRICT
+  FOREIGN KEY (to_facility_id) REFERENCES facilities(id) ON DELETE RESTRICT
+  FOREIGN KEY (received_by) REFERENCES users(id) ON DELETE SET NULL
   ```
-
-
-
-### BẢNG 4 — ShipmentTransfers
-Quản lý luồng xuất/nhập kho chặng giữa. Mỗi lần xe xuất phát từ Kho A và cập bến Kho B sẽ được ghi nhận tại đây để kiểm soát hao hụt và thời gian luân chuyển liên kho.
-
-* **Các trường dữ liệu:**
-
-| Field | PostgreSQL Type | Nullable | Chức năng |
-| :--- | :--- | :---: | :--- |
-| `id` | UUID | ❌ | Khóa chính. |
-| `shipment_id` | UUID | ❌ | FK → `Shipments(id)` (ON DELETE CASCADE). |
-| `from_facility_id` | UUID | ❌ | FK → `Facilities(id)` (Kho xuất phát). |
-| `to_facility_id` | UUID | ❌ | FK → `Facilities(id)` (Kho đích đến). |
-| `status` | `transfer_status_enum` | ❌ | Trạng thái luân chuyển (`PENDING`, `IN_TRANSIT`, `ARRIVED`, `REJECTED`). |
-| `dispatched_at` | TIMESTAMPTZ | ✅ | Thời điểm xe lăn bánh rời kho xuất phát. |
-| `arrived_at` | TIMESTAMPTZ | ✅ | Thời điểm xe cập bến và hoàn thành quét nhập kho đích. |
-| `received_by` | UUID | ✅ | FK → `Users(id)` (nullable). Nhân viên kho đích ký xác nhận nhập kho. |
-
-* **Định nghĩa ENUMs:**
-  ```sql
-  CREATE TYPE transfer_status_enum AS ENUM ('PENDING', 'IN_TRANSIT', 'ARRIVED', 'REJECTED');
-  ```
-
-* **Indexes & Constraints:**
-  ```sql
-  PRIMARY KEY (id)
-  CREATE INDEX idx_shp_trans_ship ON ShipmentTransfers(shipment_id);
-  ```
-
-
-
----
-
-## 💡 Đề Xuất Cơ Chế Tự Động Tạo Timeline (PostgreSQL Trigger)
-
-Mỗi khi bảng `Shipments` cập nhật trạng thái mới (`status`), hệ thống nên tự động chèn một dòng vào `ShipmentEvents` để làm lịch sử vết (Audit trail):
-
-```sql
-CREATE OR REPLACE FUNCTION log_shipment_status_event()
-RETURNS TRIGGER AS $$
-DECLARE
-    v_event_type shipment_event_type_enum;
-BEGIN
-    IF (TG_OP = 'INSERT') OR (OLD.status <> NEW.status) THEN
-        -- Ánh xạ các giá trị từ shipment_status_enum sang shipment_event_type_enum tương đương
-        v_event_type := CASE NEW.status
-            WHEN 'CREATED' THEN 'CREATED'::shipment_event_type_enum
-            WHEN 'ASSIGNED' THEN 'DRIVER_ASSIGNED'::shipment_event_type_enum
-            WHEN 'IN_TRANSIT' THEN 'DEPARTED_FACILITY'::shipment_event_type_enum
-            WHEN 'AT_HUB' THEN 'ARRIVED_FACILITY'::shipment_event_type_enum
-            WHEN 'OUT_FOR_DELIVERY' THEN 'OUT_FOR_DELIVERY'::shipment_event_type_enum
-            WHEN 'DELIVERED' THEN 'DELIVERY_SUCCESS'::shipment_event_type_enum
-            WHEN 'FAILED' THEN 'DELIVERY_FAIL'::shipment_event_type_enum
-            WHEN 'RETURNING' THEN 'RETURN_STARTED'::shipment_event_type_enum
-            ELSE 'EXCEPTION_OCCURRED'::shipment_event_type_enum
-        END;
-
-        INSERT INTO ShipmentEvents (
-            id,
-            shipment_id,
-            event_type,
-            event_time
-        )
-        VALUES (
-            gen_random_uuid(),
-            NEW.id,
-            v_event_type,
-            NOW()
-        );
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_log_shipment_status_event
-AFTER INSERT OR UPDATE OF status ON Shipments
-FOR EACH ROW
-EXECUTE FUNCTION log_shipment_status_event();
-```
