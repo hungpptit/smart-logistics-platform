@@ -85,13 +85,61 @@ enum PaymentMethod {
   CASH
   BANK_TRANSFER
   E_WALLET
+  ZALOPAY
+  VNPAY
+  MOMO
   COD
 }
 
 enum PaymentStatus {
   UNPAID
+  PARTIALLY_PAID
   PAID
+  PARTIALLY_REFUNDED
   REFUNDED
+}
+
+enum CodCollectionStatus {
+  NOT_APPLICABLE
+  PENDING_COLLECTION
+  COLLECTED
+  REMITTED
+}
+
+enum GatewayProvider {
+  ZALOPAY
+  VNPAY
+  MOMO
+  CASH
+  BANK_TRANSFER
+}
+
+enum TransactionType {
+  PREPAY_SHIPPING
+  COD_COLLECTION
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum RefundReason {
+  CUSTOMER_CANCEL
+  DUPLICATE_PAYMENT
+  OVERPAID
+  LATE_PAYMENT_AFTER_CANCEL
+  DELIVERY_FAILED_REFUND
+  OTHER
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCESS
+  FAILED
 }
 
 enum ShipmentStatus {
@@ -265,6 +313,7 @@ model User {
   trackingEvents        TrackingEvent[]
   warehouseScans        WarehouseScan[]
   systemSettings        SystemSetting[]
+  refundRequests        RefundTransaction[]  @relation("RefundRequester")
 
   @@map("users")
 }
@@ -558,20 +607,87 @@ model Package {
 }
 
 model OrderPayment {
-  id                 String        @id @default(uuid()) @db.Uuid
-  orderId            String        @unique @map("order_id") @db.Uuid
-  finalShippingFee   Decimal       @map("final_shipping_fee") @db.Decimal(12, 2)
-  finalInsuranceFee  Decimal       @map("final_insurance_fee") @db.Decimal(12, 2)
-  finalCodAmount     Decimal       @map("final_cod_amount") @db.Decimal(12, 2)
-  feePayer           FeePayer      @map("fee_payer")
-  paymentMethod      PaymentMethod @map("payment_method")
-  paymentStatus      PaymentStatus @map("payment_status")
-  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  id                    String               @id @default(uuid()) @db.Uuid
+  orderId               String               @unique @map("order_id") @db.Uuid
+  finalShippingFee      Decimal              @map("final_shipping_fee") @db.Decimal(12, 2)
+  finalInsuranceFee     Decimal              @map("final_insurance_fee") @db.Decimal(12, 2)
+  finalCodAmount        Decimal              @map("final_cod_amount") @db.Decimal(12, 2)
+  feePayer              FeePayer             @map("fee_payer")
+  paymentMethod         PaymentMethod        @map("payment_method")
+  paymentStatus         PaymentStatus        @default(UNPAID) @map("payment_status")
+  shippingPaymentStatus PaymentStatus        @default(UNPAID) @map("shipping_payment_status")
+  codCollectionStatus   CodCollectionStatus  @default(NOT_APPLICABLE) @map("cod_collection_status")
+  version               Int                  @default(0)
+  createdAt             DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime             @updatedAt @map("updated_at") @db.Timestamptz
 
-  order              Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order                 Order                @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  transactions          PaymentTransaction[]
 
   @@map("order_payments")
+}
+
+model PaymentTransaction {
+  id                     String              @id @default(uuid()) @db.Uuid
+  orderPaymentId         String              @map("order_payment_id") @db.Uuid
+  gatewayProvider        GatewayProvider     @map("gateway_provider")
+  merchantTransCode      String              @map("merchant_trans_code") @db.VarChar(100)
+  gatewayTransCode       String?             @map("gateway_trans_code") @db.VarChar(100)
+  amount                 Decimal             @db.Decimal(12, 2)
+  shippingAmount         Decimal?            @map("shipping_amount") @db.Decimal(12, 2)
+  codAmount              Decimal?            @map("cod_amount") @db.Decimal(12, 2)
+  currency               String              @default("VND") @db.VarChar(3)
+  transactionType        TransactionType     @map("transaction_type")
+  transactionStatus      TransactionStatus   @default(PENDING) @map("transaction_status")
+  paymentUrl             String?             @map("payment_url") @db.Text
+  qrCodeUrl              String?             @map("qr_code_url") @db.Text
+  collectedByDriverId    String?             @map("collected_by_driver_id") @db.Uuid
+  expiresAt              DateTime?           @map("expires_at") @db.Timestamptz
+  gatewayTransactionDate DateTime?           @map("gateway_transaction_date") @db.Timestamptz
+  failureCode            String?             @map("failure_code") @db.VarChar(50)
+  failureMessage         String?             @map("failure_message") @db.Text
+  providerMetadata       Json?               @map("provider_metadata")
+  rawCallbackPayload     Json?               @map("raw_callback_payload")
+  paidAt                 DateTime?           @map("paid_at") @db.Timestamptz
+  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  orderPayment           OrderPayment        @relation(fields: [orderPaymentId], references: [id], onDelete: Restrict)
+  collectedByDriver      Staff?              @relation("DriverCollectedPayments", fields: [collectedByDriverId], references: [id], onDelete: SetNull)
+  refunds                RefundTransaction[]
+
+  @@unique([gatewayProvider, merchantTransCode], name: "uq_provider_merchant_trans")
+  @@unique([gatewayProvider, gatewayTransCode], name: "uq_provider_gateway_trans")
+  @@index([orderPaymentId, transactionStatus], name: "idx_pay_trans_order_status")
+  @@index([gatewayProvider, transactionStatus, paidAt], name: "idx_pay_trans_audit")
+  @@map("payment_transactions")
+}
+
+model RefundTransaction {
+  id                   String             @id @default(uuid()) @db.Uuid
+  paymentTransactionId String             @map("payment_transaction_id") @db.Uuid
+  merchantRefundCode   String             @unique @map("merchant_refund_code") @db.VarChar(100)
+  gatewayRefundCode    String?            @map("gateway_refund_code") @db.VarChar(100)
+  amount               Decimal            @db.Decimal(12, 2)
+  reasonCode           RefundReason       @map("reason_code")
+  reason               String?            @db.Text
+  refundStatus         RefundStatus       @default(PENDING) @map("refund_status")
+  retryCount           Int                @default(0) @map("retry_count")
+  nextRetryAt          DateTime?          @map("next_retry_at") @db.Timestamptz
+  failureCode          String?            @map("failure_code") @db.VarChar(50)
+  requestedByUserId    String?            @map("requested_by_user_id") @db.Uuid
+  rawGatewayResponse   Json?              @map("raw_gateway_response")
+  refundedAt           DateTime?          @map("refunded_at") @db.Timestamptz
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  paymentTransaction   PaymentTransaction @relation(fields: [paymentTransactionId], references: [id], onDelete: Restrict)
+  requestedByUser      User?              @relation("RefundRequester", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([paymentTransactionId], name: "idx_refund_trans_payment")
+  @@index([refundStatus, createdAt], name: "idx_refund_pending_cron")
+  @@index([requestedByUserId], name: "idx_refund_requester")
+  @@map("refund_transactions")
 }
 
 model OrderStatusHistory {
@@ -687,6 +803,7 @@ model Staff {
   assignments          DriverVehicleAssignment[]
   location             DriverLocation?
   dispatchTasks        DispatchTask[]
+  collectedPayments    PaymentTransaction[] @relation("DriverCollectedPayments")
 
   @@index([employmentStatus], name: "idx_staff_status")
   @@index([assignedFacilityId], name: "idx_staff_facility")
