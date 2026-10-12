@@ -1,0 +1,245 @@
+﻿{
+    "geocoded_waypoints":  [
+                               {
+                                   "geocoder_status":  "OK",
+                                   "place_id":  "SQBSd6aUTVVVnIuormZmgYwxn7eDa0l6hqZRK7o9tv55p3hrlEa6gVSmczi1dv_84Zp53Nbd7vt15w3MLtEmDzWK3YCSyWYTDUaRgRoR0hO1hnkESshKUhGO2STmEE__E"
+                               },
+                               {
+                                   "geocoder_status":  "OK",
+                                   "place_id":  "XFMobhF1BjeRsGpQu3i_80ewRDG7W4nRQY55vaMG7u5wVTailweZzTnOPZj-QW6jYc7I-mZeeWFJGiX6jyLOr00GiR69zop6QdbFHU25hkfh0i1QHpweBkXajXCyRBurR"
+                               }
+                           ],
+    "routes":  [
+                   {
+                       "bounds":  {
+
+                                  },
+                       "legs":  [
+                                    {
+                                        "distance":  {
+                                                         "text":  "2.06 km",
+                                                         "value":  2065
+                                                     },
+                                        "duration":  {
+                                                         "text":  "8 phút",
+                                                         "value":  508
+                                                     },
+                                        "end_address":  "ĐH Sư Phạm Kỹ Thuật TP,HCM, 1 Võ Văn Ngân, P, Linh Chiểu, Q, Thủ Đức, Hồ Chí Minh",
+                                        "end_location":  {
+                                                             "lat":  10.85012,
+                                                             "lng":  106.772
+                                                         },
+                                        "start_address":  "A198 Lê Văn Việt, Hiệp Phú, Quận 9, Thành phố Hồ Chí Minh",
+                                        "start_location":  {
+                                                               "lat":  10.84601,
+                                                               "lng":  106.78605
+                                                           },
+                                        "steps":  [
+                                                      {
+                                                          "distance":  {
+                                                                           "text":  "5 m",
+                                                                           "value":  5
+                                                                       },
+                                                          "duration":  {
+                                                                           "text":  "5 giây",
+                                                                           "value":  5
+                                                                       },
+                                                          "end_location":  {
+                                                                               "lat":  10.84596,
+                                                                               "lng":  106.78606
+                                                                           },
+                                                          "html_instructions":  "Bắt đầu đi từ Hẻm 78 Số 265",
+                                                          "maneuver":  "right",
+                                                          "polyline":  {
+                                                                           "points":  "qjeaAyswjSHA"
+                                                                       },
+                                                          "start_location":  {
+                                                                                 "lat":  10.84601,
+                                                                                 "lng":  106.78605
+                                                                             },
+                                                          "travel_mode":  "DRIVING"
+                                                      },
+                                                      {
+                                                          "distance":  {
+                                                                           "text":  "35 m",
+                                                                           "value":  35
+                                                                       },
+                                                          "duration":  {
+                                                                           "text":  "28 giây",
+                                                                           "value":  28
+                                                                       },
+                                                          "end_location":  {
+                                                                               "lat":  10.8459,
+                                                                               "lng":  106.78574
+                                                                           },
+                                                          "html_instructions":  "Rẽ phải vào Hẻm 32 Số 311",
+                                                          "maneuver":  "right",
+                                                          "polyline":  {
+                                                                           "points":  "gjeaA{swjSJ~@"
+                                                                       },
+                                                          "start_location":  {
+                                                                                 "lat":  10.84596,
+                                                                                 "lng":  106.78606
+                                                                             },
+                                                          "travel_mode":  "DRIVING"
+                                                      },
+                                                      {
+                                                          "distance":  {
+                                                                           "text":  "118 m",
+                                                                           "value":  118
+                                                                       },
+                                                          "duration":  {
+                                                                           "text":  "45 giây",
+                                                                           "value":  45
+                                                                       },
+                                                          "end_location":  {
+                                                                               "lat":  10.84491,
+                                                                               "lng":  106.78611
+                                                                           },
+                                                          "html_instructions":  "Rẽ trái vào Số 311",
+                                                          "maneuver":  "left",
+                                                          "polyline":  {
+                                                                           "points":  "{ieaA{qwjSNEZGh@Mb@Kb@Of@Q"
+                                                                       },
+                                                          "start_location":  {
+                                                                                 "lat":  10.8459,
+                                                                                 "lng":  106.78574
+                                                                             },
+                                                          "travel_mode":  "DRIVING"
+                                                      },
+                                                      {
+                                                          "distance":  {
+                                                                           "text":  "1.60 km",
+                                                                           "value":  1601
+                                                                       },
+                                                          "duration":  {
+                                                                           "text":  "6 phút",
+                                                                           "value":  331
+                                                                       },
+                                                          "end_location":  {
+                                                                               "lat":  10.84962,
+                                                                               "lng":  106.77339
+                                                                           },
+                                                          "html_instructions":  "Rẽ phải vào Lê Văn Việt",
+                                                          "maneuver":  "right",
+                                                          "polyline":  {
+                                                                           "points":  "uceaAetwjS`ArAJPPh@Ll@BRDVBZ@DFn@JjAJnALrADf@D|@@d@GZE\\]nAi@lBIZ[l@QX}@nAs@nAKTUf@k@rAO^Ub@Sb@o@pAS`@m@lAGLw@~AcAtB]t@gAzBa@v@KNi@t@EFG@IFk@r@_AfAa@`@EFEFGFi@l@o@x@KPGTCR"
+                                                                       },
+                                                          "start_location":  {
+                                                                                 "lat":  10.84491,
+                                                                                 "lng":  106.78611
+                                                                             },
+                                                          "travel_mode":  "DRIVING"
+                                                      },
+                                                      {
+                                                          "distance":  {
+                                                                           "text":  "21 m",
+                                                                           "value":  21
+                                                                       },
+                                                          "duration":  {
+                                                                           "text":  "11 giây",
+                                                                           "value":  11
+                                                                       },
+                                                          "end_location":  {
+                                                                               "lat":  10.84978,
+                                                                               "lng":  106.7735
+                                                                           },
+                                                          "html_instructions":  "Rẽ phải vào Lê Văn Chí",
+                                                          "maneuver":  "right",
+                                                          "polyline":  {
+                                                                           "points":  "cafaAudujS_@U"
+                                                                       },
+                                                          "start_location":  {
+                                                                                 "lat":  10.84962,
+                                                                                 "lng":  106.77339
+                                                                             },
+                                                          "travel_mode":  "DRIVING"
+                                                      },
+                                                      {
+                                                          "distance":  {
+                                                                           "text":  "205 m",
+                                                                           "value":  205
+                                                                       },
+                                                          "duration":  {
+                                                                           "text":  "55 giây",
+                                                                           "value":  55
+                                                                       },
+                                                          "end_location":  {
+                                                                               "lat":  10.84985,
+                                                                               "lng":  106.77163
+                                                                           },
+                                                          "html_instructions":  "Hướng sang trái",
+                                                          "maneuver":  "sharp left",
+                                                          "polyline":  {
+                                                                           "points":  "cbfaAkeujSMtJ"
+                                                                       },
+                                                          "start_location":  {
+                                                                                 "lat":  10.84978,
+                                                                                 "lng":  106.7735
+                                                                             },
+                                                          "travel_mode":  "DRIVING"
+                                                      },
+                                                      {
+                                                          "distance":  {
+                                                                           "text":  "79 m",
+                                                                           "value":  79
+                                                                       },
+                                                          "duration":  {
+                                                                           "text":  "35 giây",
+                                                                           "value":  35
+                                                                       },
+                                                          "end_location":  {
+                                                                               "lat":  10.85012,
+                                                                               "lng":  106.772
+                                                                           },
+                                                          "html_instructions":  "Rẽ phải",
+                                                          "maneuver":  "right",
+                                                          "polyline":  {
+                                                                           "points":  "qbfaAuytjSa@@QJAwA"
+                                                                       },
+                                                          "start_location":  {
+                                                                                 "lat":  10.84985,
+                                                                                 "lng":  106.77163
+                                                                             },
+                                                          "travel_mode":  "DRIVING"
+                                                      },
+                                                      {
+                                                          "distance":  {
+                                                                           "text":  "0 m",
+                                                                           "value":  0
+                                                                       },
+                                                          "duration":  {
+                                                                           "text":  "0 giây",
+                                                                           "value":  0
+                                                                       },
+                                                          "end_location":  {
+                                                                               "lat":  10.85012,
+                                                                               "lng":  106.772
+                                                                           },
+                                                          "html_instructions":  "Bạn đã đến điểm đích",
+                                                          "maneuver":  "right",
+                                                          "polyline":  {
+                                                                           "points":  "gdfaA_|tjS"
+                                                                       },
+                                                          "start_location":  {
+                                                                                 "lat":  10.85012,
+                                                                                 "lng":  106.772
+                                                                             },
+                                                          "travel_mode":  "DRIVING"
+                                                      }
+                                                  ]
+                                    }
+                                ],
+                       "overview_polyline":  {
+                                                 "points":  "qjeaAyswjSHAJ~@NEZGh@Mb@Kb@Of@Q`ArAJPPh@Ll@BRDVBZ@DFn@JjAJnALrADf@D|@@d@GZE\\]nAi@lBIZ[l@QX}@nAs@nAKTUf@k@rAO^Ub@Sb@o@pAS`@m@lAGLw@~AcAtB]t@gAzBa@v@KNi@t@EFG@IFk@r@_AfAa@`@EFEFGFi@l@o@x@KPGTCR_@UMtJa@@QJAwA"
+                                             },
+                       "summary":  "",
+                       "warnings":  [
+
+                                    ],
+                       "waypoint_order":  [
+
+                                          ]
+                   }
+               ]
+}

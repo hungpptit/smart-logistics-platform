@@ -181,7 +181,7 @@ class PickupAssignmentDialog extends StatelessWidget {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: stops.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  separatorBuilder: (_, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
                   itemBuilder: (ctx, idx) {
                     final stop = stops[idx];
                     final orderCode = stop['orderCode'] ?? 'ORD-$idx';
@@ -218,9 +218,14 @@ class PickupAssignmentDialog extends StatelessWidget {
                                       orderCode,
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.deepOnyx),
                                     ),
-                                    Text(
-                                      receiverName,
-                                      style: const TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.w500),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        receiverName,
+                                        style: const TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.w500),
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.end,
+                                      ),
                                     ),
                                   ],
                                 ),

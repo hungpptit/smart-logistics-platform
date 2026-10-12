@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../core/constants/api_constants.dart';
+import '../navigation/polyline_codec.dart';
+import '../navigation/route_model.dart';
 import 'auth_service.dart';
 
 class DriverService {
@@ -510,5 +512,33 @@ class DriverService {
       debugPrint('⚠️ [Goong Steps API] Error: $e');
     }
     return [];
+  }
+
+  /// Fetch full RouteModel with coordinates, cumulative distances and structured steps from Goong Maps
+  static Future<RouteModel?> fetchGoongRouteModel({
+    required LatLng origin,
+    required LatLng destination,
+    double? heading,
+  }) async {
+    try {
+      final String originStr = '${origin.latitude},${origin.longitude}';
+      final String destStr = '${destination.latitude},${destination.longitude}';
+      final String urlStr =
+          'https://rsapi.goong.io/Direction?origin=$originStr&destination=$destStr&vehicle=bike&api_key=$goongApiKey';
+
+      debugPrint('🗺️ [Goong RouteModel API] Requesting route: $urlStr');
+      final response = await http.get(Uri.parse(urlStr)).timeout(const Duration(seconds: 6));
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final route = PolylineCodec.parseGoongDirections(body);
+        if (route.isNotEmpty) {
+          debugPrint('🗺️ [Goong RouteModel] Fetched route: ${route.points.length} points, ${route.steps.length} steps, ${route.totalMeters.toStringAsFixed(0)}m');
+          return route;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [Goong RouteModel API] Error: $e');
+    }
+    return null;
   }
 }

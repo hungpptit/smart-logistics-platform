@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/config/app_config.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -102,8 +103,10 @@ class MapPreviewCard extends StatelessWidget {
               ),
               children: [
                 TileLayer(
-                  urlTemplate: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.velocity.mobile',
+                  urlTemplate: AppConfig.mapTileUrl,
+                  userAgentPackageName: 'com.velocity.slp.velocity_mobile',
+                  maxZoom: 20.0,
+                  maxNativeZoom: 18,
                 ),
                 PolylineLayer(
                   polylines: [

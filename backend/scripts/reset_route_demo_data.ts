@@ -3,8 +3,8 @@ import { prisma } from '../src/config/prisma';
 async function resetDemoRouteData() {
   console.log('🔄 Đang bắt đầu khôi phục dữ liệu Lộ trình RT-66266482 về trạng thái ban đầu...');
 
-  // 1. Find Route RT-66266482
-  const route = await prisma.route.findFirst({
+  // 1. Find Route RT-66266482 or latest route
+  let route = await prisma.route.findFirst({
     where: { routeCode: 'RT-66266482' },
     include: {
       stops: {
@@ -24,7 +24,28 @@ async function resetDemoRouteData() {
   });
 
   if (!route) {
-    console.error('❌ Không tìm thấy Lộ trình RT-66266482 trong CSDL!');
+    route = await prisma.route.findFirst({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        stops: {
+          include: {
+            shipment: {
+              include: {
+                shipmentPackages: {
+                  include: {
+                    package: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  if (!route) {
+    console.error('❌ Không tìm thấy Lộ trình nào trong CSDL!');
     return;
   }
 

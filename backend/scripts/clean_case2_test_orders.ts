@@ -52,6 +52,14 @@ async function cleanCase2TestOrders() {
       where: { orderId: { in: extraOrderIds } },
     });
 
+    await prisma.paymentTransaction.deleteMany({
+      where: {
+        orderPayment: {
+          orderId: { in: extraOrderIds },
+        },
+      },
+    });
+
     await prisma.orderPayment.deleteMany({
       where: { orderId: { in: extraOrderIds } },
     });

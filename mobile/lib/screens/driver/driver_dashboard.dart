@@ -17,6 +17,9 @@ import 'widgets/map_preview_card.dart';
 import 'widgets/finish_route_card.dart';
 import 'widgets/stop_card.dart';
 import 'widgets/navigation_screen.dart';
+import '../../navigation/navigation_engine.dart';
+import '../../navigation/route_model.dart';
+import '../../navigation/polyline_codec.dart';
 import 'widgets/stop_details_dialog.dart';
 import 'widgets/qr_scanner_dialog.dart';
 import 'widgets/shipment_qr_modal.dart';
@@ -65,6 +68,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   LatLng _currentLocation = AppConstants.defaultHcmLocation;
   final MapController _mapController = MapController();
   final MapController _navMapController = MapController();
+  NavigationEngine? _navigationEngine;
 
   // ------ Helpers ------
   String _formatCurrency(num amount) {
@@ -95,6 +99,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     _alertTimer?.cancel();
     _routeRefreshTimer?.cancel();
     _positionSubscription?.cancel();
+    _navigationEngine?.dispose();
     SocketService().disconnect();
     super.dispose();
   }
@@ -507,7 +512,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
     }
     await _positionSubscription?.cancel();
     _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 5),
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 2,
+      ),
     ).listen((Position position) {
       if (mounted) {
         setState(() => _currentLocation = LatLng(position.latitude, position.longitude));
@@ -521,8 +529,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
             accuracyMeters: position.accuracy,
           );
         }
-        if (_isNavigating) {
-          _navMapController.move(_currentLocation, 14.5);
+        if (_isNavigating && _navigationEngine != null) {
+          _navigationEngine!.processPosition(position);
         } else {
           _mapController.move(_currentLocation, 13.0);
         }
@@ -588,7 +596,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   // ------ Navigation ------
-  void _startNavigation() {
+  Future<void> _startNavigation() async {
     final bool allCompleted = _driverStops.isNotEmpty &&
         _driverStops.every((s) {
           final isPickup = s['stopType'] == 'PICKUP' ||
@@ -656,20 +664,81 @@ class _DriverDashboardState extends State<DriverDashboard> {
       );
       return;
     }
-    setState(() { _isNavigating = true; _showTrafficAlert = false; });
-    _alertTimer?.cancel();
-    _alertTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted && _isNavigating) {
-        setState(() => _showTrafficAlert = true);
-        Timer(const Duration(seconds: 5), () {
-          if (mounted) setState(() => _showTrafficAlert = false);
-        });
-      }
-    });
+
+    // Determine target destination stop
+    final incomplete = _driverStops.where((s) => s['isCheckedIn'] != true);
+    final activeStop = incomplete.isNotEmpty ? incomplete.first : (_driverStops.isNotEmpty ? _driverStops.first : null);
+
+    LatLng dest = _currentLocation;
+    if (activeStop != null) {
+      final double targetLat = double.tryParse(activeStop['latitude']?.toString() ?? '') ?? _currentLocation.latitude;
+      final double targetLng = double.tryParse(activeStop['longitude']?.toString() ?? '') ?? _currentLocation.longitude;
+      dest = LatLng(targetLat, targetLng);
+    }
+
+    // Fetch full Goong RouteModel
+    RouteModel? routeModel;
+    try {
+      routeModel = await DriverService.fetchGoongRouteModel(
+        origin: _currentLocation,
+        destination: dest,
+      );
+    } catch (_) {}
+
+    // Fallback if Goong API failed or offline: build basic route from polyline points
+    if (routeModel == null || routeModel.isEmpty) {
+      final pts = _roadPolylinePoints.isNotEmpty ? _roadPolylinePoints : [_currentLocation, dest];
+      final cum = PolylineCodec.computeCumulativeDistances(pts);
+      routeModel = RouteModel(
+        points: pts,
+        cumDist: cum,
+        steps: [
+          NavStep(
+            index: 0,
+            instruction: activeStop?['address']?.toString() ?? 'Tiếp tục di chuyển đến điểm dừng',
+            maneuver: 'straight',
+            startDist: 0.0,
+            endDist: cum.isNotEmpty ? cum.last : 100.0,
+            startLocation: _currentLocation,
+            endLocation: dest,
+          ),
+        ],
+      );
+    }
+
+    _navigationEngine?.dispose();
+    _navigationEngine = NavigationEngine(
+      initialRoute: routeModel,
+      destination: dest,
+      onRerouteRequested: (orig, target) async {
+        return await DriverService.fetchGoongRouteModel(origin: orig, destination: target);
+      },
+    );
+
+    if (mounted) {
+      setState(() {
+        _isNavigating = true;
+        _showTrafficAlert = false;
+      });
+      _alertTimer?.cancel();
+      _alertTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted && _isNavigating) {
+          setState(() => _showTrafficAlert = true);
+          Timer(const Duration(seconds: 5), () {
+            if (mounted) setState(() => _showTrafficAlert = false);
+          });
+        }
+      });
+    }
   }
 
   void _stopNavigation() {
-    setState(() { _isNavigating = false; _showTrafficAlert = false; });
+    _navigationEngine?.dispose();
+    _navigationEngine = null;
+    setState(() {
+      _isNavigating = false;
+      _showTrafficAlert = false;
+    });
     _alertTimer?.cancel();
   }
 
@@ -1095,12 +1164,12 @@ class _DriverDashboardState extends State<DriverDashboard> {
   @override
   Widget build(BuildContext context) {
     // If navigating: show full-screen GPS navigation
-    if (_isNavigating) {
+    if (_isNavigating && _navigationEngine != null) {
       return NavigationScreen(
         navMapController: _navMapController,
+        engine: _navigationEngine!,
         currentLocation: _currentLocation,
         stops: _driverStops,
-        roadPolylinePoints: _roadPolylinePoints,
         showTrafficAlert: _showTrafficAlert,
         onStopNavigation: _stopNavigation,
       );

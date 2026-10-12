@@ -1,6 +1,6 @@
- # 📖 TỰ ĐIỂN CƠ SỞ DỮ LIỆU CHUẨN HÓA (DATABASE DICTIONARY) - SMART LOGISTICS PLATFORM
+# 📖 TỰ ĐIỂN CƠ SỞ DỮ LIỆU CHUẨN HÓA (DATABASE DICTIONARY) - SMART LOGISTICS PLATFORM
 
-Tài liệu này tổng hợp toàn bộ 41 bảng cơ sở dữ liệu được thiết kế theo chuẩn **Clean Architecture & Domain Driven Design**, phân chia theo 10 Phân hệ (Module) phục vụ hệ thống Smart Logistics Platform (SLP). 
+Tài liệu này tổng hợp toàn bộ 43 bảng cơ sở dữ liệu được thiết kế theo chuẩn **Clean Architecture & Domain Driven Design**, phân chia theo 10 Phân hệ (Module) phục vụ hệ thống Smart Logistics Platform (SLP). Chuẩn hóa đạt chuẩn **1NF, 2NF, 3NF tuyệt đối**, tích hợp kiến trúc thanh toán Đa Cổng (Multi-Gateway: ZaloPay, VNPay, MoMo) và cơ chế Hoàn tiền tự động.
 
 Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của bảng** giải thích chi tiết mục đích nghiệp vụ và đóng vai trò gì trong hệ thống, cùng các ghi chú rõ ràng về **Khóa chính (PK)**, **Khóa ngoại (FK)**, **Cặp khóa chính phức hợp (Composite PK)**, **Khóa ngoại 1-1 (Unique FK)**, **Khóa duy nhất (Unique)** và **Ý nghĩa & Ví dụ thực tế chuẩn hóa** giúp bạn dễ dàng thuyết trình, bảo vệ đồ án trước Giảng viên và Hội đồng phản biện.
 
@@ -251,21 +251,81 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ---
 
-### 16. Bảng `order_payments` (Thanh toán Thực tế & COD)
-📌 **Chức năng của bảng:** Quản lý tài chính thanh toán chính thức của đơn hàng. Lưu cước vận chuyển chốt cuối cùng, số tiền thu hộ COD chốt cuối cùng, người chịu phí (`SENDER` / `RECEIVER`), hình thức thanh toán (`CASH`, `BANK_TRANSFER`, `E_WALLET`, `COD`) và trạng thái thanh toán.
+### 16. Bảng `order_payments` (Nghĩa vụ Tài chính Đơn hàng & COD - Chuẩn 3NF)
+📌 **Chức năng của bảng:** Quản lý tài chính tổng thể và các nghĩa vụ thanh toán của đơn hàng. Tách bạch 2 nghĩa vụ độc lập trong Logistics: Cước vận chuyển (`shipping_payment_status` do sàn thu) và Tiền thu hộ COD (`cod_collection_status` do shipper thu hộ và trả lại người gửi). Thiết lập ràng buộc `onDelete: Restrict` với bảng `orders` nhằm bảo toàn vĩnh viễn dữ liệu kiểm toán tài chính. Hỗ trợ Optimistic Locking (`version`) chống xung đột ghi đồng thời.
 
 | Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
 | :--- | :--- | :--- | :--- |
-| `id` | Uuid | **Khóa chính (PK)** | Mã giao dịch thanh toán. VD: `op-01` |
-| `order_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng orders)** | Gắn duy nhất 1-1 với đơn hàng (Trỏ `orders.id`). VD: `ord-01` |
+| `id` | Uuid | **Khóa chính (PK)** | Mã định danh nghĩa vụ thanh toán. VD: `op-01` |
+| `order_id` | Uuid | **Khóa ngoại 1-1 (FK, Unique ➔ bảng orders, onDelete: Restrict)** | Gắn duy nhất 1-1 với đơn hàng (Trỏ `orders.id`). VD: `ord-01` |
 | `final_shipping_fee`| Decimal(12,2)| Bắt buộc | Cước vận chuyển cuối cùng thực tế. VD: `25000.00` VNĐ |
+| `final_insurance_fee` | Decimal(12,2) | Bắt buộc | Phí bảo hiểm hàng hóa chính thức. VD: `2000.00` VNĐ |
 | `final_cod_amount` | Decimal(12,2)| Bắt buộc | Số tiền thu hộ COD chốt thực tế. VD: `500000.00` VNĐ |
 | `fee_payer` | Enum | Bắt buộc | Người trả cước: `SENDER` (Người gửi trả), `RECEIVER` (Người nhận trả) |
-| `payment_method` | Enum | Bắt buộc | Hình thức: `CASH` (Tiền mặt), `BANK_TRANSFER`, `E_WALLET`, `COD` |
-| `payment_status` | Enum | Default Unpaid | Trạng thái thanh toán: `UNPAID` (Chưa thanh toán), `PAID` (Đã thanh toán), `REFUNDED` |
-| `final_insurance_fee` | Decimal(12,2) | Bắt buộc | Phí bảo hiểm chính thức (VNĐ) |
+| `payment_method` | Enum | Bắt buộc | Phương thức thanh toán ưu tiên: `CASH`, `BANK_TRANSFER`, `E_WALLET`, `ZALOPAY`, `VNPAY`, `MOMO`, `COD` |
+| `payment_status` | Enum | Default Unpaid | Trạng thái thanh toán tổng thể: `UNPAID`, `PARTIALLY_PAID`, `PAID`, `PARTIALLY_REFUNDED`, `REFUNDED` |
+| `shipping_payment_status` | Enum | Default Unpaid | Trạng thái riêng cho cước vận chuyển: `UNPAID` (Chưa trả), `PAID` (Đã thanh toán Online/Tiền mặt), `REFUNDED` |
+| `cod_collection_status` | Enum | Default Not Applicable | Trạng thái thu hộ COD: `NOT_APPLICABLE` (Không có COD), `PENDING_COLLECTION` (Chờ thu), `COLLECTED` (Shipper đã thu), `REMITTED` (Đã trả tiền cho shop) |
+| `version` | Integer | Default 0 | Số phiên bản dữ liệu (Optimistic Locking chống xung đột ghi) |
 | `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian khởi tạo bản ghi |
 | `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật thông tin gần nhất |
+
+---
+
+### 16.1. Bảng `payment_transactions` (Lịch sử Phiên giao dịch Đa cổng ZaloPay/VNPay/MoMo/Tiền mặt)
+📌 **Chức năng của bảng:** Quản lý lịch sử từng phiên giao dịch thanh toán trực tuyến hoặc tiền mặt phát sinh trong hệ thống (Chuẩn 3NF). Cho phép một đơn hàng có thể phát sinh nhiều phiên giao dịch (thử lại khi hết hạn hoặc shipper thu COD bằng Dynamic QR). Bóc tách rõ ràng doanh thu cước của sàn (`shipping_amount`) và tiền nợ thu hộ (`cod_amount`). Lưu trữ đầy đủ dữ liệu IPN/Webhook (`raw_callback_payload`) làm bằng chứng đối soát kiểm toán với Ngân hàng/Cổng thanh toán.
+
+| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
+| :--- | :--- | :--- | :--- |
+| `id` | Uuid | **Khóa chính (PK)** | Mã định danh phiên giao dịch. VD: `ptran-01` |
+| `order_payment_id` | Uuid | **Khóa ngoại (FK ➔ bảng order_payments, onDelete: Restrict)** | Thuộc nghĩa vụ thanh toán của đơn nào (Trỏ `order_payments.id`) |
+| `gateway_provider` | Enum | Bắt buộc | Cổng thanh toán: `ZALOPAY`, `VNPAY`, `MOMO`, `CASH`, `BANK_TRANSFER` |
+| `merchant_trans_code` | VarChar(100) | **Cặp khóa duy nhất [gateway_provider, merchant_trans_code]**, Bắt buộc | Mã giao dịch phía hệ thống sinh ra (ZaloPay: `app_trans_id`, VNPay: `vnp_TxnRef`). VD: `261009_ORD005_7793` |
+| `gateway_trans_code` | VarChar(100) | **Cặp khóa duy nhất [gateway_provider, gateway_trans_code]**, Tùy chọn | Mã giao dịch phía Cổng thanh toán cấp (ZaloPay: `zp_trans_id`, VNPay: `vnp_TransactionNo`). VD: `26100900018892` |
+| `amount` | Decimal(12,2)| Bắt buộc (Ràng buộc CHECK `amount > 0`) | Tổng số tiền thanh toán của phiên giao dịch. VD: `524000.00` VNĐ |
+| `shipping_amount` | Decimal(12,2)| Tùy chọn | Phần tiền cước vận chuyển (Doanh thu của sàn). VD: `24000.00` VNĐ |
+| `cod_amount` | Decimal(12,2)| Tùy chọn | Phần tiền thu hộ COD (Công nợ hoàn trả cho người gửi). VD: `500000.00` VNĐ |
+| `currency` | VarChar(3) | Default 'VND' | Đơn vị tiền tệ. VD: `VND` |
+| `transaction_type` | Enum | Bắt buộc | Loại giao dịch: `PREPAY_SHIPPING` (Khách trả cước trước), `COD_COLLECTION` (Shipper thu tại điểm giao) |
+| `transaction_status` | Enum | Bắt buộc (Default PENDING) | Trạng thái: `PENDING` (Chờ quét mã), `SUCCESS` (Thành công), `FAILED` (Thất bại), `EXPIRED` (Hết hạn), `CANCELLED` (Đã hủy) |
+| `payment_url` | Text | Tùy chọn | Đường link thanh toán web/app ZaloPay Gateway |
+| `qr_code_url` | Text | Tùy chọn | Chuỗi link/dữ liệu sinh mã QR thanh toán trên mobile |
+| `collected_by_driver_id` | Uuid | **Khóa ngoại (FK ➔ bảng staff)**, Tùy chọn | Mã tài xế/Shipper trực tiếp mở mã QR thu tiền tại điểm giao |
+| `expires_at` | Timestamptz | Tùy chọn (Partial Index) | Thời điểm hết hạn phiên thanh toán (quá 15 phút). Hỗ trợ Job quét hết hạn |
+| `gateway_transaction_date` | Timestamptz | Tùy chọn | Ngày giao dịch thực tế được ghi nhận phía máy chủ cổng thanh toán |
+| `failure_code` | VarChar(50) | Tùy chọn | Mã lỗi trả về nếu giao dịch thất bại. VD: `-1`, `2` |
+| `failure_message` | Text | Tùy chọn | Thông điệp lỗi chi tiết |
+| `provider_metadata` | Json | Tùy chọn | Dữ liệu mở rộng riêng của cổng (ZaloPay `zp_trans_token`, mã ngân hàng...) |
+| `raw_callback_payload` | Json | Tùy chọn | Toàn bộ payload JSON webhook IPN từ cổng thanh toán phục vụ đối soát |
+| `paid_at` | Timestamptz | Tùy chọn (Ràng buộc CHECK `SUCCESS` thì `paid_at IS NOT NULL`) | Thời điểm cổng thanh toán xác nhận tiền đã về |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Mốc thời gian tạo phiên giao dịch |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật trạng thái gần nhất |
+
+> **Ràng buộc Partial Index đặc biệt:** `CREATE UNIQUE INDEX uq_pay_trans_one_pending ON payment_transactions (order_payment_id, transaction_type) WHERE transaction_status = 'PENDING';` $\to$ Chống gian lận hoặc lỗi bấm trùng tạo 2 phiên PENDING cùng lúc cho 1 đơn hàng.
+
+---
+
+### 16.2. Bảng `refund_transactions` (Lịch sử Hoàn tiền Đa cổng - Chuẩn 3NF)
+📌 **Chức năng của bảng:** Quản lý lịch sử các yêu cầu hoàn tiền (Refund) phát sinh khi khách hàng hủy đơn hàng hợp lệ hoặc do giao dịch trùng lặp. Mỗi bản ghi hoàn tiền liên kết trực tiếp với một phiên giao dịch đã thanh toán thành công (`payment_transaction_id`). Hỗ trợ kiểm tra bất biến $\sum \text{Refund} \le \text{Giao dịch gốc}$ và lưu trữ tiến trình hoàn tiền bất đồng bộ (`retry_count`, `next_retry_at`).
+
+| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
+| :--- | :--- | :--- | :--- |
+| `id` | Uuid | **Khóa chính (PK)** | Mã định danh yêu cầu hoàn tiền. VD: `ref-01` |
+| `payment_transaction_id` | Uuid | **Khóa ngoại (FK ➔ bảng payment_transactions, onDelete: Restrict)** | Hoàn tiền cho phiên giao dịch thành công nào |
+| `merchant_refund_code` | VarChar(100) | Khóa duy nhất (Unique), Bắt buộc | Mã hoàn tiền do hệ thống sinh gửi sang cổng (ZaloPay: `m_refund_id`). VD: `261009_2554_992102` |
+| `gateway_refund_code` | VarChar(100) | Tùy chọn | Mã định danh hoàn tiền do Cổng cấp (ZaloPay: `refund_id`). VD: `26100900017721` |
+| `amount` | Decimal(12,2)| Bắt buộc (Ràng buộc CHECK `amount > 0`) | Số tiền hoàn trả (đảm bảo $\le$ số tiền giao dịch gốc). VD: `24000.00` VNĐ |
+| `reason_code` | Enum | Bắt buộc | Lý do hoàn chuẩn hóa: `CUSTOMER_CANCEL`, `DUPLICATE_PAYMENT`, `OVERPAID`, `LATE_PAYMENT_AFTER_CANCEL`, `DELIVERY_FAILED_REFUND`, `OTHER` |
+| `reason` | Text | Tùy chọn | Mô tả chi tiết lý do hoàn. VD: `Khách hủy đơn hàng trước khi shipper đến lấy` |
+| `refund_status` | Enum | Bắt buộc (Default PENDING) | Trạng thái hoàn tiền: `PENDING` (Đang xử lý), `SUCCESS` (Thành công), `FAILED` (Thất bại) |
+| `retry_count` | Integer | Default 0 | Số lần hệ thống tự động thử gọi lại cổng nếu gặp lỗi mạng |
+| `next_retry_at` | Timestamptz | Tùy chọn | Mốc thời gian tiếp theo để Cron Job tự động retry hoàn tiền |
+| `failure_code` | VarChar(50) | Tùy chọn | Mã lỗi hoàn tiền từ cổng trả về |
+| `requested_by_user_id` | Uuid | **Khóa ngoại (FK ➔ bảng users)**, Tùy chọn | Tài khoản người dùng/quản trị viên thực hiện yêu cầu hoàn tiền |
+| `raw_gateway_response` | Json | Tùy chọn | Toàn bộ phản hồi JSON từ API cổng hoàn tiền phục vụ đối soát |
+| `refunded_at` | Timestamptz | Tùy chọn | Thời điểm tiền được hoàn thành công về ví/tài khoản khách |
+| `created_at` | Timestamptz | Bắt buộc (Default Now) | Thời điểm gửi yêu cầu hoàn tiền |
+| `updated_at` | Timestamptz | UpdatedAt | Mốc thời gian cập nhật trạng thái gần nhất |
 
 ---
 

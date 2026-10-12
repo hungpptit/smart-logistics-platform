@@ -50,6 +50,8 @@ class AddressMapPreview extends StatelessWidget {
                 TileLayer(
                   urlTemplate: AppConfig.mapTileUrl,
                   userAgentPackageName: 'com.velocity.slp.velocity_mobile',
+                  maxZoom: 20.0,
+                  maxNativeZoom: 18,
                 ),
                 MarkerLayer(
                   markers: [
