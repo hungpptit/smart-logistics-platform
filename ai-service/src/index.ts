@@ -25,7 +25,7 @@ app.get('/health', (req: Request, res: Response) => {
 
 app.post('/api/v1/ai/optimize', async (req: Request, res: Response) => {
   try {
-    const { orders, facilityLocation, k } = req.body;
+    const { orders, facilityLocation, k, returnToHub } = req.body;
 
     if (!orders || !Array.isArray(orders) || orders.length === 0) {
       return res.status(400).json({
@@ -42,31 +42,43 @@ app.post('/api/v1/ai/optimize', async (req: Request, res: Response) => {
     }
 
     const targetK = k || 3;
-    console.log(`[AI Microservice] Processing optimization for ${orders.length} orders into ${targetK} clusters...`);
+    const shouldReturnToHub = returnToHub === true;
+    console.log(`[AI Microservice] Processing optimization for ${orders.length} orders into ${targetK} clusters (returnToHub: ${shouldReturnToHub})...`);
     const startTime = Date.now();
 
     // 1. Run K-Means Clustering
     const rawClusters = kmeansService.clusterOrders(orders, targetK);
 
     // 2. Run Genetic Algorithm VRP on each cluster
-    const optimizedClusters = await Promise.all(
-      rawClusters.map(async (cluster) => {
-        const sortedOrders = await vrpService.optimizeRouteStops(cluster.orders, facilityLocation);
-        return {
-          ...cluster,
-          orders: sortedOrders,
-        };
-      })
-    );
+    // 2. Run Genetic Algorithm VRP on each cluster sequentially to respect external API rate limits
+    const optimizedClusters = [];
+    for (const cluster of rawClusters) {
+      const res = await vrpService.optimizeRouteWithMetrics(cluster.orders, facilityLocation, new Date(), shouldReturnToHub);
+      optimizedClusters.push({
+        ...cluster,
+        orders: res.orders,
+        plannedDistanceKm: res.metrics.plannedDistanceKm,
+        plannedDurationMin: res.metrics.plannedDurationMin,
+        matrixSource: res.metrics.matrixSource,
+      });
+    }
+
+    const overallMatrixSource = optimizedClusters.every((c) => c.matrixSource === 'goong')
+      ? 'goong'
+      : optimizedClusters.some((c) => c.matrixSource === 'goong')
+        ? 'mixed (goong + osrm)'
+        : optimizedClusters[0]?.matrixSource || 'osrm';
 
     const durationMs = Date.now() - startTime;
-    console.log(`[AI Microservice] Optimization complete in ${durationMs}ms`);
+    console.log(`[AI Microservice] Optimization complete in ${durationMs}ms (source: ${overallMatrixSource})`);
 
     return res.json({
       success: true,
       message: 'AI optimization completed successfully on dedicated microservice',
       executionTimeMs: durationMs,
+      matrixSource: overallMatrixSource,
       data: {
+        matrixSource: overallMatrixSource,
         clusters: optimizedClusters,
       },
     });

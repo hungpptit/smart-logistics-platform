@@ -93,6 +93,12 @@ export const LiveTrackingTab: React.FC = () => {
   const [routes, setRoutes] = useState<RouteData[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const selectedRouteIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    selectedRouteIdRef.current = selectedRouteId;
+  }, [selectedRouteId]);
+
   const [selectedRoute, setSelectedRoute] = useState<RouteData | null>(null);
   const [isOptimizationModalOpen, setIsOptimizationModalOpen] = useState(false);
   const [routeGeometry, setRouteGeometry] = useState<[number, number][]>([]);
@@ -156,7 +162,10 @@ export const LiveTrackingTab: React.FC = () => {
   // Fetch routes
   const fetchRoutes = async (selectedIdToKeep?: string) => {
     if (!token) return;
-    setLoading(true);
+    setRoutes(prev => {
+      if (prev.length === 0) setLoading(true);
+      return prev;
+    });
     setError(null);
     try {
       const queryParams = new URLSearchParams();
@@ -179,14 +188,18 @@ export const LiveTrackingTab: React.FC = () => {
           });
         });
 
-        // Auto-select first route if none selected
-        if (fetchedRoutes.length > 0 && !selectedIdToKeep) {
-          handleSelectRoute(fetchedRoutes[0].id);
-        } else if (selectedIdToKeep) {
-          // Refresh details of the currently selected route
-          const stillExists = fetchedRoutes.find((r: any) => r.id === selectedIdToKeep);
-          if (stillExists) {
-            handleSelectRoute(selectedIdToKeep);
+        // Maintain the active route selection and prevent auto-resetting
+        const activeTargetId = selectedIdToKeep || selectedRouteIdRef.current;
+        if (fetchedRoutes.length > 0) {
+          const activeStillExists = activeTargetId && fetchedRoutes.some((r: any) => r.id === activeTargetId);
+          if (activeStillExists) {
+            // Keep current route selected! If state is not set yet, select it:
+            if (!selectedRouteIdRef.current) {
+              handleSelectRoute(activeTargetId);
+            }
+          } else {
+            // Only auto-select first route if no route has been selected yet
+            handleSelectRoute(fetchedRoutes[0].id);
           }
         }
       } else {
@@ -204,6 +217,7 @@ export const LiveTrackingTab: React.FC = () => {
   const handleSelectRoute = async (routeId: string) => {
     if (!token) return;
     setSelectedRouteId(routeId);
+    selectedRouteIdRef.current = routeId;
     try {
       const response = await fetch(`${CONFIG.API_BASE_URL}/routes/${routeId}`, {
         headers: { 'Authorization': `Bearer ${token}` }

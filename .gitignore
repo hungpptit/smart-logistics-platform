@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment files
+.env
+*/.env
+*.env.local
+
+# Archives
+*.zip
+*.tar.gz
+
+# Test fixtures and caches
+backend/src/scripts/test_fixtures/
+*/test_fixtures/
+
+# Build artifacts
+dist/
+build/
+*/dist/
+*/build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*

@@ -437,7 +437,7 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
                   </p>
                 </div>
                 <span className="text-[11px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-2.5 py-1 rounded-full font-mono">
-                  ⏳ Chờ xác nhận lưu
+                  Chờ xác nhận lưu
                 </span>
               </div>
 
@@ -461,13 +461,39 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
 
                       <div className="bg-slate-50 rounded p-2 text-[11px] space-y-0.5 border border-slate-100">
                         <p className="text-slate-700">
-                          👤 Tài xế: <strong className="text-slate-900">{driverName}</strong>
+                          <span className="text-slate-500 font-medium">Tài xế:</span> <strong className="text-slate-900">{driverName}</strong>
                           {driverPhone && <span className="text-slate-500 text-[10px] ml-1">({driverPhone})</span>}
                         </p>
-                        <div className="flex justify-between text-[10px] text-slate-500 pt-1 font-mono">
-                          <span>📏 Quãng đường: <strong>{distance} km</strong></span>
-                          <span>⏱️ Thời gian: <strong>{duration} phút</strong></span>
+                        <div className="flex justify-between items-center text-[10px] text-slate-500 pt-1 font-mono">
+                          <span>Quãng đường: <strong className="text-slate-800">{distance} km</strong></span>
+                          <span>Thời gian: <strong className="text-slate-800">{duration} phút</strong></span>
                         </div>
+                        {rt.matrixSource && (
+                          <div className="pt-0.5">
+                            {(() => {
+                              const src = String(rt.matrixSource).toLowerCase();
+                              if (src === 'goong') {
+                                return (
+                                  <span className="text-[9px] px-2 py-0.5 rounded font-sans font-medium inline-block bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    Ma trận Goong (Đường thực)
+                                  </span>
+                                );
+                              }
+                              if (src === 'osrm') {
+                                return (
+                                  <span className="text-[9px] px-2 py-0.5 rounded font-sans font-medium inline-block bg-blue-50 text-blue-800 border border-blue-200">
+                                    Ma trận OSRM (Đường thực)
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="text-[9px] px-2 py-0.5 rounded font-sans font-medium inline-block bg-amber-50 text-amber-800 border border-amber-200">
+                                  Haversine Fallback (Hiệu chỉnh)
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        )}
                       </div>
 
                       {/* Expandable Stops Preview */}
@@ -496,7 +522,7 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
                                     {o.recipientName ? `Người nhận: ${o.recipientName}` : (o.senderName ? `Người gửi: ${o.senderName}` : '')}
                                   </p>
                                   <p className="text-slate-500 truncate" title={o.address}>
-                                    📍 {o.address}
+                                    {o.address}
                                   </p>
                                 </div>
                               ))}
