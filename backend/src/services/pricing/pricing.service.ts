@@ -1,15 +1,40 @@
+import axios from 'axios';
 import { prisma } from '../../config/prisma';
 import { BadRequestException } from '../../middlewares/error.middleware';
+import { expressDeadlineSec } from '../routing/express_insertion';
 
 export class PricingService {
   /**
-   * Tính toán phí vận chuyển tự động
-   * @param serviceCode Mã dịch vụ (EXPRESS, STANDARD, SAVING, COLD_CHAIN)
-   * @param distanceKm Khoảng cách địa lý tính theo Km
-   * @param totalWeightKg Tổng trọng lượng các kiện hàng tính bằng Kg
-   * @param isFragile Có chứa hàng dễ vỡ không
-   * @param codAmount Số tiền thu hộ COD
+   * Gọi Goong Distance Matrix (1x1 xe máy) với cơ chế Retry 1 lần (delay 1s) khi gặp sự cố mạng
    */
+  private async fetchGoongDurationWithRetry(
+    pickup: { lat: number; lng: number },
+    delivery: { lat: number; lng: number }
+  ): Promise<number | null> {
+    const apiKey = process.env.GOONG_API_KEY;
+    if (!apiKey) return null;
+
+    const url = `https://rsapi.goong.io/DistanceMatrix?origins=${pickup.lat},${pickup.lng}&destinations=${delivery.lat},${delivery.lng}&vehicle=bike&api_key=${apiKey}`;
+
+    for (let attempt = 0; attempt <= 1; attempt++) {
+      try {
+        const res = await axios.get(url, { timeout: 3500 });
+        const element = res.data?.rows?.[0]?.elements?.[0];
+        if (element?.status === 'OK' && typeof element.duration?.value === 'number') {
+          return element.duration.value; // Số giây thực tế từ Goong
+        }
+      } catch (err) {
+        if (attempt === 0) {
+          // Delay 1 giây (1000ms) rồi gọi lại lần 2 chống chập chờn mạng
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+        console.warn('⚠️ [PricingService] Goong Matrix failed after retry, using calibrated fallback:', (err as Error).message);
+      }
+    }
+    return null;
+  }
+
   /**
    * Tính toán phí vận chuyển tự động & thời gian dự kiến giao hàng (ETA)
    */
@@ -20,7 +45,9 @@ export class PricingService {
     isFragile: boolean = false,
     codAmount: number = 0,
     originWardCode?: string,
-    destWardCode?: string
+    destWardCode?: string,
+    pickupCoords?: { lat: number; lng: number },
+    deliveryCoords?: { lat: number; lng: number }
   ) {
     // 1. Lấy thông tin gói cước dịch vụ từ DB
     const service = await prisma.service.findUnique({
@@ -31,8 +58,15 @@ export class PricingService {
       throw new BadRequestException(`Gói dịch vụ '${serviceCode}' không tồn tại hoặc đã bị khóa`);
     }
 
-    // 2. Tính ETA dự kiến giao hàng
-    const etaResult = await this.calculateDeliveryEta(serviceCode, distanceKm, originWardCode, destWardCode);
+    // 2. Tính ETA dự kiến giao hàng (truyền tọa độ để gọi Goong nếu là EXPRESS)
+    const etaResult = await this.calculateDeliveryEta(
+      serviceCode,
+      distanceKm,
+      originWardCode,
+      destWardCode,
+      pickupCoords,
+      deliveryCoords
+    );
 
     const basePrice = Number(service.basePrice);
     const freeDistanceKm = service.freeDistanceKm;
@@ -85,7 +119,9 @@ export class PricingService {
     serviceCode: string,
     distanceKm: number,
     originWardCode?: string,
-    destWardCode?: string
+    destWardCode?: string,
+    pickupCoords?: { lat: number; lng: number },
+    deliveryCoords?: { lat: number; lng: number }
   ) {
     const service = await prisma.service.findUnique({
       where: { serviceCode, isActive: true },
@@ -101,7 +137,25 @@ export class PricingService {
       if (distanceKm > 20.0) {
         throw new BadRequestException('Dịch vụ Hỏa tốc (EXPRESS) chỉ hỗ trợ giao hàng dưới 20km');
       }
-      const totalMinutes = Math.round(25 + (distanceKm * 2.4));
+
+      // Thử gọi Goong Distance Matrix 1x1 xe máy kèm retry 1s
+      let pickupToDropSec: number | null = null;
+      if (pickupCoords?.lat && pickupCoords?.lng && deliveryCoords?.lat && deliveryCoords?.lng) {
+        pickupToDropSec = await this.fetchGoongDurationWithRetry(pickupCoords, deliveryCoords);
+      }
+
+      let totalMinutes: number;
+      if (pickupToDropSec !== null) {
+        // Áp dụng hàm expressDeadlineSec: 25p đệm (15p tới đón + 5p gửi + 5p giao) + 1.3 * thời gian Goong
+        const deadlineSec = expressDeadlineSec(pickupToDropSec);
+        totalMinutes = Math.max(25, Math.round(deadlineSec / 60));
+      } else {
+        // Fallback khoa học khi mất mạng: Haversine * 1.76 độ uốn lượn / 11.3 km/h
+        const fallbackTravelSec = Math.round(((distanceKm * 1.76) / 11.3) * 3600);
+        const deadlineSec = expressDeadlineSec(fallbackTravelSec);
+        totalMinutes = Math.max(25, Math.round(deadlineSec / 60));
+      }
+
       const hours = totalMinutes / 60;
       const estimatedDate = new Date(now.getTime() + totalMinutes * 60 * 1000);
 

@@ -195,9 +195,6 @@ export class OrderService {
       );
     }
 
-    // Giả định tốc độ trung bình 30km/h để tính thời gian di chuyển dự kiến (phút)
-    const durationMin = Math.ceil((distanceKm / 30) * 60) + 15; // + 15 phút thời gian chuẩn bị/xử lý
-
     // 4. Snapshot sender and receiver contact names and phones
     let resolvedSenderName = '';
     let resolvedSenderPhone = '';
@@ -254,8 +251,13 @@ export class OrderService {
       isFragile,
       dto.codAmount || 0,
       pickupAddrObj?.wardCode || undefined,
-      deliveryAddrObj?.wardCode || undefined
+      deliveryAddrObj?.wardCode || undefined,
+      { lat: pickupLat, lng: pickupLon },
+      { lat: deliveryLat, lng: deliveryLon }
     );
+
+    // Thời gian giao hàng dự kiến (phút) chuẩn hóa lấy từ giờ cam kết của gói dịch vụ
+    const durationMin = Math.round(pricing.estimatedDeliveryHours * 60);
 
     // 7. Generate order code
     const count = await prisma.order.count();

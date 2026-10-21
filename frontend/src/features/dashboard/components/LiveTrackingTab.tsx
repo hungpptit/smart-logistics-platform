@@ -4,7 +4,8 @@ import { CONFIG } from '../../../config';
 import { io, Socket } from 'socket.io-client';
 import {
   Navigation, Earth, Truck, MapPin, Search, RefreshCw,
-  Play, Square, Clock, Loader2, AlertCircle, Bot, Building2, QrCode, X
+  Play, Square, Clock, Loader2, AlertCircle, Bot, Building2, QrCode, X,
+  ChevronDown, ChevronUp, Radio
 } from 'lucide-react';
 import { Map, MapControls, MapMarker, MarkerContent, MapRoute, MarkerPopup } from '../../../components/ui/map';
 import MapLibreGL from 'maplibre-gl';
@@ -135,6 +136,7 @@ export const LiveTrackingTab: React.FC = () => {
   // Simulation State
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [simulationIndex, setSimulationIndex] = useState<number>(0);
+  const [isSimCardCollapsed, setIsSimCardCollapsed] = useState<boolean>(false);
   const simIntervalRef = useRef<any>(null);
 
   // Parse Socket Host
@@ -768,9 +770,11 @@ export const LiveTrackingTab: React.FC = () => {
         {/* Map Container */}
         <div className="flex-1 relative">
           {(() => {
-            const primaryDepotAddr = selectedRoute?.startFacility?.facilityAddresses?.find((fa) => fa.isPrimary)?.address || selectedRoute?.startFacility?.facilityAddresses?.[0]?.address;
-            const depotLat = primaryDepotAddr?.latitude || (selectedRoute?.stops?.[0] ? selectedRoute.stops[0].latitude - 0.003 : 10.762622);
-            const depotLng = primaryDepotAddr?.longitude || (selectedRoute?.stops?.[0] ? selectedRoute.stops[0].longitude - 0.003 : 106.660172);
+            const depotAddress = (selectedRoute?.startFacility as any)?.address
+              || selectedRoute?.startFacility?.facilityAddresses?.find((fa) => fa.isPrimary)?.address
+              || selectedRoute?.startFacility?.facilityAddresses?.[0]?.address;
+            const depotLat = depotAddress?.latitude ?? 10.8495;
+            const depotLng = depotAddress?.longitude ?? 106.7625;
 
             return (
               <Map
@@ -813,7 +817,7 @@ export const LiveTrackingTab: React.FC = () => {
                         Mã bưu cục: <span className="font-bold text-slate-800">{selectedRoute?.startFacility?.facilityCode || 'N/A'}</span>
                       </p>
                       <p className="text-slate-500 text-[9px] mt-1 italic border-t border-slate-100 pt-1">
-                        📍 {primaryDepotAddr?.addressLine1 || 'Điểm xuất phát & điểm kết thúc của lộ trình (VRP)'}
+                        📍 {depotAddress?.addressLine1 || '180 Đặng Văn Bi, Phường Bình Thọ, TP. Thủ Đức'}
                       </p>
                     </div>
                   </MarkerPopup>
@@ -879,44 +883,88 @@ export const LiveTrackingTab: React.FC = () => {
 
           {/* Quick Simulation Controller overlay */}
           {selectedRoute && selectedRoute.status !== 'COMPLETED' && (
-            <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-md p-4 rounded-lg border border-[#e2e8f0] shadow-md z-10 max-w-xs space-y-3">
-              <div>
-                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Trình mô phỏng GPS</span>
-                <h4 className="text-xs font-bold text-gray-800">{selectedRoute.routeCode}</h4>
-              </div>
+            <div
+              className={`absolute top-4 left-4 bg-white/95 backdrop-blur-md rounded-lg border border-[#e2e8f0] shadow-md z-10 transition-all duration-200 ${
+                isSimCardCollapsed ? 'p-2' : 'p-4 max-w-xs space-y-3'
+              }`}
+            >
+              {isSimCardCollapsed ? (
+                /* Giao diện thu gọn: 1 thanh capsule nhỏ gọn ở góc bản đồ */
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsSimCardCollapsed(false)}
+                    className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-slate-100 rounded text-gray-700 text-xs font-bold transition-colors cursor-pointer border border-gray-200/60"
+                    title="Mở rộng trình mô phỏng GPS"
+                  >
+                    <Radio size={13} className={isSimulating ? "text-green-600 animate-pulse" : "text-gray-400"} />
+                    <span className="text-[11px] font-bold">{selectedRoute.routeCode}</span>
+                    <ChevronDown size={14} className="text-gray-400 ml-0.5" />
+                  </button>
 
-              <p className="text-[10px] text-gray-500">
-                Mô phỏng tín hiệu phát tọa độ GPS từ điện thoại di động tài xế lên hệ thống Socket.io & Redis.
-              </p>
-
-              <button
-                onClick={handleToggleSimulation}
-                className={`w-full py-2 px-4 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer ${isSimulating
-                  ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                  : 'bg-[#bc0100] hover:bg-[#a00100] text-white shadow-sm'
-                  }`}
-              >
-                {isSimulating ? (
-                  <>
-                    <Square size={12} fill="white" />
-                    <span>Dừng mô phỏng</span>
-                  </>
-                ) : (
-                  <>
-                    <Play size={12} fill="white" />
-                    <span>Bắt đầu mô phỏng</span>
-                  </>
-                )}
-              </button>
-
-              {isSimulating && (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-[10px] text-green-600 font-semibold animate-pulse">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                    <span>Đang truyền tín hiệu định vị...</span>
-                  </div>
-                  <span className="text-[9px] text-gray-400">Bước mô phỏng: {simulationIndex}</span>
+                  {/* Nút hành động nhanh ngay trên thanh thu gọn */}
+                  <button
+                    onClick={handleToggleSimulation}
+                    className={`p-1.5 rounded transition-colors cursor-pointer ${
+                      isSimulating
+                        ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                        : 'bg-[#bc0100] hover:bg-[#a00100] text-white'
+                    }`}
+                    title={isSimulating ? "Dừng mô phỏng" : "Bắt đầu mô phỏng"}
+                  >
+                    {isSimulating ? <Square size={12} fill="white" /> : <Play size={12} fill="white" />}
+                  </button>
                 </div>
+              ) : (
+                /* Giao diện mở rộng đầy đủ */
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Trình mô phỏng GPS</span>
+                      <h4 className="text-xs font-bold text-gray-800">{selectedRoute.routeCode}</h4>
+                    </div>
+                    <button
+                      onClick={() => setIsSimCardCollapsed(true)}
+                      className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                      title="Thu gọn vào góc"
+                    >
+                      <ChevronUp size={16} />
+                    </button>
+                  </div>
+
+                  <p className="text-[10px] text-gray-500">
+                    Mô phỏng tín hiệu phát tọa độ GPS từ điện thoại di động tài xế lên hệ thống Socket.io & Redis.
+                  </p>
+
+                  <button
+                    onClick={handleToggleSimulation}
+                    className={`w-full py-2 px-4 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer ${isSimulating
+                      ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                      : 'bg-[#bc0100] hover:bg-[#a00100] text-white shadow-sm'
+                      }`}
+                  >
+                    {isSimulating ? (
+                      <>
+                        <Square size={12} fill="white" />
+                        <span>Dừng mô phỏng</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play size={12} fill="white" />
+                        <span>Bắt đầu mô phỏng</span>
+                      </>
+                    )}
+                  </button>
+
+                  {isSimulating && (
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2 text-[10px] text-green-600 font-semibold animate-pulse">
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                        <span>Đang truyền tín hiệu định vị...</span>
+                      </div>
+                      <span className="text-[9px] text-gray-400">Bước mô phỏng: {simulationIndex}</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

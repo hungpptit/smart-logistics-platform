@@ -5,6 +5,7 @@ import { VRPService } from './vrp.service';
 import { BadRequestException, NotFoundException } from '../../middlewares/error.middleware';
 import { getTrackingGateway } from '../../gateways/tracking.gateway';
 import { OrderStatus, RouteStatus, RouteStopStatus, DriverEmploymentStatus, TransferStatus, DispatchTaskStatus } from '@prisma/client';
+import { selectBatchDrivers, DriverRole } from './express_insertion';
 
 export class RoutingService {
   private kmeansService = new KMeansService();
@@ -97,13 +98,48 @@ export class RoutingService {
       },
     });
 
-    // All active drivers at this facility are available (including motorcycle shippers)
-    const availableDrivers = drivers;
-    console.log(`🔍 [AI DEBUG] 2. Available Drivers fetched: ${availableDrivers.length} (${availableDrivers.map(d => d.fullName).join(', ')})`);
-
-    if (availableDrivers.length === 0) {
+    if (drivers.length === 0) {
       throw new BadRequestException('Không có tài xế nào đang hoạt động tại bưu cục này');
     }
+
+    // 3b. Chuẩn hóa & Phân loại tài xế qua selectBatchDrivers (Ưu tiên 2 - Giai đoạn 5.3)
+    const mappedDrivers = drivers.map((d) => ({
+      ...d,
+      driverId: d.id,
+      roles: (d.driverTypes || []).map((dt) => dt.driverType as DriverRole),
+    }));
+
+    const capableDrivers = mappedDrivers.filter((d) => d.roles.includes('HUB_DELIVERY'));
+    if (capableDrivers.length === 0) {
+      throw new BadRequestException(
+        'Bưu cục không có tài xế nào đủ điều kiện chạy tuyến bưu cục (toàn bộ tài xế đều chỉ có vai trò ON_DEMAND hoặc thiếu vai trò HUB_DELIVERY). Vui lòng phân quyền lại vai trò tài xế tại bưu cục này.'
+      );
+    }
+
+    // Van an toàn (Safety Valve): Tính số lượng tài xế cần thiết cho đợt giao sọt bưu cục (tối đa 25 đơn/tài xế)
+    const TARGET_RESERVE_K = 1;
+    const MAX_ORDERS_PER_BATCH_DRIVER = 25;
+    const neededBatchDrivers = Math.ceil(orders.length / MAX_ORDERS_PER_BATCH_DRIVER);
+
+    // Nếu đơn quá tải khiến số tài xế còn lại không đủ, tự động giảm reserveK (thậm chí về 0) để cứu tải cho bưu cục
+    const maxPossibleReserve = Math.max(0, capableDrivers.length - neededBatchDrivers);
+    const effectiveReserveK = Math.min(TARGET_RESERVE_K, maxPossibleReserve);
+
+    const { batch, reserved, excluded } = selectBatchDrivers(mappedDrivers, effectiveReserveK);
+
+    console.log(
+      `🔍 [AI BATCH SELECTION] Facility ${facilityId}: Tổng=${drivers.length}, Đủ điều kiện=${capableDrivers.length}, Cần cho tải=${neededBatchDrivers}, ReserveK=${effectiveReserveK} ` +
+      `-> Batch=${batch.length} (${batch.map((d) => d.fullName).join(', ')}), Dự phòng=${reserved.length} (${reserved.map((d) => d.fullName).join(', ')}), Loại trừ=${excluded.length} (${excluded.map((d) => d.fullName).join(', ')})`
+    );
+
+    if (batch.length === 0) {
+      throw new BadRequestException(
+        'Không có đủ tài xế khả dụng để chia tuyến bưu cục sau khi phân loại vai trò.'
+      );
+    }
+
+    const availableDrivers = batch;
+    console.log(`🔍 [AI DEBUG] 2. Available Drivers for Batch: ${availableDrivers.length} (${availableDrivers.map((d) => d.fullName).join(', ')})`);
 
     // 4. Delegate AI K-Means & VRP Genetic Algorithm to Standalone AI Microservice (Port 5001)
     const K = Math.min(availableDrivers.length, orders.length);

@@ -15,17 +15,27 @@ export interface OrderItem {
   packageWeightKg?: number;
   package?: {
     weight?: number | string;
+    weightKg?: number;
     volume?: number | string;
+    volumeM3?: number;
     length?: number | string;
+    lengthCm?: number;
     width?: number | string;
+    widthCm?: number;
     height?: number | string;
+    heightCm?: number;
   };
   packages?: Array<{
     weight?: number | string;
+    weightKg?: number;
     volume?: number | string;
+    volumeM3?: number;
     length?: number | string;
+    lengthCm?: number;
     width?: number | string;
+    widthCm?: number;
     height?: number | string;
+    heightCm?: number;
   }>;
 }
 
@@ -33,6 +43,13 @@ export interface Cluster {
   id: number;
   centroid: { lat: number; lng: number };
   orders: OrderItem[];
+}
+
+export interface KMeansOptions {
+  maxOrdersPerCluster?: number;
+  maxWeightKg?: number;
+  maxVolumeM3?: number;
+  restarts?: number;
 }
 
 export class KMeansService {
@@ -55,11 +72,14 @@ export class KMeansService {
 
   /**
    * Group orders into K clusters using K-Means algorithm.
+   * Multi-start (restarts=5) để loại bỏ phương sai khởi tạo ngẫu nhiên,
+   * gỡ bỏ cưỡng ép số đơn phẳng (Math.ceil(N/K)) và áp dụng trần tải đa chiều thực tế (25 đơn, 50kg, 0.20m3).
    */
-  public clusterOrders(orders: OrderItem[], k: number): Cluster[] {
+  public clusterOrders(orders: OrderItem[], k: number, options?: KMeansOptions): Cluster[] {
     if (orders.length === 0) return [];
     if (k <= 0) return [];
 
+    // Extract correct coordinates based on order status (Pickup vs Delivery)
     const getOrderCoords = (order: OrderItem) => {
       const isPickup = order.status !== 'AT_HUB' && order.status !== 'OUT_FOR_DELIVERY' && order.status !== 'DELIVERED';
       const lat = isPickup ? order.pickupLatitude : order.deliveryLatitude;
@@ -67,6 +87,7 @@ export class KMeansService {
       return { lat, lng };
     };
 
+    // Filter orders that have valid coordinates
     const validOrders = orders.filter((order) => {
       const coords = getOrderCoords(order);
       return coords.lat !== null && coords.lng !== null && coords.lat !== undefined && coords.lng !== undefined;
@@ -83,7 +104,7 @@ export class KMeansService {
       }
     }
 
-    // 1. Calculate physical capacity demands (Weight, Volume m3, Order Count)
+    // 1. Calculate physical capacity demands
     let totalWeightKg = 0;
     let totalVolumeM3 = 0;
 
@@ -94,24 +115,26 @@ export class KMeansService {
       let v = 0;
 
       if (pkg) {
-        w = Number(pkg.weight) || 0;
-        v = Number(pkg.volume) || 0;
+        w = Number(pkg.weightKg || pkg.weight) || 0;
+        const width = Number(pkg.widthCm || pkg.width || 20) / 100;
+        const height = Number(pkg.heightCm || pkg.height || 20) / 100;
+        const length = Number(pkg.lengthCm || pkg.length || 20) / 100;
+        v = Number(pkg.volumeM3 || pkg.volume) || width * height * length;
       } else if (pkgs && pkgs.length > 0) {
         for (const p of pkgs) {
-          w += Number(p.weight) || 0;
-          v += Number(p.volume) || 0;
+          w += Number(p.weightKg || p.weight) || 0;
+          v += Number(p.volumeM3 || p.volume) || 0.004;
         }
       }
 
-      totalWeightKg += (w > 0 ? w : 1.0);
-      totalVolumeM3 += (v > 0 ? v : 0.004);
+      totalWeightKg += w > 0 ? w : 1.0;
+      totalVolumeM3 += v > 0 ? v : 0.008;
     }
 
-    // Standard Motorcycle Shipper Bag/Box Constraints:
-    // Max 50 kg weight, Max 0.20 m3 volume (~200 Liters sọt hàng), Max 25 orders per driver
-    const MAX_WEIGHT_PER_DRIVER = 50.0;
-    const MAX_VOLUME_PER_DRIVER = 0.20;
-    const MAX_ORDERS_PER_DRIVER = 25;
+    // Standard Motorcycle Capacity Limits:
+    const MAX_ORDERS_PER_DRIVER = options?.maxOrdersPerCluster ?? 25;
+    const MAX_WEIGHT_PER_DRIVER = options?.maxWeightKg ?? 50.0;
+    const MAX_VOLUME_PER_DRIVER = options?.maxVolumeM3 ?? 0.20;
 
     const weightK = Math.ceil(totalWeightKg / MAX_WEIGHT_PER_DRIVER);
     const volumeK = Math.ceil(totalVolumeM3 / MAX_VOLUME_PER_DRIVER);
@@ -119,7 +142,7 @@ export class KMeansService {
 
     const capacityK = Math.max(1, weightK, volumeK, countK);
 
-    // 2. Calculate spatial spread (max distance between any two orders in km)
+    // 2. Spatial spread
     let maxDistanceKm = 0;
     for (let i = 0; i < validOrders.length; i++) {
       const c1 = getOrderCoords(validOrders[i]);
@@ -132,106 +155,112 @@ export class KMeansService {
       }
     }
 
-    // Determine spatial clusters: if all orders are within 1.0 km radius (same street/neighborhood), 1 driver is sufficient
     let spatialK = 1;
     if (maxDistanceKm > 1.0) {
       spatialK = Math.min(k, uniqueLocKeys.size);
     }
 
-    // Ideal number of drivers is max of capacity demand and spatial cluster demand
     const idealK = Math.max(capacityK, spatialK);
     const targetK = Math.max(1, Math.min(k, idealK));
-    const centroids: { lat: number; lng: number }[] = [];
-    const usedIndices = new Set<number>();
-    
-    while (centroids.length < targetK) {
-      const randIdx = Math.floor(Math.random() * validOrders.length);
-      if (!usedIndices.has(randIdx)) {
-        usedIndices.add(randIdx);
-        const c = getOrderCoords(validOrders[randIdx]);
-        centroids.push({ lat: c.lat!, lng: c.lng! });
+
+    // Multi-start K-Means: Chạy nhiều lần ngẫu nhiên và chọn nghiệm có Inertia nhỏ nhất
+    const parsedRestarts = Math.floor(Number(process.env.KMEANS_RESTARTS));
+    const restarts = options?.restarts ?? (Number.isFinite(parsedRestarts) && parsedRestarts >= 1 ? parsedRestarts : 5);
+
+    let bestInertia = Infinity;
+    let bestCentroids: { lat: number; lng: number }[] = [];
+    let bestAssignments: number[] = [];
+
+    for (let r = 0; r < restarts; r++) {
+      // Khởi tạo tâm
+      const centroids: { lat: number; lng: number }[] = [];
+      const usedIndices = new Set<number>();
+
+      while (centroids.length < targetK) {
+        const randIdx = Math.floor(Math.random() * validOrders.length);
+        if (!usedIndices.has(randIdx)) {
+          usedIndices.add(randIdx);
+          const c = getOrderCoords(validOrders[randIdx]);
+          centroids.push({ lat: c.lat!, lng: c.lng! });
+        }
       }
-    }
 
-    let iterations = 0;
-    const maxIterations = 100;
-    let assignments = new Array(validOrders.length).fill(-1);
-    let changed = true;
+      let iterations = 0;
+      const maxIterations = 60;
+      let assignments = new Array(validOrders.length).fill(-1);
+      let changed = true;
 
-    while (changed && iterations < maxIterations) {
-      changed = false;
-      iterations++;
+      while (changed && iterations < maxIterations) {
+        changed = false;
+        iterations++;
 
-      for (let i = 0; i < validOrders.length; i++) {
-        const order = validOrders[i];
-        const coords = getOrderCoords(order);
-        let minDistance = Infinity;
-        let bestCluster = -1;
+        for (let i = 0; i < validOrders.length; i++) {
+          const coords = getOrderCoords(validOrders[i]);
+          let minDist = Infinity;
+          let closest = 0;
 
-        for (let j = 0; j < centroids.length; j++) {
-          const dist = this.haversineDistance(
-            coords.lat!,
-            coords.lng!,
-            centroids[j].lat,
-            centroids[j].lng
-          );
-          if (dist < minDistance) {
-            minDistance = dist;
-            bestCluster = j;
+          for (let j = 0; j < targetK; j++) {
+            const dist = this.haversineDistance(coords.lat!, coords.lng!, centroids[j].lat, centroids[j].lng);
+            if (dist < minDist) {
+              minDist = dist;
+              closest = j;
+            }
+          }
+
+          if (assignments[i] !== closest) {
+            assignments[i] = closest;
+            changed = true;
           }
         }
 
-        if (assignments[i] !== bestCluster) {
-          assignments[i] = bestCluster;
-          changed = true;
-        }
-      }
-
-      const newCentroids = Array.from({ length: targetK }, () => ({
-        latSum: 0,
-        lngSum: 0,
-        count: 0,
-      }));
-
-      for (let i = 0; i < validOrders.length; i++) {
-        const clusterIdx = assignments[i];
-        if (clusterIdx !== -1) {
+        const newCentroids = Array.from({ length: targetK }, () => ({ latSum: 0, lngSum: 0, count: 0 }));
+        for (let i = 0; i < validOrders.length; i++) {
+          const clusterId = assignments[i];
           const coords = getOrderCoords(validOrders[i]);
-          newCentroids[clusterIdx].latSum += coords.lat!;
-          newCentroids[clusterIdx].lngSum += coords.lng!;
-          newCentroids[clusterIdx].count++;
+          newCentroids[clusterId].latSum += coords.lat!;
+          newCentroids[clusterId].lngSum += coords.lng!;
+          newCentroids[clusterId].count++;
+        }
+
+        for (let j = 0; j < targetK; j++) {
+          if (newCentroids[j].count > 0) {
+            centroids[j] = {
+              lat: newCentroids[j].latSum / newCentroids[j].count,
+              lng: newCentroids[j].lngSum / newCentroids[j].count,
+            };
+          }
         }
       }
 
-      for (let j = 0; j < targetK; j++) {
-        if (newCentroids[j].count > 0) {
-          centroids[j] = {
-            lat: newCentroids[j].latSum / newCentroids[j].count,
-            lng: newCentroids[j].lngSum / newCentroids[j].count,
-          };
-        }
+      let currentInertia = 0;
+      for (let i = 0; i < validOrders.length; i++) {
+        const cId = assignments[i];
+        const coords = getOrderCoords(validOrders[i]);
+        const d = this.haversineDistance(coords.lat!, coords.lng!, centroids[cId].lat, centroids[cId].lng);
+        currentInertia += d * d;
+      }
+
+      if (currentInertia < bestInertia) {
+        bestInertia = currentInertia;
+        bestCentroids = centroids.map((c) => ({ ...c }));
+        bestAssignments = [...assignments];
       }
     }
 
-    const clusters: Cluster[] = Array.from({ length: targetK }, (_, idx) => {
-      const c = centroids[idx] || { lat: 10.7769, lng: 106.7009 };
-      const safeLat = isNaN(c?.lat) ? 10.7769 : c.lat;
-      const safeLng = isNaN(c?.lng) ? 106.7009 : c.lng;
-      return {
-        id: idx + 1,
-        centroid: { lat: safeLat, lng: safeLng },
-        orders: [],
-      };
-    });
+    const clusters: Cluster[] = Array.from({ length: targetK }, (_, idx) => ({
+      id: idx + 1,
+      centroid: bestCentroids[idx],
+      orders: [],
+    }));
 
     for (let i = 0; i < validOrders.length; i++) {
-      const clusterIdx = assignments[i];
-      if (clusterIdx !== -1 && clusterIdx < targetK) {
-        clusters[clusterIdx].orders.push(validOrders[i]);
+      const cId = bestAssignments[i];
+      if (cId !== -1 && cId < targetK) {
+        clusters[cId].orders.push(validOrders[i]);
       }
     }
 
-    // Ensure no cluster is left empty
+    // Đảm bảo không cụm nào bị rỗng
     for (let c = 0; c < targetK; c++) {
       if (clusters[c].orders.length === 0) {
         let largest = clusters[0];
@@ -247,53 +276,87 @@ export class KMeansService {
       }
     }
 
-    // Workload Balancing: Fairly balance orders among drivers
-    if (targetK > 1 && validOrders.length > targetK) {
-      const maxCapacity = Math.ceil(validOrders.length / targetK);
-      for (let iter = 0; iter < 10; iter++) {
-        let rebalanced = false;
-        for (let c = 0; c < targetK; c++) {
-          while (clusters[c].orders.length > maxCapacity) {
-            let maxDist = -1;
-            let furthestIdx = -1;
-            for (let i = 0; i < clusters[c].orders.length; i++) {
-              const ord = clusters[c].orders[i];
-              const coords = getOrderCoords(ord);
-              const dist = this.haversineDistance(coords.lat!, coords.lng!, clusters[c].centroid.lat, clusters[c].centroid.lng);
-              if (dist > maxDist) {
-                maxDist = dist;
-                furthestIdx = i;
-              }
-            }
+    // Xử lý tràn tải thực tế đa chiều (Chỉ can thiệp khi vượt trần 25 đơn, 50kg, 0.20m3)
+    const getOrderDemand = (o: OrderItem) => {
+      const pkg = o.package;
+      let w = 1.0;
+      let v = 0.008;
+      if (pkg) {
+        w = Number(pkg.weightKg || pkg.weight) || 1.0;
+        const width = Number(pkg.widthCm || pkg.width || 20) / 100;
+        const height = Number(pkg.heightCm || pkg.height || 20) / 100;
+        const length = Number(pkg.lengthCm || pkg.length || 20) / 100;
+        v = Number(pkg.volumeM3 || pkg.volume) || width * height * length;
+      }
+      return { w, v };
+    };
 
-            if (furthestIdx === -1) break;
+    for (let iter = 0; iter < 10; iter++) {
+      let overCapacityFound = false;
 
-            let bestOther = -1;
-            let minOtherDist = Infinity;
-            const ordToMove = clusters[c].orders[furthestIdx];
-            const coords = getOrderCoords(ordToMove);
+      for (let c = 0; c < targetK; c++) {
+        const clusterOrders = clusters[c].orders;
+        let cWeight = clusterOrders.reduce((sum, o) => sum + getOrderDemand(o).w, 0);
+        let cVolume = clusterOrders.reduce((sum, o) => sum + getOrderDemand(o).v, 0);
 
-            for (let o = 0; o < targetK; o++) {
-              if (o !== c && clusters[o].orders.length < maxCapacity) {
-                const dist = this.haversineDistance(coords.lat!, coords.lng!, clusters[o].centroid.lat, clusters[o].centroid.lng);
-                if (dist < minOtherDist) {
-                  minOtherDist = dist;
-                  bestOther = o;
-                }
-              }
-            }
+        while (
+          clusterOrders.length > MAX_ORDERS_PER_DRIVER ||
+          cWeight > MAX_WEIGHT_PER_DRIVER ||
+          cVolume > MAX_VOLUME_PER_DRIVER
+        ) {
+          overCapacityFound = true;
 
-            if (bestOther !== -1) {
-              const [moved] = clusters[c].orders.splice(furthestIdx, 1);
-              clusters[bestOther].orders.push(moved);
-              rebalanced = true;
-            } else {
-              break;
+          let maxDist = -1;
+          let furthestIdx = -1;
+          for (let i = 0; i < clusterOrders.length; i++) {
+            const coords = getOrderCoords(clusterOrders[i]);
+            const dist = this.haversineDistance(coords.lat!, coords.lng!, clusters[c].centroid.lat, clusters[c].centroid.lng);
+            if (dist > maxDist) {
+              maxDist = dist;
+              furthestIdx = i;
             }
           }
+
+          if (furthestIdx === -1) break;
+
+          const ordToMove = clusterOrders[furthestIdx];
+          const ordDemand = getOrderDemand(ordToMove);
+          const coords = getOrderCoords(ordToMove);
+
+          let bestOther = -1;
+          let minOtherDist = Infinity;
+
+          for (let other = 0; other < targetK; other++) {
+            if (other === c) continue;
+            const otherOrders = clusters[other].orders;
+            const otherWeight = otherOrders.reduce((sum, o) => sum + getOrderDemand(o).w, 0);
+            const otherVolume = otherOrders.reduce((sum, o) => sum + getOrderDemand(o).v, 0);
+
+            if (
+              otherOrders.length + 1 <= MAX_ORDERS_PER_DRIVER &&
+              otherWeight + ordDemand.w <= MAX_WEIGHT_PER_DRIVER &&
+              otherVolume + ordDemand.v <= MAX_VOLUME_PER_DRIVER
+            ) {
+              const dist = this.haversineDistance(coords.lat!, coords.lng!, clusters[other].centroid.lat, clusters[other].centroid.lng);
+              if (dist < minOtherDist) {
+                minOtherDist = dist;
+                bestOther = other;
+              }
+            }
+          }
+
+          if (bestOther !== -1) {
+            const [moved] = clusterOrders.splice(furthestIdx, 1);
+            clusters[bestOther].orders.push(moved);
+            cWeight -= ordDemand.w;
+            cVolume -= ordDemand.v;
+          } else {
+            break;
+          }
         }
-        if (!rebalanced) break;
       }
+
+      if (!overCapacityFound) break;
     }
 
     return clusters;

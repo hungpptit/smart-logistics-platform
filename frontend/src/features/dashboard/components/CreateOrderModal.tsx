@@ -491,6 +491,10 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [description, setDescription] = useState('');
   const [declaredValue, setDeclaredValue] = useState<number | ''>('');
 
+  // Express Real-time Goong Matrix ETA States
+  const [expressEta, setExpressEta] = useState<string>('');
+  const [loadingEta, setLoadingEta] = useState<boolean>(false);
+
 
 
   // Fetch initial data (customers if admin, active services)
@@ -794,6 +798,84 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const distanceKm = calculateDistance(senderLatitude, senderLongitude, receiverLatitude, receiverLongitude);
   const activeService = services.find((s) => s.serviceCode === serviceCode);
 
+  // Dynamic fetch Goong Matrix ETA for EXPRESS service
+  useEffect(() => {
+    if (serviceCode !== 'EXPRESS') {
+      setExpressEta('');
+      return;
+    }
+    if (!senderLatitude || !senderLongitude || !receiverLatitude || !receiverLongitude) {
+      setExpressEta('');
+      return;
+    }
+    if (distanceKm > 20) {
+      setExpressEta('Vượt quá 20km (Không hỗ trợ Hỏa tốc)');
+      return;
+    }
+
+    let isCancelled = false;
+    const timer = setTimeout(async () => {
+      setLoadingEta(true);
+      try {
+        const res = await fetch(`${CONFIG.API_BASE_URL}/orders/calculate-pricing`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            serviceCode: 'EXPRESS',
+            distanceKm,
+            totalWeightKg: weight || 1,
+            isFragile,
+            codAmount,
+            pickupWardCode: senderWardCode,
+            deliveryWardCode: receiverWardCode,
+            pickupCoordinates: { lat: senderLatitude, lng: senderLongitude },
+            deliveryCoordinates: { lat: receiverLatitude, lng: receiverLongitude },
+          }),
+        });
+        const data = await res.json();
+        if (!isCancelled && data.success && data.data?.formattedDeliveryEta) {
+          setExpressEta(data.data.formattedDeliveryEta);
+        }
+      } catch (err) {
+        console.warn('Lỗi tính cước hỏa tốc từ server, dùng fallback khoa học:', err);
+        // Fallback khoa học: 11.3 km/h x 1.76 + 25 phút đệm
+        const fallbackTravelSec = Math.round(((distanceKm * 1.76) / 11.3) * 3600);
+        const totalMins = Math.max(25, Math.round((25 * 60 + fallbackTravelSec * 1.3) / 60));
+        const hrs = Math.floor(totalMins / 60);
+        const mins = totalMins % 60;
+        const fallbackStr = totalMins < 60
+          ? `Dự kiến giao sau ${totalMins} phút`
+          : mins > 0
+            ? `Dự kiến giao sau ${hrs} tiếng ${mins} phút`
+            : `Dự kiến giao sau ${hrs} tiếng`;
+        if (!isCancelled) setExpressEta(fallbackStr);
+      } finally {
+        if (!isCancelled) setLoadingEta(false);
+      }
+    }, 400);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    serviceCode,
+    distanceKm,
+    senderLatitude,
+    senderLongitude,
+    receiverLatitude,
+    receiverLongitude,
+    senderWardCode,
+    receiverWardCode,
+    weight,
+    isFragile,
+    codAmount,
+    token
+  ]);
+
   let basePrice = 0;
   let distanceFee = 0;
   let weightFee = 0;
@@ -833,8 +915,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     if (serviceCode === 'EXPRESS') {
       if (distanceKm > 20) {
         formattedDeliveryEta = 'Vượt quá 20km (Không hỗ trợ Hỏa tốc)';
+      } else if (loadingEta) {
+        formattedDeliveryEta = 'Đang tính thời gian thực tế Goong...';
+      } else if (expressEta) {
+        formattedDeliveryEta = expressEta;
       } else {
-        const totalMins = Math.round(25 + (distanceKm * 2.4));
+        // Fallback khoa học tạm thời trước khi Goong phản hồi: 11.3 km/h x 1.76 + 25p đệm
+        const fallbackTravelSec = Math.round(((distanceKm * 1.76) / 11.3) * 3600);
+        const totalMins = Math.max(25, Math.round((25 * 60 + fallbackTravelSec * 1.3) / 60));
         if (totalMins < 60) {
           formattedDeliveryEta = `Dự kiến giao sau ${totalMins} phút`;
         } else {
@@ -1730,7 +1818,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                               <Clock size={14} className="text-emerald-600 shrink-0" />
                               <span>Thời gian dự kiến giao:</span>
                             </div>
-                            <span className="text-xs font-bold text-emerald-800 bg-white px-2.5 py-1 rounded border border-emerald-300">
+                            <span className="text-xs font-bold text-emerald-800 bg-white px-2.5 py-1 rounded border border-emerald-300 flex items-center gap-1.5">
+                              {loadingEta && <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />}
                               {formattedDeliveryEta}
                             </span>
                           </div>
