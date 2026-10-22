@@ -8,7 +8,9 @@ import 'off_route_detector.dart';
 import 'polyline_codec.dart';
 import 'route_model.dart';
 import 'route_snapper.dart';
+import 'traffic_camera.dart';
 import 'voice_guide.dart';
+import '../services/camera_service.dart';
 
 /// State emitted by NavigationEngine on every position update or state transition
 class NavState {
@@ -30,6 +32,10 @@ class NavState {
   final List<LatLng> remainingPolyline;
   final bool isHeadUpMode;
 
+  // Traffic Enforcement Camera Alert State
+  final TrafficCamera? nearbyAlertCamera;
+  final double? distanceToCameraMeters;
+
   const NavState({
     required this.snappedPosition,
     required this.rawGpsPosition,
@@ -48,6 +54,8 @@ class NavState {
     required this.speedKmh,
     required this.remainingPolyline,
     required this.isHeadUpMode,
+    this.nearbyAlertCamera,
+    this.distanceToCameraMeters,
   });
 
   factory NavState.initial() => NavState(
@@ -66,6 +74,8 @@ class NavState {
         speedKmh: 0.0,
         remainingPolyline: const [],
         isHeadUpMode: true,
+        nearbyAlertCamera: null,
+        distanceToCameraMeters: null,
       );
 }
 
@@ -77,6 +87,9 @@ class NavigationEngine extends ChangeNotifier {
   final RouteSnapper _snapper = RouteSnapper();
   final OffRouteDetector _offRouteDetector = OffRouteDetector();
   final VoiceGuide _voiceGuide = VoiceGuide();
+  final CameraService _cameraService = CameraService();
+
+  TrafficCamera? _activeAlertCamera;
 
   RerouteCallback? onRerouteRequested;
   LatLng? destination;
@@ -86,20 +99,42 @@ class NavigationEngine extends ChangeNotifier {
   bool _isHeadUpMode = true;
   bool _isArrived = false;
   bool _isFirstPosition = true;
+  bool _isStarted = false;
 
   Future<void> start() async {
+    if (_isStarted) return;
+    _isStarted = true;
+
     await _voiceGuide.init();
+    await _cameraService.loadCameras();
+    _cameraService.resetAnnouncements();
+
+    // Giữ một nhịp nghỉ ngắn để TTS engine trên Android sẵn sàng
+    await Future.delayed(const Duration(milliseconds: 300));
+
     if (_route.steps.isNotEmpty) {
       final firstStep = _route.steps.first;
       firstStep.announcedFar = true;
-      await _voiceGuide.speakInstruction(firstStep.instruction, prefix: 'Bắt đầu điều hướng.');
+      final distStr = firstStep.endDist > 0 
+          ? ', ${_voiceGuide.isVietnamese ? VoiceGuide.roundDistanceToSpokenVietnamese(firstStep.endDist) : "distance ${firstStep.endDist < 1000 ? "${firstStep.endDist.round()} meters" : "${(firstStep.endDist / 1000).toStringAsFixed(1)} kilometers"}"}' 
+          : '';
+      final prefix = _voiceGuide.isVietnamese ? 'Bắt đầu điều hướng$distStr.' : 'Navigation started$distStr.';
+      await _voiceGuide.speakInstruction(firstStep.instruction, prefix: prefix);
+    } else {
+      await _voiceGuide.speakInstruction(_voiceGuide.isVietnamese ? 'Bắt đầu di chuyển đến điểm tiếp theo' : 'Proceed to destination');
     }
   }
 
   Future<void> speakCurrentInstruction() async {
     if (_currentStepIndex < _route.steps.length) {
       final step = _route.steps[_currentStepIndex];
-      await _voiceGuide.speakInstruction(step.instruction);
+      final distStr = step.endDist > 0 
+          ? ', ${_voiceGuide.isVietnamese ? VoiceGuide.roundDistanceToSpokenVietnamese(step.endDist) : "distance ${step.endDist < 1000 ? "${step.endDist.round()} meters" : "${(step.endDist / 1000).toStringAsFixed(1)} kilometers"}"}' 
+          : '';
+      final prefix = _voiceGuide.isVietnamese ? 'Chỉ dẫn tiếp theo$distStr.' : 'Next direction$distStr.';
+      await _voiceGuide.speakInstruction(step.instruction, prefix: prefix);
+    } else {
+      await _voiceGuide.testSpeak();
     }
   }
 
@@ -229,6 +264,31 @@ class NavigationEngine extends ChangeNotifier {
         distanceToTurnMeters: distToTurn,
         speedMps: speedMps,
       );
+    }
+
+    // 6.5. 🎯 Quét phát hiện Camera phạt nguội gần nhất (2 tầng: Bounding Box + WGS-84)
+    final camResult = _cameraService.findNearbyAlertCamera(
+      currentPosition: rawGps,
+      searchRadiusMeters: 450.0,
+    );
+
+    if (camResult != null) {
+      final cam = camResult.camera;
+      if (camResult.distanceMeters <= cam.warningDistance) {
+        _activeAlertCamera = cam;
+        if (!cam.isAnnounced) {
+          cam.isAnnounced = true;
+          debugPrint('🚨 [NavigationEngine] Cảnh báo camera phạt nguội: ${cam.name} (${camResult.distanceMeters.toStringAsFixed(0)}m)');
+          _voiceGuide.speakCameraAlert(
+            cameraName: cam.name,
+            distanceMeters: camResult.distanceMeters,
+          );
+        }
+      }
+    } else {
+      if (_activeAlertCamera != null) {
+        _activeAlertCamera = null;
+      }
     }
 
     // 7. Check Arrival
@@ -369,6 +429,8 @@ class NavigationEngine extends ChangeNotifier {
       speedKmh: curSpeed,
       remainingPolyline: remainingPoly,
       isHeadUpMode: _isHeadUpMode,
+      nearbyAlertCamera: _activeAlertCamera,
+      distanceToCameraMeters: _activeAlertCamera?.currentDistanceMeters,
     );
 
     notifyListeners();

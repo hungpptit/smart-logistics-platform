@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../core/config/app_config.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
@@ -11,6 +12,7 @@ import '../../../core/theme/app_styles.dart';
 import '../../../navigation/nav_config.dart';
 import '../../../navigation/navigation_engine.dart';
 import '../../../navigation/route_model.dart';
+import '../../../../services/camera_service.dart';
 import 'map_stop_pin.dart';
 import 'floating_nav_btn.dart';
 import 'nav_stat_item.dart';
@@ -65,6 +67,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
     // Keep screen awake while driving
     WakelockPlus.enable();
     widget.engine.addListener(_onEngineUpdate);
+    widget.engine.start(); // Khởi tạo động cơ giọng nói và nạp camera
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _recenter();
     });
@@ -201,6 +204,56 @@ class _NavigationScreenState extends State<NavigationScreen> {
                 // Marker Layer
                 MarkerLayer(
                   markers: [
+                    // 📷 Camera Phạt Nguội Markers
+                    ...CameraService().cameras.where((c) => c.isActive).map((cam) {
+                      final bool isNear = navState.nearbyAlertCamera?.code == cam.code;
+                      return Marker(
+                        point: LatLng(cam.latitude, cam.longitude),
+                        width: isNear ? 46.0 : 36.0,
+                        height: isNear ? 46.0 : 36.0,
+                        child: GestureDetector(
+                          onTap: () {
+                            final double d = Geolocator.distanceBetween(
+                              navState.snappedPosition.latitude,
+                              navState.snappedPosition.longitude,
+                              cam.latitude,
+                              cam.longitude,
+                            );
+                            final String dStr = d < 1000 ? '${d.toStringAsFixed(0)}m' : '${(d / 1000).toStringAsFixed(1)}km';
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('📷 ${cam.name} (cách $dStr)'),
+                                duration: const Duration(seconds: 2),
+                                backgroundColor: const Color(0xFFD32F2F),
+                              ),
+                            );
+                            // Chạm vào chỉ để xem thông tin khoảng cách, âm thanh sẽ tự động phát khi xe tới gần
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isNear ? const Color(0xFFD32F2F) : const Color(0xFFE65100),
+                              border: Border.all(color: Colors.white, width: isNear ? 2.5 : 1.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (isNear ? Colors.red : Colors.black).withValues(alpha: 0.35),
+                                  blurRadius: isNear ? 8 : 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.videocam_rounded,
+                              color: Colors.white,
+                              size: isNear ? 24.0 : 18.0,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+
                     // Delivery stops
                     ...widget.stops.map((stop) {
                       final lat = double.tryParse(stop['latitude']?.toString() ?? '') ??
@@ -401,21 +454,6 @@ class _NavigationScreenState extends State<NavigationScreen> {
             top: 230.0,
             child: Column(
               children: [
-                // Voice Mute Toggle
-                FloatingNavBtn(
-                  icon: widget.engine.voiceGuide.isEnabled ? Icons.volume_up : Icons.volume_off,
-                  onPressed: () {
-                    final willEnable = !widget.engine.voiceGuide.isEnabled;
-                    widget.engine.setMute(!willEnable);
-                    if (willEnable) {
-                      widget.engine.speakCurrentInstruction();
-                    }
-                    setState(() {});
-                  },
-                  color: widget.engine.voiceGuide.isEnabled ? AppColors.deepOnyx : AppColors.secondary,
-                ),
-                const SizedBox(height: 12.0),
-
                 // Compass Button: Head-Up vs North-Up Mode
                 GestureDetector(
                   onTap: () {
@@ -423,8 +461,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     _recenter();
                   },
                   child: Container(
-                    width: 44.0,
-                    height: 44.0,
+                    width: 50.0,
+                    height: 50.0,
                     decoration: BoxDecoration(
                       color: AppColors.pureWhite,
                       shape: BoxShape.circle,
@@ -448,6 +486,39 @@ class _NavigationScreenState extends State<NavigationScreen> {
                 ),
                 const SizedBox(height: 12.0),
 
+                // Unified Sound & Voice Guidance Toggle Button
+                FloatingNavBtn(
+                  icon: widget.engine.voiceGuide.isEnabled ? Icons.volume_up : Icons.volume_off,
+                  onPressed: () {
+                    final willEnable = !widget.engine.voiceGuide.isEnabled;
+                    widget.engine.setMute(!willEnable);
+                    if (willEnable) {
+                      widget.engine.speakCurrentInstruction();
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('🔊 Đã bật giọng nói dẫn đường và cảnh báo camera'),
+                          duration: Duration(seconds: 2),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    } else {
+                      widget.engine.voiceGuide.stop();
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('🔇 Đã tắt âm thanh cảnh báo'),
+                          duration: Duration(seconds: 2),
+                          backgroundColor: Colors.grey,
+                        ),
+                      );
+                    }
+                    setState(() {});
+                  },
+                  color: widget.engine.voiceGuide.isEnabled ? AppColors.logisticsRed : Colors.grey,
+                ),
+                const SizedBox(height: 12.0),
+
                 // Recenter Button (when user drags map away)
                 if (!_isFollowing)
                   FloatingNavBtn(
@@ -458,6 +529,91 @@ class _NavigationScreenState extends State<NavigationScreen> {
               ],
             ),
           ),
+
+          // 🚨 Camera Phạt Nguội HUD Warning Card
+          if (navState.nearbyAlertCamera != null)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 90.0,
+              left: 16.0,
+              right: 16.0,
+              child: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(14),
+                color: const Color(0xFFD32F2F),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () {
+                    widget.engine.voiceGuide.speakCameraAlert(
+                      cameraName: navState.nearbyAlertCamera!.name,
+                      distanceMeters: navState.distanceToCameraMeters,
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.videocam_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text(
+                                    '⚠️ CẢNH BÁO PHẠT NGUỘI',
+                                    style: TextStyle(
+                                      color: Colors.yellowAccent,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    navState.distanceToCameraMeters != null
+                                        ? '${navState.distanceToCameraMeters!.toStringAsFixed(0)}m'
+                                        : '< 350m',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                navState.nearbyAlertCamera!.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // 4. Traffic alert notification
           if (widget.showTrafficAlert)

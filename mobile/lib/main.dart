@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
+import 'navigation/voice_guide.dart';
 import 'screens/auth/welcome_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -11,6 +12,8 @@ import 'screens/customer/order_detail_screen.dart';
 import 'screens/driver/driver_dashboard.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  VoiceGuide().init(); // Warm up Android TextToSpeech service connection
   runApp(const MyApp());
 }
 

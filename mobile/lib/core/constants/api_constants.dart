@@ -63,4 +63,7 @@ class ApiConstants {
   static String get calculateFee => '${AppConfig.baseUrl}/orders/calculate-fee';
   static String get calculatePricing => '${AppConfig.baseUrl}/orders/calculate-pricing';
   static String payOrder(String id) => '${AppConfig.baseUrl}/orders/$id/pay';
+
+  // Traffic Enforcement Camera Endpoints
+  static String get trafficCameras => '${AppConfig.baseUrl}/cameras';
 }

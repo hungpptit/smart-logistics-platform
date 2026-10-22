@@ -715,6 +715,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
       },
     );
 
+    // Kích hoạt động cơ điều hướng, tải camera và phát âm thanh mở đầu
+    _navigationEngine!.start();
+
     if (mounted) {
       setState(() {
         _isNavigating = true;
