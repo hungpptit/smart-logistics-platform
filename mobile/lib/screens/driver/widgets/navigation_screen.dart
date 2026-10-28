@@ -17,13 +17,13 @@ import 'map_stop_pin.dart';
 import 'floating_nav_btn.dart';
 import 'nav_stat_item.dart';
 import 'report_incident_dialog.dart';
+import 'speed_limit_badge.dart';
 
 class NavigationScreen extends StatefulWidget {
   final MapController navMapController;
   final NavigationEngine engine;
   final LatLng currentLocation;
   final List<Map<String, dynamic>> stops;
-  final bool showTrafficAlert;
   final VoidCallback onStopNavigation;
 
   const NavigationScreen({
@@ -32,7 +32,6 @@ class NavigationScreen extends StatefulWidget {
     required this.engine,
     required this.currentLocation,
     required this.stops,
-    required this.showTrafficAlert,
     required this.onStopNavigation,
   });
 
@@ -615,47 +614,87 @@ class _NavigationScreenState extends State<NavigationScreen> {
               ),
             ),
 
-          // 4. Traffic alert notification
-          if (widget.showTrafficAlert)
+          // 🚨 Cảnh báo đoạn đường cấm xe máy (Thông tư 38/2024/TT-BGTVT)
+          if (navState.isMotorcycleForbidden)
             Positioned(
-              bottom: 220.0,
-              left: 20.0,
-              right: 20.0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF4E5),
-                  borderRadius: AppStyles.roundedXl,
-                  border: Border.all(color: const Color(0xFFFF9800)),
-                  boxShadow: AppStyles.ambientShadow,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFFF9800), size: 28.0),
-                    const SizedBox(width: 12.0),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Kẹt xe phía trước',
-                            style: AppTypography.labelLg.copyWith(
-                              color: const Color(0xFF663C00),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'Chậm khoảng 3 phút trên tuyến đường di chuyển.',
-                            style: AppTypography.labelMd.copyWith(color: const Color(0xFF663C00)),
-                          ),
-                        ],
+              top: MediaQuery.of(context).padding.top + (navState.nearbyAlertCamera != null ? 165.0 : 90.0),
+              left: 16.0,
+              right: 16.0,
+              child: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(14),
+                color: const Color(0xFFB71C1C),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.block,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '⛔ ĐOẠN ĐƯỜNG CẤM XE MÁY',
+                              style: TextStyle(
+                                color: Colors.yellowAccent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Đường cao tốc / cầu cấm xe mô tô, xe gắn máy!',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
+
+          // 4. Speed Limit & Current Speed Badge
+          Positioned(
+            bottom: 215.0,
+            left: 16.0,
+            child: SpeedLimitBadge(
+              speedLimitKmh: navState.currentSpeedLimitKmh,
+              currentSpeedKmh: navState.speedKmh,
+              roadName: navState.currentRoadName,
+              isOverSpeed: navState.isOverSpeed,
+              isMotorcycleForbidden: navState.isMotorcycleForbidden,
+              onTap: () {
+                if (navState.currentSpeedLimitKmh != null) {
+                  widget.engine.voiceGuide.speakSpeedLimitChanged(
+                    newLimit: navState.currentSpeedLimitKmh!,
+                    roadName: navState.currentRoadName ?? '',
+                  );
+                }
+              },
+            ),
+          ),
 
           // 5. Bottom GPS Stats Panel & Primary Control
           Positioned(
@@ -717,10 +756,20 @@ class _NavigationScreenState extends State<NavigationScreen> {
                             child: SizedBox(width: 1.0, height: 40.0),
                           ),
                         ),
-                        NavStatItem(
-                          label: 'Vận tốc',
-                          value: navState.speedKmh.toStringAsFixed(0),
-                          unit: 'km/h',
+                        TweenAnimationBuilder<double>(
+                          tween: Tween<double>(
+                            begin: 0.0,
+                            end: navState.speedKmh.clamp(0.0, 200.0),
+                          ),
+                          duration: const Duration(milliseconds: 700),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, val, child) {
+                            return NavStatItem(
+                              label: 'Vận tốc',
+                              value: val.round().toString(),
+                              unit: 'km/h',
+                            );
+                          },
                         ),
                       ],
                     ),

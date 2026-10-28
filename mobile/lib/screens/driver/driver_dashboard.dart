@@ -20,6 +20,7 @@ import 'widgets/navigation_screen.dart';
 import '../../navigation/navigation_engine.dart';
 import '../../navigation/route_model.dart';
 import '../../navigation/polyline_codec.dart';
+import '../../services/speed_limit_service.dart';
 import 'widgets/stop_details_dialog.dart';
 import 'widgets/qr_scanner_dialog.dart';
 import 'widgets/shipment_qr_modal.dart';
@@ -44,8 +45,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
   bool _isRouteFinished = false;
   bool _isRouteStarted = false;
   bool _isNavigating = false;
-  bool _showTrafficAlert = false;
-  Timer? _alertTimer;
   Timer? _routeRefreshTimer;
   bool _isFetchingRoutes = false;
 
@@ -96,7 +95,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
   @override
   void dispose() {
-    _alertTimer?.cancel();
     _routeRefreshTimer?.cancel();
     _positionSubscription?.cancel();
     _navigationEngine?.dispose();
@@ -514,7 +512,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     _positionSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 2,
+        distanceFilter: 0,
       ),
     ).listen((Position position) {
       if (mounted) {
@@ -710,6 +708,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     _navigationEngine = NavigationEngine(
       initialRoute: routeModel,
       destination: dest,
+      vehicleType: (_isLinehaulDriverProfile || _isLinehaulRoute) ? 'TRUCK' : 'MOTORCYCLE',
       onRerouteRequested: (orig, target) async {
         return await DriverService.fetchGoongRouteModel(origin: orig, destination: target);
       },
@@ -721,16 +720,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
     if (mounted) {
       setState(() {
         _isNavigating = true;
-        _showTrafficAlert = false;
-      });
-      _alertTimer?.cancel();
-      _alertTimer = Timer(const Duration(seconds: 3), () {
-        if (mounted && _isNavigating) {
-          setState(() => _showTrafficAlert = true);
-          Timer(const Duration(seconds: 5), () {
-            if (mounted) setState(() => _showTrafficAlert = false);
-          });
-        }
       });
     }
   }
@@ -740,9 +729,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     _navigationEngine = null;
     setState(() {
       _isNavigating = false;
-      _showTrafficAlert = false;
     });
-    _alertTimer?.cancel();
   }
 
   // ------ Stop Actions ------
@@ -1173,7 +1160,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
         engine: _navigationEngine!,
         currentLocation: _currentLocation,
         stops: _driverStops,
-        showTrafficAlert: _showTrafficAlert,
         onStopNavigation: _stopNavigation,
       );
     }
@@ -1272,6 +1258,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
               leading: const Icon(Icons.logout, color: AppColors.error),
               title: const Text('Đăng xuất'),
               onTap: () async {
+                SpeedLimitService().clearCache();
                 await AuthService.clearAuthData();
                 if (context.mounted) Navigator.pushReplacementNamed(context, '/');
               },

@@ -105,6 +105,37 @@ class VoiceGuide {
     }
   }
 
+  /// Cảnh báo chạy quá tốc độ giới hạn (Task 3.1)
+  Future<void> speakSpeedAlert({required int speedLimit, double? currentSpeed}) async {
+    if (!isEnabled) return;
+    if (_isVietnamese) {
+      await _speak('Cảnh báo! Bạn đang chạy quá tốc độ $speedLimit ki-lô-mét một giờ. Vui lòng giảm tốc độ.');
+    } else {
+      await _speak('Warning! Speed limit $speedLimit kilometers per hour exceeded. Please slow down.');
+    }
+  }
+
+  /// Thông báo thay đổi tốc độ giới hạn của đoạn đường mới
+  Future<void> speakSpeedLimitChanged({required int newLimit, String roadName = ''}) async {
+    if (!isEnabled) return;
+    final roadPart = roadName.isNotEmpty ? 'vào $roadName, ' : '';
+    if (_isVietnamese) {
+      await _speak('Đã $roadPart tốc độ tối đa $newLimit ki-lô-mét một giờ.');
+    } else {
+      await _speak('Speed limit is $newLimit kilometers per hour.');
+    }
+  }
+
+  /// Cảnh báo xe máy đi vào đường cấm (Cao tốc)
+  Future<void> speakMotorcycleForbidden() async {
+    if (!isEnabled) return;
+    if (_isVietnamese) {
+      await _speak('Nguy hiểm! Tuyến đường phía trước cấm xe máy, vui lòng chú ý.');
+    } else {
+      await _speak('Danger! Road ahead prohibits motorcycles.');
+    }
+  }
+
   /// Mở rộng viết tắt và định dạng câu tiếng Việt
   static String cleanVietnameseSpeechText(String raw) {
     String text = raw

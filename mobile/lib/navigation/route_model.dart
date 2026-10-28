@@ -1,4 +1,5 @@
 import 'package:latlong2/latlong.dart';
+import 'speed_limit_info.dart';
 
 /// Single turn-by-turn navigation instruction step
 class NavStep {
@@ -11,6 +12,10 @@ class NavStep {
   final LatLng endLocation;
   final String? distanceText;
   final int? durationSeconds;
+
+  // Speed Limit Metadata (Từ OpenStreetMap & Thông tư 38/2024/TT-BGTVT)
+  int? speedLimitKmh;
+  SpeedLimitInfo? speedLimitInfo;
 
   bool announcedFar = false;
   bool announcedNear = false;
@@ -25,6 +30,8 @@ class NavStep {
     required this.endLocation,
     this.distanceText,
     this.durationSeconds,
+    this.speedLimitKmh,
+    this.speedLimitInfo,
   });
 
   double get stepLengthMeters => (endDist - startDist).clamp(0.0, double.infinity);
@@ -44,6 +51,8 @@ class NavStep {
     'endLocation': {'lat': endLocation.latitude, 'lng': endLocation.longitude},
     'distanceText': distanceText,
     'durationSeconds': durationSeconds,
+    'speedLimitKmh': speedLimitKmh,
+    'speedLimitInfo': speedLimitInfo?.toJson(),
   };
 }
 

@@ -39,4 +39,19 @@ class NavConfig {
   static const double voiceFarSpeedMultiplier = 10.0;
   static const double voiceNearThresholdBaseMeters = 60.0;
   static const double voiceNearSpeedMultiplier = 4.0;
+
+  // Speed Processing & Quality Filter (Theo Plan Lấy tốc độ hiện tại)
+  static const double maxGpsAccuracyMeters = 30.0;
+  static const double maxSpeedAccuracyMps = 3.0;
+  static const double maxSpeedJumpKmhPerSec = 54.0; // Gia tốc tối đa ~15 m/s² (~54 km/h mỗi giây)
+  static const double minMovingSpeedKmh = 3.0; // Dưới 3 km/h coi như đứng yên (chống trôi GPS)
+  static const int speedSmoothingWindow = 3; // Moving average 3 mẫu (~3 giây)
+  static const int gpsSampleMaxAgeSeconds = 3; // Mẫu quá 3 giây coi như cũ
+  static const int gpsWatchdogTimeoutSeconds = 4; // Quá 4s không có mẫu tốt báo mất GPS
+
+  // Speed Alert (Hysteresis & Debounce)
+  static const double speedAlertToleranceKmh = 1.0; // Vượt limit + 1 km/h
+  static const int speedAlertHoldSeconds = 2; // Duy trì vượt tốc 2s liên tục mới báo
+  static const int speedAlertRepeatSeconds = 10; // Giãn cách 10s nhắc lại 1 lần nếu vẫn quá tốc độ
+  static const double speedLimitChangeAnnounceCooldown = 10.0; // Cooldown báo đổi biển tốc độ
 }

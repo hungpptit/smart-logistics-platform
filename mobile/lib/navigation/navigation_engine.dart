@@ -8,9 +8,12 @@ import 'off_route_detector.dart';
 import 'polyline_codec.dart';
 import 'route_model.dart';
 import 'route_snapper.dart';
+import 'speed_limit_info.dart';
+import 'speed_processor.dart';
 import 'traffic_camera.dart';
 import 'voice_guide.dart';
 import '../services/camera_service.dart';
+import '../services/speed_limit_service.dart';
 
 /// State emitted by NavigationEngine on every position update or state transition
 class NavState {
@@ -36,6 +39,13 @@ class NavState {
   final TrafficCamera? nearbyAlertCamera;
   final double? distanceToCameraMeters;
 
+  // Speed Limit Alert State (Thông tư 38/2024/TT-BGTVT & OSM)
+  final int? currentSpeedLimitKmh;
+  final String? currentRoadName;
+  final bool isOverSpeed;
+  final bool isMotorcycleForbidden;
+  final SpeedLimitInfo? currentSpeedLimitInfo;
+
   const NavState({
     required this.snappedPosition,
     required this.rawGpsPosition,
@@ -56,6 +66,11 @@ class NavState {
     required this.isHeadUpMode,
     this.nearbyAlertCamera,
     this.distanceToCameraMeters,
+    this.currentSpeedLimitKmh,
+    this.currentRoadName,
+    this.isOverSpeed = false,
+    this.isMotorcycleForbidden = false,
+    this.currentSpeedLimitInfo,
   });
 
   factory NavState.initial() => NavState(
@@ -76,6 +91,11 @@ class NavState {
         isHeadUpMode: true,
         nearbyAlertCamera: null,
         distanceToCameraMeters: null,
+        currentSpeedLimitKmh: null,
+        currentRoadName: null,
+        isOverSpeed: false,
+        isMotorcycleForbidden: false,
+        currentSpeedLimitInfo: null,
       );
 }
 
@@ -88,11 +108,34 @@ class NavigationEngine extends ChangeNotifier {
   final OffRouteDetector _offRouteDetector = OffRouteDetector();
   final VoiceGuide _voiceGuide = VoiceGuide();
   final CameraService _cameraService = CameraService();
+  final SpeedLimitService _speedLimitService = SpeedLimitService();
+  final SpeedFilter _speedFilter = SpeedFilter();
+  final SpeedSmoother _speedSmoother = SpeedSmoother();
+  final SpeedAlert _speedAlert = SpeedAlert();
+  DateTime _lastValidGpsTime = DateTime.fromMillisecondsSinceEpoch(0);
+  int? _lastAnnouncedSpeedLimit;
+  DateTime? _lastSpeedLimitAnnouncedTime;
+
+  SpeedAlert get speedAlert => _speedAlert;
+  SpeedSmoother get speedSmoother => _speedSmoother;
+  SpeedFilter get speedFilter => _speedFilter;
 
   TrafficCamera? _activeAlertCamera;
 
   RerouteCallback? onRerouteRequested;
   LatLng? destination;
+
+  String _vehicleType = 'MOTORCYCLE';
+  double _truckWeightTons = 3.5;
+
+  String get vehicleType => _vehicleType;
+  double get truckWeightTons => _truckWeightTons;
+
+  void setVehicleType(String type, {double? truckWeightTons}) {
+    _vehicleType = type;
+    if (truckWeightTons != null) _truckWeightTons = truckWeightTons;
+    _prefetchSpeedLimits();
+  }
 
   int _currentStepIndex = 0;
   double _currentBearing = 0.0;
@@ -109,6 +152,9 @@ class NavigationEngine extends ChangeNotifier {
     await _cameraService.loadCameras();
     _cameraService.resetAnnouncements();
 
+    // Nạp giới hạn tốc độ đường bộ từ OSM & Thông tư 38/2024
+    _prefetchSpeedLimits();
+
     // Giữ một nhịp nghỉ ngắn để TTS engine trên Android sẵn sàng
     await Future.delayed(const Duration(milliseconds: 300));
 
@@ -122,6 +168,28 @@ class NavigationEngine extends ChangeNotifier {
       await _voiceGuide.speakInstruction(firstStep.instruction, prefix: prefix);
     } else {
       await _voiceGuide.speakInstruction(_voiceGuide.isVietnamese ? 'Bắt đầu di chuyển đến điểm tiếp theo' : 'Proceed to destination');
+    }
+  }
+
+  /// Nạp trước tốc độ cho toàn bộ lộ trình
+  Future<void> _prefetchSpeedLimits() async {
+    if (_route.steps.isEmpty) return;
+    try {
+      final speedMap = await _speedLimitService.prefetchForRoute(
+        _route.steps,
+        _vehicleType,
+        truckWeightTons: _truckWeightTons,
+      );
+      for (final step in _route.steps) {
+        if (speedMap.containsKey(step.index)) {
+          final info = speedMap[step.index];
+          step.speedLimitInfo = info;
+          step.speedLimitKmh = info?.speedLimit;
+        }
+      }
+      _updateState();
+    } catch (e) {
+      debugPrint('⚠️ [NavigationEngine] Lỗi nạp tốc độ giới hạn: $e');
     }
   }
 
@@ -149,7 +217,11 @@ class NavigationEngine extends ChangeNotifier {
     required RouteModel initialRoute,
     this.onRerouteRequested,
     this.destination,
-  }) : _route = initialRoute {
+    String vehicleType = 'MOTORCYCLE',
+    double truckWeightTons = 3.5,
+  })  : _route = initialRoute,
+        _vehicleType = vehicleType,
+        _truckWeightTons = truckWeightTons {
     _voiceGuide.init();
     if (_route.isNotEmpty) {
       _initFromRoute();
@@ -175,6 +247,12 @@ class NavigationEngine extends ChangeNotifier {
     _isFirstPosition = true;
     _snapper.reset();
     _offRouteDetector.reset();
+    _speedFilter.reset();
+    _speedSmoother.reset();
+    _speedAlert.reset();
+    _lastValidGpsTime = DateTime.fromMillisecondsSinceEpoch(0);
+    _lastAnnouncedSpeedLimit = null;
+    _lastSpeedLimitAnnouncedTime = null;
     _currentStepIndex = 0;
     _isArrived = false;
 
@@ -199,6 +277,7 @@ class NavigationEngine extends ChangeNotifier {
     _route = newRoute;
     _offRouteDetector.onRerouteSuccess();
     _initFromRoute();
+    _prefetchSpeedLimits();
     _voiceGuide.speakRerouting();
   }
 
@@ -206,19 +285,31 @@ class NavigationEngine extends ChangeNotifier {
   void processPosition(Position position) {
     if (_route.isEmpty) return;
 
-    // 1. Filter out bad GPS accuracy
-    if (position.accuracy > NavConfig.maxValidAccuracyMeters) {
+    // 1. Áp dụng bộ lọc chất lượng GPS (SpeedFilter theo Plan Lấy tốc độ hiện tại)
+    final sample = _speedFilter.process(position);
+    if (sample == null) {
+      // Watchdog: Nếu quá 4s không có mẫu tốt thì reset bộ làm mượt và cảnh báo
+      if (_lastValidGpsTime.millisecondsSinceEpoch > 0 &&
+          DateTime.now().difference(_lastValidGpsTime).inSeconds > NavConfig.gpsWatchdogTimeoutSeconds) {
+        _speedSmoother.reset();
+        _speedAlert.reset();
+        _updateState(speedKmh: 0.0);
+      }
       return;
     }
 
-    final rawGps = LatLng(position.latitude, position.longitude);
-    final speedMps = position.speed >= 0 ? position.speed : 0.0;
-    final speedKmh = speedMps * 3.6;
+    _lastValidGpsTime = DateTime.now();
 
-    // 2. Snap to route
+    // 2. Làm mượt tốc độ bằng Moving Average cửa sổ 3 mẫu (SpeedSmoother)
+    final smoothedSpeedKmh = _speedSmoother.add(sample.kmh);
+    final speedMps = smoothedSpeedKmh / 3.6;
+
+    final rawGps = LatLng(position.latitude, position.longitude);
+
+    // 3. Snap to route
     final snap = _snapper.snap(rawGps, _route);
 
-    // 3. Evaluate Off-route
+    // 4. Evaluate Off-route
     final isOffRouteNow = _offRouteDetector.evaluate(
       offRouteMeters: snap.offRouteMeters,
       accuracyMeters: position.accuracy,
@@ -231,7 +322,7 @@ class NavigationEngine extends ChangeNotifier {
       _triggerReroute(rawGps);
     }
 
-    // 4. Calculate Bearing
+    // 5. Calculate Bearing
     double targetBearing = _currentBearing;
     if (snap.offRouteMeters > NavConfig.offRouteMinDistanceMeters) {
       // Off-route: Use GPS heading if moving
@@ -249,10 +340,10 @@ class NavigationEngine extends ChangeNotifier {
       _currentBearing = smoothAngle(_currentBearing, targetBearing, NavConfig.smoothAngleFactor);
     }
 
-    // 5. Advance Steps
+    // 6. Advance Steps
     _evaluateStepProgress(snap.progressMeters, speedMps);
 
-    // 6. Voice Guidance
+    // 7. Voice Guidance
     if (_currentStepIndex < _route.steps.length) {
       final currentStep = _route.steps[_currentStepIndex];
       final nextStep = (_currentStepIndex + 1 < _route.steps.length) ? _route.steps[_currentStepIndex + 1] : null;
@@ -264,9 +355,40 @@ class NavigationEngine extends ChangeNotifier {
         distanceToTurnMeters: distToTurn,
         speedMps: speedMps,
       );
+
+      // 7.1 Xử lý cảnh báo vượt tốc độ (SpeedAlert với Hysteresis & Debounce)
+      final speedLimit = currentStep.speedLimitKmh;
+      final shouldAlert = _speedAlert.update(smoothedSpeedKmh, speedLimit);
+      if (shouldAlert && speedLimit != null) {
+        _voiceGuide.speakSpeedAlert(
+          speedLimit: speedLimit,
+          currentSpeed: smoothedSpeedKmh,
+        );
+      }
+
+      // 7.2 Thông báo khi tốc độ giới hạn thay đổi giữa 2 chặng đường
+      if (speedLimit != null && speedLimit != _lastAnnouncedSpeedLimit) {
+        final now = DateTime.now();
+        if (_lastSpeedLimitAnnouncedTime == null ||
+            now.difference(_lastSpeedLimitAnnouncedTime!).inSeconds >= NavConfig.speedLimitChangeAnnounceCooldown) {
+          _lastAnnouncedSpeedLimit = speedLimit;
+          _lastSpeedLimitAnnouncedTime = now;
+          _voiceGuide.speakSpeedLimitChanged(
+            newLimit: speedLimit,
+            roadName: currentStep.speedLimitInfo?.roadName ?? '',
+          );
+        }
+      }
+
+      // 7.3 Cảnh báo đường cấm xe máy (Cao tốc)
+      if (_vehicleType == 'MOTORCYCLE' && currentStep.speedLimitInfo?.motorcycleForbidden == true) {
+        if (!currentStep.announcedFar) {
+          _voiceGuide.speakMotorcycleForbidden();
+        }
+      }
     }
 
-    // 6.5. 🎯 Quét phát hiện Camera phạt nguội gần nhất (2 tầng: Bounding Box + WGS-84)
+    // 7.5. 🎯 Quét phát hiện Camera phạt nguội gần nhất (2 tầng: Bounding Box + WGS-84)
     final camResult = _cameraService.findNearbyAlertCamera(
       currentPosition: rawGps,
       searchRadiusMeters: 450.0,
@@ -291,20 +413,20 @@ class NavigationEngine extends ChangeNotifier {
       }
     }
 
-    // 7. Check Arrival
+    // 8. Check Arrival
     final remaining = math.max(0.0, _route.totalMeters - snap.progressMeters);
     if (!_isArrived && remaining <= NavConfig.arrivalDistanceMeters && _currentStepIndex >= _route.steps.length - 1) {
       _isArrived = true;
       _voiceGuide.speakArrival();
     }
 
-    // 8. Emit State
+    // 9. Emit State
     _updateState(
       snapped: snap.point,
       raw: rawGps,
       bearing: _currentBearing,
       progress: snap.progressMeters,
-      speedKmh: speedKmh,
+      speedKmh: smoothedSpeedKmh,
       isOffRoute: snap.offRouteMeters > NavConfig.offRouteMinDistanceMeters,
     );
   }
@@ -411,6 +533,12 @@ class NavigationEngine extends ChangeNotifier {
       remainingPoly = [pSnapped, ..._route.points.skip(segIdx + 1)];
     }
 
+    final curLimit = curStep?.speedLimitKmh;
+    final curRoad = curStep?.speedLimitInfo?.roadName;
+    // Vượt tốc độ giới hạn chuẩn xác có Hysteresis từ SpeedAlert
+    final isOver = _speedAlert.isActive;
+    final isMotoForbidden = (_vehicleType == 'MOTORCYCLE' && curStep?.speedLimitInfo?.motorcycleForbidden == true);
+
     _currentState = NavState(
       snappedPosition: pSnapped,
       rawGpsPosition: pRaw,
@@ -431,6 +559,11 @@ class NavigationEngine extends ChangeNotifier {
       isHeadUpMode: _isHeadUpMode,
       nearbyAlertCamera: _activeAlertCamera,
       distanceToCameraMeters: _activeAlertCamera?.currentDistanceMeters,
+      currentSpeedLimitKmh: curLimit,
+      currentRoadName: curRoad,
+      isOverSpeed: isOver,
+      isMotorcycleForbidden: isMotoForbidden,
+      currentSpeedLimitInfo: curStep?.speedLimitInfo,
     );
 
     notifyListeners();
