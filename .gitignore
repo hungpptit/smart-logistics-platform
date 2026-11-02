@@ -11,6 +11,12 @@ node_modules/
 *.zip
 *.tar.gz
 
+# AI Models
+models/
+*.gguf
+*.bin
+
+
 # Test fixtures and caches
 backend/src/scripts/test_fixtures/
 */test_fixtures/
