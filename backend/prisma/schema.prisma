@@ -286,6 +286,12 @@ enum DriverType {
   ON_DEMAND
 }
 
+enum ChatRole {
+  USER
+  ASSISTANT
+  TOOL
+}
+
 // ==========================================
 // MODULE 1: AUTHENTICATION & AUTHORIZATION
 // ==========================================
@@ -371,6 +377,7 @@ model Customer {
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   addresses    CustomerAddress[]
   orders       Order[]
+  chatConversations ChatConversation[]
 
   @@index([email], name: "idx_customer_email")
   @@map("customers")
@@ -1189,4 +1196,44 @@ model TrafficCamera {
   @@index([latitude, longitude], name: "idx_traffic_cameras_coords")
   @@index([isActive], name: "idx_traffic_cameras_active")
   @@map("traffic_cameras")
+}
+
+// ==========================================
+// MODULE 11: AI CHATBOT & CONVERSATIONS
+// ==========================================
+
+model ChatConversation {
+  id         String        @id @default(uuid()) @db.Uuid
+  customerId String        @map("customer_id") @db.Uuid
+  title      String?       @db.VarChar(255)
+  status     String        @default("ACTIVE") @db.VarChar(30)
+  closedAt   DateTime?     @map("closed_at") @db.Timestamptz
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  customer   Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  messages   ChatMessage[]
+
+  @@index([customerId, updatedAt(sort: Desc)], name: "idx_chat_conversations_customer")
+  @@index([customerId, status], name: "idx_chat_conversations_status")
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id             String           @id @default(uuid()) @db.Uuid
+  conversationId String           @map("conversation_id") @db.Uuid
+  role           ChatRole
+  content        String?          @db.Text
+  imageUrl       String?          @map("image_url") @db.Text
+  toolCallId     String?          @map("tool_call_id") @db.VarChar(100)
+  toolName       String?          @map("tool_name") @db.VarChar(100)
+  toolArgs       Json?            @map("tool_args")
+  toolResult     Json?            @map("tool_result")
+  status         String?          @default("SENT") @db.VarChar(30)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt], name: "idx_chat_messages_conversation")
+  @@map("chat_messages")
 }

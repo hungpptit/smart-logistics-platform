@@ -729,6 +729,40 @@ Trên mỗi bảng đều được bổ sung mục **📌 Chức năng của b�
 
 ---
 
+### 44. Bảng `chat_conversations` (Cuộc trò chuyện Trợ lý AI Khách hàng)
+📌 **Chức năng của bảng:** Quản lý các phiên hội thoại (Chat Sessions / Conversations) của khách hàng với Trợ lý AI CSKH. Hỗ trợ khách hàng mở lại lịch sử chat khi tải lại trang web hoặc đổi thiết bị.
+
+| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
+| :--- | :--- | :--- | :--- |
+| `id` | UUID | **Khóa chính (PK)** | Mã định danh duy nhất của cuộc trò chuyện (UUID) |
+| `customer_id` | UUID | **Khóa ngoại (FK ➔ bảng customers)** | Khách hàng sở hữu cuộc hội thoại (ON DELETE CASCADE) |
+| `title` | VarChar(255) | Tùy chọn | Tiêu đề tóm tắt cuộc trò chuyện (vd: `Tra cứu đơn ORD-TD-046`) |
+| `status` | VarChar(30) | Mặc định `'ACTIVE'` | Trạng thái phiên chat (`ACTIVE`: đang hoạt động, `CLOSED`: đã đóng do hết thời gian chờ hoặc kết thúc) |
+| `closed_at` | Timestamptz | Tùy chọn | Thời điểm đóng phiên chat (khi hết 5 phút không phản hồi hoặc người dùng kết thúc) |
+| `created_at` | Timestamptz | Mặc định `NOW()` | Thời điểm bắt đầu tạo cuộc trò chuyện |
+| `updated_at` | Timestamptz | Mặc định `NOW()` | Thời điểm cập nhật tin nhắn cuối cùng (dùng để sắp xếp gần đây) |
+
+---
+
+### 45. Bảng `chat_messages` (Chi tiết Tin nhắn & Nhật ký Function Calling)
+📌 **Chức năng của bảng:** Lưu trữ chi tiết từng tin nhắn trao đổi trong cuộc trò chuyện, lưu ảnh kiện hàng đính kèm và ghi vết kiểm toán (Audit Trail) cho các lượt gọi Function Calling của AI.
+
+| Tên trường | Kiểu dữ liệu | Loại Khóa & Ràng buộc | Ý nghĩa & Ví dụ thực tế |
+| :--- | :--- | :--- | :--- |
+| `id` | UUID | **Khóa chính (PK)** | Mã định danh duy nhất của tin nhắn (UUID) |
+| `conversation_id` | UUID | **Khóa ngoại (FK ➔ bảng chat_conversations)** | Thuộc về cuộc trò chuyện nào (ON DELETE CASCADE) |
+| `role` | `ChatRole` | Bắt buộc (ENUM) | Vai trò phát biểu: `USER` (Khách), `ASSISTANT` (AI), `TOOL` (Dữ liệu DB) |
+| `content` | Text | Tùy chọn (Cho phép null khi chỉ gọi tool) | Nội dung văn bản hiển thị trong khung chat |
+| `image_url` | Text | Tùy chọn | Chuỗi Base64 hoặc URL ảnh kiện hàng hư hỏng/hóa đơn |
+| `tool_call_id` | VarChar(100) | Tùy chọn | Định danh cuộc gọi tool từ mô hình ngôn ngữ lớn |
+| `tool_name` | VarChar(100) | Tùy chọn | Tên function được AI gọi (vd: `track_order`, `estimate_shipping_fee`) |
+| `tool_args` | JSONB | Tùy chọn | Tham số đầu vào AI gửi cho tool |
+| `tool_result` | JSONB | Tùy chọn | Dữ liệu kết quả thực tế từ DB trả về cho tool (đã mask dữ liệu nhạy cảm) |
+| `status` | VarChar(30) | Mặc định `'SENT'` | Trạng thái tin nhắn (`SENT`, `OK`, `ERROR`, `NOT_FOUND`, `NOT_ALLOWED`) |
+| `created_at` | Timestamptz | Mặc định `NOW()` | Thời điểm gửi tin nhắn |
+
+---
+
 ## 💡 KẾT LUẬN
 
 Tài liệu Tự điển CSDL này hiện tại đã có đầy đủ mục **📌 Chức năng của bảng** trên tất cả các bảng dữ liệu, được bổ sung chi tiết về **Khóa chính (PK)**, **Khóa ngoại (FK)**, **Cặp khóa chính (Composite PK)**, **Khóa ngoại 1-1** và đồng bộ 100% với mã nguồn Prisma Schema (`schema.prisma`) và Báo cáo Thẩm định Kiến trúc. 

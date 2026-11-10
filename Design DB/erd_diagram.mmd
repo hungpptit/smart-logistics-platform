@@ -433,3 +433,31 @@ erDiagram
     }
     
     Users ||--o{ SystemSettings : "configured_by"
+
+    %% ==========================================
+    %% MODULE 11: AI CHATBOT & CONVERSATIONS
+    %% ==========================================
+    ChatConversations {
+        uuid id PK
+        uuid customer_id FK
+        varchar title
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    ChatMessages {
+        uuid id PK
+        uuid conversation_id FK
+        chat_role_enum role
+        text content
+        text image_url
+        varchar tool_call_id
+        varchar tool_name
+        jsonb tool_args
+        jsonb tool_result
+        varchar status
+        timestamptz created_at
+    }
+
+    Customers ||--o{ ChatConversations : "has_conversations"
+    ChatConversations ||--o{ ChatMessages : "contains_messages"

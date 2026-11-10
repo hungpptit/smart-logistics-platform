@@ -220,5 +220,26 @@
 
 ---
 
+## 8. Module 11: AI Chatbot & Conversations (Trợ lý AI & Hội thoại)
+
+### 8.1. `ChatRole` (Vai trò Thực thể trong Lượt chat)
+📌 **Phạm vi áp dụng**: Bảng `chat_messages`.
+
+| Giá trị ENUM | Ý nghĩa Nghiệp vụ | Chi Tiết Sử Dụng |
+| :--- | :--- | :--- |
+| `USER` | Khách hàng | Tin nhắn câu hỏi, yêu cầu tra cứu hoặc ảnh kiện hàng do người dùng gửi lên. |
+| `ASSISTANT` | Trợ lý AI Nemotron | Phản hồi của mô hình ngôn ngữ lớn (trả lời văn bản hoặc lượt yêu cầu gọi tool). |
+| `TOOL` | Kết quả từ Hệ thống/DB | Dữ liệu thực tế từ Database / Pricing trả về cho lượt gọi Tool tương ứng (`tool_call_id`). |
+
+### 8.2. Trạng thái Cuộc trò chuyện (`ChatConversation.status`)
+📌 **Phạm vi áp dụng**: Bảng `chat_conversations`.
+
+| Trạng thái | Ý nghĩa Nghiệp vụ | Chi Tiết Sử Dụng |
+| :--- | :--- | :--- |
+| `ACTIVE` | Đang mở / Hoạt động | Phiên chat đang hoạt động bình thường, khách hàng và AI có thể tiếp tục trao đổi. |
+| `CLOSED` | Đã đóng / Kết thúc | Phiên chat đã kết thúc (do quá 5 phút khách hàng không phản hồi theo Shopee Style hoặc người dùng chủ động bấm Làm mới/Tạo phiên mới). Ô nhập tin nhắn sẽ khóa và cần mở phiên mới. |
+
+---
+
 📄 *Tài liệu giải thích ENUMs được khởi tạo & lưu chính thức tại*:  
 👉 **[STATUS_ENUMS_EXPLANATION.md](file:///d:/smart-logistics-platform/Design%20DB/STATUS_ENUMS_EXPLANATION.md)**

@@ -491,6 +491,26 @@ def build_excel():
                 ["20185", "Phường Hải Châu 1", "Hai Chau 1 Ward", "Phường Hải Châu 1", "Hai Chau 1 Ward", "hai_chau_1", "48", 1],
                 ["31117", "Phường Tân An", "Tan An Ward", "Phường Tân An", "Tan An Ward", "tan_an", "92", 1]
             ]
+        },
+        # 41. chat_conversations
+        {
+            "name": "chat_conversations (Cuộc trò chuyện Trợ lý AI Khách hàng)",
+            "headers": ["id", "customer_id", "title", "created_at", "updated_at"],
+            "rows": [
+                ["conv-01", "cus-01", "Tra cứu đơn hàng ORD-TD-046", "2026-11-10 09:30:00", "2026-11-10 09:32:00"],
+                ["conv-02", "cus-01", "Hỏi chính sách bồi thường hàng hư hỏng", "2026-11-10 10:00:00", "2026-11-10 10:05:00"]
+            ]
+        },
+        # 42. chat_messages
+        {
+            "name": "chat_messages (Chi tiết Tin nhắn & Nhật ký Function Calling)",
+            "headers": ["id", "conversation_id", "role", "content", "image_url", "tool_call_id", "tool_name", "tool_args", "tool_result", "status", "created_at"],
+            "rows": [
+                ["msg-01", "conv-01", "USER", "Đơn hàng ORD-TD-046 của tôi đang ở đâu?", None, None, None, None, None, "SENT", "2026-11-10 09:30:00"],
+                ["msg-02", "conv-01", "ASSISTANT", None, None, "call_abc123", "track_order", '{"orderCode": "ORD-TD-046"}', None, "SENT", "2026-11-10 09:30:02"],
+                ["msg-03", "conv-01", "TOOL", None, None, "call_abc123", "track_order", None, '{"status": "OUT_FOR_DELIVERY", "station": "Bưu cục Linh Trung"}', "OK", "2026-11-10 09:30:03"],
+                ["msg-04", "conv-01", "ASSISTANT", "Đơn hàng ORD-TD-046 của bạn đang được shipper giao từ Bưu cục Linh Trung ạ.", None, None, None, None, None, "SENT", "2026-11-10 09:30:05"]
+            ]
         }
     ]
 

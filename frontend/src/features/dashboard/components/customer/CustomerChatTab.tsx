@@ -1,5 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, RotateCcw, HelpCircle, Paperclip, X, Maximize2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  Send,
+  Bot,
+  User,
+  Sparkles,
+  RotateCcw,
+  HelpCircle,
+  Paperclip,
+  X,
+  Maximize2,
+  Clock,
+  MessageSquarePlus,
+} from 'lucide-react';
 import { CONFIG } from '../../../../config';
 
 interface ChatMessage {
@@ -32,16 +44,148 @@ export const CustomerChatTab: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isSessionClosed, setIsSessionClosed] = useState<boolean>(false);
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const reminderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const closingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  /**
+   * Hủy các bộ đếm thời gian timeout khi người dùng có hoạt động mới
+   */
+  const clearInactivityTimers = useCallback(() => {
+    if (reminderTimeoutRef.current) {
+      clearTimeout(reminderTimeoutRef.current);
+      reminderTimeoutRef.current = null;
+    }
+    if (closingTimeoutRef.current) {
+      clearTimeout(closingTimeoutRef.current);
+      closingTimeoutRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Kích hoạt bộ đếm thời gian không hoạt động (Shopee CSKH Style)
+   * - 3 phút (180.000ms): Tự động gửi tin nhắn hỏi thăm còn thắc mắc gì nữa không.
+   * - 5 phút (300.000ms): Tự động đóng phiên chat và khóa khung nhập.
+   */
+  const startInactivityTimers = useCallback(
+    (convId: string) => {
+      clearInactivityTimers();
+      if (!convId || isSessionClosed) return;
+
+      // Mốc 3 phút (180.000ms)
+      reminderTimeoutRef.current = setTimeout(async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`${CONFIG.API_BASE_URL}/chat/customer/timeout-check`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ conversationId: convId, action: 'REMINDER_3M' }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success && data.action === 'REMINDED' && data.message) {
+            setMessages((prev) => [...prev, data.message]);
+          }
+        } catch (err) {
+          console.error('Lỗi khi kích hoạt timeout nhắc nhở 3 phút:', err);
+        }
+      }, 3 * 60 * 1000);
+
+      // Mốc 5 phút (300.000ms)
+      closingTimeoutRef.current = setTimeout(async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`${CONFIG.API_BASE_URL}/chat/customer/timeout-check`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ conversationId: convId, action: 'CLOSE_5M' }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success && data.action === 'CLOSED') {
+            if (data.message) {
+              setMessages((prev) => [...prev, data.message]);
+            }
+            setIsSessionClosed(true);
+          }
+        } catch (err) {
+          console.error('Lỗi khi kích hoạt timeout đóng phiên 5 phút:', err);
+        }
+      }, 5 * 60 * 1000);
+    },
+    [clearInactivityTimers, isSessionClosed]
+  );
+
+  /**
+   * Tự động tải lại lịch sử cuộc trò chuyện gần nhất từ Database khi mở tab (Phương án A)
+   */
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, loading]);
+    const fetchActiveConversation = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setInitialLoading(false);
+          return;
+        }
+
+        const res = await fetch(`${CONFIG.API_BASE_URL}/chat/customer/active`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success && data.data) {
+          if (data.data.conversationId) {
+            setConversationId(data.data.conversationId);
+          }
+          if (Array.isArray(data.data.messages) && data.data.messages.length > 0) {
+            setMessages(data.data.messages);
+          }
+          if (data.data.isClosed) {
+            setIsSessionClosed(true);
+          } else {
+            setIsSessionClosed(false);
+            if (data.data.conversationId && Array.isArray(data.data.messages) && data.data.messages.length > 0) {
+              const last = data.data.messages[data.data.messages.length - 1];
+              if (last && last.sender === 'ai') {
+                startInactivityTimers(data.data.conversationId);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Lỗi khi tải lịch sử cuộc trò chuyện:', err);
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    fetchActiveConversation();
+
+    return () => {
+      clearInactivityTimers();
+    };
+  }, [clearInactivityTimers, startInactivityTimers]);
+
+  useEffect(() => {
+    if (!initialLoading) {
+      scrollToBottom();
+    }
+  }, [messages, loading, initialLoading]);
 
   /**
    * Xử lý khi người dùng chọn đính kèm file ảnh
@@ -92,12 +236,68 @@ export const CustomerChatTab: React.FC = () => {
     e.target.value = '';
   };
 
+  /**
+   * Bắt đầu một phiên trò chuyện mới sạch sẽ
+   */
+  const handleResetChat = async () => {
+    clearInactivityTimers();
+    setIsSessionClosed(false);
+    setSelectedImage(null);
+
+    let newId: string | null = null;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${CONFIG.API_BASE_URL}/chat/customer/new`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.data?.conversationId) {
+        newId = data.data.conversationId;
+        setConversationId(newId);
+      } else {
+        setConversationId(null);
+      }
+    } catch (err) {
+      console.error('Lỗi khi tạo phiên trò chuyện mới:', err);
+      setConversationId(null);
+    }
+
+    setMessages([
+      {
+        id: 'welcome',
+        sender: 'ai',
+        text: 'Cuộc trò chuyện đã được làm mới. Quý khách cần tra cứu hoặc hỗ trợ thông tin gì ạ?',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
+
+    return newId;
+  };
+
+  /**
+   * Gửi tin nhắn câu hỏi tới AI
+   */
   const handleSend = async (questionText?: string) => {
     const textToSend = (questionText || input).trim();
     if ((!textToSend && !selectedImage) || loading) return;
 
+    // Người dùng đã tương tác: hủy mọi timer timeout cũ ngay lập tức
+    clearInactivityTimers();
+
+    let targetConvId = conversationId;
+
+    // Nếu phiên trước đó đã bị đóng, tự động tạo mới phiên chat trước khi gửi
+    if (isSessionClosed) {
+      targetConvId = await handleResetChat();
+    }
+
     const currentImage = selectedImage;
-    const displayText = textToSend || 'Kiểm tra hình ảnh kiện hàng này giúp tôi và hướng dẫn quy trình bồi thường / khiếu nại.';
+    const displayText =
+      textToSend || 'Kiểm tra hình ảnh kiện hàng này giúp tôi và hướng dẫn quy trình bồi thường / khiếu nại.';
 
     const userMsgId = `user-${Date.now()}`;
     const newMsg: ChatMessage = {
@@ -124,6 +324,7 @@ export const CustomerChatTab: React.FC = () => {
         body: JSON.stringify({
           message: displayText,
           image: currentImage || undefined,
+          conversationId: targetConvId || undefined,
           conversationHistory: messages.slice(-4),
         }),
       });
@@ -131,6 +332,11 @@ export const CustomerChatTab: React.FC = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        const updatedConvId = data.data.conversationId || targetConvId;
+        if (updatedConvId) {
+          setConversationId(updatedConvId);
+        }
+
         const aiMsg: ChatMessage = {
           id: `ai-${Date.now()}`,
           sender: 'ai',
@@ -138,11 +344,18 @@ export const CustomerChatTab: React.FC = () => {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
         setMessages((prev) => [...prev, aiMsg]);
+
+        // Sau khi AI phản hồi, bắt đầu đếm ngược 3 phút & 5 phút không hoạt động
+        if (updatedConvId) {
+          startInactivityTimers(updatedConvId);
+        }
       } else {
         const errorMsg: ChatMessage = {
           id: `ai-err-${Date.now()}`,
           sender: 'ai',
-          text: data.message || 'Xin lỗi quý khách, hệ thống AI đang bận xử lý. Quý khách vui lòng thử lại sau giây lát ạ!',
+          text:
+            data.message ||
+            'Xin lỗi quý khách, hệ thống AI đang bận xử lý. Quý khách vui lòng thử lại sau giây lát ạ!',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
         setMessages((prev) => [...prev, errorMsg]);
@@ -159,18 +372,6 @@ export const CustomerChatTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleResetChat = () => {
-    setSelectedImage(null);
-    setMessages([
-      {
-        id: 'welcome',
-        sender: 'ai',
-        text: 'Cuộc trò chuyện đã được làm mới. Quý khách cần tra cứu hoặc hỗ trợ thông tin gì ạ?',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
   };
 
   /**
@@ -246,7 +447,11 @@ export const CustomerChatTab: React.FC = () => {
       if (isBullet) {
         return (
           <div key={lineIdx} className="flex items-start gap-2 my-1 pl-1">
-            <span className={isUser ? 'text-white font-bold leading-tight' : 'text-[#bc0100] font-bold leading-tight'}>
+            <span
+              className={
+                isUser ? 'text-white font-bold leading-tight' : 'text-[#bc0100] font-bold leading-tight'
+              }
+            >
               •
             </span>
             <div className="flex-1 leading-relaxed">{parts}</div>
@@ -276,15 +481,27 @@ export const CustomerChatTab: React.FC = () => {
               <span className="flex items-center gap-1 text-[10px] font-bold bg-[#bc0100] text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
                 <Sparkles size={10} /> RAG & Vision
               </span>
+              {/* Badge trạng thái phiên trò chuyện */}
+              {isSessionClosed ? (
+                <span className="flex items-center gap-1 text-[10px] font-bold bg-amber-900/80 text-amber-200 border border-amber-600/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <Clock size={10} /> Đã đóng
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Đang kết nối
+                </span>
+              )}
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">Hỗ trợ tra cứu chính sách và giám định hình ảnh kiện hàng hư hỏng trực tuyến</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Hỗ trợ tra cứu chính sách và giám định hình ảnh kiện hàng hư hỏng trực tuyến
+            </p>
           </div>
         </div>
 
         <button
           onClick={handleResetChat}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition-colors border border-gray-700 cursor-pointer"
-          title="Làm mới cuộc trò chuyện"
+          title="Bắt đầu cuộc trò chuyện mới"
         >
           <RotateCcw size={14} />
           <span className="hidden sm:inline">Làm mới</span>
@@ -301,7 +518,7 @@ export const CustomerChatTab: React.FC = () => {
             key={idx}
             onClick={() => handleSend(q)}
             disabled={loading}
-            className="shrink-0 text-xs font-medium text-gray-700 bg-white hover:bg-[#bc0100] hover:text-white border border-gray-300 hover:border-[#bc0100] px-3 py-1 rounded-full transition-all cursor-pointer shadow-2xs"
+            className="shrink-0 text-xs font-medium text-gray-700 bg-white hover:bg-[#bc0100] hover:text-white border border-gray-300 hover:border-[#bc0100] px-3 py-1 rounded-full transition-all cursor-pointer shadow-2xs disabled:opacity-50"
           >
             {q}
           </button>
@@ -369,8 +586,14 @@ export const CustomerChatTab: React.FC = () => {
               <span className="text-xs text-gray-500 font-medium">Trợ lý AI đang tra cứu cẩm nang và trả lời...</span>
               <div className="flex gap-1">
                 <span className="w-2 h-2 rounded-full bg-[#bc0100] animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 rounded-full bg-[#bc0100] animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 rounded-full bg-[#bc0100] animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span
+                  className="w-2 h-2 rounded-full bg-[#bc0100] animate-bounce"
+                  style={{ animationDelay: '150ms' }}
+                />
+                <span
+                  className="w-2 h-2 rounded-full bg-[#bc0100] animate-bounce"
+                  style={{ animationDelay: '300ms' }}
+                />
               </div>
             </div>
           </div>
@@ -379,87 +602,122 @@ export const CustomerChatTab: React.FC = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Box Bar */}
+      {/* Input Box Bar / Session Closed Banner */}
       <div className="p-4 bg-white border-t border-gray-200">
-        {/* Thumbnail Preview khi đã chọn ảnh */}
-        {selectedImage && (
-          <div className="mb-2 flex items-center gap-2.5 bg-red-50 border border-red-200 p-2 rounded-lg w-fit">
-            <div className="relative">
-              <img
-                src={selectedImage}
-                alt="Đã chọn"
-                className="w-14 h-14 object-cover rounded-md border border-red-300"
-              />
+        {isSessionClosed ? (
+          /* Khối thông báo Đóng phiên trò chuyện (Shopee CSKH Style) */
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2.5 text-left">
+              <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
+                <Clock size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-amber-900">
+                  Phiên trò chuyện đã tự động kết thúc do không nhận được phản hồi sau 5 phút
+                </p>
+                <p className="text-[11px] text-amber-700/90 mt-0.5">
+                  Quý khách có thể bắt đầu phiên hỗ trợ mới bất cứ lúc nào bằng nút bên cạnh hoặc chọn câu hỏi gợi ý phía trên.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleResetChat}
+              className="w-full sm:w-auto px-5 py-2.5 bg-[#bc0100] hover:bg-[#a00100] text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer shrink-0"
+            >
+              <MessageSquarePlus size={15} />
+              <span>Bắt đầu cuộc trò chuyện mới</span>
+            </button>
+          </div>
+        ) : (
+          /* Khung nhập tin nhắn hoạt động bình thường */
+          <>
+            {/* Thumbnail Preview khi đã chọn ảnh */}
+            {selectedImage && (
+              <div className="mb-2 flex items-center gap-2.5 bg-red-50 border border-red-200 p-2 rounded-lg w-fit">
+                <div className="relative">
+                  <img
+                    src={selectedImage}
+                    alt="Đã chọn"
+                    className="w-14 h-14 object-cover rounded-md border border-red-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSelectedImage(null)}
+                    className="absolute -top-1.5 -right-1.5 bg-[#bc0100] text-white rounded-full p-0.5 hover:bg-black transition-colors cursor-pointer shadow"
+                    title="Hủy ảnh này"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+                <div className="text-xs text-gray-700">
+                  <p className="font-bold text-[#bc0100]">Đã đính kèm 1 ảnh</p>
+                  <p className="text-[11px] text-gray-500">
+                    AI sẽ phân tích tình trạng kiện hàng hoặc tem vận đơn
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Hidden File Input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageSelect}
+            />
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSend();
+              }}
+              className="flex items-center gap-2"
+            >
+              {/* Nút bấm Đính kèm hình ảnh */}
               <button
                 type="button"
-                onClick={() => setSelectedImage(null)}
-                className="absolute -top-1.5 -right-1.5 bg-[#bc0100] text-white rounded-full p-0.5 hover:bg-black transition-colors cursor-pointer shadow"
-                title="Hủy ảnh này"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading}
+                title="Đính kèm hình ảnh kiện hàng hư hỏng hoặc phiếu giao hàng"
+                className="p-3 text-gray-500 hover:text-[#bc0100] hover:bg-red-50 rounded-lg transition-colors border border-gray-300 cursor-pointer disabled:opacity-50 shrink-0"
               >
-                <X size={12} />
+                <Paperclip size={18} />
               </button>
+
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  clearInactivityTimers();
+                }}
+                placeholder={
+                  selectedImage
+                    ? 'Nhập mô tả thêm về ảnh (hoặc nhấn Gửi để AI phân tích ngay)...'
+                    : 'Nhập câu hỏi của bạn (ví dụ: Làm thế nào để hủy đơn hàng?)...'
+                }
+                disabled={loading}
+                className="flex-1 bg-gray-50 border border-gray-300 focus:border-[#bc0100] focus:ring-1 focus:ring-[#bc0100] rounded-lg px-4 py-3 text-sm text-gray-800 outline-none transition-all placeholder:text-gray-400"
+              />
+
+              <button
+                type="submit"
+                disabled={loading || (!input.trim() && !selectedImage)}
+                className="bg-[#bc0100] hover:bg-[#a00100] disabled:bg-gray-300 text-white px-5 py-3 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-sm disabled:cursor-not-allowed shrink-0"
+              >
+                <span>Gửi</span>
+                <Send size={15} />
+              </button>
+            </form>
+
+            <div className="flex justify-between items-center mt-2 px-1 text-[11px] text-gray-400">
+              <span>* Hỗ trợ hỏi đáp chính sách và phân tích ảnh kiện hàng hư hỏng từ AI Velocity.</span>
+              <span className="hidden sm:inline">Nhấn Enter để gửi</span>
             </div>
-            <div className="text-xs text-gray-700">
-              <p className="font-bold text-[#bc0100]">Đã đính kèm 1 ảnh</p>
-              <p className="text-[11px] text-gray-500">AI sẽ phân tích tình trạng kiện hàng hoặc tem vận đơn</p>
-            </div>
-          </div>
+          </>
         )}
-
-        {/* Hidden File Input */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept="image/*"
-          className="hidden"
-          onChange={handleImageSelect}
-        />
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-          className="flex items-center gap-2"
-        >
-          {/* Nút bấm Đính kèm hình ảnh */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={loading}
-            title="Đính kèm hình ảnh kiện hàng hư hỏng hoặc phiếu giao hàng"
-            className="p-3 text-gray-500 hover:text-[#bc0100] hover:bg-red-50 rounded-lg transition-colors border border-gray-300 cursor-pointer disabled:opacity-50 shrink-0"
-          >
-            <Paperclip size={18} />
-          </button>
-
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              selectedImage
-                ? 'Nhập mô tả thêm về ảnh (hoặc nhấn Gửi để AI phân tích ngay)...'
-                : 'Nhập câu hỏi của bạn (ví dụ: Làm thế nào để hủy đơn hàng?)...'
-            }
-            disabled={loading}
-            className="flex-1 bg-gray-50 border border-gray-300 focus:border-[#bc0100] focus:ring-1 focus:ring-[#bc0100] rounded-lg px-4 py-3 text-sm text-gray-800 outline-none transition-all placeholder:text-gray-400"
-          />
-
-          <button
-            type="submit"
-            disabled={loading || (!input.trim() && !selectedImage)}
-            className="bg-[#bc0100] hover:bg-[#a00100] disabled:bg-gray-300 text-white px-5 py-3 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-sm disabled:cursor-not-allowed shrink-0"
-          >
-            <span>Gửi</span>
-            <Send size={15} />
-          </button>
-        </form>
-
-        <div className="flex justify-between items-center mt-2 px-1 text-[11px] text-gray-400">
-          <span>* Hỗ trợ hỏi đáp chính sách và phân tích ảnh kiện hàng hư hỏng từ AI Velocity.</span>
-          <span className="hidden sm:inline">Nhấn Enter để gửi</span>
-        </div>
       </div>
 
       {/* Modal phóng to ảnh */}

@@ -136,3 +136,71 @@ export const requireRoles = (allowedRoles: string[]) => {
     }
   };
 };
+
+/**
+ * Middleware xác thực tùy chọn (Optional Auth):
+ * Nếu có Bearer token hợp lệ thì giải mã gắn req.user, nếu không có token hoặc token sai thì vẫn cho đi tiếp mà không chặn lỗi.
+ */
+export const optionalAuthMiddleware = async (
+  req: RequestWithUser,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return next();
+    }
+
+    const token = authHeader.split(' ')[1];
+    const jwtSecret = process.env.JWT_SECRET || 'super_secret_key_slp_2026';
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, jwtSecret);
+    } catch {
+      return next();
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { id: decoded.id, status: 'ACTIVE' },
+      include: {
+        staff: true,
+        customer: true,
+        role: {
+          include: {
+            rolePermissions: {
+              include: {
+                permission: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (user && user.status === 'ACTIVE') {
+      const roles = user.role ? [user.role.roleCode] : [];
+      const permissions: string[] = user.role?.rolePermissions
+        ? Array.from(
+            new Set(
+              user.role.rolePermissions.map((rp: any) => rp.permission.permissionCode)
+            )
+          )
+        : [];
+      const profileEmail = user.staff?.email || user.customer?.email || '';
+
+      req.user = {
+        id: user.id,
+        username: user.username,
+        email: profileEmail,
+        roles,
+        permissions,
+      };
+    }
+
+    next();
+  } catch {
+    next();
+  }
+};
