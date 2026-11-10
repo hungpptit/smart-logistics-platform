@@ -30,24 +30,38 @@ export class RagService {
     this.chunks = [];
     const knowledgeDir = path.resolve(__dirname, 'knowledge');
 
-    // 1. Nạp cẩm nang tài xế (SHIPPER)
-    const driverPath = path.join(knowledgeDir, 'driver_handbook.md');
-    if (fs.existsSync(driverPath)) {
-      const content = fs.readFileSync(driverPath, 'utf-8');
-      const driverChunks = this.chunkMarkdown(content, 'SHIPPER', 'driver_handbook');
+    // 1. Nạp cẩm nang tài xế (SHIPPER) từ thư mục driver/
+    const driverDir = path.join(knowledgeDir, 'driver');
+    const driverFiles = this.loadMarkdownFilesFromDir(driverDir);
+    if (driverFiles.length === 0) {
+      const driverPath = path.join(knowledgeDir, 'driver_handbook.md');
+      if (fs.existsSync(driverPath)) {
+        driverFiles.push({ name: 'driver_handbook.md', content: fs.readFileSync(driverPath, 'utf-8') });
+      }
+    }
+    for (const f of driverFiles) {
+      const prefix = f.name.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_');
+      const driverChunks = this.chunkMarkdown(f.content, 'SHIPPER', prefix);
       this.chunks.push(...driverChunks);
     }
 
-    // 2. Nạp chính sách khách hàng (CUSTOMER)
-    const customerPath = path.join(knowledgeDir, 'customer_policies.md');
-    if (fs.existsSync(customerPath)) {
-      const content = fs.readFileSync(customerPath, 'utf-8');
-      const customerChunks = this.chunkMarkdown(content, 'CUSTOMER', 'customer_policies');
+    // 2. Nạp chính sách khách hàng (CUSTOMER) từ thư mục customer/
+    const customerDir = path.join(knowledgeDir, 'customer');
+    const customerFiles = this.loadMarkdownFilesFromDir(customerDir);
+    if (customerFiles.length === 0) {
+      const customerPath = path.join(knowledgeDir, 'customer_policies.md');
+      if (fs.existsSync(customerPath)) {
+        customerFiles.push({ name: 'customer_policies.md', content: fs.readFileSync(customerPath, 'utf-8') });
+      }
+    }
+    for (const f of customerFiles) {
+      const prefix = f.name.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_');
+      const customerChunks = this.chunkMarkdown(f.content, 'CUSTOMER', prefix);
       this.chunks.push(...customerChunks);
     }
 
     this.isInitialized = true;
-    console.log(`[RagService] Đã nạp ${this.chunks.length} phân đoạn tri thức (chunks) vào bộ nhớ.`);
+    console.log(`[RagService] Đã nạp thành công ${this.chunks.length} phân đoạn tri thức (chunks) từ thư mục knowledge.`);
 
     // 3. Nếu có API key, tự động tạo embedding vector cho các chunks
     const hasKey =
@@ -60,20 +74,98 @@ export class RagService {
     }
   }
 
+  private loadMarkdownFilesFromDir(dirPath: string): Array<{ name: string; content: string }> {
+    if (!fs.existsSync(dirPath)) return [];
+    const entries = fs.readdirSync(dirPath);
+    const files: Array<{ name: string; content: string }> = [];
+    for (const entry of entries) {
+      if (entry.toLowerCase().endsWith('.md')) {
+        const fullPath = path.join(dirPath, entry);
+        if (fs.statSync(fullPath).isFile()) {
+          files.push({
+            name: entry,
+            content: fs.readFileSync(fullPath, 'utf-8'),
+          });
+        }
+      }
+    }
+    return files;
+  }
+
   /**
-   * Tạo vector embedding cho tất cả các chunk bằng NVIDIA Nemotron Embed 8B
+   * Tạo vector embedding cho tất cả các chunk bằng NVIDIA Nemotron Embed 8B (có cache trên ổ đĩa)
    */
   public async generateEmbeddings(): Promise<void> {
-    console.log('[RagService] Đang tính toán vector embedding với nvidia/nemotron-3.5-embed-8b...');
+    const cache = this.loadCache();
+    let cacheHits = 0;
+    let newlyComputed = 0;
+
+    console.log('[RagService] Đang kiểm tra và đồng bộ vector embedding cho các chunks...');
     try {
       for (let i = 0; i < this.chunks.length; i++) {
-        const text = `${this.chunks[i].title}\n${this.chunks[i].content}`;
-        const embedding = await nvidiaEmbeddingService.createEmbedding(text, 'passage');
-        this.chunks[i].embedding = embedding;
+        const chunk = this.chunks[i];
+        const text = `${chunk.title}\n${chunk.content}`;
+        const hash = this.simpleHash(text);
+
+        if (cache[chunk.id] && cache[chunk.id].hash === hash && cache[chunk.id].embedding) {
+          chunk.embedding = cache[chunk.id].embedding;
+          cacheHits++;
+        } else {
+          const embedding = await nvidiaEmbeddingService.createEmbedding(text, 'passage');
+          chunk.embedding = embedding;
+          cache[chunk.id] = { hash, embedding };
+          newlyComputed++;
+        }
       }
-      console.log(`[RagService] Đã tạo thành công vector embedding cho ${this.chunks.length} chunks.`);
+
+      if (newlyComputed > 0) {
+        this.saveCache(cache);
+      }
+
+      console.log(
+        `[RagService] Hoàn tất nạp vector: ${cacheHits} từ cache, ${newlyComputed} tính toán mới. Tổng: ${this.chunks.length} chunks sẵn sàng.`
+      );
     } catch (error: any) {
-      console.warn(`[RagService] Chưa thể sinh embedding: ${error.message}`);
+      console.warn(`[RagService] Chưa thể hoàn tất tính embedding (chuyển sang tìm kiếm từ khóa fallback): ${error.message}`);
+    }
+  }
+
+  private simpleHash(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0;
+    }
+    return `${hash}_${str.length}`;
+  }
+
+  private getCachePath(): string {
+    const cacheDir = path.resolve(__dirname, 'knowledge', '.cache');
+    if (!fs.existsSync(cacheDir)) {
+      fs.mkdirSync(cacheDir, { recursive: true });
+    }
+    return path.join(cacheDir, 'embeddings.json');
+  }
+
+  private loadCache(): Record<string, { hash: string; embedding: number[] }> {
+    const p = this.getCachePath();
+    if (fs.existsSync(p)) {
+      try {
+        return JSON.parse(fs.readFileSync(p, 'utf-8'));
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  }
+
+  private saveCache(cache: Record<string, { hash: string; embedding: number[] }>): void {
+    const p = this.getCachePath();
+    try {
+      fs.writeFileSync(p, JSON.stringify(cache));
+    } catch (err: any) {
+      console.warn('[RagService] Không thể lưu cache:', err.message);
     }
   }
 
@@ -134,7 +226,7 @@ export class RagService {
   }
 
   /**
-   * Phân đoạn văn bản Markdown theo đề mục tiêu đề cấp 2 (##)
+   * Phân đoạn văn bản Markdown theo đề mục tiêu đề (#, ##, ###, ####) hoặc mã câu hỏi ID/Code
    */
   private chunkMarkdown(markdown: string, role: 'SHIPPER' | 'CUSTOMER', docPrefix: string): KnowledgeChunk[] {
     const lines = markdown.split(/\r?\n/);
@@ -145,12 +237,18 @@ export class RagService {
     let sectionIndex = 1;
 
     for (const line of lines) {
-      if (line.startsWith('## ')) {
+      const trimmed = line.trim();
+      const isHeader =
+        /^#{1,4}\s+/.test(trimmed) ||
+        trimmed.startsWith('ID: ') ||
+        /^[A-Z]{3,4}-\d{3}/.test(trimmed);
+
+      if (isHeader) {
         if (currentLines.length > 0) {
           const content = currentLines.join('\n').trim();
           if (content.length > 0) {
             chunks.push({
-              id: `${docPrefix}_section_${sectionIndex}`,
+              id: `${docPrefix}_chunk_${sectionIndex}`,
               role,
               title: currentTitle,
               content,
@@ -158,8 +256,8 @@ export class RagService {
             sectionIndex++;
           }
         }
-        currentTitle = line.replace('## ', '').trim();
-        currentLines = [];
+        currentTitle = trimmed.replace(/^#+\s*/, '');
+        currentLines = [line];
       } else {
         currentLines.push(line);
       }
@@ -169,11 +267,52 @@ export class RagService {
       const content = currentLines.join('\n').trim();
       if (content.length > 0) {
         chunks.push({
-          id: `${docPrefix}_section_${sectionIndex}`,
+          id: `${docPrefix}_chunk_${sectionIndex}`,
           role,
           title: currentTitle,
           content,
         });
+      }
+    }
+
+    // Nếu văn bản không có tiêu đề markdown chuẩn (chỉ có 1 chunk lớn duy nhất)
+    // thì tự động chia nhỏ theo từng đoạn văn (paragraphs)
+    if (chunks.length <= 1 && markdown.length > 1000) {
+      const paragraphs = markdown.split(/\r?\n\s*\r?\n/);
+      const refinedChunks: KnowledgeChunk[] = [];
+      let pIdx = 1;
+      let buffer: string[] = [];
+
+      for (const p of paragraphs) {
+        const pTrimmed = p.trim();
+        if (!pTrimmed) continue;
+        buffer.push(pTrimmed);
+
+        // Gom khoảng 2-3 đoạn ngắn thành 1 chunk ~150-250 từ
+        if (buffer.join('\n\n').split(/\s+/).length >= 100) {
+          const text = buffer.join('\n\n');
+          refinedChunks.push({
+            id: `${docPrefix}_para_${pIdx}`,
+            role,
+            title: buffer[0].slice(0, 60),
+            content: text,
+          });
+          pIdx++;
+          buffer = [];
+        }
+      }
+
+      if (buffer.length > 0) {
+        refinedChunks.push({
+          id: `${docPrefix}_para_${pIdx}`,
+          role,
+          title: buffer[0].slice(0, 60),
+          content: buffer.join('\n\n'),
+        });
+      }
+
+      if (refinedChunks.length > 1) {
+        return refinedChunks;
       }
     }
 

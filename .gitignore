@@ -20,6 +20,7 @@ models/
 # Test fixtures and caches
 backend/src/scripts/test_fixtures/
 */test_fixtures/
+backend/src/services/ai/knowledge/.cache/
 
 # Build artifacts
 dist/

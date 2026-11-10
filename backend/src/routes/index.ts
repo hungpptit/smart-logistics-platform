@@ -14,6 +14,7 @@ import shipmentRouter from './shipment.routes';
 import trackingRouter from './tracking.route';
 import analyticsRouter from './analytics.routes';
 import cameraRouter from './camera.routes';
+import chatRouter from './chat.routes';
 
 const router = Router();
 
@@ -33,5 +34,6 @@ router.use('/shipments', shipmentRouter);
 router.use('/tracking', trackingRouter);
 router.use('/analytics', analyticsRouter);
 router.use('/cameras', cameraRouter);
+router.use('/chat', chatRouter);
 
 export default router;

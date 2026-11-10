@@ -1,8 +1,9 @@
 import React from 'react';
-import { Package, User } from 'lucide-react';
+import { Package, User, Bot } from 'lucide-react';
 import { DashboardShell } from '../layouts/DashboardShell';
 import type { MenuItem } from '../layouts/Sidebar';
 import { OrderTab } from '../OrderTab';
+import { CustomerChatTab } from './CustomerChatTab';
 
 interface CustomerDashboardProps {
   onBackToHome?: () => void;
@@ -15,6 +16,13 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ onBackToHo
       label: 'Đơn hàng của tôi',
       icon: Package,
       component: OrderTab,
+      allowed: true,
+    },
+    {
+      id: 'ai-chat',
+      label: 'Trợ lý AI CSKH',
+      icon: Bot,
+      component: CustomerChatTab,
       allowed: true,
     },
     {
