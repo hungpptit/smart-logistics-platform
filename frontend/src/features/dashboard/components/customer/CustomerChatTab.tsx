@@ -11,8 +11,27 @@ import {
   Maximize2,
   Clock,
   MessageSquarePlus,
+  Plus,
+  Package,
+  Search,
+  Truck,
+  DollarSign,
+  Calculator,
+  Building,
+  XCircle,
+  Edit3,
+  Headphones,
+  Check,
 } from 'lucide-react';
 import { CONFIG } from '../../../../config';
+import {
+  ActionConfirmationCard,
+  DraftOrderCard,
+  EscalationCard,
+  OrderListInteractiveCard,
+  OrderPickerModal,
+} from './ActionCards';
+import type { ActionData } from './ActionCards';
 
 interface ChatMessage {
   id: string;
@@ -20,15 +39,16 @@ interface ChatMessage {
   text: string;
   image?: string;
   timestamp: string;
+  toolsUsed?: string[];
+  actionData?: ActionData;
 }
 
 const QUICK_QUESTIONS = [
-  'Làm thế nào để đổi tài xế khác?',
-  'Làm thế nào để huỷ đơn hàng?',
-  'Cước phí giao hàng được tính như thế nào?',
-  'Hàng bị hư hỏng hoặc mất thì bồi thường ra sao?',
-  'Tổng thời gian giao hàng toàn trình là bao lâu?',
-  'Tại sao tài khoản của tôi bị khoá hoặc hạn chế?',
+  'Đơn hàng của tôi đang ở đâu?',
+  'Tôi muốn hủy đơn hàng',
+  'Đổi số điện thoại / địa chỉ nhận hàng',
+  'Tính phí gửi 2kg khoảng 12km gói Tiêu chuẩn',
+  'Tôi muốn gặp nhân viên CSKH',
 ];
 
 export const CustomerChatTab: React.FC = () => {
@@ -36,7 +56,7 @@ export const CustomerChatTab: React.FC = () => {
     {
       id: 'welcome',
       sender: 'ai',
-      text: 'Xin chào quý khách! Em là Trợ lý AI CSKH của Velocity. Em có thể giải đáp mọi thắc mắc của quý khách về quy trình đặt đơn, đổi tài xế, hủy đơn, cách tính cước và chính sách bồi thường theo đúng cẩm nang chính thức. Quý khách có thể gửi câu hỏi hoặc đính kèm hình ảnh kiện hàng hư hỏng để em hỗ trợ nhé!',
+      text: 'Xin chào quý khách! Em là Trợ lý AI CSKH của Velocity. Em có thể giải đáp mọi thắc mắc của quý khách về quy trình đặt đơn, đổi tài xế, hủy đơn, cách tính cước và chính sách bồi thường theo đúng cẩm nang chính thức. Quý khách có thể bấm nút [+ Chọn đơn hàng] để tra cứu đơn thực tế của mình hoặc đặt câu hỏi bất kỳ nhé!',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -47,11 +67,12 @@ export const CustomerChatTab: React.FC = () => {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isSessionClosed, setIsSessionClosed] = useState<boolean>(false);
   const [initialLoading, setInitialLoading] = useState<boolean>(true);
+  const [isOrderPickerOpen, setIsOrderPickerOpen] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const reminderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const closingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reminderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -279,6 +300,66 @@ export const CustomerChatTab: React.FC = () => {
   };
 
   /**
+   * Xác nhận thực hiện hành động ghi (Hủy đơn, Đổi thông tin giao hàng, Hẹn ngày giao)
+   */
+  const handleConfirmAction = async (
+    token: string,
+    actionType: string
+  ): Promise<{ success: boolean; message: string }> => {
+    try {
+      const authToken = localStorage.getItem('token');
+      const res = await fetch(`${CONFIG.API_BASE_URL}/chat/customer/confirm-action`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ token, actionType }),
+      });
+      const data = await res.json();
+      return {
+        success: res.ok && data.success,
+        message: data.message || 'Hành động đã được thực hiện thành công trên hệ thống.',
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err.message || 'Lỗi kết nối khi xác nhận hành động.',
+      };
+    }
+  };
+
+  /**
+   * Hủy bỏ yêu cầu hành động (Khi khách hàng bấm nút [Hủy bỏ])
+   */
+  const handleCancelAction = async (token: string): Promise<void> => {
+    try {
+      const authToken = localStorage.getItem('token');
+      await fetch(`${CONFIG.API_BASE_URL}/chat/customer/cancel-action`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ token }),
+      });
+    } catch (err) {
+      console.warn('Lỗi khi gửi yêu cầu hủy bỏ token hành động:', err);
+    }
+  };
+
+  /**
+   * Xử lý khi người dùng chọn một hành động trên đơn hàng từ OrderPicker hoặc OrderListCard
+   */
+  const handleOrderPickerSelect = (actionText: string, autoSend: boolean = true) => {
+    if (autoSend) {
+      handleSend(actionText);
+    } else {
+      setInput(actionText);
+    }
+  };
+
+  /**
    * Gửi tin nhắn câu hỏi tới AI
    */
   const handleSend = async (questionText?: string) => {
@@ -342,6 +423,8 @@ export const CustomerChatTab: React.FC = () => {
           sender: 'ai',
           text: data.data.reply,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          toolsUsed: Array.isArray(data.data?.toolsUsed) ? data.data.toolsUsed : undefined,
+          actionData: data.data?.actionData || undefined,
         };
         setMessages((prev) => [...prev, aiMsg]);
 
@@ -391,9 +474,8 @@ export const CustomerChatTab: React.FC = () => {
         return (
           <h4
             key={lineIdx}
-            className={`font-extrabold text-sm mt-2 mb-1 ${
-              isUser ? 'text-white' : 'text-[#bc0100]'
-            }`}
+            className={`font-extrabold text-sm mt-2 mb-1 ${isUser ? 'text-white' : 'text-[#bc0100]'
+              }`}
           >
             {headingText}
           </h4>
@@ -468,7 +550,7 @@ export const CustomerChatTab: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-210px)] min-h-[500px] bg-white rounded-lg border border-[#e2e8f0] shadow-soft overflow-hidden font-montserrat">
+    <div className="flex flex-col h-[calc(100vh-45px)] md:h-[calc(100vh-55px)] min-h-[600px] bg-white rounded-lg border border-[#e2e8f0] shadow-soft overflow-hidden font-montserrat">
       {/* Top Banner */}
       <div className="bg-[#161D25] text-white px-6 py-4 flex items-center justify-between border-b border-gray-800">
         <div className="flex items-center gap-3">
@@ -479,7 +561,7 @@ export const CustomerChatTab: React.FC = () => {
             <div className="flex items-center gap-2">
               <h3 className="font-extrabold text-sm uppercase tracking-wider text-white">Trợ lý AI Velocity</h3>
               <span className="flex items-center gap-1 text-[10px] font-bold bg-[#bc0100] text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
-                <Sparkles size={10} /> RAG & Vision
+                <Sparkles size={10} /> RAG & Tools
               </span>
               {/* Badge trạng thái phiên trò chuyện */}
               {isSessionClosed ? (
@@ -513,6 +595,7 @@ export const CustomerChatTab: React.FC = () => {
         <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
           <HelpCircle size={13} className="text-[#bc0100]" /> Gợi ý:
         </span>
+
         {QUICK_QUESTIONS.map((q, idx) => (
           <button
             key={idx}
@@ -534,9 +617,8 @@ export const CustomerChatTab: React.FC = () => {
           >
             {/* Avatar */}
             <div
-              className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-xs font-bold ${
-                msg.sender === 'user' ? 'bg-gray-700 text-white' : 'bg-[#bc0100] text-white shadow-xs'
-              }`}
+              className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-xs font-bold ${msg.sender === 'user' ? 'bg-gray-700 text-white' : 'bg-[#bc0100] text-white shadow-xs'
+                }`}
             >
               {msg.sender === 'user' ? <User size={16} /> : <Bot size={16} />}
             </div>
@@ -544,11 +626,10 @@ export const CustomerChatTab: React.FC = () => {
             {/* Bubble Content */}
             <div className={`flex flex-col gap-1 ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
               <div
-                className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                  msg.sender === 'user'
+                className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.sender === 'user'
                     ? 'bg-[#bc0100] text-white rounded-tr-none shadow-sm'
                     : 'bg-white text-[#161D25] border border-gray-200 rounded-tl-none shadow-soft'
-                }`}
+                  }`}
               >
                 {/* Ảnh đính kèm nếu có */}
                 {msg.image && (
@@ -568,7 +649,86 @@ export const CustomerChatTab: React.FC = () => {
                   </div>
                 )}
 
+                {/* Hiển thị huy hiệu các công cụ vừa thực thi thời gian thực */}
+                {msg.toolsUsed && msg.toolsUsed.length > 0 && (
+                  <div className="mb-2.5 flex flex-wrap gap-1.5">
+                    {msg.toolsUsed.map((tool, tIdx) => (
+                      <span
+                        key={tIdx}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold bg-red-50 text-[#bc0100] border border-red-200 px-2 py-0.5 rounded-md"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#bc0100] animate-pulse" />
+                        {tool === 'track_order' && <><Search size={10} className="stroke-[2.5]" /> Tra cứu lộ trình đơn</>}
+                        {tool === 'get_customer_orders' && <><Package size={10} className="stroke-[2.5]" /> Danh sách đơn hàng</>}
+                        {tool === 'get_order_details' && <><DollarSign size={10} className="stroke-[2.5]" /> Chi tiết kiện & cước</>}
+                        {tool === 'get_assigned_shipper' && <><Truck size={10} className="stroke-[2.5]" /> Thông tin shipper</>}
+                        {tool === 'estimate_shipping_fee' && <><Calculator size={10} className="stroke-[2.5]" /> Ước tính giá cước</>}
+                        {tool === 'find_nearest_station' && <><Building size={10} className="stroke-[2.5]" /> Bưu cục gần nhất</>}
+                        {tool === 'cancel_order' && <><XCircle size={10} className="stroke-[2.5]" /> Yêu cầu hủy đơn</>}
+                        {tool === 'update_delivery_info' && <><Edit3 size={10} className="stroke-[2.5]" /> Đổi thông tin giao hàng</>}
+                        {tool === 'create_draft_order' && <><Package size={10} className="stroke-[2.5]" /> Tạo đơn hàng nháp</>}
+                        {tool === 'escalate_to_human' && <><Headphones size={10} className="stroke-[2.5]" /> Chuyển tổng đài CSKH</>}
+                        {![
+                          'track_order',
+                          'get_customer_orders',
+                          'get_order_details',
+                          'get_assigned_shipper',
+                          'estimate_shipping_fee',
+                          'find_nearest_station',
+                          'cancel_order',
+                          'update_delivery_info',
+                          'reschedule_delivery',
+                          'create_draft_order',
+                          'escalate_to_human',
+                        ].includes(tool) && tool}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {renderFormattedText(msg.text, msg.sender === 'user')}
+
+                {/* Nút bấm Chọn đơn hàng trực tiếp dưới tin nhắn phản hồi của AI nếu chưa có OrderList Card */}
+                {msg.sender === 'ai' && !msg.actionData?.isOrderList && !msg.actionData?.requiresConfirmation && (
+                  <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setIsOrderPickerOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-[#bc0100] text-[#bc0100] hover:text-white border border-red-200 hover:border-[#bc0100] rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+                      title="Mở danh sách đơn hàng thực tế của bạn để chọn thao tác"
+                    >
+                      <Package size={13} className="stroke-[2.5]" />
+                      <span>Chọn đơn hàng của bạn</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Render Thẻ Xác Nhận Hành Động (Action Confirmation Card 2 bước) */}
+                {msg.actionData && msg.actionData.requiresConfirmation && (
+                  <ActionConfirmationCard
+                    actionData={msg.actionData}
+                    onConfirm={handleConfirmAction}
+                    onCancel={handleCancelAction}
+                  />
+                )}
+
+                {/* Render Thẻ Đơn Hàng Nháp (Draft Order Card - khi không yêu cầu xác nhận 2 bước) */}
+                {msg.actionData && !msg.actionData.requiresConfirmation && (msg.actionData.isDraft || msg.actionData.isDraftOrder) && (
+                  <DraftOrderCard actionData={msg.actionData} />
+                )}
+
+                {/* Render Thẻ Chuyển Giao CSKH (Escalation Card) */}
+                {msg.actionData && msg.actionData.isEscalation && (
+                  <EscalationCard actionData={msg.actionData} />
+                )}
+
+                {/* Render Thẻ Danh Sách Đơn Hàng Tương Tác */}
+                {msg.actionData && msg.actionData.isOrderList && msg.actionData.orders && (
+                  <OrderListInteractiveCard
+                    orders={msg.actionData.orders}
+                    onSelectAction={handleOrderPickerSelect}
+                  />
+                )}
               </div>
 
               <span className="text-[10px] text-gray-400 px-1">{msg.timestamp}</span>
@@ -583,7 +743,7 @@ export const CustomerChatTab: React.FC = () => {
               <Bot size={16} />
             </div>
             <div className="bg-white border border-gray-200 px-4 py-3 rounded-2xl rounded-tl-none shadow-soft flex items-center gap-2">
-              <span className="text-xs text-gray-500 font-medium">Trợ lý AI đang tra cứu cẩm nang và trả lời...</span>
+              {/* <span className="text-xs text-gray-500 font-medium">Trợ lý AI đang tra cứu cẩm nang và trả lời...</span> */}
               <div className="flex gap-1">
                 <span className="w-2 h-2 rounded-full bg-[#bc0100] animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span
@@ -686,6 +846,18 @@ export const CustomerChatTab: React.FC = () => {
                 <Paperclip size={18} />
               </button>
 
+              {/* Nút bấm [+] Chọn đơn hàng của tôi */}
+              <button
+                type="button"
+                onClick={() => setIsOrderPickerOpen(true)}
+                disabled={loading}
+                title="Mở danh sách đơn hàng của bạn để tra cứu hoặc xử lý (+)"
+                className="p-3 text-gray-600 hover:text-[#bc0100] hover:bg-red-50 rounded-lg transition-colors border border-gray-300 cursor-pointer disabled:opacity-50 shrink-0 flex items-center justify-center gap-1"
+              >
+                <Plus size={13} className="stroke-[3] -mr-1 text-[#bc0100]" />
+                <Package size={17} />
+              </button>
+
               <input
                 type="text"
                 value={input}
@@ -742,6 +914,13 @@ export const CustomerChatTab: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal Chọn đơn hàng thực tế của khách hàng */}
+      <OrderPickerModal
+        isOpen={isOrderPickerOpen}
+        onClose={() => setIsOrderPickerOpen(false)}
+        onSelectAction={handleOrderPickerSelect}
+      />
     </div>
   );
 };

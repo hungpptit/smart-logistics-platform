@@ -33,6 +33,18 @@ router.post('/customer/timeout-check', (req, res) => chatController.handleTimeou
 router.post('/customer/close', (req, res) => chatController.closeConversation(req, res));
 
 /**
+ * Xác nhận thực hiện hành động ghi (Hủy đơn, Đổi thông tin nhận hàng, Hẹn ngày giao)
+ * POST /api/v1/chat/customer/confirm-action
+ */
+router.post('/customer/confirm-action', (req, res) => chatController.confirmAction(req, res));
+
+/**
+ * Hủy bỏ yêu cầu hành động đã tạo
+ * POST /api/v1/chat/customer/cancel-action
+ */
+router.post('/customer/cancel-action', (req, res) => chatController.cancelAction(req, res));
+
+/**
  * Gửi tin nhắn chat và nhận phản hồi từ AI (tự động lưu vào ChatConversation & ChatMessage)
  * POST /api/v1/chat/customer
  */
