@@ -263,7 +263,15 @@ export const CUSTOMER_TOOLS: ChatTool[] = [
           },
           serviceCode: {
             type: 'string',
-            description: 'Mã gói cước dịch vụ: STANDARD (Tiêu chuẩn), EXPRESS (Hỏa tốc 2h), SAVING (Tiết kiệm)',
+            enum: ['STANDARD', 'EXPRESS', 'SAVING', 'COLD_CHAIN'],
+            description:
+              'Mã gói cước dịch vụ: "STANDARD" (Giao hàng Tiêu chuẩn, mặc định nếu khách không chọn), "EXPRESS" (Giao hàng Hỏa tốc 2h), "SAVING" (Giao hàng Tiết kiệm), "COLD_CHAIN" (Vận chuyển Đông lạnh)',
+          },
+          pickupType: {
+            type: 'string',
+            enum: ['PICKUP', 'DROP_OFF'],
+            description:
+              'Hình thức gửi hàng: "PICKUP" (Shipper đến lấy hàng tận nơi, mặc định nếu khách không chọn), "DROP_OFF" (Khách tự mang hàng ra bưu cục gửi)',
           },
           codAmount: {
             type: 'number',

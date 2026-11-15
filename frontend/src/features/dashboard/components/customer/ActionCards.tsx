@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CONFIG } from '../../../../config';
+import { MapPicker } from '../../../../components/ui/MapPicker';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -18,9 +19,8 @@ import {
   ArrowRight,
   Package,
   Search,
-  RefreshCw,
-  Plus,
   Edit3,
+  Truck,
 } from 'lucide-react';
 
 export interface OrderItemSummary {
@@ -71,6 +71,13 @@ export interface ActionData {
     deliveryAddress?: string;
     weightKg?: number;
     serviceCode?: string;
+    serviceName?: string;
+    pickupType?: string;
+    pickupTypeText?: string;
+    feePayer?: string;
+    feePayerText?: string;
+    isFragile?: boolean;
+    description?: string;
     codAmount?: number;
     shippingFee?: number;
     insuranceFee?: number;
@@ -91,9 +98,53 @@ export interface ActionData {
   operatingHours?: string;
 }
 
+export const formatServiceName = (code?: string, name?: string): string => {
+  if (name && !['STANDARD', 'EXPRESS', 'SAVING', 'COLD_CHAIN'].includes(name.toUpperCase())) {
+    return name;
+  }
+  const clean = (code || '').toUpperCase();
+  switch (clean) {
+    case 'EXPRESS':
+      return 'Giao hàng Hỏa tốc 2h';
+    case 'SAVING':
+      return 'Giao hàng Tiết kiệm';
+    case 'COLD_CHAIN':
+      return 'Vận chuyển Đông lạnh';
+    case 'STANDARD':
+    default:
+      return 'Giao hàng Tiêu chuẩn';
+  }
+};
+
+export const formatPickupType = (type?: string, text?: string): string => {
+  if (text && !['PICKUP', 'DROP_OFF'].includes(text.toUpperCase())) {
+    return text;
+  }
+  const clean = (type || '').toUpperCase();
+  switch (clean) {
+    case 'DROP_OFF':
+      return 'Gửi tại bưu cục';
+    case 'PICKUP':
+    default:
+      return 'Lấy tận nơi';
+  }
+};
+
+export const formatFeePayer = (payer?: string, text?: string): string => {
+  if (text && !['SENDER', 'RECEIVER'].includes(text.toUpperCase())) {
+    return text;
+  }
+  const clean = (payer || '').toUpperCase();
+  return clean === 'RECEIVER' ? 'Người nhận trả cước' : 'Người gửi trả cước';
+};
+
 interface ActionConfirmationCardProps {
   actionData: ActionData;
-  onConfirm: (token: string, actionType: string) => Promise<{ success: boolean; message: string }>;
+  onConfirm: (
+    token: string,
+    actionType: string,
+    customCoordinates?: { lat: number; lng: number }
+  ) => Promise<{ success: boolean; message: string }>;
   onCancel: (token: string) => Promise<void>;
 }
 
@@ -105,6 +156,16 @@ export const ActionConfirmationCard: React.FC<ActionConfirmationCardProps> = ({
   const [secondsLeft, setSecondsLeft] = useState<number>(actionData.expiresInSeconds || 300);
   const [state, setState] = useState<'PENDING' | 'CONFIRMING' | 'CONFIRMED' | 'CANCELLED' | 'EXPIRED' | 'ERROR'>('PENDING');
   const [resultMessage, setResultMessage] = useState<string>('');
+
+  // Tọa độ tùy chỉnh khi mở bản đồ định vị
+  const [customLat, setCustomLat] = useState<number>(
+    Number(actionData.details?.deliveryLatitude) || 10.8231
+  );
+  const [customLng, setCustomLng] = useState<number>(
+    Number(actionData.details?.deliveryLongitude) || 106.6297
+  );
+  const [hasCustomLocation, setHasCustomLocation] = useState<boolean>(false);
+  const [showMapModal, setShowMapModal] = useState<boolean>(false);
 
   useEffect(() => {
     if (state !== 'PENDING') return;
@@ -133,7 +194,11 @@ export const ActionConfirmationCard: React.FC<ActionConfirmationCardProps> = ({
     if (!actionData.confirmationToken || !actionData.actionType || state !== 'PENDING') return;
     setState('CONFIRMING');
     try {
-      const res = await onConfirm(actionData.confirmationToken, actionData.actionType);
+      const coords =
+        actionData.actionType === 'CONFIRM_CREATE_ORDER' && customLat && customLng
+          ? { lat: customLat, lng: customLng }
+          : undefined;
+      const res = await onConfirm(actionData.confirmationToken, actionData.actionType, coords);
       if (res.success) {
         setState('CONFIRMED');
         setResultMessage(res.message);
@@ -319,21 +384,63 @@ export const ActionConfirmationCard: React.FC<ActionConfirmationCardProps> = ({
                 {actionData.details.receiverName} ({actionData.details.receiverPhone})
               </span>
             </div>
-            <div className="flex items-start gap-2">
-              <span className="text-gray-500 font-medium shrink-0">Địa chỉ giao:</span>
-              <span className="font-medium text-gray-800">{actionData.details.deliveryAddress}</span>
+            <div className="p-2 rounded-lg bg-white/80 border border-emerald-200 space-y-1.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <span className="text-gray-500 font-medium">Địa chỉ giao: </span>
+                  <span className="font-semibold text-gray-800">{actionData.details.deliveryAddress}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMapModal(true)}
+                  className="shrink-0 flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-md text-[11px] font-semibold transition-colors cursor-pointer"
+                  title="Căn chỉnh vị trí chính xác trên bản đồ"
+                >
+                  <MapPin size={12} className="text-emerald-700" />
+                  <span>{hasCustomLocation ? 'Đã chỉnh định vị' : 'Chỉnh định vị'}</span>
+                </button>
+              </div>
+              {hasCustomLocation && (
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                  <Check size={12} className="text-emerald-600" />
+                  <span>Đã chọn tọa độ: [{customLat.toFixed(5)}, {customLng.toFixed(5)}]</span>
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-4">
+            {/* Vận chuyển & Gói dịch vụ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-emerald-200/60 mt-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-500 font-medium shrink-0">Hình thức gửi:</span>
+                <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-[11px] flex items-center gap-1">
+                  <Truck size={12} className="text-blue-600" />
+                  <span>{formatPickupType(actionData.details.pickupType, actionData.details.pickupTypeText)}</span>
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-500 font-medium shrink-0">Gói dịch vụ:</span>
+                <span className="font-bold text-emerald-800 bg-emerald-100/70 border border-emerald-300 px-2 py-0.5 rounded text-[11px] flex items-center gap-1">
+                  <PackageCheck size={12} className="text-emerald-700" />
+                  <span>{formatServiceName(actionData.details.serviceCode, actionData.details.serviceName)}</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Kiện hàng & Người trả cước */}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-gray-700">
               <div>
                 <span className="text-gray-500 font-medium">Kiện hàng: </span>
                 <span className="font-semibold text-gray-800">
-                  {actionData.details.description || 'Hàng hóa'} ({actionData.details.weightKg} kg)
+                  {actionData.details.description || 'Hàng hóa'} ({actionData.details.weightKg} kg{actionData.details.isFragile ? ' - Dễ vỡ' : ''})
                 </span>
               </div>
-              <div>
-                <span className="text-gray-500 font-medium">Gói cước: </span>
-                <span className="font-bold text-emerald-700">{actionData.details.serviceCode || 'STANDARD'}</span>
-              </div>
+              {actionData.details.feePayer && (
+                <div className="text-[11px]">
+                  <span className="text-gray-500 font-medium">Thanh toán cước: </span>
+                  <span className="font-semibold text-gray-800">
+                    {formatFeePayer(actionData.details.feePayer, actionData.details.feePayerText)}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 pt-1">
               <span className="text-gray-500 font-medium">Cước vận chuyển:</span>
@@ -444,6 +551,82 @@ export const ActionConfirmationCard: React.FC<ActionConfirmationCardProps> = ({
           </button>
         </div>
       )}
+
+      {/* Map Picker Modal */}
+      {showMapModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg">
+                  <MapPin size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">
+                    Căn chỉnh vị trí giao hàng
+                  </h3>
+                  <p className="text-[11px] text-gray-500 line-clamp-1">
+                    {actionData.details?.deliveryAddress || 'Chọn vị trí trên bản đồ'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMapModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body / Map */}
+            <div className="p-4 flex-1 overflow-hidden flex flex-col gap-2">
+              <p className="text-[11px] text-gray-600">
+                Kéo thả điểm ghim hoặc nhấp vào bản đồ để xác định chính xác vị trí nhận hàng của người nhận:
+              </p>
+              <div className="h-[360px] w-full rounded-lg overflow-hidden border border-gray-200 relative">
+                <MapPicker
+                  latitude={customLat}
+                  longitude={customLng}
+                  onChange={(lat, lng) => {
+                    setCustomLat(lat);
+                    setCustomLng(lng);
+                    setHasCustomLocation(true);
+                  }}
+                  token={localStorage.getItem('token') || ''}
+                  className="h-full w-full"
+                />
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-gray-500 px-1">
+                <span>
+                  Tọa độ đã chọn:{' '}
+                  <strong className="text-gray-800">
+                    {customLat.toFixed(5)}, {customLng.toFixed(5)}
+                  </strong>
+                </span>
+                {hasCustomLocation && (
+                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                    <Check size={12} /> Đã cập nhật tọa độ
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-100 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setShowMapModal(false)}
+                className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              >
+                <Check size={14} />
+                <span>Xác nhận vị trí này</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -474,15 +657,37 @@ export const DraftOrderCard: React.FC<{ actionData: ActionData }> = ({ actionDat
           <span className="text-gray-500 font-medium shrink-0">Địa chỉ giao:</span>
           <span className="font-medium text-gray-800">{draft.deliveryAddress}</span>
         </div>
-        <div className="flex items-center gap-4">
+        {/* Vận chuyển & Gói dịch vụ */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-emerald-200/60 mt-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-500 font-medium shrink-0">Hình thức gửi:</span>
+            <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-[11px] flex items-center gap-1">
+              <Truck size={12} className="text-blue-600" />
+              <span>{formatPickupType(draft.pickupType, draft.pickupTypeText)}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-500 font-medium shrink-0">Gói dịch vụ:</span>
+            <span className="font-bold text-emerald-800 bg-emerald-100/70 border border-emerald-300 px-2 py-0.5 rounded text-[11px] flex items-center gap-1">
+              <PackageCheck size={12} className="text-emerald-700" />
+              <span>{formatServiceName(draft.serviceCode, draft.serviceName)}</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 text-gray-700">
           <div>
             <span className="text-gray-500 font-medium">Khối lượng: </span>
-            <span className="font-bold text-gray-800">{draft.weightKg} kg</span>
+            <span className="font-bold text-gray-800">{draft.weightKg} kg{draft.isFragile ? ' - Dễ vỡ' : ''}</span>
           </div>
-          <div>
-            <span className="text-gray-500 font-medium">Gói cước: </span>
-            <span className="font-bold text-emerald-700">{draft.serviceCode || 'STANDARD'}</span>
-          </div>
+          {draft.feePayer && (
+            <div className="text-[11px]">
+              <span className="text-gray-500 font-medium">Thanh toán cước: </span>
+              <span className="font-semibold text-gray-800">
+                {formatFeePayer(draft.feePayer, draft.feePayerText)}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Cước phí vận chuyển */}
@@ -600,7 +805,6 @@ export const OrderListInteractiveCard: React.FC<{
             label: ord.status,
             badgeClass: 'bg-gray-100 text-gray-700 border-gray-200',
           };
-          const canCancel = ord.status === 'CREATED' || ord.status === 'READY_FOR_PICKUP';
 
           return (
             <div
@@ -788,7 +992,6 @@ export const OrderPickerModal: React.FC<{
                 label: ord.status,
                 badgeClass: 'bg-gray-100 text-gray-700 border-gray-200',
               };
-              const canCancel = ord.status === 'CREATED' || ord.status === 'READY_FOR_PICKUP';
 
               return (
                 <div

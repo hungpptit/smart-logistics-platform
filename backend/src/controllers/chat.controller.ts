@@ -137,7 +137,7 @@ export class ChatController {
    */
   public async confirmAction(req: any, res: Response): Promise<void> {
     try {
-      const { token, actionType } = req.body;
+      const { token, actionType, customCoordinates } = req.body;
       if (!token || !actionType) {
         res.status(400).json({
           success: false,
@@ -166,7 +166,7 @@ export class ChatController {
         return;
       }
 
-      const result = await executeConfirmedAction(token, actionType, customer.id, req.user.id);
+      const result = await executeConfirmedAction(token, actionType, customer.id, req.user.id, customCoordinates);
 
       if (!result.success) {
         res.status(400).json(result);

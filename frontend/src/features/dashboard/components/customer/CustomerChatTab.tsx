@@ -300,11 +300,12 @@ export const CustomerChatTab: React.FC = () => {
   };
 
   /**
-   * Xác nhận thực hiện hành động ghi (Hủy đơn, Đổi thông tin giao hàng, Hẹn ngày giao)
+   * Xác nhận thực hiện hành động ghi (Hủy đơn, Đổi thông tin giao hàng, Hẹn ngày giao, Đặt đơn hàng)
    */
   const handleConfirmAction = async (
     token: string,
-    actionType: string
+    actionType: string,
+    customCoordinates?: { lat: number; lng: number }
   ): Promise<{ success: boolean; message: string }> => {
     try {
       const authToken = localStorage.getItem('token');
@@ -314,7 +315,7 @@ export const CustomerChatTab: React.FC = () => {
           'Content-Type': 'application/json',
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
-        body: JSON.stringify({ token, actionType }),
+        body: JSON.stringify({ token, actionType, customCoordinates }),
       });
       const data = await res.json();
       return {

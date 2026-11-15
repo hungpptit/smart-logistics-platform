@@ -4,7 +4,6 @@ import { Sidebar } from './Sidebar';
 import type { MenuItem } from './Sidebar';
 import { MobileHeader } from './MobileHeader';
 import { ProfileTab } from '../profile/ProfileTab';
-import { Package, Clock, CheckCircle2 } from 'lucide-react';
 
 interface DashboardShellProps {
   menuItems: MenuItem[];

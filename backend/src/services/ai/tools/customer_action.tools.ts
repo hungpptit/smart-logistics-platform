@@ -1,11 +1,13 @@
 import { prisma } from '../../../config/prisma';
 import { PricingService } from '../../pricing/pricing.service';
 import { OrderService } from '../../order.service';
+import { GeocodingService } from '../../geocoding.service';
 import { actionTokenService, ActionType } from '../action_token.service';
 import { ToolContext } from './customer_read.tools';
 
 const pricingService = new PricingService();
 const orderService = new OrderService();
+const geocodingService = new GeocodingService();
 
 /**
  * Helper: Phân tích chuỗi địa chỉ tự do thành các thành phần địa chỉ chuẩn
@@ -336,6 +338,7 @@ export async function createDraftOrder(
     deliveryAddress: string;
     weightKg: number;
     serviceCode?: string;
+    pickupType?: 'PICKUP' | 'DROP_OFF';
     codAmount?: number;
     description?: string;
     isFragile?: boolean;
@@ -358,11 +361,30 @@ export async function createDraftOrder(
     const receiverPhone = args?.receiverPhone?.trim();
     const deliveryAddress = args?.deliveryAddress?.trim();
     const weightKg = Number(args?.weightKg) || 1.0;
-    const serviceCode = (args?.serviceCode || 'STANDARD').toUpperCase();
+
+    // Chuẩn hóa Gói dịch vụ (mặc định: STANDARD - Giao hàng Tiêu chuẩn)
+    const rawService = (args?.serviceCode || '').toUpperCase();
+    const serviceCode = ['STANDARD', 'EXPRESS', 'SAVING', 'COLD_CHAIN'].includes(rawService)
+      ? rawService
+      : 'STANDARD';
+    const serviceNameMap: Record<string, string> = {
+      STANDARD: 'Giao hàng Tiêu chuẩn',
+      EXPRESS: 'Giao hàng Hỏa tốc 2h',
+      SAVING: 'Giao hàng Tiết kiệm',
+      COLD_CHAIN: 'Vận chuyển Đông lạnh',
+    };
+    const serviceName = serviceNameMap[serviceCode] || 'Giao hàng Tiêu chuẩn';
+
+    // Chuẩn hóa Hình thức gửi hàng (mặc định: PICKUP - Lấy tận nơi)
+    const rawPickup = (args?.pickupType || '').toUpperCase();
+    const pickupType: 'PICKUP' | 'DROP_OFF' = rawPickup === 'DROP_OFF' ? 'DROP_OFF' : 'PICKUP';
+    const pickupTypeText = pickupType === 'DROP_OFF' ? 'Gửi tại bưu cục' : 'Lấy tận nơi';
+
     const codAmount = Number(args?.codAmount) || 0;
     const description = args?.description?.trim() || 'Hàng hóa thông thường';
     const isFragile = Boolean(args?.isFragile);
     const feePayer = args?.feePayer === 'RECEIVER' ? 'RECEIVER' : 'SENDER';
+    const feePayerText = feePayer === 'RECEIVER' ? 'Người nhận trả cước' : 'Người gửi trả cước';
 
     if (!receiverName || !receiverPhone || !deliveryAddress) {
       return {
@@ -404,6 +426,19 @@ export async function createDraftOrder(
     const pickupAddressText = args?.pickupAddressText?.trim() || defaultAddressText;
     const pickupAddressId = defaultCustAddr?.id;
 
+    // Geocode địa chỉ giao hàng để có tọa độ GPS ban đầu phục vụ bản đồ
+    let deliveryLatitude = 10.8231;
+    let deliveryLongitude = 106.6297;
+    try {
+      const geocoded = await geocodingService.geocode(deliveryAddress);
+      if (geocoded && geocoded.latitude && geocoded.longitude) {
+        deliveryLatitude = parseFloat(geocoded.latitude.toFixed(6));
+        deliveryLongitude = parseFloat(geocoded.longitude.toFixed(6));
+      }
+    } catch (geoErr) {
+      console.warn('[createDraftOrder] Lỗi Geocoding deliveryAddress:', geoErr);
+    }
+
     // Tính cước dự kiến với khoảng cách mặc định 10km nội thành
     const priceResult = await pricingService.calculatePrice(serviceCode, 10, weightKg, isFragile, codAmount);
 
@@ -421,10 +456,16 @@ export async function createDraftOrder(
         receiverName,
         receiverPhone,
         deliveryAddress,
+        deliveryLatitude,
+        deliveryLongitude,
         weightKg,
         serviceCode,
+        serviceName,
+        pickupType,
+        pickupTypeText,
         codAmount,
         feePayer,
+        feePayerText,
         description,
         isFragile,
         senderName,
@@ -441,7 +482,6 @@ export async function createDraftOrder(
 
     const codText = codAmount > 0 ? `\n- Tiền thu hộ COD: **${codAmount.toLocaleString('vi-VN')} ₫**` : '';
     const feeText = `\n- Cước phí vận chuyển dự kiến: **${totalShippingFee.toLocaleString('vi-VN')} ₫** (${priceResult.formattedDeliveryEta})`;
-    const feePayerText = feePayer === 'RECEIVER' ? 'Người nhận trả cước' : 'Người gửi trả cước';
     const totalText = codAmount > 0
       ? `\n- **Tổng số tiền thu khi giao hàng (Tổng chi phí đơn)**: **${totalOrderAmount.toLocaleString('vi-VN')} ₫** (gồm tiền COD và cước vận chuyển)`
       : `\n- **Tổng chi phí đơn**: **${totalShippingFee.toLocaleString('vi-VN')} ₫**`;
@@ -458,10 +498,16 @@ export async function createDraftOrder(
         receiverName,
         receiverPhone,
         deliveryAddress,
+        deliveryLatitude,
+        deliveryLongitude,
         weightKg,
         serviceCode,
+        serviceName,
+        pickupType,
+        pickupTypeText,
         codAmount,
         feePayer,
+        feePayerText,
         description,
         isFragile,
         senderName,
@@ -477,10 +523,16 @@ export async function createDraftOrder(
         receiverName,
         receiverPhone,
         deliveryAddress,
+        deliveryLatitude,
+        deliveryLongitude,
         weightKg,
         serviceCode,
+        serviceName,
+        pickupType,
+        pickupTypeText,
         codAmount,
         feePayer,
+        feePayerText,
         description,
         isFragile,
         senderName,
@@ -494,7 +546,7 @@ export async function createDraftOrder(
         estimatedTotalFee: totalShippingFee,
         formattedEta: priceResult.formattedDeliveryEta,
       },
-      message: `Em đã tạo đơn hàng nháp và chuẩn bị thẻ xác nhận đặt đơn với thông tin sau:\n- Người gửi: **${senderName}** (${senderPhone})\n- Điểm lấy hàng: **${pickupAddressText}**\n- Người nhận: **${receiverName}** (${receiverPhone})\n- Địa chỉ giao: **${deliveryAddress}**\n- Kiện hàng: **${description}** (${weightKg} kg, ${isFragile ? 'Dễ vỡ' : 'Tiêu chuẩn'})\n- Gói cước: **${serviceCode}** (${feePayerText})${codText}${feeText}${totalText}\n\nQuý khách vui lòng kiểm tra lại thông tin và bấm nút **[Xác nhận đặt đơn hàng]** bên dưới trong vòng 5 phút để hệ thống tạo đơn ngay nhé!`,
+      message: `Em đã tạo đơn hàng nháp và chuẩn bị thẻ xác nhận đặt đơn với thông tin sau:\n- Người gửi: **${senderName}** (${senderPhone})\n- Điểm lấy hàng: **${pickupAddressText}**\n- Hình thức gửi: **${pickupTypeText}**\n- Người nhận: **${receiverName}** (${receiverPhone})\n- Địa chỉ giao: **${deliveryAddress}**\n- Kiện hàng: **${description}** (${weightKg} kg, ${isFragile ? 'Dễ vỡ' : 'Tiêu chuẩn'})\n- Gói dịch vụ: **${serviceName}** (${feePayerText})${codText}${feeText}${totalText}\n\nQuý khách vui lòng kiểm tra lại thông tin và bấm nút **[Xác nhận đặt đơn hàng]** bên dưới trong vòng 5 phút để hệ thống tạo đơn ngay nhé!`,
     };
   } catch (error: any) {
     console.error('[Tool: create_draft_order] Lỗi:', error);
@@ -534,7 +586,8 @@ export async function executeConfirmedAction(
   token: string,
   actionType: ActionType,
   customerId: string,
-  userId: string
+  userId: string,
+  customCoordinates?: { lat: number; lng: number }
 ): Promise<{ success: boolean; message: string; data?: any }> {
   const payload = await actionTokenService.verifyAndConsumeToken(token, actionType, customerId);
 
@@ -546,6 +599,9 @@ export async function executeConfirmedAction(
   }
 
   if (actionType === 'CANCEL_ORDER') {
+    if (!payload.orderId) {
+      return { success: false, message: 'Không tìm thấy thông tin đơn hàng cần hủy.' };
+    }
     // 1. Cập nhật Order sang CANCELLED
     const updatedOrder = await prisma.order.update({
       where: { id: payload.orderId },
@@ -558,7 +614,7 @@ export async function executeConfirmedAction(
     // 2. Ghi nhật ký trạng thái
     await prisma.orderStatusHistory.create({
       data: {
-        orderId: payload.orderId,
+        orderId: updatedOrder.id,
         status: 'CANCELLED',
         changedByUserId: userId,
         reason: payload.details.reason || 'Khách hàng xác nhận hủy đơn qua Trợ lý AI CSKH',
@@ -579,6 +635,9 @@ export async function executeConfirmedAction(
   }
 
   if (actionType === 'UPDATE_DELIVERY_INFO') {
+    if (!payload.orderId) {
+      return { success: false, message: 'Không tìm thấy thông tin đơn hàng cần cập nhật.' };
+    }
     const updatedOrder = await prisma.order.update({
       where: { id: payload.orderId },
       data: {
@@ -590,7 +649,7 @@ export async function executeConfirmedAction(
 
     await prisma.orderStatusHistory.create({
       data: {
-        orderId: payload.orderId,
+        orderId: updatedOrder.id,
         status: updatedOrder.status,
         changedByUserId: userId,
         reason: `Cập nhật thông tin giao nhận qua Trợ lý AI: SĐT ${payload.details.receiverPhone}, Địa chỉ: ${payload.details.deliveryAddressText}`,
@@ -609,6 +668,9 @@ export async function executeConfirmedAction(
   }
 
   if (actionType === 'RESCHEDULE_DELIVERY') {
+    if (!payload.orderId) {
+      return { success: false, message: 'Không tìm thấy thông tin đơn hàng cần hẹn lại.' };
+    }
     const targetDate = new Date(payload.details.newDeliveryDate);
     const updatedOrder = await prisma.order.update({
       where: { id: payload.orderId },
@@ -620,7 +682,7 @@ export async function executeConfirmedAction(
 
     await prisma.orderStatusHistory.create({
       data: {
-        orderId: payload.orderId,
+        orderId: updatedOrder.id,
         status: updatedOrder.status,
         changedByUserId: userId,
         reason: `Khách hẹn lại ngày giao sang ${targetDate.toLocaleDateString('vi-VN')}: ${payload.details.note || 'Không có ghi chú'}`,
@@ -660,6 +722,9 @@ export async function executeConfirmedAction(
         };
       }
 
+      const finalDeliveryLat = customCoordinates?.lat || details.deliveryLatitude;
+      const finalDeliveryLng = customCoordinates?.lng || details.deliveryLongitude;
+
       // 3. Chuẩn bị DTO tạo đơn hàng
       const createOrderDto: any = {
         customerId,
@@ -667,7 +732,7 @@ export async function executeConfirmedAction(
         feePayer: details.feePayer || 'SENDER',
         paymentMethod: details.codAmount > 0 ? 'COD' : 'CASH',
         codAmount: Number(details.codAmount) || 0,
-        pickupType: 'PICKUP',
+        pickupType: details.pickupType || 'PICKUP',
         senderContact: {
           fullName: details.senderName || 'Người gửi',
           phone: (details.senderPhone || '0900000000').replace(/[\s\.\-\(\)]/g, ''),
@@ -681,6 +746,8 @@ export async function executeConfirmedAction(
           ward: parsedDelivery.ward,
           province: parsedDelivery.province,
           wardCode: parsedDelivery.wardCode,
+          latitude: finalDeliveryLat ? Number(finalDeliveryLat) : undefined,
+          longitude: finalDeliveryLng ? Number(finalDeliveryLng) : undefined,
           country: 'Vietnam',
         },
         packages: [
