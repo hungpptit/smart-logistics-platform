@@ -301,8 +301,10 @@ export const ProfileTab: React.FC = () => {
           <h3 className="text-sm font-bold text-[#161D25] uppercase tracking-wider border-b border-[#e8e8e8] pb-2">Thông tin tài khoản chi tiết</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs mt-3">
             <div className="flex flex-col gap-1">
-              <span className="text-gray-400 font-medium">ID Người dùng</span>
-              <span className="font-bold text-[#161D25] font-mono bg-[#F4F4F4] p-2 rounded border border-[#e2e8f0]">{user.id}</span>
+              <span className="text-gray-400 font-medium">Email</span>
+              <span className="font-bold text-[#161D25] bg-[#F4F4F4] p-2 rounded border border-[#e2e8f0] truncate" title={user.email}>
+                {user.email || 'Chưa cập nhật'}
+              </span>
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-gray-400 font-medium">Số điện thoại</span>

@@ -4,7 +4,7 @@ import { nvidiaEmbeddingService } from './embedding.service';
 
 export interface KnowledgeChunk {
   id: string;
-  role: 'SHIPPER' | 'CUSTOMER';
+  role: 'SHIPPER' | 'CUSTOMER' | 'COMMON';
   title: string;
   content: string;
   embedding?: number[];
@@ -60,10 +60,19 @@ export class RagService {
       this.chunks.push(...customerChunks);
     }
 
+    // 3. Nạp tài liệu dùng chung (COMMON) từ thư mục common/
+    const commonDir = path.join(knowledgeDir, 'common');
+    const commonFiles = this.loadMarkdownFilesFromDir(commonDir);
+    for (const f of commonFiles) {
+      const prefix = f.name.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_');
+      const commonChunks = this.chunkMarkdown(f.content, 'COMMON', prefix);
+      this.chunks.push(...commonChunks);
+    }
+
     this.isInitialized = true;
     console.log(`[RagService] Đã nạp thành công ${this.chunks.length} phân đoạn tri thức (chunks) từ thư mục knowledge.`);
 
-    // 3. Nếu có API key, tự động tạo embedding vector cho các chunks
+    // 4. Nếu có API key, tự động tạo embedding vector cho các chunks
     const hasKey =
       !!process.env.NVIDIA_API_KEY &&
       process.env.NVIDIA_API_KEY.trim() !== '' &&
@@ -181,8 +190,8 @@ export class RagService {
       await this.initialize();
     }
 
-    // Lọc theo vai trò (Tài xế hoặc Khách hàng)
-    const candidateChunks = this.chunks.filter((c) => c.role === role);
+    // Lọc theo vai trò của người hỏi cộng với tài liệu dùng chung (COMMON)
+    const candidateChunks = this.chunks.filter((c) => c.role === role || c.role === 'COMMON');
     if (candidateChunks.length === 0) return [];
 
     // Kiểm tra xem đã có vector embedding chưa
@@ -228,7 +237,7 @@ export class RagService {
   /**
    * Phân đoạn văn bản Markdown theo đề mục tiêu đề (#, ##, ###, ####) hoặc mã câu hỏi ID/Code
    */
-  private chunkMarkdown(markdown: string, role: 'SHIPPER' | 'CUSTOMER', docPrefix: string): KnowledgeChunk[] {
+  private chunkMarkdown(markdown: string, role: 'SHIPPER' | 'CUSTOMER' | 'COMMON', docPrefix: string): KnowledgeChunk[] {
     const lines = markdown.split(/\r?\n/);
     const chunks: KnowledgeChunk[] = [];
 

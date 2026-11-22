@@ -14,7 +14,7 @@ interface CustomerModalProps {
     customerType: 'INDIVIDUAL' | 'BUSINESS';
     companyName: string;
     taxCode: string;
-    status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED' | 'DISABLED' | string;
+    status: 'ACTIVE' | 'LOCKED' | 'DISABLED';
     note: string;
   };
   setFormData: React.Dispatch<React.SetStateAction<{
@@ -25,7 +25,7 @@ interface CustomerModalProps {
     customerType: 'INDIVIDUAL' | 'BUSINESS';
     companyName: string;
     taxCode: string;
-    status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED' | 'DISABLED' | string;
+    status: 'ACTIVE' | 'LOCKED' | 'DISABLED';
     note: string;
   }>>;
   onSubmit: (e: React.FormEvent) => void;
@@ -185,8 +185,8 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
                 className="w-full px-3 py-2 border border-[#e2e8f0] rounded-md outline-none focus:border-[#bc0100]"
               >
                 <option value="ACTIVE">Hoạt động (Active)</option>
-                <option value="INACTIVE">Ngừng hoạt động (Inactive)</option>
-                <option value="BLOCKED">Khóa (Blocked)</option>
+                <option value="LOCKED">Bị khóa (Locked)</option>
+                <option value="DISABLED">Vô hiệu hóa (Disabled)</option>
               </select>
             </div>
           )}

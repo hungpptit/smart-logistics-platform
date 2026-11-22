@@ -202,7 +202,7 @@ export class CustomerService {
       },
     });
 
-    if (!customer || customer.user?.status === 'DISABLED') {
+    if (!customer) {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng');
     }
 
@@ -218,7 +218,7 @@ export class CustomerService {
       include: { user: true },
     });
 
-    if (!customer || customer.user?.status === 'DISABLED') {
+    if (!customer) {
       throw new NotFoundException('Không tìm thấy thông tin khách hàng để cập nhật');
     }
 

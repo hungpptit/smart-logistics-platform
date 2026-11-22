@@ -221,7 +221,10 @@ const AppContent: React.FC = () => {
             <h2 className="section-title text-[#161D25] font-bold uppercase tracking-wider mb-2" style={{ fontFamily: 'Montserrat', fontSize: '24px' }}>Ước Tính Chi Phí</h2>
             <p className="section-subtitle text-gray-500">Xem trước chi phí vận chuyển để đưa ra lựa chọn gói cước phù hợp nhất.</p>
           </div>
-          <PricingCalculator />
+          <PricingCalculator
+            onOpenAuth={() => setIsAuthOpen(true)}
+            onGoToDashboard={() => setView('dashboard')}
+          />
         </section>
       ) : null}
 

@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { CONFIG } from '../../../config';
+import { useAuth } from '../../../context/AuthContext';
 import { Scale, MapPin, ShieldAlert, BadgeDollarSign, HelpCircle } from 'lucide-react';
+
+export interface PricingCalculatorProps {
+  onOpenAuth?: () => void;
+  onGoToDashboard?: () => void;
+}
 
 interface ServiceData {
   id: string;
@@ -66,7 +72,11 @@ const FALLBACK_SERVICES: ServiceData[] = [
   }
 ];
 
-export const PricingCalculator: React.FC = () => {
+export const PricingCalculator: React.FC<PricingCalculatorProps> = ({
+  onOpenAuth,
+  onGoToDashboard,
+}) => {
+  const { user } = useAuth();
   const [services, setServices] = useState<ServiceData[]>(FALLBACK_SERVICES);
   const [selectedServiceCode, setSelectedServiceCode] = useState<string>('STANDARD');
   const [distanceKm, setDistanceKm] = useState<number>(5);
@@ -343,16 +353,15 @@ export const PricingCalculator: React.FC = () => {
 
             <button
               onClick={() => {
-                const element = document.getElementById('dashboard') || document.getElementById('tracking-results');
-                if (element) {
-                  element.scrollIntoView({ behavior: 'smooth' });
+                if (user) {
+                  onGoToDashboard?.();
                 } else {
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  onOpenAuth?.();
                 }
               }}
               className="w-full bg-[#bc0100] hover:bg-[#930100] text-white py-3 rounded-md text-sm font-bold uppercase tracking-wider transition-colors cursor-pointer text-center"
             >
-              Đăng nhập để đặt hàng ngay
+              {user ? 'Đi đến bảng điều khiển đặt hàng' : 'Đăng nhập để đặt hàng ngay'}
             </button>
           </div>
         </div>

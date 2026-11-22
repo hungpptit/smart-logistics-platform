@@ -282,7 +282,7 @@ export const StaffTab: React.FC = () => {
   return (
     <div className="flex flex-col gap-6 font-montserrat">
       {/* Header Info */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-[#1e293b] to-[#0f172a] text-white p-6 rounded-lg shadow-soft border border-[#1e293b]/50">
+      {/* <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-[#1e293b] to-[#0f172a] text-white p-6 rounded-lg shadow-soft border border-[#1e293b]/50">
         <div>
           <h2 className="text-lg font-extrabold flex items-center gap-2 tracking-wide uppercase">
             <Shield className="text-[#bc0100]" size={22} />
@@ -292,7 +292,7 @@ export const StaffTab: React.FC = () => {
             Quản trị viên có quyền thêm nhân viên mới, phân công nhân viên chịu trách nhiệm quản lý hoặc làm việc theo từng kho hàng cụ thể trong hệ thống.
           </p>
         </div>
-      </div>
+      </div> */}
 
       {/* Search & Action Bar */}
       <div className="bg-white p-4 rounded-lg border border-[#e2e8f0] shadow-soft flex flex-col lg:flex-row gap-4 items-center justify-between">
@@ -434,11 +434,10 @@ export const StaffTab: React.FC = () => {
                       )}
                     </td>
                     <td className="p-3">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                        staff.status === 'ACTIVE'
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold ${staff.status === 'ACTIVE'
                           ? 'bg-green-50 text-green-700 border border-green-200'
                           : 'bg-red-50 text-red-700 border border-red-200'
-                      }`}>
+                        }`}>
                         {STAFF_STATUS_MAP[staff.status]?.label || staff.status}
                       </span>
                     </td>
@@ -498,11 +497,10 @@ export const StaffTab: React.FC = () => {
                 <button
                   key={p}
                   onClick={() => setCurrentPage(p)}
-                  className={`px-2.5 py-1 border rounded text-[10px] font-bold cursor-pointer ${
-                    currentPage === p
+                  className={`px-2.5 py-1 border rounded text-[10px] font-bold cursor-pointer ${currentPage === p
                       ? 'bg-[#bc0100] text-white border-[#bc0100]'
                       : 'bg-white text-gray-600 border-[#e2e8f0] hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   {p}
                 </button>
@@ -759,11 +757,10 @@ export const StaffTab: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-sm text-gray-800">{selectedStaffDetail.username}</h4>
-                  <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-extrabold mt-1 ${
-                    selectedStaffDetail.status === 'ACTIVE'
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-extrabold mt-1 ${selectedStaffDetail.status === 'ACTIVE'
                       ? 'bg-green-50 text-green-700 border border-green-200'
                       : 'bg-red-50 text-red-700 border border-red-200'
-                  }`}>
+                    }`}>
                     {STAFF_STATUS_MAP[selectedStaffDetail.status]?.label || selectedStaffDetail.status}
                   </span>
                 </div>

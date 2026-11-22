@@ -76,11 +76,20 @@ export const CustomerDetailPanel: React.FC<CustomerDetailPanelProps> = ({
             <span className="font-extrabold text-[#161D25] uppercase tracking-wider">
               {customer.customerType === 'BUSINESS' ? 'Doanh Nghiệp' : 'Cá Nhân'}
             </span>
-            <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${
-              (customer.user?.status || 'ACTIVE') === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-            }`}>
-              {customer.user?.status || 'ACTIVE'}
-            </span>
+            {(() => {
+              const statusVal = customer.user?.status || customer.status || 'ACTIVE';
+              return (
+                <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${
+                  statusVal === 'ACTIVE'
+                    ? 'bg-green-100 text-green-700'
+                    : statusVal === 'LOCKED'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {statusVal === 'ACTIVE' ? 'Hoạt động' : statusVal === 'LOCKED' ? 'Bị khóa' : 'Vô hiệu hóa'}
+                </span>
+              );
+            })()}
           </div>
 
           <div className="grid grid-cols-2 gap-y-3 gap-x-2">

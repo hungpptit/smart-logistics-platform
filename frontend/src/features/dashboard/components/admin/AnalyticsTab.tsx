@@ -332,21 +332,19 @@ export const AnalyticsTab: React.FC = () => {
                     {/* Revenue Bar */}
                     <div
                       style={{ height: `${revHeight > 0 ? Math.max(revHeight, 4) : 0}%` }}
-                      className={`w-1/2 rounded-t-md transition-all group-hover:brightness-110 ${
-                        revHeight > 0
-                          ? 'bg-gradient-to-t from-[#bc0100] to-red-500 shadow-sm'
-                          : 'bg-transparent'
-                      }`}
+                      className={`w-1/2 rounded-t-md transition-all group-hover:brightness-110 ${revHeight > 0
+                        ? 'bg-gradient-to-t from-[#bc0100] to-red-500 shadow-sm'
+                        : 'bg-transparent'
+                        }`}
                     ></div>
 
                     {/* Cost Bar */}
                     <div
                       style={{ height: `${costHeight > 0 ? Math.max(costHeight, 2) : 0}%` }}
-                      className={`w-1/2 rounded-t-md transition-all ${
-                        costHeight > 0
-                          ? 'bg-slate-300 group-hover:bg-slate-400'
-                          : 'bg-transparent'
-                      }`}
+                      className={`w-1/2 rounded-t-md transition-all ${costHeight > 0
+                        ? 'bg-slate-300 group-hover:bg-slate-400'
+                        : 'bg-transparent'
+                        }`}
                     ></div>
                   </div>
                   <span className="text-[11px] font-bold text-slate-600 font-mono mt-1">{d.label}</span>
@@ -355,7 +353,7 @@ export const AnalyticsTab: React.FC = () => {
             })}
           </div>
           <div className="flex justify-between items-center text-[11px] text-gray-400 font-mono pt-1">
-            <span>Tính toán trực tiếp từ cơ sở dữ liệu PostgreSQL</span>
+            <span></span>
             <span>Tổng cộng: {kpis.totalRevenueMillion.toLocaleString('vi-VN')} Tr.đ</span>
           </div>
         </div>
@@ -464,7 +462,7 @@ export const AnalyticsTab: React.FC = () => {
               </h3>
               <p className="text-[11px] text-gray-400 mt-0.5">Dựa trên số đơn giao thành công & quãng đường di chuyển</p>
             </div>
-            <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-bold px-2 py-0.5 rounded uppercase">Thực tế CSDL</span>
+            {/* <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-bold px-2 py-0.5 rounded uppercase">Thực tế CSDL</span> */}
           </div>
 
           <div className="overflow-x-auto">

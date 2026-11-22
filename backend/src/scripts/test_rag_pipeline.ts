@@ -31,7 +31,7 @@ async function main() {
   }
 
   console.log('\n----------------------------------------------------');
-  console.log('[3/3] Kiểm tra truy vấn kiến thức cho KHÁCH HÀNG (CUSTOMER):');
+  console.log('[3/4] Kiểm tra truy vấn kiến thức cho KHÁCH HÀNG (CUSTOMER):');
   const customerQueries = [
     'Hàng bị hư hỏng thì mức bồi thường là bao nhiêu?',
     'Cách tính cước theo khối lượng quy đổi thế nào?',
@@ -41,7 +41,25 @@ async function main() {
     console.log(`\n🔍 Câu hỏi: "${q}"`);
     const results = await ragService.search('CUSTOMER', q, 1);
     if (results.length > 0) {
-      console.log(`   👉 Tiêu đề khớp nhất: [${results[0].chunk.title}] (Score: ${results[0].score.toFixed(2)})`);
+      console.log(`   👉 Tiêu đề khớp nhất: [${results[0].chunk.title}] (Role: ${results[0].chunk.role}, Score: ${results[0].score.toFixed(2)})`);
+      console.log(`   📄 Trích đoạn: ${results[0].chunk.content.slice(0, 150)}...`);
+    } else {
+      console.log('   ❌ Không tìm thấy kết quả phù hợp.');
+    }
+  }
+
+  console.log('\n----------------------------------------------------');
+  console.log('[4/4] Kiểm tra tri thức DÙNG CHUNG (COMMON):');
+  const commonQueries = [
+    { role: 'CUSTOMER' as const, q: 'Quy định số lần giao lại tối đa và thời gian lưu kho tại bưu cục?' },
+    { role: 'SHIPPER' as const, q: 'Quy trình hoàn trả hàng về cho người gửi?' },
+  ];
+
+  for (const item of commonQueries) {
+    console.log(`\n🔍 [Role ${item.role}] hỏi: "${item.q}"`);
+    const results = await ragService.search(item.role, item.q, 1);
+    if (results.length > 0) {
+      console.log(`   👉 Tiêu đề khớp nhất: [${results[0].chunk.title}] (Role: ${results[0].chunk.role}, Score: ${results[0].score.toFixed(2)})`);
       console.log(`   📄 Trích đoạn: ${results[0].chunk.content.slice(0, 150)}...`);
     } else {
       console.log('   ❌ Không tìm thấy kết quả phù hợp.');

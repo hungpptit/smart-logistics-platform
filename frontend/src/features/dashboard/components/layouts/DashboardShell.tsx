@@ -50,8 +50,8 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({ menuItems, onBac
           activeTab === 'ai-chat' ? 'p-3 md:p-5 gap-0' : 'p-6 md:p-8 gap-6'
         } flex flex-col overflow-y-auto`}
       >
-        {/* Content Header Card (Ẩn chỉ riêng đối với tab Trợ lý AI CSKH để mở rộng diện tích khung chat) */}
-        {activeTab !== 'ai-chat' && (
+        {/* Content Header Card (Ẩn riêng đối với tab Trợ lý AI CSKH và Cấu hình hệ thống vì đã có khung tích hợp chuyên biệt) */}
+        {activeTab !== 'ai-chat' && activeTab !== 'system-config' && (
           <div className="bg-white p-6 rounded-lg border border-[#e2e8f0] shadow-soft flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1.5">

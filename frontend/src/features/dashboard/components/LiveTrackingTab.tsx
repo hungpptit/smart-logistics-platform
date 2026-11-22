@@ -636,7 +636,7 @@ export const LiveTrackingTab: React.FC = () => {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Tìm mã lộ trình, tài xế, bưu cục..."
+              placeholder="Tìm mã lộ trình, tài xế..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-8 pr-4 py-2 border border-[#e2e8f0] rounded text-xs focus:border-[#bc0100] outline-none transition-colors"
@@ -884,9 +884,8 @@ export const LiveTrackingTab: React.FC = () => {
           {/* Quick Simulation Controller overlay */}
           {selectedRoute && selectedRoute.status !== 'COMPLETED' && (
             <div
-              className={`absolute top-4 left-4 bg-white/95 backdrop-blur-md rounded-lg border border-[#e2e8f0] shadow-md z-10 transition-all duration-200 ${
-                isSimCardCollapsed ? 'p-2' : 'p-4 max-w-xs space-y-3'
-              }`}
+              className={`absolute top-4 left-4 bg-white/95 backdrop-blur-md rounded-lg border border-[#e2e8f0] shadow-md z-10 transition-all duration-200 ${isSimCardCollapsed ? 'p-2' : 'p-4 max-w-xs space-y-3'
+                }`}
             >
               {isSimCardCollapsed ? (
                 /* Giao diện thu gọn: 1 thanh capsule nhỏ gọn ở góc bản đồ */
@@ -904,11 +903,10 @@ export const LiveTrackingTab: React.FC = () => {
                   {/* Nút hành động nhanh ngay trên thanh thu gọn */}
                   <button
                     onClick={handleToggleSimulation}
-                    className={`p-1.5 rounded transition-colors cursor-pointer ${
-                      isSimulating
+                    className={`p-1.5 rounded transition-colors cursor-pointer ${isSimulating
                         ? 'bg-slate-900 hover:bg-slate-800 text-white'
                         : 'bg-[#bc0100] hover:bg-[#a00100] text-white'
-                    }`}
+                      }`}
                     title={isSimulating ? "Dừng mô phỏng" : "Bắt đầu mô phỏng"}
                   >
                     {isSimulating ? <Square size={12} fill="white" /> : <Play size={12} fill="white" />}

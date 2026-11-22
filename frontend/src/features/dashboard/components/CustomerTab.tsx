@@ -76,7 +76,7 @@ export const CustomerTab: React.FC = () => {
     customerType: 'INDIVIDUAL' as 'INDIVIDUAL' | 'BUSINESS',
     companyName: '',
     taxCode: '',
-    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE' | 'BLOCKED' | 'DISABLED' | string,
+    status: 'ACTIVE' as 'ACTIVE' | 'LOCKED' | 'DISABLED',
     note: ''
   });
 
@@ -215,7 +215,7 @@ export const CustomerTab: React.FC = () => {
       customerType: c.customerType,
       companyName: c.companyName || '',
       taxCode: c.taxCode || '',
-      status: c.status,
+      status: ((c.user?.status || c.status || 'ACTIVE') as 'ACTIVE' | 'LOCKED' | 'DISABLED'),
       note: c.note || ''
     });
     setEditingCustomerId(c.id);
@@ -435,8 +435,8 @@ export const CustomerTab: React.FC = () => {
             >
               <option value="">Tất cả trạng thái</option>
               <option value="ACTIVE">Hoạt động</option>
-              <option value="INACTIVE">Ngừng hoạt động</option>
-              <option value="BLOCKED">Bị khóa</option>
+              <option value="LOCKED">Bị khóa</option>
+              <option value="DISABLED">Vô hiệu hóa</option>
             </select>
           </div>
 

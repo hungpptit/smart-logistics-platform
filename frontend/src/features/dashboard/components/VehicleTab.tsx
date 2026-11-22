@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { CONFIG } from '../../../config';
-import { 
-  Truck, Search, Plus, RefreshCw, ShieldAlert, Edit2, Trash2, CheckCircle2, AlertTriangle, 
+import {
+  Truck, Search, Plus, RefreshCw, ShieldAlert, Edit2, Trash2, CheckCircle2, AlertTriangle,
   ChevronLeft, ChevronRight, X, Loader2, Compass, UserMinus, UserPlus
 } from 'lucide-react';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
@@ -84,7 +84,7 @@ export const VehicleTab: React.FC = () => {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [activeAssignments, setActiveAssignments] = useState<ActiveAssignment[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  
+
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
@@ -106,7 +106,7 @@ export const VehicleTab: React.FC = () => {
   const [showVehicleModal, setShowVehicleModal] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
-  
+
   const [showAssignModal, setShowAssignModal] = useState<boolean>(false);
   const [selectedVehicleForAssign, setSelectedVehicleForAssign] = useState<Vehicle | null>(null);
   const [selectedDriverId, setSelectedDriverId] = useState<string>('');
@@ -123,7 +123,7 @@ export const VehicleTab: React.FC = () => {
     title: '',
     message: '',
     type: 'confirm',
-    onConfirm: () => {}
+    onConfirm: () => { }
   });
 
   // Form States (Vehicle)
@@ -258,7 +258,7 @@ export const VehicleTab: React.FC = () => {
     const hh = String(now.getHours()).padStart(2, '0');
     const min = String(now.getMinutes()).padStart(2, '0');
     const ss = String(now.getSeconds()).padStart(2, '0');
-    
+
     setFormData({
       vehicleCode: `VEH-${yy}${mm}${dd}-${hh}${min}${ss}`,
       licensePlate: '',
@@ -319,8 +319,8 @@ export const VehicleTab: React.FC = () => {
     };
 
     try {
-      const url = isEditing 
-        ? `${CONFIG.API_BASE_URL}/vehicles/${selectedVehicleId}` 
+      const url = isEditing
+        ? `${CONFIG.API_BASE_URL}/vehicles/${selectedVehicleId}`
         : `${CONFIG.API_BASE_URL}/vehicles`;
       const method = isEditing ? 'PUT' : 'POST';
 
@@ -452,7 +452,7 @@ export const VehicleTab: React.FC = () => {
     setConfirmConfig({
       isOpen: true,
       title: 'Thu hồi phương tiện',
-      message: `Bạn có chắc chắn muốn thu hồi xe của tài xế "${driverName}"?`,
+      message: `Bạn có chắc chắn muốn thu hồi phương tiện của tài xế "${driverName}"?`,
       type: 'confirm',
       onConfirm: async () => {
         setConfirmConfig(prev => ({ ...prev, isOpen: false }));
@@ -488,7 +488,7 @@ export const VehicleTab: React.FC = () => {
     const licenseHierarchy: Record<string, number> = {
       'A1': 1, 'A2': 2, 'B1': 3, 'B2': 4, 'C': 5, 'D': 6, 'E': 7, 'FC': 8, 'FE': 9
     };
-    
+
     const driverRank = licenseHierarchy[driverClass.toUpperCase()] || 0;
     const code = vehicleTypeCode.toUpperCase();
 
@@ -671,7 +671,7 @@ export const VehicleTab: React.FC = () => {
                                 onClick={() => handleTerminateAssignment(activeAssign.driverId, activeAssign.driver.fullName)}
                                 className="mt-1 flex items-center gap-1 text-[8px] font-extrabold uppercase text-red-600 hover:text-red-800 bg-white border border-red-200 rounded px-1 py-0.5 self-start cursor-pointer transition-colors"
                               >
-                                <UserMinus size={8} /> Thu hồi xe
+                                <UserMinus size={8} /> Thu hồi phương tiện
                               </button>
                             )}
                           </div>
@@ -721,13 +721,12 @@ export const VehicleTab: React.FC = () => {
 
                       {/* Status */}
                       <td className="p-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
-                          vh.operatingStatus === 'ACTIVE'
-                            ? 'bg-green-50 text-green-700 border border-green-200'
-                            : vh.operatingStatus === 'MAINTENANCE'
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${vh.operatingStatus === 'ACTIVE'
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : vh.operatingStatus === 'MAINTENANCE'
                             ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
                             : 'bg-red-50 text-red-700 border border-red-200'
-                        }`}>
+                          }`}>
                           {VEHICLE_STATUS_MAP[vh.operatingStatus]?.label || vh.operatingStatus}
                         </span>
                       </td>
@@ -1036,7 +1035,7 @@ export const VehicleTab: React.FC = () => {
               {/* Driver Select Filtered by Facility & Compatible License */}
               {(() => {
                 const vehicleFacilityId = selectedVehicleForAssign.assignedFacilityId || selectedVehicleForAssign.homeFacilityId || selectedVehicleForAssign.assignedFacility?.id || selectedVehicleForAssign.homeFacility?.id;
-                
+
                 // Only drivers belonging to the SAME facility (or unassigned), and with compatible license class
                 const availableDrivers = drivers.filter((drv) => {
                   const drvFacId = drv.assignedFacilityId || (drv as any).assignedFacility?.id || drv.homeFacilityId;

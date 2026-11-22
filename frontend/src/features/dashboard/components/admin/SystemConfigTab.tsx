@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Settings2, Cpu, ShieldAlert, Save } from 'lucide-react';
+import { Settings2, Cpu, ShieldAlert, Save, CheckCircle2, Loader2 } from 'lucide-react';
+import { useAuth } from '../../../../context/AuthContext';
 
 export const SystemConfigTab: React.FC = () => {
+  const { user } = useAuth();
   const [configs, setConfigs] = useState([
     { key: 'GPS_INTERVAL_SECONDS', value: '5', category: 'GPS', description: 'Khoảng thời gian định kỳ (giây) chạy ngầm gửi vị trí GPS của Shipper.' },
     { key: 'ETA_REFRESH_INTERVAL_MIN', value: '5', category: 'ROUTING', description: 'Chu kỳ tính toán lại thời gian dự kiến giao hàng (ETA) cho các stop.' },
@@ -33,36 +35,52 @@ export const SystemConfigTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-        <div>
-          <h2 className="text-base font-bold text-[#161D25] uppercase tracking-wider flex items-center gap-2">
-            <Settings2 size={18} className="text-[#bc0100]" /> Cấu hình tham số hệ thống
-          </h2>
-          <p className="text-xs text-gray-500 mt-1">Điều chỉnh các biến điều hành GPS, thuật toán AI và giới hạn kinh doanh.</p>
-        </div>
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-[#bc0100] text-white hover:bg-[#a00100] transition-colors rounded text-xs font-bold uppercase tracking-wider shadow-sm disabled:opacity-50"
-        >
-          <Save size={14} /> {saving ? 'Đang lưu...' : 'Lưu cấu hình'}
-        </button>
-      </div>
-
-      {savedSuccess && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold px-4 py-3 rounded-lg flex items-center gap-2 shadow-sm">
-          <span>✓</span> Đã cập nhật thành công các tham số cấu hình hệ thống trên toàn mạng lưới!
-        </div>
-      )}
-
-      {/* Safety warnings for AI variables */}
-      <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm">
-        <div className="flex gap-3">
-          <ShieldAlert className="text-red-600 shrink-0 mt-0.5" size={20} />
+      {/* Khối Header Thống Nhất (Gộp chung Tiêu đề, Vai trò, Nút Lưu cấu hình và Cảnh báo bảo mật thành 1 ô duy nhất) */}
+      <div className="bg-white p-6 rounded-lg border border-[#e2e8f0] shadow-soft space-y-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h4 className="text-xs font-bold text-red-900 uppercase tracking-wider">Lưu ý bảo mật & hiệu suất</h4>
-            <p className="text-[11px] text-red-700 mt-1 leading-relaxed">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-[10px] font-extrabold bg-[#bc0100]/10 text-[#bc0100] px-2 py-0.5 rounded uppercase tracking-wider">
+                {user?.roles?.join(' | ') || 'ADMIN'}
+              </span>
+              <span className="text-gray-300">|</span>
+              <span className="text-xs text-gray-400 font-medium">Bảng quản trị hệ thống</span>
+            </div>
+            <h2 className="text-xl md:text-2xl font-extrabold text-[#161D25] uppercase tracking-wider flex items-center gap-2.5">
+              <Settings2 size={24} className="text-[#bc0100]" />
+              Cấu hình hệ thống
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Điều chỉnh các biến điều hành GPS, thuật toán AI và giới hạn kinh doanh.
+            </p>
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#bc0100] text-white hover:bg-[#a00100] transition-colors rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm disabled:opacity-50 shrink-0"
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {saving ? 'Đang lưu...' : 'Lưu cấu hình'}
+          </button>
+        </div>
+
+        {/* Thông báo cập nhật thành công */}
+        {savedSuccess && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-xs">
+            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+            <span>Đã cập nhật thành công các tham số cấu hình hệ thống trên toàn mạng lưới!</span>
+          </div>
+        )}
+
+        {/* Cảnh báo bảo mật & hiệu suất AI */}
+        <div className="bg-red-50/70 border border-red-200/80 p-3.5 rounded-lg flex items-start gap-3">
+          <ShieldAlert className="text-[#bc0100] shrink-0 mt-0.5" size={18} />
+          <div className="text-xs">
+            <h4 className="font-bold text-red-900 uppercase tracking-wider text-[11px]">
+              Lưu ý bảo mật & hiệu suất
+            </h4>
+            <p className="text-[11px] text-red-700 mt-0.5 leading-relaxed">
               Việc chỉnh sửa các tham số Genetic Algorithm (như tỷ lệ đột biến và kích thước quần thể) sẽ ảnh hưởng trực tiếp đến chu kỳ tính toán và mức độ hội tụ lộ trình của động cơ tối ưu hóa chặng đường VRP. Hãy thực hiện kiểm tra tải trước khi áp dụng trên môi trường sản xuất.
             </p>
           </div>
