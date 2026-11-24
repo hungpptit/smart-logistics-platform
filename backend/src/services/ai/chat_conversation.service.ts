@@ -5,6 +5,11 @@ export const REMINDER_MESSAGE =
 export const CLOSING_MESSAGE =
   'Do không nhận được phản hồi từ quý khách, Velocity xin phép đóng phiên hỗ trợ này. Cảm ơn quý khách đã tin tưởng và đồng hành cùng Velocity Logistics. Chúc quý khách một ngày tốt lành! Quý khách có thể gửi tin nhắn mới bất cứ lúc nào để bắt đầu phiên hỗ trợ mới.';
 
+export const DRIVER_REMINDER_MESSAGE =
+  'Bác tài còn cần hỗ trợ thêm thông tin hoặc xử lý sự cố nào trên chuyến đi nữa không ạ?';
+export const DRIVER_CLOSING_MESSAGE =
+  'Do không nhận được phản hồi, Trợ lý AI xin phép tạm đóng phiên hỗ trợ này. Chúc bác tài vạn dặm bình an và giao hàng thuận lợi! Bác tài có thể nhắn tin mới bất cứ lúc nào để tiếp tục.';
+
 export class ChatConversationService {
   /**
    * Lấy cuộc hội thoại đang mở (ACTIVE) gần nhất của khách hàng (kèm tự động xử lý timeout)
@@ -14,16 +19,8 @@ export class ChatConversationService {
       return { conversationId: null, status: 'NEW', isClosed: false, messages: [] };
     }
 
-    const customer = await prisma.customer.findUnique({
-      where: { userId },
-    });
-
-    if (!customer) {
-      return { conversationId: null, status: 'NEW', isClosed: false, messages: [] };
-    }
-
     let activeConv = await prisma.chatConversation.findFirst({
-      where: { customerId: customer.id },
+      where: { userId },
       orderBy: { updatedAt: 'desc' },
       include: {
         messages: {
@@ -38,6 +35,19 @@ export class ChatConversationService {
 
     let isClosed = activeConv.status === 'CLOSED';
 
+    // Xác định vai trò (Tài xế hay Khách hàng) để xưng hô chuẩn xác
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true, staff: true },
+    });
+    const isDriver =
+      user?.role?.roleCode === 'SHIPPER' ||
+      user?.staff?.position === 'DRIVER' ||
+      activeConv.title?.toLowerCase().includes('tài xế');
+
+    const expectedReminder = isDriver ? DRIVER_REMINDER_MESSAGE : REMINDER_MESSAGE;
+    const expectedClosing = isDriver ? DRIVER_CLOSING_MESSAGE : CLOSING_MESSAGE;
+
     // Xử lý Timeout tự động trên Server (Shopee Style: 3p nhắc nhở, 5p tự đóng)
     if (!isClosed && activeConv.messages.length > 0) {
       const lastMsg = activeConv.messages[activeConv.messages.length - 1];
@@ -47,26 +57,36 @@ export class ChatConversationService {
         const FIVE_MINUTES = 5 * 60 * 1000;
 
         if (elapsedMs >= FIVE_MINUTES) {
-          const hasReminder = activeConv.messages.some((m) => m.content === REMINDER_MESSAGE);
+          const hasReminder = activeConv.messages.some(
+            (m) =>
+              m.content === expectedReminder ||
+              m.content === REMINDER_MESSAGE ||
+              m.content === DRIVER_REMINDER_MESSAGE
+          );
           if (!hasReminder) {
             await prisma.chatMessage.create({
               data: {
                 conversationId: activeConv.id,
                 role: 'ASSISTANT',
-                content: REMINDER_MESSAGE,
+                content: expectedReminder,
                 status: 'SENT',
                 createdAt: new Date(new Date(lastMsg.createdAt).getTime() + THREE_MINUTES),
               },
             });
           }
 
-          const hasClosing = activeConv.messages.some((m) => m.content === CLOSING_MESSAGE);
+          const hasClosing = activeConv.messages.some(
+            (m) =>
+              m.content === expectedClosing ||
+              m.content === CLOSING_MESSAGE ||
+              m.content === DRIVER_CLOSING_MESSAGE
+          );
           if (!hasClosing) {
             await prisma.chatMessage.create({
               data: {
                 conversationId: activeConv.id,
                 role: 'ASSISTANT',
-                content: CLOSING_MESSAGE,
+                content: expectedClosing,
                 status: 'SENT',
                 createdAt: new Date(new Date(lastMsg.createdAt).getTime() + FIVE_MINUTES),
               },
@@ -92,25 +112,21 @@ export class ChatConversationService {
             },
           })) as any;
         } else if (elapsedMs >= THREE_MINUTES) {
-          const hasReminder = activeConv.messages.some((m) => m.content === REMINDER_MESSAGE);
+          const hasReminder = activeConv.messages.some(
+            (m) =>
+              m.content === expectedReminder ||
+              m.content === REMINDER_MESSAGE ||
+              m.content === DRIVER_REMINDER_MESSAGE
+          );
           if (!hasReminder) {
             await prisma.chatMessage.create({
               data: {
                 conversationId: activeConv.id,
                 role: 'ASSISTANT',
-                content: REMINDER_MESSAGE,
+                content: expectedReminder,
                 status: 'SENT',
               },
             });
-
-            activeConv = (await prisma.chatConversation.findUnique({
-              where: { id: activeConv.id },
-              include: {
-                messages: {
-                  orderBy: { createdAt: 'asc' },
-                },
-              },
-            })) as any;
           }
         }
       }
@@ -121,10 +137,13 @@ export class ChatConversationService {
       .map((m) => ({
         id: m.id,
         sender: m.role === 'USER' ? 'user' : 'ai',
+        role: m.role,
         text: m.content || '',
+        content: m.content || '',
         image: m.imageUrl || undefined,
         actionData: (m.toolResult as any) || undefined,
         timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        createdAt: m.createdAt,
       }));
 
     return {
@@ -144,17 +163,9 @@ export class ChatConversationService {
       return { conversationId: null };
     }
 
-    const customer = await prisma.customer.findUnique({
-      where: { userId },
-    });
-
-    if (!customer) {
-      return { conversationId: null };
-    }
-
     const newConv = await prisma.chatConversation.create({
       data: {
-        customerId: customer.id,
+        userId,
         title: 'Cuộc trò chuyện mới',
         status: 'ACTIVE',
       },
@@ -172,7 +183,7 @@ export class ChatConversationService {
    * Lấy hoặc tự động tạo phiên trò chuyện hợp lệ cho lượt chat mới
    */
   public async getOrCreateActiveConversation(
-    customerId: string,
+    userId: string,
     requestedConvId?: string,
     firstQueryText?: string
   ): Promise<string> {
@@ -180,7 +191,7 @@ export class ChatConversationService {
 
     if (requestedConvId) {
       const existing = await prisma.chatConversation.findFirst({
-        where: { id: requestedConvId, customerId },
+        where: { id: requestedConvId, userId },
       });
       if (existing && existing.status !== 'CLOSED') {
         if (existing.title === 'Cuộc trò chuyện mới' && firstQueryText) {
@@ -195,14 +206,14 @@ export class ChatConversationService {
 
     // Tìm phiên gần nhất đang ACTIVE
     let conv = await prisma.chatConversation.findFirst({
-      where: { customerId, status: 'ACTIVE' },
+      where: { userId, status: 'ACTIVE' },
       orderBy: { updatedAt: 'desc' },
     });
 
     if (!conv) {
       conv = await prisma.chatConversation.create({
         data: {
-          customerId,
+          userId,
           title: titleSnippet,
           status: 'ACTIVE',
         },
@@ -224,6 +235,12 @@ export class ChatConversationService {
     const conv = await prisma.chatConversation.findUnique({
       where: { id: conversationId },
       include: {
+        user: {
+          include: {
+            role: true,
+            staff: true,
+          },
+        },
         messages: {
           orderBy: { createdAt: 'asc' },
         },
@@ -244,17 +261,68 @@ export class ChatConversationService {
       return { success: true, action: 'IGNORED_USER_ACTIVE', isClosed: false };
     }
 
+    const isDriver =
+      conv.user?.role?.roleCode === 'SHIPPER' ||
+      conv.user?.staff?.position === 'DRIVER' ||
+      conv.title?.toLowerCase().includes('tài xế');
+
+    const expectedReminder = isDriver ? DRIVER_REMINDER_MESSAGE : REMINDER_MESSAGE;
+    const expectedClosing = isDriver ? DRIVER_CLOSING_MESSAGE : CLOSING_MESSAGE;
+
+    // 1. Tìm tin nhắn trợ lý thật gần nhất (bỏ qua tin nhắc nhở để mốc đóng không bị dời sang phút thứ 8)
+    const assistantMessages = conv.messages.filter(
+      (m) =>
+        m.role === 'ASSISTANT' &&
+        m.content !== REMINDER_MESSAGE &&
+        m.content !== CLOSING_MESSAGE &&
+        m.content !== DRIVER_REMINDER_MESSAGE &&
+        m.content !== DRIVER_CLOSING_MESSAGE
+    );
+    const lastRealAssistantMsg =
+      assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1] : null;
+
+    if (!lastRealAssistantMsg) {
+      return { success: true, action: 'NOOP', isClosed: false, message: 'Chưa có câu trả lời từ Trợ lý AI.' };
+    }
+
+    const lastAiTime = new Date(lastRealAssistantMsg.createdAt).getTime();
+    const now = Date.now();
+    const elapsedSeconds = Math.floor((now - lastAiTime) / 1000);
+
+    // Ngưỡng thời gian (hỗ trợ override qua process.env khi test nhanh)
+    const REMINDER_THRESHOLD_SECONDS = process.env.TEST_TIMEOUT_REMIND_SEC
+      ? parseInt(process.env.TEST_TIMEOUT_REMIND_SEC, 10)
+      : 180; // 3 phút = 180 giây
+    const CLOSE_THRESHOLD_SECONDS = process.env.TEST_TIMEOUT_CLOSE_SEC
+      ? parseInt(process.env.TEST_TIMEOUT_CLOSE_SEC, 10)
+      : 300; // 5 phút = 300 giây
+
     if (action === 'REMINDER_3M') {
-      const hasReminder = conv.messages.some((m) => m.content === REMINDER_MESSAGE);
+      const hasReminder = conv.messages.some(
+        (m) =>
+          m.content === expectedReminder ||
+          m.content === REMINDER_MESSAGE ||
+          m.content === DRIVER_REMINDER_MESSAGE
+      );
       if (hasReminder) {
-        return { success: true, action: 'ALREADY_REMINDED', isClosed: false };
+        // Chống lặp: Chỉ gửi nhắc nhở đúng 1 lần duy nhất trong phiên
+        return { success: true, action: 'NOOP', isClosed: false, message: 'Đã gửi lời nhắc trước đó rồi.' };
+      }
+
+      if (elapsedSeconds < REMINDER_THRESHOLD_SECONDS) {
+        return {
+          success: true,
+          action: 'NOOP',
+          isClosed: false,
+          message: `Chưa đủ thời gian nhắc nhở 3 phút (mới trôi qua ${elapsedSeconds}s).`,
+        };
       }
 
       const reminderMsg = await prisma.chatMessage.create({
         data: {
           conversationId: conv.id,
           role: 'ASSISTANT',
-          content: REMINDER_MESSAGE,
+          content: expectedReminder,
           status: 'SENT',
         },
       });
@@ -278,11 +346,20 @@ export class ChatConversationService {
     }
 
     if (action === 'CLOSE_5M') {
+      if (elapsedSeconds < CLOSE_THRESHOLD_SECONDS) {
+        return {
+          success: true,
+          action: 'NOOP',
+          isClosed: false,
+          message: `Chưa đủ thời gian tự đóng phiên 5 phút (mới trôi qua ${elapsedSeconds}s).`,
+        };
+      }
+
       const closingMsg = await prisma.chatMessage.create({
         data: {
           conversationId: conv.id,
           role: 'ASSISTANT',
-          content: CLOSING_MESSAGE,
+          content: expectedClosing,
           status: 'SENT',
         },
       });

@@ -5,6 +5,9 @@ export interface ToolContext {
   userId?: string;
   customerId?: string;
   customerName?: string;
+  staffId?: string;
+  driverName?: string;
+  role?: string;
 }
 
 const pricingService = new PricingService();

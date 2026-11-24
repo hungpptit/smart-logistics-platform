@@ -320,6 +320,7 @@ model User {
   warehouseScans        WarehouseScan[]
   systemSettings        SystemSetting[]
   refundRequests        RefundTransaction[]  @relation("RefundRequester")
+  chatConversations     ChatConversation[]
 
   @@map("users")
 }
@@ -377,7 +378,6 @@ model Customer {
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   addresses    CustomerAddress[]
   orders       Order[]
-  chatConversations ChatConversation[]
 
   @@index([email], name: "idx_customer_email")
   @@map("customers")
@@ -1204,18 +1204,18 @@ model TrafficCamera {
 
 model ChatConversation {
   id         String        @id @default(uuid()) @db.Uuid
-  customerId String        @map("customer_id") @db.Uuid
+  userId     String        @map("user_id") @db.Uuid
   title      String?       @db.VarChar(255)
   status     String        @default("ACTIVE") @db.VarChar(30)
   closedAt   DateTime?     @map("closed_at") @db.Timestamptz
   createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
-  customer   Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages   ChatMessage[]
 
-  @@index([customerId, updatedAt(sort: Desc)], name: "idx_chat_conversations_customer")
-  @@index([customerId, status], name: "idx_chat_conversations_status")
+  @@index([userId, updatedAt(sort: Desc)], name: "idx_chat_conversations_user")
+  @@index([userId, status], name: "idx_chat_conversations_status")
   @@map("chat_conversations")
 }
 

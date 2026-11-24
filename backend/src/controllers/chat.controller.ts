@@ -2,8 +2,12 @@ import { Response } from 'express';
 import { prisma } from '../config/prisma';
 import { chatConversationService } from '../services/ai/chat_conversation.service';
 import { customerAgentService } from '../services/ai/customer_agent.service';
+import { driverAgentService } from '../services/ai/driver_agent.service';
 import { executeConfirmedAction } from '../services/ai/tools/customer_action.tools';
 import { actionTokenService } from '../services/ai/action_token.service';
+import { ChatMessageInputSchema } from '../dtos/chat_validation.dto';
+import { securityAuditService } from '../services/ai/security_audit.service';
+import { ZodError } from 'zod';
 
 export class ChatController {
   /**
@@ -99,15 +103,27 @@ export class ChatController {
    */
   public async chatCustomer(req: any, res: Response): Promise<void> {
     try {
-      const { message, image, conversationId, conversationHistory } = req.body;
-
-      if ((!message || typeof message !== 'string' || !message.trim()) && (!image || typeof image !== 'string')) {
-        res.status(400).json({
+      // 1. Kiểm tra giới hạn tần suất gửi tin nhắn (20 requests / phút / user)
+      const rateLimit = securityAuditService.checkChatRateLimit(req.user?.id);
+      if (!rateLimit.allowed) {
+        res.status(429).json({
           success: false,
-          message: 'Vui lòng cung cấp nội dung tin nhắn hoặc đính kèm hình ảnh.',
+          message: `Quý khách đang gửi tin nhắn quá nhanh. Vui lòng thử lại sau ${rateLimit.retryAfterSec || 10} giây.`,
         });
         return;
       }
+
+      const parseResult = ChatMessageInputSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        const firstError = parseResult.error.issues[0]?.message || 'Dữ liệu tin nhắn không hợp lệ.';
+        res.status(400).json({
+          success: false,
+          message: firstError,
+        });
+        return;
+      }
+
+      const { message, image, conversationId, conversationHistory } = parseResult.data;
 
       const result = await customerAgentService.handleCustomerMessage({
         userId: req.user?.id,
@@ -126,6 +142,57 @@ export class ChatController {
       res.status(500).json({
         success: false,
         message: 'Đã có lỗi xảy ra trong quá trình xử lý câu trả lời từ AI.',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Chat hỗ trợ Tài xế kết hợp RAG cẩm nang nghiệp vụ và xử lý sự cố tuyến đường
+   * POST /api/v1/chat/driver
+   */
+  public async chatDriver(req: any, res: Response): Promise<void> {
+    try {
+      // 1. Kiểm tra giới hạn tần suất gửi tin nhắn (20 requests / phút / user)
+      const rateLimit = securityAuditService.checkChatRateLimit(req.user?.id);
+      if (!rateLimit.allowed) {
+        res.status(429).json({
+          success: false,
+          message: `Bác tài đang gửi tin nhắn quá nhanh. Vui lòng thử lại sau ${rateLimit.retryAfterSec || 10} giây.`,
+        });
+        return;
+      }
+
+      const parseResult = ChatMessageInputSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        const firstError = parseResult.error.issues[0]?.message || 'Dữ liệu tin nhắn không hợp lệ.';
+        res.status(400).json({
+          success: false,
+          message: firstError,
+        });
+        return;
+      }
+
+      const { message, image, conversationId, conversationHistory } = parseResult.data;
+
+      const result = await driverAgentService.handleDriverMessage({
+        userId: req.user?.id,
+        message,
+        image,
+        conversationId,
+        conversationHistory,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      console.error('[ChatController] Lỗi khi xử lý chat tài xế:', error);
+      const status = error.status || error.statusCode || 500;
+      res.status(status).json({
+        success: false,
+        message: error.message || 'Đã có lỗi xảy ra trong quá trình xử lý câu trả lời từ AI.',
         error: error.message,
       });
     }

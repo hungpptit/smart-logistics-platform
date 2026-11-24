@@ -27,6 +27,7 @@ import 'widgets/shipment_qr_modal.dart';
 import 'widgets/tote_detail_dialog.dart';
 import 'widgets/pickup_assignment_dialog.dart';
 import 'widgets/reject_route_dialog.dart';
+import 'driver_chat_screen.dart';
 
 /// Driver Dashboard - Main screen for drivers.
 /// All UI widgets extracted to screens/driver/widgets/ directory.
@@ -1249,6 +1250,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
             ),
             ListTile(leading: const Icon(Icons.home, color: AppColors.logisticsRed), title: const Text('Trang chủ'), onTap: () => Navigator.pop(context)),
             ListTile(leading: const Icon(Icons.inventory_2, color: AppColors.secondary), title: const Text('Đơn hàng đang giao'), onTap: () {}),
+            ListTile(
+              leading: const Icon(Icons.smart_toy_rounded, color: AppColors.logisticsRed),
+              title: const Text('Trợ lý Tài xế AI'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DriverChatScreen()),
+                );
+              },
+            ),
             ListTile(leading: const Icon(Icons.history, color: AppColors.secondary), title: const Text('Lịch sử lộ trình'), onTap: () {}),
             ListTile(leading: const Icon(Icons.query_stats, color: AppColors.secondary), title: const Text('Hiệu suất'), onTap: () {}),
             const Divider(),
@@ -1523,6 +1535,18 @@ class _DriverDashboardState extends State<DriverDashboard> {
             ],
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DriverChatScreen()),
+          );
+        },
+        backgroundColor: AppColors.logisticsRed,
+        elevation: 4.0,
+        tooltip: 'Trợ lý Tài xế AI',
+        child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 26.0),
       ),
     );
   }

@@ -66,4 +66,11 @@ class ApiConstants {
 
   // Traffic Enforcement Camera Endpoints
   static String get trafficCameras => '${AppConfig.baseUrl}/cameras';
+
+  // AI Driver Chat Endpoints
+  static String get driverChat => '${AppConfig.baseUrl}/chat/driver';
+  static String get driverChatMessages => '${AppConfig.baseUrl}/chat/driver/messages';
+  static String get driverChatNew => '${AppConfig.baseUrl}/chat/driver/new';
+  static String get driverChatTimeoutCheck => '${AppConfig.baseUrl}/chat/driver/timeout-check';
+  static String get driverChatClose => '${AppConfig.baseUrl}/chat/driver/close';
 }

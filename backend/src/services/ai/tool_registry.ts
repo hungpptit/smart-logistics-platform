@@ -15,6 +15,13 @@ import {
   createDraftOrder,
   escalateToHuman,
 } from './tools/customer_action.tools';
+import {
+  getMyOrders,
+  getNextStop,
+  getOrderDeliveryInfo,
+  getCodSummary,
+  findNearestFacility,
+} from './tools/driver_read.tools';
 
 /**
  * Danh sách định nghĩa Tools cho Khách hàng chuẩn OpenAI Specification
@@ -321,20 +328,112 @@ export const CUSTOMER_TOOLS: ChatTool[] = [
   },
 ];
 
+/**
+ * Danh sách định nghĩa 5 Tools Chỉ Đọc cho Tài Xế chuẩn OpenAI/NVIDIA API Specification
+ */
+export const DRIVER_TOOLS: ChatTool[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'get_my_orders',
+      description:
+        'Xem danh sách các đơn hàng trong lộ trình ca hôm nay của tài xế theo từng nhóm trạng thái (ACTIVE: đang giao/lấy, PENDING: chờ giao, DELIVERED: đã giao xong, FAILED: thất bại/hoàn hàng).',
+      parameters: {
+        type: 'object',
+        properties: {
+          group: {
+            type: 'string',
+            enum: ['ACTIVE', 'PENDING', 'DELIVERED', 'FAILED'],
+            description: 'Nhóm trạng thái đơn cần xem (mặc định là ACTIVE)',
+          },
+          limit: {
+            type: 'number',
+            description: 'Số lượng đơn tối đa cần lấy (1 đến 10, mặc định: 10)',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_next_stop',
+      description:
+        'Tra cứu điểm dừng kế tiếp cần thực hiện theo đúng thứ tự lộ trình (hỗ trợ cả điểm giao hàng, điểm lấy hàng, hoặc quay về bưu cục/kho).',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_order_delivery_info',
+      description:
+        'Tra cứu chi tiết thông tin giao hàng của một mã đơn cụ thể thuộc lộ trình hiện tại của tài xế (người nhận, số điện thoại, địa chỉ, COD, lịch sử giao).',
+      parameters: {
+        type: 'object',
+        properties: {
+          orderCode: {
+            type: 'string',
+            description: 'Mã vận đơn cần xem chi tiết (ví dụ: "ORD-TD-012")',
+          },
+        },
+        required: ['orderCode'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_cod_summary',
+      description:
+        'Tổng hợp toàn bộ tiền COD cần thu, đã thu và còn phải nộp về thủ quỹ trong ca giao hàng hôm nay.',
+      parameters: {
+        type: 'object',
+        properties: {
+          includeOrders: {
+            type: 'boolean',
+            description: 'Có kèm danh sách các đơn COD chi tiết hay không (mặc định: false)',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'find_nearest_facility',
+      description:
+        'Tìm bưu cục hoặc trạm trung chuyển gần vị trí GPS hiện tại của tài xế nhất (kèm khoảng cách, địa chỉ, hotline bưu cục 1900-6868 và giờ mở cửa).',
+      parameters: {
+        type: 'object',
+        properties: {
+          limit: {
+            type: 'number',
+            description: 'Số lượng bưu cục cần tìm (1 đến 3, mặc định: 1)',
+          },
+        },
+      },
+    },
+  },
+];
+
 export class ToolRegistry {
   /**
    * Bộ điều phối thực thi Tool an toàn (Dispatcher)
-   * Luôn truyền ngữ cảnh bảo mật ctx (customerId) từ JWT token
+   * Luôn truyền ngữ cảnh bảo mật ctx (customerId / staffId) từ JWT token
    */
   public async execute(
     name: string,
     args: Record<string, any>,
     ctx: ToolContext
   ): Promise<Record<string, any>> {
-    console.log(`[ToolRegistry] Đang thực thi tool: ${name} với args:`, JSON.stringify(args));
+    console.log(`[ToolRegistry] Đang thực thi tool: ${name} cho role: ${ctx.role} với args:`, JSON.stringify(args));
 
     switch (name) {
-      // Read Tools
+      // --- CUSTOMER TOOLS ---
       case 'track_order':
         return await trackOrder(args as any, ctx);
 
@@ -353,7 +452,6 @@ export class ToolRegistry {
       case 'find_nearest_station':
         return await findNearestStation(args as any, ctx);
 
-      // Action Tools (Write with confirmation)
       case 'cancel_order':
         return await requestCancelOrder(args as any, ctx);
 
@@ -363,12 +461,27 @@ export class ToolRegistry {
       case 'reschedule_delivery':
         return await requestRescheduleDelivery(args as any, ctx);
 
-      // Draft & Escalation
       case 'create_draft_order':
         return await createDraftOrder(args as any, ctx);
 
       case 'escalate_to_human':
         return await escalateToHuman(args as any, ctx);
+
+      // --- DRIVER READ-ONLY TOOLS ---
+      case 'get_my_orders':
+        return await getMyOrders(args, ctx);
+
+      case 'get_next_stop':
+        return await getNextStop(args, ctx);
+
+      case 'get_order_delivery_info':
+        return await getOrderDeliveryInfo(args, ctx);
+
+      case 'get_cod_summary':
+        return await getCodSummary(args, ctx);
+
+      case 'find_nearest_facility':
+        return await findNearestFacility(args, ctx);
 
       default:
         console.warn(`[ToolRegistry] Tool không được hỗ trợ: ${name}`);
@@ -381,10 +494,14 @@ export class ToolRegistry {
 
   /**
    * Lấy danh sách công cụ theo đối tượng người dùng
+   * Đảm bảo bộ tool của Khách hàng và Tài xế hoàn toàn độc lập, không dùng chung tool nào
    */
   public getToolsForRole(role: 'CUSTOMER' | 'DRIVER' = 'CUSTOMER'): ChatTool[] {
     if (role === 'CUSTOMER') {
       return CUSTOMER_TOOLS;
+    }
+    if (role === 'DRIVER') {
+      return DRIVER_TOOLS;
     }
     return [];
   }
