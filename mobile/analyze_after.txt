@@ -1,0 +1,21 @@
+﻿Analyzing mobile...                                             
+
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\screens\customer\tabs\create_order\service_option_card.dart:43:15 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\screens\customer\tabs\create_order\service_option_card.dart:45:15 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\screens\customer\tabs\create_order_tab.dart:941:9 - use_build_context_synchronously
+   info - Use 'isNotEmpty' instead of 'length' to test whether the collection is empty - lib\screens\customer\tabs\create_order_tab.dart:968:29 - prefer_is_empty
+   info - Use 'isNotEmpty' instead of 'length' to test whether the collection is empty - lib\screens\customer\tabs\create_order_tab.dart:1008:31 - prefer_is_empty
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\screens\customer\tabs\create_order_tab.dart:1741:37 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\screens\customer\tabs\create_order_tab.dart:1766:37 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\screens\customer\tabs\create_order_tab.dart:1804:27 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\screens\customer\tabs\create_order_tab.dart:1973:21 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\screens\customer\tabs\create_order_tab.dart:2003:21 - deprecated_member_use
+   info - Unnecessary use of multiple underscores - lib\screens\customer\tabs\create_order_tab.dart:2070:47 - unnecessary_underscores
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\screens\driver\widgets\report_failure_dialog.dart:87:13 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\screens\driver\widgets\report_incident_dialog.dart:54:13 - deprecated_member_use
+   info - Unnecessary use of multiple underscores - lib\screens\driver\widgets\tote_detail_dialog.dart:266:29 - unnecessary_underscores
+   info - Unnecessary 'const' keyword - lib\screens\driver\widgets\tote_detail_dialog.dart:348:20 - unnecessary_const
+   info - Unnecessary use of multiple underscores - lib\screens\driver\widgets\tote_detail_dialog.dart:357:29 - unnecessary_underscores
+   info - Use the null-aware marker '?' rather than a null check via an 'if' - lib\services\driver_service.dart:133:9 - use_null_aware_elements
+warning - Unused import: 'package:latlong2/latlong.dart' - test\navigation\navigation_engine_test.dart:5:8 - unused_import
+

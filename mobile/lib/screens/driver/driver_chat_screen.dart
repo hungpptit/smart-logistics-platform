@@ -7,29 +7,16 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/app_snackbar.dart';
+import '../../core/utils/chat_markdown_formatter.dart';
+import '../../core/utils/time_format.dart';
+import '../../models/chat_message.dart';
 import '../../services/driver_chat_service.dart';
-
-enum MessageStatus { sending, sent, failed }
-
-class ChatMessage {
-  final String id;
-  final String text;
-  final bool isUser;
-  final String time;
-  final String? imageBase64;
-  final String? imageUrl;
-  MessageStatus status;
-
-  ChatMessage({
-    required this.id,
-    required this.text,
-    required this.isUser,
-    required this.time,
-    this.imageBase64,
-    this.imageUrl,
-    this.status = MessageStatus.sent,
-  });
-}
+import 'widgets/chat/attached_image_bar.dart';
+import 'widgets/chat/chat_app_bar_title.dart';
+import 'widgets/chat/chat_input_bar.dart';
+import 'widgets/chat/quick_chips_bar.dart';
+import 'widgets/chat/typing_indicator.dart';
 
 class DriverChatScreen extends StatefulWidget {
   const DriverChatScreen({super.key});
@@ -140,31 +127,19 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
 
   void _toggleListening() async {
     if (!_speechAvailable) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Tính năng nhận diện giọng nói không khả dụng trên thiết bị này.'),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          margin: const EdgeInsets.all(16.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-        ),
+      AppSnackBar.show(
+        context,
+        content: const Text('Tính năng nhận diện giọng nói không khả dụng trên thiết bị này.'),
+        backgroundColor: Colors.orange,
       );
       return;
     }
 
     if (!_hasVietnamese) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Thiết bị chưa cài đặt nhận dạng giọng nói Tiếng Việt. Bác tài vui lòng bật Google Speech Services hoặc nhập văn bản.'),
-          backgroundColor: AppColors.logisticsRed,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          margin: const EdgeInsets.all(16.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-        ),
+      AppSnackBar.show(
+        context,
+        content: const Text('Thiết bị chưa cài đặt nhận dạng giọng nói Tiếng Việt. Bác tài vui lòng bật Google Speech Services hoặc nhập văn bản.'),
+        backgroundColor: AppColors.logisticsRed,
       );
       return;
     }
@@ -280,11 +255,11 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
         DateTime msgDate = DateTime.now();
         if (m['createdAt'] != null) {
           msgDate = DateTime.tryParse(m['createdAt'].toString())?.toLocal() ?? DateTime.now();
-          timeStr = '${msgDate.hour.toString().padLeft(2, '0')}:${msgDate.minute.toString().padLeft(2, '0')}';
+          timeStr = formatHHmm(msgDate);
         } else if (m['timestamp'] != null) {
           timeStr = m['timestamp'].toString();
         } else {
-          timeStr = '${msgDate.hour.toString().padLeft(2, '0')}:${msgDate.minute.toString().padLeft(2, '0')}';
+          timeStr = formatHHmm(msgDate);
         }
 
         loaded.add(ChatMessage(
@@ -325,8 +300,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
   }
 
   List<ChatMessage> _getDefaultWelcomeMessage() {
-    final now = TimeOfDay.now();
-    final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final timeStr = formatHHmm(DateTime.now());
     return [
       ChatMessage(
         id: 'welcome',
@@ -395,8 +369,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
     if (res['success'] == true) {
       final act = res['action'];
       if (act == 'REMINDED') {
-        final now = TimeOfDay.now();
-        final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        final timeStr = formatHHmm(DateTime.now());
         final reminderText = res['message']?['text'] ??
             'Bác tài ơi, bác có còn cần Trợ lý AI hỗ trợ thêm thông tin gì trên tuyến đường nữa không ạ?';
 
@@ -411,8 +384,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
         });
         _scrollToBottom();
       } else if (act == 'CLOSED') {
-        final now = TimeOfDay.now();
-        final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        final timeStr = formatHHmm(DateTime.now());
         final closingText = res['message']?['text'] ??
             'Do không nhận được phản hồi, Trợ lý AI xin phép tạm đóng phiên hỗ trợ. Chúc bác tài vạn dặm bình an!';
 
@@ -443,8 +415,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
 
     if (text.isEmpty && imageBase64 == null) return;
 
-    final now = TimeOfDay.now();
-    final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final timeStr = formatHHmm(DateTime.now());
 
     _cancelTimers(); // Hủy ngay bộ đếm khi tài xế gửi tin
 
@@ -487,8 +458,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
       final replyText = data?['reply']?.toString() ?? 'Em đã ghi nhận thông tin từ bác tài.';
       _conversationId = data?['conversationId'] ?? _conversationId;
 
-      final replyNow = TimeOfDay.now();
-      final replyTimeStr = '${replyNow.hour.toString().padLeft(2, '0')}:${replyNow.minute.toString().padLeft(2, '0')}';
+      final replyTimeStr = formatHHmm(DateTime.now());
 
       setState(() {
         userMsg.status = MessageStatus.sent;
@@ -521,23 +491,17 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
         _isSending = false;
       });
 
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMsg),
-          backgroundColor: AppColors.logisticsRed,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          margin: const EdgeInsets.all(16.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-          action: statusCode == 401
-              ? null
-              : SnackBarAction(
-                  label: 'Thử lại',
-                  textColor: Colors.white,
-                  onPressed: () => _sendMessage(retryMessage: userMsg),
-                ),
-        ),
+      AppSnackBar.show(
+        context,
+        content: Text(errorMsg),
+        backgroundColor: AppColors.logisticsRed,
+        action: statusCode == 401
+            ? null
+            : SnackBarAction(
+                label: 'Thử lại',
+                textColor: Colors.white,
+                onPressed: () => _sendMessage(retryMessage: userMsg),
+              ),
       );
     }
 
@@ -608,54 +572,9 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
           onPressed: () => Navigator.pop(context),
         ),
         titleSpacing: 0,
-        title: Row(
-          children: [
-            Container(
-              width: 38.0,
-              height: 38.0,
-              decoration: BoxDecoration(
-                color: AppColors.logisticsRed.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.logisticsRed.withValues(alpha: 0.2)),
-              ),
-              child: const Icon(Icons.smart_toy_rounded, color: AppColors.logisticsRed, size: 22.0),
-            ),
-            const SizedBox(width: 10.0),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Trợ lý Điều phối AI',
-                  style: TextStyle(
-                    fontSize: 15.0,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.deepOnyx,
-                  ),
-                ),
-                Row(
-                  children: [
-                    Container(
-                      width: 7.0,
-                      height: 7.0,
-                      decoration: BoxDecoration(
-                        color: _isClosed ? Colors.grey : const Color(0xFF10B981),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4.0),
-                    Text(
-                      _isClosed ? 'Phiên đã đóng' : (_isAITyping ? 'Đang trả lời...' : 'Sẵn sàng hỗ trợ'),
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: _isClosed ? Colors.grey : const Color(0xFF059669),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
+        title: ChatAppBarTitle(
+          isClosed: _isClosed,
+          isAITyping: _isAITyping,
         ),
         actions: [
           IconButton(
@@ -669,7 +588,11 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
         child: Column(
           children: [
             // Quick Prompt Chips (3 chip chuẩn)
-            _buildQuickChipsBar(),
+            QuickChipsBar(
+              chips: _quickChips,
+              isDisabled: _isSending || _isAITyping,
+              onChipTap: (chip) => _sendMessage(customText: chip),
+            ),
 
             // Chat Message List
             Expanded(
@@ -681,7 +604,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
                       itemCount: _messages.length + (_isAITyping ? 1 : 0),
                       itemBuilder: (context, index) {
                         if (index == _messages.length && _isAITyping) {
-                          return _buildTypingIndicator();
+                          return const TypingIndicator();
                         }
                         return _buildMessageBubble(_messages[index]);
                       },
@@ -689,71 +612,25 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
             ),
 
             // Attached Image Preview
-            if (_attachedImageFile != null) _buildAttachedImageBar(),
+            if (_attachedImageFile != null)
+              AttachedImageBar(
+                imageFile: _attachedImageFile!,
+                onClear: _clearAttachedImage,
+              ),
 
             // Bottom Input Bar
-            _buildBottomInputBar(),
+            ChatInputBar(
+              controller: _textController,
+              isListening: _isListening,
+              isBusy: _isSending || _isAITyping,
+              onMic: _toggleListening,
+              onCamera: () => _pickImage(ImageSource.camera),
+              onSend: () => _sendMessage(),
+            ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildQuickChipsBar() {
-    return Container(
-      height: 48.0,
-      color: AppColors.pureWhite,
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 14.0),
-        itemCount: _quickChips.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8.0),
-        itemBuilder: (context, index) {
-          final chip = _quickChips[index];
-          return ActionChip(
-            label: Text(
-              chip,
-              style: const TextStyle(
-                fontSize: 12.0,
-                color: AppColors.deepOnyx,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            backgroundColor: AppColors.surface,
-            side: BorderSide(color: AppColors.surfaceContainerHighest.withValues(alpha: 0.8)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
-            onPressed: _isSending || _isAITyping ? null : () => _sendMessage(customText: chip),
-          );
-        },
-      ),
-    );
-  }
-
-  String _formatMarkdownForDisplay(String rawText) {
-    if (rawText.isEmpty) return rawText;
-
-    String text = rawText;
-
-    // 1. Chuẩn hóa: Nếu dòng đã có gạch đầu dòng (- hoặc *) trước Bước X thì chuẩn hóa để không bị đúp bullet
-    text = text.replaceAllMapped(
-      RegExp(r'(?:^|\n)\s*[-*]\s*(\*{0,2}(Bước\s*\d+:?|Lưu ý:?)\*{0,2})', caseSensitive: false),
-      (m) => '\n\n- ${m[1]}',
-    );
-
-    // 2. Nếu "Bước X:" dính liền trong câu mà chưa có gạch đầu dòng: Tách thành mục danh sách
-    text = text.replaceAllMapped(
-      RegExp(r'([^\n-*])\s*(\*{0,2}(Bước\s*\d+:?|Lưu ý:?)\*{0,2})', caseSensitive: false),
-      (m) => '${m[1]}\n\n- ${m[2]}',
-    );
-
-    // 3. Xóa các gạch đầu dòng mồ côi (dòng chỉ có dấu - hoặc *)
-    text = text.replaceAll(RegExp(r'^\s*[-*]\s*$', multiLine: true), '');
-
-    // 4. Chuyển các dấu xuống dòng đơn lẻ thành \n\n để Markdown ngắt dòng đẹp mắt
-    text = text.replaceAll(RegExp(r'(?<!\n)\n(?!\n)'), '\n\n');
-
-    return text.trim();
   }
 
   Widget _buildMessageBubble(ChatMessage msg) {
@@ -921,7 +798,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
                           const SizedBox(height: 6.0),
                         ],
                         MarkdownBody(
-                          data: _formatMarkdownForDisplay(msg.text),
+                          data: ChatMarkdownFormatter.format(msg.text),
                           selectable: false,
                           styleSheet: MarkdownStyleSheet(
                             p: const TextStyle(
@@ -968,170 +845,4 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
     }
   }
 
-  Widget _buildTypingIndicator() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 2.0, right: 8.0),
-            width: 32.0,
-            height: 32.0,
-            decoration: BoxDecoration(
-              color: AppColors.logisticsRed.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.logisticsRed.withValues(alpha: 0.2)),
-            ),
-            child: const Icon(Icons.smart_toy_rounded, color: AppColors.logisticsRed, size: 18.0),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
-            decoration: BoxDecoration(
-              color: AppColors.pureWhite,
-              borderRadius: BorderRadius.circular(16.0),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 14.0,
-                  height: 14.0,
-                  child: CircularProgressIndicator(strokeWidth: 2.0, color: AppColors.logisticsRed),
-                ),
-                SizedBox(width: 8.0),
-                Text('Trợ lý AI đang xử lý...', style: TextStyle(fontSize: 12.0, color: Colors.grey)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAttachedImageBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6.0),
-      color: Colors.grey.shade100,
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8.0),
-            child: Image.file(_attachedImageFile!, width: 44.0, height: 44.0, fit: BoxFit.cover),
-          ),
-          const SizedBox(width: 10.0),
-          const Expanded(
-            child: Text('Đã đính kèm ảnh sự cố', style: TextStyle(fontSize: 12.0, fontWeight: FontWeight.w500)),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 18.0, color: Colors.grey),
-            onPressed: _clearAttachedImage,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomInputBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-      decoration: BoxDecoration(
-        color: AppColors.pureWhite,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10.0,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Voice mic button
-          IconButton(
-            icon: Icon(
-              _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-              color: _isListening ? AppColors.logisticsRed : AppColors.deepOnyx,
-              size: 24.0,
-            ),
-            tooltip: 'Nói để nhập bằng giọng nói',
-            onPressed: _isSending || _isAITyping ? null : _toggleListening,
-          ),
-
-          // Camera icon
-          IconButton(
-            icon: const Icon(Icons.camera_alt_outlined, color: AppColors.deepOnyx, size: 22.0),
-            tooltip: 'Chụp ảnh sự cố',
-            onPressed: _isSending || _isAITyping
-                ? null
-                : () => _pickImage(ImageSource.camera),
-          ),
-
-          // Text Field (Tự động mở rộng từ 1 đến 5 dòng, sau 5 dòng sẽ cuộn bên trong)
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 2.0),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF3F4F6),
-                borderRadius: BorderRadius.circular(20.0),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: TextField(
-                controller: _textController,
-                enabled: !_isSending && !_isAITyping, // Khóa khi AI đang trả lời
-                minLines: 1,
-                maxLines: 5, // Mở rộng tối đa 5 dòng, sau đó bắt đầu cuộn bên trong ô nhập
-                keyboardType: TextInputType.multiline,
-                textInputAction: TextInputAction.newline,
-                style: const TextStyle(fontSize: 13.5, color: AppColors.deepOnyx, height: 1.4),
-                decoration: InputDecoration(
-                  hintText: _isListening ? 'Đang lắng nghe bác tài...' : 'Nói hoặc nhập câu hỏi...',
-                  hintStyle: TextStyle(
-                    fontSize: 12.5,
-                    color: _isListening ? AppColors.logisticsRed : Colors.grey,
-                  ),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  errorBorder: InputBorder.none,
-                  disabledBorder: InputBorder.none,
-                  focusedErrorBorder: InputBorder.none,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 9.0),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8.0),
-
-          // Send Button
-          Padding(
-            padding: const EdgeInsets.only(bottom: 2.0),
-            child: InkWell(
-              onTap: _isSending || _isAITyping ? null : () => _sendMessage(),
-              borderRadius: BorderRadius.circular(24.0),
-              child: Container(
-                width: 42.0,
-                height: 42.0,
-                decoration: BoxDecoration(
-                  color: _isSending || _isAITyping ? Colors.grey : AppColors.logisticsRed,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.logisticsRed.withValues(alpha: 0.3),
-                      blurRadius: 6.0,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.send_rounded, color: Colors.white, size: 20.0),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

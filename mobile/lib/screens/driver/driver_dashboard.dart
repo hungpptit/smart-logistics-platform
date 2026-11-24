@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_styles.dart';
+import '../../core/utils/app_snackbar.dart';
 import '../../core/constants/app_constants.dart';
 import '../../services/auth_service.dart';
 import '../../services/driver_service.dart';
@@ -1008,27 +1009,22 @@ class _DriverDashboardState extends State<DriverDashboard> {
       });
       _initSocketAndFetchRoutes(force: true);
 
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Đã nhận Lộ trình gom hàng [$routeIdToStart] thành công! Đang bắt đầu chuyến...',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
+      AppSnackBar.show(
+        context,
+        immediateClear: true,
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Đã nhận Lộ trình gom hàng [$routeIdToStart] thành công! Đang bắt đầu chuyến...',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               ),
-            ],
-          ),
-          backgroundColor: const Color(0xFF15803D),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 3),
+            ),
+          ],
         ),
+        backgroundColor: const Color(0xFF15803D),
       );
     }
   }
@@ -1058,29 +1054,24 @@ class _DriverDashboardState extends State<DriverDashboard> {
           });
           _initSocketAndFetchRoutes(force: true);
 
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.white, size: 22),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      success
-                          ? 'Đã từ chối lộ trình [$routeId] và gửi báo cáo về bưu cục điều phối.'
-                          : 'Không thể gửi yêu cầu từ chối lộ trình. Vui lòng thử lại.',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
+          AppSnackBar.show(
+            context,
+            immediateClear: true,
+            content: Row(
+              children: [
+                const Icon(Icons.info_outline, color: Colors.white, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    success
+                        ? 'Đã từ chối lộ trình [$routeId] và gửi báo cáo về bưu cục điều phối.'
+                        : 'Không thể gửi yêu cầu từ chối lộ trình. Vui lòng thử lại.',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
-                ],
-              ),
-              backgroundColor: success ? AppColors.deepOnyx : AppColors.error,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              margin: const EdgeInsets.all(16),
-              duration: const Duration(seconds: 3),
+                ),
+              ],
             ),
+            backgroundColor: success ? AppColors.deepOnyx : AppColors.error,
           );
         }
       },
