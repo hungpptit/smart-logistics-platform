@@ -12,6 +12,8 @@ import '../../core/constants/app_constants.dart';
 import '../../services/auth_service.dart';
 import '../../services/driver_service.dart';
 import '../../services/socket_service.dart';
+import 'widgets/dashboard/ai_assistant_fab.dart';
+import 'widgets/dashboard/empty_routes_placeholder.dart';
 import 'widgets/duty_status_card.dart';
 import 'widgets/stats_bento_card.dart';
 import 'widgets/map_preview_card.dart';
@@ -1469,45 +1471,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
               ),
               const SizedBox(height: 12.0),
               if (_driverStops.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 20.0),
-                  margin: const EdgeInsets.only(bottom: 20.0),
-                  decoration: BoxDecoration(
-                    color: AppColors.pureWhite,
-                    borderRadius: BorderRadius.circular(16.0),
-                    border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-                    boxShadow: AppStyles.ambientShadow,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16.0),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFF1F5F9),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.assignment_outlined, size: 36, color: Color(0xFF64748B)),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Chưa Có Chuyến Xe Nào',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.deepOnyx,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Hiện tại bạn chưa có chuyến xe nào được điều phối. Hãy duy trì trạng thái Trực tuyến để sẵn sàng nhận chuyến mới từ Bưu cục!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: AppColors.secondary, height: 1.4),
-                      ),
-                    ],
-                  ),
-                )
+                const EmptyRoutesPlaceholder()
               else
                 Column(
                   children: _driverStops.map((stop) {
@@ -1527,17 +1491,13 @@ class _DriverDashboardState extends State<DriverDashboard> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: AiAssistantFab(
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const DriverChatScreen()),
           );
         },
-        backgroundColor: AppColors.logisticsRed,
-        elevation: 4.0,
-        tooltip: 'Trợ lý Tài xế AI',
-        child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 26.0),
       ),
     );
   }
