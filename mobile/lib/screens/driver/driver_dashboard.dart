@@ -13,7 +13,9 @@ import '../../services/auth_service.dart';
 import '../../services/driver_service.dart';
 import '../../services/socket_service.dart';
 import 'widgets/dashboard/ai_assistant_fab.dart';
+import 'widgets/dashboard/delivery_scan_banner.dart';
 import 'widgets/dashboard/empty_routes_placeholder.dart';
+import 'widgets/dashboard/tote_scan_button.dart';
 import 'widgets/duty_status_card.dart';
 import 'widgets/stats_bento_card.dart';
 import 'widgets/map_preview_card.dart';
@@ -1288,29 +1290,14 @@ class _DriverDashboardState extends State<DriverDashboard> {
               ),
               // 2. Quick Action ("Quét Nhận Thùng Hàng") - Only for Linehaul Driver
               if (showToteActions) ...[
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      final activeStop = _driverStops.firstWhere(
-                        (s) => s['isCheckedIn'] != true,
-                        orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
-                      );
-                      _showQRScanner(activeStop, 'TOTE');
-                    },
-                    icon: const Icon(Icons.inventory_2, size: 20.0),
-                    label: const Text(
-                      'Quét Nhận Thùng Hàng Lên Xe Tải',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.logisticsRed,
-                      foregroundColor: AppColors.pureWhite,
-                      padding: const EdgeInsets.symmetric(vertical: 14.0),
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedLg),
-                    ),
-                  ),
+                ToteScanButton(
+                  onPressed: () {
+                    final activeStop = _driverStops.firstWhere(
+                      (s) => s['isCheckedIn'] != true,
+                      orElse: () => _driverStops.isNotEmpty ? _driverStops.first : <String, dynamic>{},
+                    );
+                    _showQRScanner(activeStop, 'TOTE');
+                  },
                 ),
                 const SizedBox(height: 20.0),
               ],
@@ -1384,53 +1371,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
               // 3B. Delivery Scan Banner (when a Hub Delivery route is assigned with Hub Tote)
               if (showDeliveryScanBanner)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 20.0),
-                  padding: const EdgeInsets.all(14.0),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.circular(12.0),
-                    border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.qr_code_scanner, color: Color(0xFFB45309), size: 22),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Bưu cục đã phân công Chuyến Xe [$_activeRouteCode]',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFB45309)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Tài xế chưa quét nhận chuyến xe. Vui lòng bấm nút bên dưới để quét mã QR Thùng hàng / Chuyến xe tại bưu cục trước khi bắt đầu lộ trình!',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF92400E)),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            _showQRScanner(null, 'ROUTE');
-                          },
-                          icon: const Icon(Icons.qr_code_scanner, size: 18),
-                          label: const Text('QUÉT NHẬN CHUYẾN XE NGAY', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD97706),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                DeliveryScanBanner(
+                  routeCode: _activeRouteCode ?? '',
+                  onScan: () => _showQRScanner(null, 'ROUTE'),
                 ),
 
               // 4. Stats Bento Card
