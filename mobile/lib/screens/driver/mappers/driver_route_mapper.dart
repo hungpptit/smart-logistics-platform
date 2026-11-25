@@ -17,13 +17,23 @@ class DriverRouteMapResult {
   });
 }
 
-DriverRouteMapResult mapRouteToStops({
-  required Map firstRoute,
-  required List stopsRaw,
-  required bool isLinehaulDriverProfile,
-  required bool isRouteStarted,
-  required int prevLoadedTotesCount,
-}) {
+class _ToteAndPackages {
+  final Set<String> toteCodes;
+  final int totalPkgCount;
+  final bool isLinehaul;
+
+  const _ToteAndPackages({
+    required this.toteCodes,
+    required this.totalPkgCount,
+    required this.isLinehaul,
+  });
+}
+
+_ToteAndPackages _extractToteAndPackages(
+  Map firstRoute,
+  List stopsRaw,
+  bool isLinehaulDriverProfile,
+) {
   final Set<String> allToteCodes = {};
   int totalPkgCount = 0;
   bool isLinehaul = isLinehaulDriverProfile;
@@ -67,6 +77,91 @@ DriverRouteMapResult mapRouteToStops({
       }
     }
   }
+
+  return _ToteAndPackages(
+    toteCodes: allToteCodes,
+    totalPkgCount: totalPkgCount,
+    isLinehaul: isLinehaul,
+  );
+}
+
+class _StopMoney {
+  final String feePayer;
+  final num codAmount;
+  final num shippingFee;
+  final bool isReceiverPayFee;
+  final num totalToCollect;
+
+  const _StopMoney({
+    required this.feePayer,
+    required this.codAmount,
+    required this.shippingFee,
+    required this.isReceiverPayFee,
+    required this.totalToCollect,
+  });
+}
+
+_StopMoney _resolveStopMoney(
+  dynamic firstOrder,
+  dynamic stop,
+  dynamic stopType,
+) {
+  final paymentInfo = firstOrder?['payment'] ?? stop['payment'];
+  final String feePayer = (paymentInfo?['feePayer'] ?? firstOrder?['feePayer'] ?? stop['feePayer'] ?? 'SENDER').toString().toUpperCase();
+  final num codAmount = num.tryParse(paymentInfo?['finalCodAmount']?.toString() ?? firstOrder?['estimatedCodAmount']?.toString() ?? firstOrder?['codAmount']?.toString() ?? stop['estimatedCodAmount']?.toString() ?? stop['codAmount']?.toString() ?? '0') ?? 0;
+  final num baseFee = num.tryParse(paymentInfo?['finalShippingFee']?.toString() ?? firstOrder?['estimatedShippingFee']?.toString() ?? firstOrder?['estimatedTotalAmount']?.toString() ?? firstOrder?['shippingFee']?.toString() ?? stop['estimatedShippingFee']?.toString() ?? stop['shippingFee']?.toString() ?? '0') ?? 0;
+  final num insuranceFee = num.tryParse(paymentInfo?['finalInsuranceFee']?.toString() ?? firstOrder?['estimatedInsuranceFee']?.toString() ?? firstOrder?['insuranceFee']?.toString() ?? stop['estimatedInsuranceFee']?.toString() ?? stop['insuranceFee']?.toString() ?? '0') ?? 0;
+  final num shippingFee = (baseFee + insuranceFee) > 0 ? (baseFee + insuranceFee) : (baseFee > 0 ? baseFee : AppConstants.defaultShippingFee);
+  final bool isReceiverPayFee = (feePayer == 'RECEIVER');
+  final bool isSenderPayFee = (feePayer == 'SENDER');
+  final num totalToCollect = (stopType == 'PICKUP')
+      ? (isSenderPayFee ? shippingFee : 0)
+      : (codAmount + (isReceiverPayFee ? shippingFee : 0));
+
+  return _StopMoney(
+    feePayer: feePayer,
+    codAmount: codAmount,
+    shippingFee: shippingFee,
+    isReceiverPayFee: isReceiverPayFee,
+    totalToCollect: totalToCollect,
+  );
+}
+
+bool _resolveIsDispatched(
+  List? transfers,
+  String rawShipmentStatus,
+  String rawStopStatus,
+) {
+  bool isDispatched = false;
+  if (transfers != null && transfers.isNotEmpty) {
+    if (transfers.any((t) => t['status'] == 'IN_TRANSIT' || t['status'] == 'ARRIVED' || t['status'] == 'COMPLETED')) {
+      isDispatched = true;
+    }
+  }
+  if (!isDispatched && (rawShipmentStatus == 'IN_TRANSIT' || rawShipmentStatus == 'AT_HUB' || rawShipmentStatus == 'ARRIVED_DEST_FACILITY' || rawShipmentStatus == 'DELIVERED')) {
+    isDispatched = true;
+  }
+  if (!isDispatched && (rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED')) {
+    isDispatched = true;
+  }
+  return isDispatched;
+}
+
+DriverRouteMapResult mapRouteToStops({
+  required Map firstRoute,
+  required List stopsRaw,
+  required bool isLinehaulDriverProfile,
+  required bool isRouteStarted,
+  required int prevLoadedTotesCount,
+}) {
+  final extracted = _extractToteAndPackages(
+    firstRoute,
+    stopsRaw,
+    isLinehaulDriverProfile,
+  );
+  final Set<String> allToteCodes = extracted.toteCodes;
+  final int totalPkgCount = extracted.totalPkgCount;
+  final bool isLinehaul = extracted.isLinehaul;
 
   final int loadedTotesCount = allToteCodes.length;
   final List<String> loadedToteCodes = allToteCodes.toList();
@@ -114,35 +209,19 @@ DriverRouteMapResult mapRouteToStops({
           stop['receiverName']?.toString() ??
           (facilityObj?['facilityName'] != null ? 'Bưu cục: ${facilityObj['facilityName']}' : 'Chuyến xe trung chuyển');
       final String receiverPhone = firstOrder?['receiverPhone']?.toString() ?? stop['receiverPhone']?.toString() ?? '';
-      final paymentInfo = firstOrder?['payment'] ?? stop['payment'];
-      final String feePayer = (paymentInfo?['feePayer'] ?? firstOrder?['feePayer'] ?? stop['feePayer'] ?? 'SENDER').toString().toUpperCase();
-      final num codAmount = num.tryParse(paymentInfo?['finalCodAmount']?.toString() ?? firstOrder?['estimatedCodAmount']?.toString() ?? firstOrder?['codAmount']?.toString() ?? stop['estimatedCodAmount']?.toString() ?? stop['codAmount']?.toString() ?? '0') ?? 0;
-      final num baseFee = num.tryParse(paymentInfo?['finalShippingFee']?.toString() ?? firstOrder?['estimatedShippingFee']?.toString() ?? firstOrder?['estimatedTotalAmount']?.toString() ?? firstOrder?['shippingFee']?.toString() ?? stop['estimatedShippingFee']?.toString() ?? stop['shippingFee']?.toString() ?? '0') ?? 0;
-      final num insuranceFee = num.tryParse(paymentInfo?['finalInsuranceFee']?.toString() ?? firstOrder?['estimatedInsuranceFee']?.toString() ?? firstOrder?['insuranceFee']?.toString() ?? stop['estimatedInsuranceFee']?.toString() ?? stop['insuranceFee']?.toString() ?? '0') ?? 0;
-      final num shippingFee = (baseFee + insuranceFee) > 0 ? (baseFee + insuranceFee) : (baseFee > 0 ? baseFee : AppConstants.defaultShippingFee);
-      final bool isReceiverPayFee = (feePayer == 'RECEIVER');
-      final bool isSenderPayFee = (feePayer == 'SENDER');
-      final num totalToCollect = (stopType == 'PICKUP')
-          ? (isSenderPayFee ? shippingFee : 0)
-          : (codAmount + (isReceiverPayFee ? shippingFee : 0));
+      final money = _resolveStopMoney(firstOrder, stop, stopType);
+      final String feePayer = money.feePayer;
+      final num codAmount = money.codAmount;
+      final num shippingFee = money.shippingFee;
+      final bool isReceiverPayFee = money.isReceiverPayFee;
+      final num totalToCollect = money.totalToCollect;
       final String rawStopStatus = (stop['status']?.toString() ?? '').toUpperCase();
       final String rawOrderStatus = (firstOrder?['status']?.toString() ?? '').toUpperCase();
       final shipmentObj = stop['shipment'];
       final String rawShipmentStatus = (shipmentObj?['status']?.toString() ?? '').toUpperCase();
       final transfers = shipmentObj?['shipmentTransfers'] as List?;
 
-      bool isDispatched = false;
-      if (transfers != null && transfers.isNotEmpty) {
-        if (transfers.any((t) => t['status'] == 'IN_TRANSIT' || t['status'] == 'ARRIVED' || t['status'] == 'COMPLETED')) {
-          isDispatched = true;
-        }
-      }
-      if (!isDispatched && (rawShipmentStatus == 'IN_TRANSIT' || rawShipmentStatus == 'AT_HUB' || rawShipmentStatus == 'ARRIVED_DEST_FACILITY' || rawShipmentStatus == 'DELIVERED')) {
-        isDispatched = true;
-      }
-      if (!isDispatched && (rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED')) {
-        isDispatched = true;
-      }
+      final bool isDispatched = _resolveIsDispatched(transfers, rawShipmentStatus, rawStopStatus);
 
       final bool isFirstStop = (i == 0);
       final bool isLastStop = (i == stopsRaw.length - 1);

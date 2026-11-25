@@ -46,3 +46,5 @@ app.*.map.json
 
 # Custom config
 /lib/core/config/app_config.dart
+# file test tạm, xong xóa trong .gitignore
+mobile/test/driver_route_mapper_test.dart
