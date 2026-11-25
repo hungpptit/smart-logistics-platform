@@ -147,6 +147,163 @@ bool _resolveIsDispatched(
   return isDispatched;
 }
 
+class _StopStatus {
+  final bool isCompleted;
+  final String displayStatus;
+  final bool isActive;
+
+  const _StopStatus({
+    required this.isCompleted,
+    required this.displayStatus,
+    required this.isActive,
+  });
+}
+
+_StopStatus _resolveLinehaulStatus({
+  required bool isFirstStop,
+  required bool isIntermediateStop,
+  required String rawStopStatus,
+  required String rawShipmentStatus,
+  required bool isDispatched,
+  required List? transfers,
+  required List stopsRaw,
+  required int prevLoadedTotesCount,
+}) {
+  bool isCompleted = false;
+  String displayStatus = 'CHỜ THỰC HIỆN';
+  bool isActive = false;
+
+  if (isFirstStop) {
+    if (rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED' || isDispatched) {
+      isCompleted = true;
+      displayStatus = 'ĐÃ XUẤT BƯU CỤC';
+      isActive = false;
+    } else {
+      isCompleted = false;
+      displayStatus = prevLoadedTotesCount > 0 ? 'ĐÃ BỐC $prevLoadedTotesCount THÙNG' : 'CHỜ BỐC HÀNG';
+      isActive = true;
+    }
+  } else if (isIntermediateStop) {
+    if (rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED') {
+      isCompleted = true;
+      displayStatus = 'ĐÃ BỐC & RỜI TRẠM GHÉ';
+      isActive = false;
+    } else if (rawStopStatus == 'ARRIVED' || rawStopStatus == 'IN_PROGRESS') {
+      isCompleted = false;
+      displayStatus = 'ĐANG BỐC HÀNG TẠI TRẠM';
+      isActive = true;
+    } else if (isDispatched) {
+      isCompleted = false;
+      displayStatus = 'ĐANG THỰC HIỆN';
+      isActive = true;
+    } else {
+      isCompleted = false;
+      displayStatus = 'CHỜ THỰC HIỆN';
+      isActive = false;
+    }
+  } else {
+    // Last Destination Stop
+    final bool isDestInbounded = rawShipmentStatus == 'AT_HUB' ||
+        rawShipmentStatus == 'ARRIVED_DEST_FACILITY' ||
+        rawShipmentStatus == 'DELIVERED' ||
+        rawStopStatus == 'COMPLETED' ||
+        rawStopStatus == 'DEPARTED' ||
+        (transfers != null && transfers.any((t) => t['status'] == 'COMPLETED'));
+    if (isDestInbounded) {
+      isCompleted = true;
+      displayStatus = 'ĐÃ TỚI KHO ĐÍCH';
+      isActive = false;
+    } else {
+      final bool prevStopsDone = (stopsRaw.length > 2)
+          ? (stopsRaw[1]['status'] == 'DEPARTED' || stopsRaw[1]['status'] == 'COMPLETED')
+          : isDispatched;
+      if (prevStopsDone && isDispatched) {
+        isCompleted = false;
+        displayStatus = 'ĐANG THỰC HIỆN';
+        isActive = true;
+      } else {
+        isCompleted = false;
+        displayStatus = 'CHỜ THỰC HIỆN';
+        isActive = false;
+      }
+    }
+  }
+
+  return _StopStatus(
+    isCompleted: isCompleted,
+    displayStatus: displayStatus,
+    isActive: isActive,
+  );
+}
+
+class _LastMileStatus {
+  final bool isCompleted;
+  final String displayStatus;
+  final bool isActive;
+  final bool foundActiveIncomplete;
+
+  const _LastMileStatus({
+    required this.isCompleted,
+    required this.displayStatus,
+    required this.isActive,
+    required this.foundActiveIncomplete,
+  });
+}
+
+_LastMileStatus _resolveLastMileStatus({
+  required dynamic stopType,
+  required String rawStopStatus,
+  required String rawOrderStatus,
+  required bool isRouteStarted,
+  required bool foundActiveIncomplete,
+}) {
+  bool isCompleted = false;
+  String displayStatus = 'CHỜ THỰC HIỆN';
+  bool isActive = false;
+
+  // Last-mile Shipper logic
+  if (stopType == 'PICKUP') {
+    isCompleted = (rawStopStatus == 'COMPLETED' ||
+        rawStopStatus == 'DEPARTED' ||
+        rawOrderStatus == 'PICKED_UP' ||
+        rawOrderStatus == 'ARRIVED_ORIGIN_FACILITY');
+    if (isCompleted) {
+      displayStatus = 'ĐÃ LẤY HÀNG';
+      isActive = false;
+    }
+  } else {
+    isCompleted = (rawStopStatus == 'COMPLETED' ||
+        rawStopStatus == 'DEPARTED' ||
+        rawOrderStatus == 'DELIVERED' ||
+        rawOrderStatus == 'COMPLETED');
+    if (isCompleted) {
+      displayStatus = 'ĐÃ GIAO';
+      isActive = false;
+    }
+  }
+
+  if (!isCompleted) {
+    if (!isRouteStarted) {
+      displayStatus = (stopType == 'PICKUP') ? 'CHỜ XÁC NHẬN' : 'CHỜ QUÉT NHẬN';
+      isActive = false;
+    } else if (!foundActiveIncomplete) {
+      displayStatus = 'ĐANG THỰC HIỆN';
+      isActive = true;
+      foundActiveIncomplete = true;
+    } else {
+      displayStatus = 'TIẾP THEO';
+      isActive = false;
+    }
+  }
+
+  return _LastMileStatus(
+    isCompleted: isCompleted,
+    displayStatus: displayStatus,
+    isActive: isActive,
+    foundActiveIncomplete: foundActiveIncomplete,
+  );
+}
+
 DriverRouteMapResult mapRouteToStops({
   required Map firstRoute,
   required List stopsRaw,
@@ -232,96 +389,31 @@ DriverRouteMapResult mapRouteToStops({
       bool isActive = false;
 
       if (isLinehaul) {
-        if (isFirstStop) {
-          if (rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED' || isDispatched) {
-            isCompleted = true;
-            displayStatus = 'ĐÃ XUẤT BƯU CỤC';
-            isActive = false;
-          } else {
-            isCompleted = false;
-            displayStatus = prevLoadedTotesCount > 0 ? 'ĐÃ BỐC $prevLoadedTotesCount THÙNG' : 'CHỜ BỐC HÀNG';
-            isActive = true;
-          }
-        } else if (isIntermediateStop) {
-          if (rawStopStatus == 'DEPARTED' || rawStopStatus == 'COMPLETED') {
-            isCompleted = true;
-            displayStatus = 'ĐÃ BỐC & RỜI TRẠM GHÉ';
-            isActive = false;
-          } else if (rawStopStatus == 'ARRIVED' || rawStopStatus == 'IN_PROGRESS') {
-            isCompleted = false;
-            displayStatus = 'ĐANG BỐC HÀNG TẠI TRẠM';
-            isActive = true;
-          } else if (isDispatched) {
-            isCompleted = false;
-            displayStatus = 'ĐANG THỰC HIỆN';
-            isActive = true;
-          } else {
-            isCompleted = false;
-            displayStatus = 'CHỜ THỰC HIỆN';
-            isActive = false;
-          }
-        } else {
-          // Last Destination Stop
-          final bool isDestInbounded = rawShipmentStatus == 'AT_HUB' ||
-              rawShipmentStatus == 'ARRIVED_DEST_FACILITY' ||
-              rawShipmentStatus == 'DELIVERED' ||
-              rawStopStatus == 'COMPLETED' ||
-              rawStopStatus == 'DEPARTED' ||
-              (transfers != null && transfers.any((t) => t['status'] == 'COMPLETED'));
-          if (isDestInbounded) {
-            isCompleted = true;
-            displayStatus = 'ĐÃ TỚI KHO ĐÍCH';
-            isActive = false;
-          } else {
-            final bool prevStopsDone = (stopsRaw.length > 2)
-                ? (stopsRaw[1]['status'] == 'DEPARTED' || stopsRaw[1]['status'] == 'COMPLETED')
-                : isDispatched;
-            if (prevStopsDone && isDispatched) {
-              isCompleted = false;
-              displayStatus = 'ĐANG THỰC HIỆN';
-              isActive = true;
-            } else {
-              isCompleted = false;
-              displayStatus = 'CHỜ THỰC HIỆN';
-              isActive = false;
-            }
-          }
-        }
+        final stopStatus = _resolveLinehaulStatus(
+          isFirstStop: isFirstStop,
+          isIntermediateStop: isIntermediateStop,
+          rawStopStatus: rawStopStatus,
+          rawShipmentStatus: rawShipmentStatus,
+          isDispatched: isDispatched,
+          transfers: transfers,
+          stopsRaw: stopsRaw,
+          prevLoadedTotesCount: prevLoadedTotesCount,
+        );
+        isCompleted = stopStatus.isCompleted;
+        displayStatus = stopStatus.displayStatus;
+        isActive = stopStatus.isActive;
       } else {
-        // Last-mile Shipper logic
-        if (stopType == 'PICKUP') {
-          isCompleted = (rawStopStatus == 'COMPLETED' ||
-              rawStopStatus == 'DEPARTED' ||
-              rawOrderStatus == 'PICKED_UP' ||
-              rawOrderStatus == 'ARRIVED_ORIGIN_FACILITY');
-          if (isCompleted) {
-            displayStatus = 'ĐÃ LẤY HÀNG';
-            isActive = false;
-          }
-        } else {
-          isCompleted = (rawStopStatus == 'COMPLETED' ||
-              rawStopStatus == 'DEPARTED' ||
-              rawOrderStatus == 'DELIVERED' ||
-              rawOrderStatus == 'COMPLETED');
-          if (isCompleted) {
-            displayStatus = 'ĐÃ GIAO';
-            isActive = false;
-          }
-        }
-
-        if (!isCompleted) {
-          if (!isRouteStarted) {
-            displayStatus = (stopType == 'PICKUP') ? 'CHỜ XÁC NHẬN' : 'CHỜ QUÉT NHẬN';
-            isActive = false;
-          } else if (!foundActiveIncomplete) {
-            displayStatus = 'ĐANG THỰC HIỆN';
-            isActive = true;
-            foundActiveIncomplete = true;
-          } else {
-            displayStatus = 'TIẾP THEO';
-            isActive = false;
-          }
-        }
+        final stopStatus = _resolveLastMileStatus(
+          stopType: stopType,
+          rawStopStatus: rawStopStatus,
+          rawOrderStatus: rawOrderStatus,
+          isRouteStarted: isRouteStarted,
+          foundActiveIncomplete: foundActiveIncomplete,
+        );
+        isCompleted = stopStatus.isCompleted;
+        displayStatus = stopStatus.displayStatus;
+        isActive = stopStatus.isActive;
+        foundActiveIncomplete = stopStatus.foundActiveIncomplete;
       }
 
       final String stopTitle = isLinehaul
