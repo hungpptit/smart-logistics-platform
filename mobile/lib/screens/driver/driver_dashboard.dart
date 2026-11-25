@@ -13,8 +13,15 @@ import '../../services/auth_service.dart';
 import '../../services/driver_service.dart';
 import '../../services/socket_service.dart';
 import 'widgets/dashboard/ai_assistant_fab.dart';
+import 'widgets/dashboard/dashboard_app_bar.dart';
 import 'widgets/dashboard/delivery_scan_banner.dart';
+import 'widgets/dashboard/driver_drawer.dart';
 import 'widgets/dashboard/empty_routes_placeholder.dart';
+import 'widgets/dashboard/finish_route_success_dialog.dart';
+import 'widgets/dashboard/location_permission_dialog.dart';
+import 'widgets/dashboard/location_service_dialog.dart';
+import 'widgets/dashboard/pickup_assignment_banner.dart';
+import 'widgets/dashboard/route_scan_reminder_dialog.dart';
 import 'widgets/dashboard/tote_scan_button.dart';
 import 'widgets/duty_status_card.dart';
 import 'widgets/stats_bento_card.dart';
@@ -486,19 +493,19 @@ class _DriverDashboardState extends State<DriverDashboard> {
   Future<void> _initLocationService() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      if (mounted) _showLocationServiceDialog();
+      if (mounted) LocationServiceDialog.show(context, onRetryInit: _initLocationService);
       return;
     }
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        if (mounted) _showPermissionDeniedDialog(false);
+        if (mounted) LocationPermissionDialog.show(context, permanent: false, onRetryInit: _initLocationService);
         return;
       }
     }
     if (permission == LocationPermission.deniedForever) {
-      if (mounted) _showPermissionDeniedDialog(true);
+      if (mounted) LocationPermissionDialog.show(context, permanent: true, onRetryInit: _initLocationService);
       return;
     }
     try {
@@ -631,40 +638,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
         return;
       }
 
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.pureWhite,
-          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 28),
-              SizedBox(width: 8),
-              Text('Chưa Quét Nhận Chuyến Xe',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFFB45309))),
-            ],
-          ),
-          content: const Text(
-              'Tài xế chưa quét nhận chuyến xe tại bưu cục. Vui lòng quét mã QR Thùng hàng / Chuyến xe để nhận chuyến trước khi bật Dẫn đường!'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Để sau', style: TextStyle(color: AppColors.secondary)),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _showQRScanner(null, 'ROUTE');
-              },
-              icon: const Icon(Icons.qr_code_scanner, size: 18),
-              label: const Text('QUÉT NHẬN NGAY', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD97706),
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
+      RouteScanReminderDialog.show(
+        context,
+        onScanNow: () => _showQRScanner(null, 'ROUTE'),
       );
       return;
     }
@@ -951,33 +927,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
       });
     }
     if (mounted) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.pureWhite,
-          shape: RoundedRectangleBorder(borderRadius: AppStyles.roundedXl),
-          title: const Row(
-            children: [
-              Icon(Icons.stars, color: Color(0xFF166534), size: 28),
-              SizedBox(width: 8.0),
-              Text('Chốt Thành Công!',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF166534))),
-            ],
-          ),
-          content: Text(success
-              ? 'Bạn đã chốt hoàn thành 100% chuyến đi trên hệ thống! Tài xế chuyển sang Sẵn sàng nhận chuyến tiếp theo.'
-              : 'Đã gửi yêu cầu chốt chuyến đi thành công đến máy chủ.'),
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _initSocketAndFetchRoutes(force: true);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF166534), foregroundColor: AppColors.pureWhite),
-              child: const Text('Đồng ý'),
-            ),
-          ],
-        ),
+      FinishRouteSuccessDialog.show(
+        context,
+        success: success,
+        onConfirm: () => _initSocketAndFetchRoutes(force: true),
       );
     }
   }
@@ -1082,70 +1035,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  // ------ Location Permission Dialogs ------
-  void _showLocationServiceDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.location_off, color: AppColors.logisticsRed),
-            SizedBox(width: 8),
-            Text('Chưa bật định vị'),
-          ],
-        ),
-        content: const Text('Dịch vụ định vị GPS trên thiết bị của bạn đang tắt. Vui lòng bật định vị để ứng dụng có thể hiển thị bản đồ và dẫn đường chính xác.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Hủy', style: TextStyle(color: AppColors.secondary))),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await Geolocator.openLocationSettings();
-              Future.delayed(const Duration(seconds: 2), _initLocationService);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.deepOnyx, foregroundColor: AppColors.pureWhite),
-            child: const Text('Mở Cài đặt'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPermissionDeniedDialog(bool permanent) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.security, color: permanent ? AppColors.logisticsRed : AppColors.secondary),
-            const SizedBox(width: 8),
-            const Text('Quyền định vị'),
-          ],
-        ),
-        content: Text(permanent
-            ? 'Bạn đã từ chối vĩnh viễn quyền định vị. Vui lòng mở Cài đặt ứng dụng để cấp quyền thủ công.'
-            : 'Ứng dụng cần quyền định vị để hiển thị vị trí của bạn trên bản đồ.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Hủy', style: TextStyle(color: AppColors.secondary))),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              if (permanent) {
-                await Geolocator.openAppSettings();
-              } else {
-                _initLocationService();
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.deepOnyx, foregroundColor: AppColors.pureWhite),
-            child: Text(permanent ? 'Mở Cài đặt' : 'Cấp quyền'),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ------ Build ------
   @override
   Widget build(BuildContext context) {
@@ -1212,67 +1101,22 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
     return Scaffold(
       backgroundColor: AppColors.cloudGray,
-      appBar: AppBar(
-        backgroundColor: AppColors.pureWhite,
-        elevation: 0.5,
-        title: Text(
-          'Velocity Logistics',
-          style: AppTypography.headlineMd.copyWith(color: AppColors.logisticsRed, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(icon: const Icon(Icons.notifications_none, color: AppColors.deepOnyx), onPressed: () {}),
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0, left: 4.0),
-            child: CircleAvatar(
-              radius: 18.0,
-              backgroundImage: const NetworkImage(AppConstants.defaultAvatarUrl),
-              backgroundColor: AppColors.surfaceContainerHighest,
-            ),
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        backgroundColor: AppColors.pureWhite,
-        child: Column(
-          children: [
-            UserAccountsDrawerHeader(
-              decoration: const BoxDecoration(color: AppColors.deepOnyx),
-              currentAccountPicture: const CircleAvatar(
-                backgroundImage: NetworkImage(AppConstants.drawerHeaderAvatarUrl),
-              ),
-              accountName: Text(_driverName, style: AppTypography.labelLg.copyWith(color: AppColors.pureWhite, fontWeight: FontWeight.bold)),
-              accountEmail: Text(_driverEmail, style: AppTypography.labelMd.copyWith(color: Colors.white70)),
-            ),
-            ListTile(leading: const Icon(Icons.home, color: AppColors.logisticsRed), title: const Text('Trang chủ'), onTap: () => Navigator.pop(context)),
-            ListTile(leading: const Icon(Icons.inventory_2, color: AppColors.secondary), title: const Text('Đơn hàng đang giao'), onTap: () {}),
-            ListTile(
-              leading: const Icon(Icons.smart_toy_rounded, color: AppColors.logisticsRed),
-              title: const Text('Trợ lý Tài xế AI'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const DriverChatScreen()),
-                );
-              },
-            ),
-            ListTile(leading: const Icon(Icons.history, color: AppColors.secondary), title: const Text('Lịch sử lộ trình'), onTap: () {}),
-            ListTile(leading: const Icon(Icons.query_stats, color: AppColors.secondary), title: const Text('Hiệu suất'), onTap: () {}),
-            const Divider(),
-            ListTile(leading: const Icon(Icons.settings, color: AppColors.secondary), title: const Text('Cài đặt'), onTap: () {}),
-            const Spacer(),
-            ListTile(
-              leading: const Icon(Icons.logout, color: AppColors.error),
-              title: const Text('Đăng xuất'),
-              onTap: () async {
-                SpeedLimitService().clearCache();
-                await AuthService.clearAuthData();
-                if (context.mounted) Navigator.pushReplacementNamed(context, '/');
-              },
-            ),
-            const SizedBox(height: 20.0),
-          ],
-        ),
+      appBar: const DashboardAppBar(),
+      drawer: DriverDrawer(
+        name: _driverName,
+        email: _driverEmail,
+        onOpenChat: () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DriverChatScreen()),
+          );
+        },
+        onLogout: () async {
+          SpeedLimitService().clearCache();
+          await AuthService.clearAuthData();
+          if (context.mounted) Navigator.pushReplacementNamed(context, '/');
+        },
       ),
       body: RefreshIndicator(
         onRefresh: () async => _initSocketAndFetchRoutes(),
@@ -1304,69 +1148,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
               // 3A. Pickup Assignment Banner (when a Pickup route is assigned to Last-mile driver)
               if (showPickupAssignmentBanner)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 20.0),
-                  padding: const EdgeInsets.all(14.0),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(12.0),
-                    border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.electric_moped, color: Color(0xFF1D4ED8), size: 24),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Bưu cục điều phối Lộ Trình Gom Hàng [$_activeRouteCode]',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E40AF)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Có ${_driverStops.length} điểm lấy hàng cần gom từ nhà khách/shop. Vui lòng bấm bên dưới để xem chi tiết và xác nhận nhận chuyến hoặc từ chối.',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF1E3A8A), height: 1.3),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: OutlinedButton(
-                              onPressed: _showRejectPickupRouteDialog,
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFFEF4444), width: 1.2),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                              ),
-                              child: const Text('TỪ CHỐI', style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.bold, fontSize: 12)),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 3,
-                            child: ElevatedButton.icon(
-                              onPressed: _showPickupAssignmentDialog,
-                              icon: const Icon(Icons.assignment_turned_in, size: 16),
-                              label: const Text('XEM & NHẬN LỘ TRÌNH', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF16A34A),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                PickupAssignmentBanner(
+                  routeCode: _activeRouteCode ?? '',
+                  stopCount: _driverStops.length,
+                  onReject: _showRejectPickupRouteDialog,
+                  onView: _showPickupAssignmentDialog,
                 ),
 
               // 3B. Delivery Scan Banner (when a Hub Delivery route is assigned with Hub Tote)
