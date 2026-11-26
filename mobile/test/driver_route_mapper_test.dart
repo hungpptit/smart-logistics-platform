@@ -1219,10 +1219,7 @@ void main() {
       );
     });
 
-    test('PIN: linehaul 4+ stops only checks stopsRaw[1] for last stop prevStopsDone', () {
-      // Hành vi HIỆN TẠI, KHÔNG phải mong muốn:
-      // Stop 3 (index 2) vẫn PENDING nhưng stop 4 (last stop) chỉ kiểm tra stopsRaw[1] (DEPARTED)
-      // nên stop 4 vẫn chuyển sang ĐANG THỰC HIỆN (isActive: true).
+    test('linehaul 4+ stops keeps last stop CHỜ THỰC HIỆN while any intermediate stop is incomplete', () {
       final result = mapRouteToStops(
         firstRoute: {'id': 'route-f3', 'status': 'IN_PROGRESS'},
         stopsRaw: [
@@ -1311,6 +1308,107 @@ void main() {
         status: 'ĐANG THỰC HIỆN',
         isActive: true,
         isCheckedIn: false,
+        title: 'Điểm ghé trung chuyển (Bốc thêm hàng)',
+        codAmount: 0,
+        shippingFee: 31000,
+        totalToCollect: 0,
+        isDispatched: true,
+        packages: 1,
+        isFirstStop: false,
+        isLastStop: false,
+        isIntermediate: true,
+      );
+      expectStop(
+        result.mappedStops[3],
+        index: 4,
+        status: 'CHỜ THỰC HIỆN',
+        isActive: false,
+        isCheckedIn: false,
+        title: 'Điểm giao thùng kho đích',
+        codAmount: 0,
+        shippingFee: 31000,
+        totalToCollect: 0,
+        isDispatched: true,
+        packages: 1,
+        isFirstStop: false,
+        isLastStop: true,
+        isIntermediate: false,
+      );
+    });
+
+    test('linehaul 4+ stops activates last stop when all intermediate stops are DEPARTED and dispatched', () {
+      final result = mapRouteToStops(
+        firstRoute: {'id': 'route-f3-all-done', 'status': 'IN_PROGRESS'},
+        stopsRaw: [
+          {
+            'id': 'f3b-1',
+            'stopType': 'HUB',
+            'sequence': 1,
+            'status': 'DEPARTED',
+            'shipmentId': 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+            'facility': {'facilityName': 'Kho 1'},
+            'shipment': {
+              'shipmentCode': 'SHP-F3B',
+              'status': 'IN_TRANSIT',
+              'warehouseScans': [{'toteBag': {'toteCode': 'TOTE-F3B'}}],
+            },
+          },
+          {
+            'id': 'f3b-2',
+            'stopType': 'HUB',
+            'sequence': 2,
+            'status': 'DEPARTED',
+            'shipmentId': 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+            'facility': {'facilityName': 'Kho 2'},
+            'shipment': {'shipmentCode': 'SHP-F3B', 'status': 'IN_TRANSIT'},
+          },
+          {
+            'id': 'f3b-3',
+            'stopType': 'HUB',
+            'sequence': 3,
+            'status': 'DEPARTED',
+            'shipmentId': 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+            'facility': {'facilityName': 'Kho 3'},
+            'shipment': {'shipmentCode': 'SHP-F3B', 'status': 'IN_TRANSIT'},
+          },
+          {
+            'id': 'f3b-4',
+            'stopType': 'HUB',
+            'sequence': 4,
+            'status': 'PENDING',
+            'shipmentId': 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+            'facility': {'facilityName': 'Kho 4'},
+            'shipment': {'shipmentCode': 'SHP-F3B', 'status': 'IN_TRANSIT'},
+          },
+        ],
+        isLinehaulDriverProfile: true,
+        isRouteStarted: true,
+        prevLoadedTotesCount: 1,
+      );
+
+      expect(result.mappedStops.length, 4);
+      expectStop(
+        result.mappedStops[1],
+        index: 2,
+        status: 'ĐÃ BỐC & RỜI TRẠM GHÉ',
+        isActive: false,
+        isCheckedIn: true,
+        title: 'Điểm ghé trung chuyển (Bốc thêm hàng)',
+        codAmount: 0,
+        shippingFee: 31000,
+        totalToCollect: 0,
+        isDispatched: true,
+        packages: 1,
+        isFirstStop: false,
+        isLastStop: false,
+        isIntermediate: true,
+      );
+      expectStop(
+        result.mappedStops[2],
+        index: 3,
+        status: 'ĐÃ BỐC & RỜI TRẠM GHÉ',
+        isActive: false,
+        isCheckedIn: true,
         title: 'Điểm ghé trung chuyển (Bốc thêm hàng)',
         codAmount: 0,
         shippingFee: 31000,

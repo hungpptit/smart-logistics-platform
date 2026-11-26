@@ -215,7 +215,9 @@ _StopStatus _resolveLinehaulStatus({
       isActive = false;
     } else {
       final bool prevStopsDone = (stopsRaw.length > 2)
-          ? (stopsRaw[1]['status'] == 'DEPARTED' || stopsRaw[1]['status'] == 'COMPLETED')
+          ? stopsRaw
+              .sublist(1, stopsRaw.length - 1)
+              .every((s) => s['status'] == 'DEPARTED' || s['status'] == 'COMPLETED')
           : isDispatched;
       if (prevStopsDone && isDispatched) {
         isCompleted = false;
