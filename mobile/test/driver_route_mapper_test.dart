@@ -1157,9 +1157,7 @@ void main() {
       );
     });
 
-    test('PIN: shipmentId shorter than 8 chars causes RangeError caught and drops stop', () {
-      // Hành vi HIỆN TẠI, KHÔNG phải mong muốn:
-      // shipmentId = 'SHORT1' (6 ký tự) gây RangeError ở substring(0, 8), bị try/catch nuốt và làm mất stop 1.
+    test('shipmentId shorter than 8 chars keeps stop and builds safe SHP-<id> orderCode', () {
       final result = mapRouteToStops(
         firstRoute: {'id': 'route-f2', 'status': 'ASSIGNED'},
         stopsRaw: [
@@ -1181,11 +1179,30 @@ void main() {
         prevLoadedTotesCount: 0,
       );
 
-      expect(result.mappedStops.length, 1);
-      expect(result.mappedStops[0]['id'], 'f2-ok');
-      expect(result.mappedStops[0]['orderCode'], 'SHP-AAAAAAAA');
+      expect(result.mappedStops.length, 2);
+      expect(result.mappedStops[0]['id'], 'f2-short');
+      expect(result.mappedStops[0]['orderCode'], 'SHP-SHORT1');
       expectStop(
         result.mappedStops[0],
+        index: 1,
+        status: 'CHỜ QUÉT NHẬN',
+        isActive: false,
+        isCheckedIn: false,
+        title: 'Điểm giao hàng',
+        codAmount: 0,
+        shippingFee: 31000,
+        totalToCollect: 0,
+        isDispatched: false,
+        packages: 1,
+        isFirstStop: true,
+        isLastStop: false,
+        isIntermediate: false,
+      );
+
+      expect(result.mappedStops[1]['id'], 'f2-ok');
+      expect(result.mappedStops[1]['orderCode'], 'SHP-AAAAAAAA');
+      expectStop(
+        result.mappedStops[1],
         index: 2,
         status: 'CHỜ QUÉT NHẬN',
         isActive: false,

@@ -356,11 +356,12 @@ DriverRouteMapResult mapRouteToStops({
         firstOrder ??= stop['order'];
       } catch (_) {}
 
+      final String? shipmentIdStr = shipmentId?.toString();
       final String orderCode = firstOrder?['orderCode']?.toString() ??
           stop['shipment']?['trackingNumber']?.toString() ??
           stop['shipment']?['shipmentCode']?.toString() ??
-          (shipmentId != null
-              ? 'SHP-${shipmentId.toString().substring(0, 8).toUpperCase()}'
+          (shipmentIdStr != null
+              ? 'SHP-${(shipmentIdStr.length >= 8 ? shipmentIdStr.substring(0, 8) : shipmentIdStr).toUpperCase()}'
               : 'ORD-66266482-0${i + 1}');
       final String receiverName = firstOrder?['receiverName']?.toString() ??
           stop['receiverName']?.toString() ??
