@@ -34,6 +34,129 @@ export class OrderService {
   }
 
   /**
+   * Build a full snapshot string (line1, ward, province) without duplicating administrative names.
+   */
+  private buildAddressSnapshot(line1: string, ward?: string | null, province?: string | null): string {
+    const cleanLine1 = (line1 || '').trim();
+    const parts: string[] = [];
+    if (cleanLine1) parts.push(cleanLine1);
+
+    const lowerLine1 = cleanLine1.toLowerCase();
+    const cleanWard = ward?.trim();
+    if (cleanWard && !lowerLine1.includes(cleanWard.toLowerCase())) {
+      parts.push(cleanWard);
+    }
+
+    const cleanProvince = province?.trim();
+    if (cleanProvince && !lowerLine1.includes(cleanProvince.toLowerCase())) {
+      parts.push(cleanProvince);
+    }
+
+    return parts.join(', ');
+  }
+
+  /**
+   * Resolve address record, coordinates, and full display snapshot for order pickup or delivery.
+   */
+  private async resolveOrderAddressSnapshot(params: {
+    addressId?: string;
+    addressDto?: any;
+    customerIdForSavedLookup?: string;
+    notFoundMsg: string;
+    missingMsg: string;
+  }): Promise<{ addressId: string; lat: number; lon: number; snapshot: string }> {
+    if (params.addressId) {
+      const addr = await prisma.address.findUnique({
+        where: { id: params.addressId },
+        include: { wardRelation: { include: { province: true } } },
+      });
+      if (!addr) throw new BadRequestException(params.notFoundMsg);
+
+      const wardName = addr.wardRelation?.fullName || addr.wardRelation?.name;
+      const provinceName = addr.wardRelation?.province?.fullName || addr.wardRelation?.province?.name;
+      return {
+        addressId: addr.id,
+        lat: addr.latitude,
+        lon: addr.longitude,
+        snapshot: this.buildAddressSnapshot(addr.addressLine1, wardName, provinceName),
+      };
+    }
+
+    if (!params.addressDto) {
+      throw new BadRequestException(params.missingMsg);
+    }
+
+    const resolved = await resolveAddressDetails(params.addressDto);
+    const cleanLine1 = params.addressDto.addressLine1.trim();
+
+    if (params.customerIdForSavedLookup) {
+      const existingCustomerAddr = await prisma.customerAddress.findFirst({
+        where: {
+          customerId: params.customerIdForSavedLookup,
+          address: {
+            addressLine1: { equals: cleanLine1, mode: 'insensitive' },
+            wardCode: resolved.wardCode,
+          },
+        },
+        include: {
+          address: {
+            include: { wardRelation: { include: { province: true } } },
+          },
+        },
+      });
+
+      if (existingCustomerAddr?.address) {
+        const addr = existingCustomerAddr.address;
+        const wardName = resolved.ward || addr.wardRelation?.fullName || addr.wardRelation?.name;
+        const provinceName = resolved.province || addr.wardRelation?.province?.fullName || addr.wardRelation?.province?.name;
+        return {
+          addressId: addr.id,
+          lat: addr.latitude,
+          lon: addr.longitude,
+          snapshot: this.buildAddressSnapshot(addr.addressLine1, wardName, provinceName),
+        };
+      }
+    }
+
+    const existingAddress = await prisma.address.findFirst({
+      where: {
+        addressLine1: { equals: cleanLine1, mode: 'insensitive' },
+        wardCode: resolved.wardCode,
+      },
+      include: { wardRelation: { include: { province: true } } },
+    });
+
+    if (existingAddress) {
+      const wardName = resolved.ward || existingAddress.wardRelation?.fullName || existingAddress.wardRelation?.name;
+      const provinceName = resolved.province || existingAddress.wardRelation?.province?.fullName || existingAddress.wardRelation?.province?.name;
+      return {
+        addressId: existingAddress.id,
+        lat: existingAddress.latitude,
+        lon: existingAddress.longitude,
+        snapshot: this.buildAddressSnapshot(existingAddress.addressLine1, wardName, provinceName),
+      };
+    }
+
+    const fallbackFullAddr = this.buildAddressSnapshot(cleanLine1, resolved.ward, resolved.province);
+    const geocoded = await this.geocodingService.geocode(fallbackFullAddr);
+    const lat = params.addressDto.latitude ?? geocoded.latitude;
+    const lon = params.addressDto.longitude ?? geocoded.longitude;
+    const snapshot = geocoded.formattedAddress || fallbackFullAddr;
+
+    const newAddr = await prisma.address.create({
+      data: {
+        addressLine1: cleanLine1,
+        country: params.addressDto.country || 'Vietnam',
+        latitude: lat,
+        longitude: lon,
+        wardCode: resolved.wardCode,
+      },
+    });
+
+    return { addressId: newAddr.id, lat, lon, snapshot };
+  }
+
+  /**
    * Create a single order (single-hub booking)
    */
   public async createOrder(creatorId: string, userRoles: string[], dto: CreateOrderDto) {
@@ -55,135 +178,29 @@ export class OrderService {
     }
 
     // 1. Resolve Pickup Address
-    let pickupLat = 0;
-    let pickupLon = 0;
-    let pickupAddrSnapshot = '';
-    let resolvedPickupAddressId: string | null = null;
-
-    if (dto.pickupAddressId) {
-      const addr = await prisma.address.findUnique({
-        where: { id: dto.pickupAddressId },
-      });
-      if (!addr) throw new BadRequestException('Địa chỉ lấy hàng không tồn tại');
-      pickupLat = addr.latitude;
-      pickupLon = addr.longitude;
-      pickupAddrSnapshot = addr.addressLine1;
-      resolvedPickupAddressId = addr.id;
-    } else if (dto.pickupAddress) {
-      // Resolve address details using administrative unit database
-      const resolved = await resolveAddressDetails(dto.pickupAddress);
-      const cleanLine1 = dto.pickupAddress.addressLine1.trim();
-
-      // Check if this customer already has this warehouse address saved
-      const existingCustomerAddr = await prisma.customerAddress.findFirst({
-        where: {
-          customerId,
-          address: {
-            addressLine1: { equals: cleanLine1, mode: 'insensitive' },
-            wardCode: resolved.wardCode,
-          },
-        },
-        include: { address: true },
-      });
-
-      if (existingCustomerAddr && existingCustomerAddr.address) {
-        resolvedPickupAddressId = existingCustomerAddr.address.id;
-        pickupLat = existingCustomerAddr.address.latitude;
-        pickupLon = existingCustomerAddr.address.longitude;
-        pickupAddrSnapshot = existingCustomerAddr.address.addressLine1;
-      } else {
-        // Check if address already exists globally in address table
-        const existingAddress = await prisma.address.findFirst({
-          where: {
-            addressLine1: { equals: cleanLine1, mode: 'insensitive' },
-            wardCode: resolved.wardCode,
-          },
-        });
-
-        if (existingAddress) {
-          resolvedPickupAddressId = existingAddress.id;
-          pickupLat = existingAddress.latitude;
-          pickupLon = existingAddress.longitude;
-          pickupAddrSnapshot = existingAddress.addressLine1;
-        } else {
-          // Geocode address
-          const rawAddr = `${cleanLine1}, ${resolved.ward}, ${resolved.province}`;
-          const geocoded = await this.geocodingService.geocode(rawAddr);
-          pickupLat = dto.pickupAddress.latitude ?? geocoded.latitude;
-          pickupLon = dto.pickupAddress.longitude ?? geocoded.longitude;
-          pickupAddrSnapshot = geocoded.formattedAddress || cleanLine1;
-
-          const newAddr = await prisma.address.create({
-            data: {
-              addressLine1: cleanLine1,
-              country: dto.pickupAddress.country || 'Vietnam',
-              latitude: pickupLat,
-              longitude: pickupLon,
-              wardCode: resolved.wardCode,
-            },
-          });
-          resolvedPickupAddressId = newAddr.id;
-        }
-      }
-    } else {
-      throw new BadRequestException('Vui lòng chọn hoặc điền địa chỉ lấy hàng');
-    }
+    const pickupResolved = await this.resolveOrderAddressSnapshot({
+      addressId: dto.pickupAddressId,
+      addressDto: dto.pickupAddress,
+      customerIdForSavedLookup: customerWithUser.id,
+      notFoundMsg: 'Địa chỉ lấy hàng không tồn tại',
+      missingMsg: 'Vui lòng chọn hoặc điền địa chỉ lấy hàng',
+    });
+    const pickupLat = pickupResolved.lat;
+    const pickupLon = pickupResolved.lon;
+    const pickupAddrSnapshot = pickupResolved.snapshot;
+    const resolvedPickupAddressId: string | null = pickupResolved.addressId;
 
     // 2. Resolve Delivery Address
-    let deliveryLat = 0;
-    let deliveryLon = 0;
-    let deliveryAddrSnapshot = '';
-    let resolvedDeliveryAddressId: string | null = null;
-
-    if (dto.deliveryAddressId) {
-      const addr = await prisma.address.findUnique({
-        where: { id: dto.deliveryAddressId },
-      });
-      if (!addr) throw new BadRequestException('Địa chỉ giao hàng không tồn tại');
-      deliveryLat = addr.latitude;
-      deliveryLon = addr.longitude;
-      deliveryAddrSnapshot = addr.addressLine1;
-      resolvedDeliveryAddressId = addr.id;
-    } else if (dto.deliveryAddress) {
-      // Resolve address details using administrative unit database
-      const resolved = await resolveAddressDetails(dto.deliveryAddress);
-      const cleanLine1 = dto.deliveryAddress.addressLine1.trim();
-
-      // Check if address already exists in address table
-      const existingAddress = await prisma.address.findFirst({
-        where: {
-          addressLine1: { equals: cleanLine1, mode: 'insensitive' },
-          wardCode: resolved.wardCode,
-        },
-      });
-
-      if (existingAddress) {
-        resolvedDeliveryAddressId = existingAddress.id;
-        deliveryLat = existingAddress.latitude;
-        deliveryLon = existingAddress.longitude;
-        deliveryAddrSnapshot = existingAddress.addressLine1;
-      } else {
-        // Geocode address
-        const rawAddr = `${cleanLine1}, ${resolved.ward}, ${resolved.province}`;
-        const geocoded = await this.geocodingService.geocode(rawAddr);
-        deliveryLat = dto.deliveryAddress.latitude ?? geocoded.latitude;
-        deliveryLon = dto.deliveryAddress.longitude ?? geocoded.longitude;
-        deliveryAddrSnapshot = geocoded.formattedAddress || cleanLine1;
-
-        const newAddr = await prisma.address.create({
-          data: {
-            addressLine1: cleanLine1,
-            country: dto.deliveryAddress.country || 'Vietnam',
-            latitude: deliveryLat,
-            longitude: deliveryLon,
-            wardCode: resolved.wardCode,
-          },
-        });
-        resolvedDeliveryAddressId = newAddr.id;
-      }
-    } else {
-      throw new BadRequestException('Vui lòng chọn hoặc điền địa chỉ giao hàng');
-    }
+    const deliveryResolved = await this.resolveOrderAddressSnapshot({
+      addressId: dto.deliveryAddressId,
+      addressDto: dto.deliveryAddress,
+      notFoundMsg: 'Địa chỉ giao hàng không tồn tại',
+      missingMsg: 'Vui lòng chọn hoặc điền địa chỉ giao hàng',
+    });
+    const deliveryLat = deliveryResolved.lat;
+    const deliveryLon = deliveryResolved.lon;
+    const deliveryAddrSnapshot = deliveryResolved.snapshot;
+    const resolvedDeliveryAddressId: string | null = deliveryResolved.addressId;
 
     // 3. Calculate distance & duration
     const distanceKm = this.geocodingService.calculateDistance(pickupLat, pickupLon, deliveryLat, deliveryLon);

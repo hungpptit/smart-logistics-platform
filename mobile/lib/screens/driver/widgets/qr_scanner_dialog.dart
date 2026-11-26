@@ -481,40 +481,50 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF15803D),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.check_circle, color: Colors.white, size: 14),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isPickupStop ? 'ĐÃ KHỚP ĐIỂM LẤY HÀNG' : 'ĐÃ KHỚP ĐƠN GIAO HÀNG',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
+                      SizedBox(
+                        width: double.infinity,
+                        child: Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF15803D),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.check_circle, color: Colors.white, size: 14),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      isPickupStop ? 'ĐÃ KHỚP ĐIỂM LẤY HÀNG' : 'ĐÃ KHỚP ĐƠN GIAO HÀNG',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            stop['orderCode'] ?? '',
-                            style: const TextStyle(
-                              color: Color(0xFF60A5FA),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              fontFamily: 'monospace',
+                            Text(
+                              stop['orderCode'] ?? '',
+                              style: const TextStyle(
+                                color: Color(0xFF60A5FA),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                fontFamily: 'monospace',
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 12),
 

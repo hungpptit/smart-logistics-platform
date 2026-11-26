@@ -537,6 +537,89 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     }
   }, [isOpen, token, isAdminOrStaff]);
 
+  // Pricing Summary distance calculation (kept above early return for Rules of Hooks)
+  const distanceKm = calculateDistance(senderLatitude, senderLongitude, receiverLatitude, receiverLongitude);
+
+  // Dynamic fetch Goong Matrix ETA for EXPRESS service
+  useEffect(() => {
+    if (!isOpen) return;
+    if (serviceCode !== 'EXPRESS') {
+      setExpressEta('');
+      return;
+    }
+    if (!senderLatitude || !senderLongitude || !receiverLatitude || !receiverLongitude) {
+      setExpressEta('');
+      return;
+    }
+    if (distanceKm > 20) {
+      setExpressEta('Vượt quá 20km (Không hỗ trợ Hỏa tốc)');
+      return;
+    }
+
+    let isCancelled = false;
+    const timer = setTimeout(async () => {
+      setLoadingEta(true);
+      try {
+        const res = await fetch(`${CONFIG.API_BASE_URL}/orders/calculate-pricing`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            serviceCode: 'EXPRESS',
+            distanceKm,
+            totalWeightKg: weight || 1,
+            isFragile,
+            codAmount,
+            pickupWardCode: senderWardCode,
+            deliveryWardCode: receiverWardCode,
+            pickupCoordinates: { lat: senderLatitude, lng: senderLongitude },
+            deliveryCoordinates: { lat: receiverLatitude, lng: receiverLongitude },
+          }),
+        });
+        const data = await res.json();
+        if (!isCancelled && data.success && data.data?.formattedDeliveryEta) {
+          setExpressEta(data.data.formattedDeliveryEta);
+        }
+      } catch (err) {
+        console.warn('Lỗi tính cước hỏa tốc từ server, dùng fallback khoa học:', err);
+        // Fallback khoa học: 11.3 km/h x 1.76 + 25 phút đệm
+        const fallbackTravelSec = Math.round(((distanceKm * 1.76) / 11.3) * 3600);
+        const totalMins = Math.max(25, Math.round((25 * 60 + fallbackTravelSec * 1.3) / 60));
+        const hrs = Math.floor(totalMins / 60);
+        const mins = totalMins % 60;
+        const fallbackStr = totalMins < 60
+          ? `Dự kiến giao sau ${totalMins} phút`
+          : mins > 0
+            ? `Dự kiến giao sau ${hrs} tiếng ${mins} phút`
+            : `Dự kiến giao sau ${hrs} tiếng`;
+        if (!isCancelled) setExpressEta(fallbackStr);
+      } finally {
+        if (!isCancelled) setLoadingEta(false);
+      }
+    }, 400);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    isOpen,
+    serviceCode,
+    distanceKm,
+    senderLatitude,
+    senderLongitude,
+    receiverLatitude,
+    receiverLongitude,
+    senderWardCode,
+    receiverWardCode,
+    weight,
+    isFragile,
+    codAmount,
+    token
+  ]);
+
   if (!isOpen) return null;
 
   // Validate single step & return error flags + messages
@@ -795,86 +878,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   };
 
   // Pricing Summary calculations
-  const distanceKm = calculateDistance(senderLatitude, senderLongitude, receiverLatitude, receiverLongitude);
   const activeService = services.find((s) => s.serviceCode === serviceCode);
-
-  // Dynamic fetch Goong Matrix ETA for EXPRESS service
-  useEffect(() => {
-    if (serviceCode !== 'EXPRESS') {
-      setExpressEta('');
-      return;
-    }
-    if (!senderLatitude || !senderLongitude || !receiverLatitude || !receiverLongitude) {
-      setExpressEta('');
-      return;
-    }
-    if (distanceKm > 20) {
-      setExpressEta('Vượt quá 20km (Không hỗ trợ Hỏa tốc)');
-      return;
-    }
-
-    let isCancelled = false;
-    const timer = setTimeout(async () => {
-      setLoadingEta(true);
-      try {
-        const res = await fetch(`${CONFIG.API_BASE_URL}/orders/calculate-pricing`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            serviceCode: 'EXPRESS',
-            distanceKm,
-            totalWeightKg: weight || 1,
-            isFragile,
-            codAmount,
-            pickupWardCode: senderWardCode,
-            deliveryWardCode: receiverWardCode,
-            pickupCoordinates: { lat: senderLatitude, lng: senderLongitude },
-            deliveryCoordinates: { lat: receiverLatitude, lng: receiverLongitude },
-          }),
-        });
-        const data = await res.json();
-        if (!isCancelled && data.success && data.data?.formattedDeliveryEta) {
-          setExpressEta(data.data.formattedDeliveryEta);
-        }
-      } catch (err) {
-        console.warn('Lỗi tính cước hỏa tốc từ server, dùng fallback khoa học:', err);
-        // Fallback khoa học: 11.3 km/h x 1.76 + 25 phút đệm
-        const fallbackTravelSec = Math.round(((distanceKm * 1.76) / 11.3) * 3600);
-        const totalMins = Math.max(25, Math.round((25 * 60 + fallbackTravelSec * 1.3) / 60));
-        const hrs = Math.floor(totalMins / 60);
-        const mins = totalMins % 60;
-        const fallbackStr = totalMins < 60
-          ? `Dự kiến giao sau ${totalMins} phút`
-          : mins > 0
-            ? `Dự kiến giao sau ${hrs} tiếng ${mins} phút`
-            : `Dự kiến giao sau ${hrs} tiếng`;
-        if (!isCancelled) setExpressEta(fallbackStr);
-      } finally {
-        if (!isCancelled) setLoadingEta(false);
-      }
-    }, 400);
-
-    return () => {
-      isCancelled = true;
-      clearTimeout(timer);
-    };
-  }, [
-    serviceCode,
-    distanceKm,
-    senderLatitude,
-    senderLongitude,
-    receiverLatitude,
-    receiverLongitude,
-    senderWardCode,
-    receiverWardCode,
-    weight,
-    isFragile,
-    codAmount,
-    token
-  ]);
 
   let basePrice = 0;
   let distanceFee = 0;

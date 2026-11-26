@@ -1099,7 +1099,7 @@ export const OrderTab: React.FC = () => {
       {/* Waybill Print Label Modal (Barcode 1D Code 128 + 2D QR Code) */}
       {showPrintLabel && selectedOrder && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-200 space-y-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 border border-slate-200 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
                 <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
@@ -1171,21 +1171,21 @@ export const OrderTab: React.FC = () => {
                         </p>
 
                         <div className="border-t border-slate-100 pt-1">
-                          <p className="truncate">
+                          <p className="break-words leading-snug">
                             <strong className="text-slate-900">Từ (Người gửi):</strong>{' '}
                             <span className="font-semibold text-slate-900">{senderNameDisp}</span> ({senderPhoneDisp})
                           </p>
-                          <p className="text-[9.5px] text-slate-500 truncate leading-tight" title={selectedOrder.pickupAddressText}>
+                          <p className="text-[9.5px] text-slate-500 leading-snug break-words mt-0.5">
                             📍 {selectedOrder.pickupAddressText || 'Địa chỉ lấy hàng'}
                           </p>
                         </div>
 
                         <div className="border-t border-slate-100 pt-1">
-                          <p className="truncate">
+                          <p className="break-words leading-snug">
                             <strong className="text-slate-900">Đến (Người nhận):</strong>{' '}
                             <span className="font-semibold text-slate-900">{selectedOrder.receiverName || 'N/A'}</span> ({selectedOrder.receiverPhone || 'N/A'})
                           </p>
-                          <p className="text-[9.5px] text-slate-500 truncate leading-tight" title={selectedOrder.deliveryAddressText}>
+                          <p className="text-[9.5px] text-slate-500 leading-snug break-words mt-0.5">
                             📍 {selectedOrder.deliveryAddressText || 'Địa chỉ giao hàng'}
                           </p>
                         </div>
@@ -1196,14 +1196,14 @@ export const OrderTab: React.FC = () => {
                     <div className="grid grid-cols-2 gap-2 text-[9.5px] bg-slate-50 p-2 rounded border border-slate-100">
                       <div>
                         <span className="text-slate-400 font-bold block text-[8.5px] uppercase">Kho xử lý gửi</span>
-                        <span className="font-bold text-blue-700 truncate block">
+                        <span className="font-bold text-blue-700 leading-snug break-words block">
                           {selectedOrder.originFacility?.facilityName || selectedOrder.originFacility?.facilityCode || 'Bưu cục gửi'}
                         </span>
                       </div>
 
                       <div>
                         <span className="text-slate-400 font-bold block text-[8.5px] uppercase">Kho xử lý nhận</span>
-                        <span className="font-bold text-emerald-700 truncate block">
+                        <span className="font-bold text-emerald-700 leading-snug break-words block">
                           {selectedOrder.destinationFacility?.facilityName || selectedOrder.destinationFacility?.facilityCode || 'Bưu cục nhận'}
                         </span>
                       </div>

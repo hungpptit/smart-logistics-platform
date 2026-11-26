@@ -1,7 +1,5 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -10,6 +8,7 @@ import '../../core/utils/app_snackbar.dart';
 import '../../core/utils/time_format.dart';
 import '../../models/chat_message.dart';
 import '../../services/driver_chat_service.dart';
+import 'controllers/chat_timeout_controller.dart';
 import 'widgets/chat/ai_message_bubble.dart';
 import 'widgets/chat/attached_image_bar.dart';
 import 'widgets/chat/chat_app_bar_title.dart';
@@ -41,10 +40,6 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
     'Tìm bưu cục gần nhất',
   ];
 
-  // Ngưỡng thời gian: Khi debug = 30s & 60s để test nhanh; Khi production/báo cáo = 180s (3p) & 300s (5p)
-  static const int _timeoutRemindSec = kDebugMode ? 30 : 180;
-  static const int _timeoutCloseSec = kDebugMode ? 60 : 300;
-
   List<ChatMessage> _messages = [];
   String? _conversationId;
   bool _isLoadingHistory = true;
@@ -61,14 +56,43 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
   String? _attachedImageBase64;
   File? _attachedImageFile;
 
-  // Timers & Mốc thời gian
-  DateTime? _lastAiReplyTimestamp;
-  Timer? _reminderTimer;
-  Timer? _closeTimer;
+  // Điều phối timeout 3p / 5p
+  late final ChatTimeoutController _timeoutController;
 
   @override
   void initState() {
     super.initState();
+    _timeoutController = ChatTimeoutController(
+      onReminder: (reminderText) {
+        if (!mounted) return;
+        final timeStr = formatHHmm(DateTime.now());
+        setState(() {
+          _messages.add(ChatMessage(
+            id: UniqueKey().toString(),
+            text: reminderText,
+            isUser: false,
+            time: timeStr,
+            status: MessageStatus.sent,
+          ));
+        });
+        _scrollToBottom();
+      },
+      onClosed: (closingText) {
+        if (!mounted) return;
+        final timeStr = formatHHmm(DateTime.now());
+        setState(() {
+          _isClosed = true;
+          _messages.add(ChatMessage(
+            id: UniqueKey().toString(),
+            text: closingText,
+            isUser: false,
+            time: timeStr,
+            status: MessageStatus.sent,
+          ));
+        });
+        _scrollToBottom();
+      },
+    );
     WidgetsBinding.instance.addObserver(this);
     _initSpeechToText();
     _loadConversationHistory();
@@ -77,7 +101,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _cancelTimers();
+    _timeoutController.dispose();
     _textController.dispose();
     _scrollController.dispose();
     _speechToText.stop();
@@ -91,7 +115,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // Khi app từ background quay lại foreground, kiểm tra thời gian đã trôi qua
-      _checkBackgroundTimeout();
+      _timeoutController.checkBackgroundTimeout();
     }
   }
 
@@ -230,7 +254,11 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
           _conversationId = null;
           _isClosed = false;
           _messages = _getDefaultWelcomeMessage();
-          _lastAiReplyTimestamp = null;
+          _timeoutController.syncState(
+            conversationId: null,
+            isClosed: false,
+            lastAiReplyTimestamp: null,
+          );
           _isLoadingHistory = false;
         });
         return;
@@ -279,14 +307,18 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
 
       setState(() {
         _messages = loaded.isNotEmpty ? loaded : _getDefaultWelcomeMessage();
-        _lastAiReplyTimestamp = lastRealAiTime;
+        _timeoutController.syncState(
+          conversationId: _conversationId,
+          isClosed: _isClosed,
+          lastAiReplyTimestamp: lastRealAiTime,
+        );
         _isLoadingHistory = false;
       });
 
       // Lập lịch timeout nếu phiên còn mở
-      if (!_isClosed && _lastAiReplyTimestamp != null) {
-        _scheduleTimers();
-        _checkBackgroundTimeout();
+      if (!_isClosed && lastRealAiTime != null) {
+        _timeoutController.scheduleTimers();
+        _timeoutController.checkBackgroundTimeout();
       }
     } else {
       // Chưa có hội thoại hoặc lỗi
@@ -313,98 +345,6 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
   }
 
   // ==========================================
-  // 4. ĐIỀU PHỐI TIMEOUT 3 PHÚT / 5 PHÚT
-  // ==========================================
-  void _cancelTimers() {
-    _reminderTimer?.cancel();
-    _closeTimer?.cancel();
-    _reminderTimer = null;
-    _closeTimer = null;
-  }
-
-  void _scheduleTimers() {
-    _cancelTimers();
-    if (_isClosed || _lastAiReplyTimestamp == null) return;
-
-    final elapsed = DateTime.now().difference(_lastAiReplyTimestamp!).inSeconds;
-
-    // Timer nhắc nhở (3 phút)
-    final remainingRemind = _timeoutRemindSec - elapsed;
-    if (remainingRemind > 0) {
-      _reminderTimer = Timer(Duration(seconds: remainingRemind), () {
-        _handleTimeoutEvent('REMINDER_3M');
-      });
-    }
-
-    // Timer đóng phiên (5 phút)
-    final remainingClose = _timeoutCloseSec - elapsed;
-    if (remainingClose > 0) {
-      _closeTimer = Timer(Duration(seconds: remainingClose), () {
-        _handleTimeoutEvent('CLOSE_5M');
-      });
-    }
-  }
-
-  void _checkBackgroundTimeout() {
-    if (_isClosed || _lastAiReplyTimestamp == null || _conversationId == null) return;
-
-    final elapsed = DateTime.now().difference(_lastAiReplyTimestamp!).inSeconds;
-
-    if (elapsed >= _timeoutCloseSec) {
-      _handleTimeoutEvent('CLOSE_5M');
-    } else if (elapsed >= _timeoutRemindSec) {
-      _handleTimeoutEvent('REMINDER_3M');
-    }
-  }
-
-  Future<void> _handleTimeoutEvent(String action) async {
-    if (!mounted || _conversationId == null || _isClosed) return;
-
-    final res = await DriverChatService.timeoutCheck(
-      conversationId: _conversationId!,
-      action: action,
-    );
-    if (!mounted) return;
-
-    if (res['success'] == true) {
-      final act = res['action'];
-      if (act == 'REMINDED') {
-        final timeStr = formatHHmm(DateTime.now());
-        final reminderText = res['message']?['text'] ??
-            'Bác tài ơi, bác có còn cần Trợ lý AI hỗ trợ thêm thông tin gì trên tuyến đường nữa không ạ?';
-
-        setState(() {
-          _messages.add(ChatMessage(
-            id: UniqueKey().toString(),
-            text: reminderText,
-            isUser: false,
-            time: timeStr,
-            status: MessageStatus.sent,
-          ));
-        });
-        _scrollToBottom();
-      } else if (act == 'CLOSED') {
-        final timeStr = formatHHmm(DateTime.now());
-        final closingText = res['message']?['text'] ??
-            'Do không nhận được phản hồi, Trợ lý AI xin phép tạm đóng phiên hỗ trợ. Chúc bác tài vạn dặm bình an!';
-
-        setState(() {
-          _isClosed = true;
-          _messages.add(ChatMessage(
-            id: UniqueKey().toString(),
-            text: closingText,
-            isUser: false,
-            time: timeStr,
-            status: MessageStatus.sent,
-          ));
-        });
-        _cancelTimers();
-        _scrollToBottom();
-      }
-    }
-  }
-
-  // ==========================================
   // 5. GỬI TIN NHẮN THẬT LÊN BACKEND (API REST)
   // ==========================================
   Future<void> _sendMessage({String? customText, ChatMessage? retryMessage}) async {
@@ -417,7 +357,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
 
     final timeStr = formatHHmm(DateTime.now());
 
-    _cancelTimers(); // Hủy ngay bộ đếm khi tài xế gửi tin
+    _timeoutController.cancelTimers(); // Hủy ngay bộ đếm khi tài xế gửi tin
 
     late ChatMessage userMsg;
     if (retryMessage != null) {
@@ -440,7 +380,10 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
     setState(() {
       _isSending = true;
       _isAITyping = true;
-      if (_isClosed) _isClosed = false; // Mở lại phiên khi tài xế gửi tin
+      if (_isClosed) {
+        _isClosed = false; // Mở lại phiên khi tài xế gửi tin
+        _timeoutController.isClosed = false;
+      }
     });
     _scrollToBottom();
 
@@ -464,7 +407,11 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
         userMsg.status = MessageStatus.sent;
         _isAITyping = false;
         _isSending = false;
-        _lastAiReplyTimestamp = DateTime.now();
+        _timeoutController.syncState(
+          conversationId: _conversationId,
+          isClosed: _isClosed,
+          lastAiReplyTimestamp: DateTime.now(),
+        );
         _messages.add(ChatMessage(
           id: UniqueKey().toString(),
           text: replyText,
@@ -474,7 +421,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
         ));
       });
 
-      _scheduleTimers(); // Lập lịch timeout sau câu trả lời của AI
+      _timeoutController.scheduleTimers(); // Lập lịch timeout sau câu trả lời của AI
     } else {
       // Xử lý lỗi trung thực (không dùng phản hồi giả mạo)
       final statusCode = res['statusCode'];
@@ -530,7 +477,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
 
     if (confirm != true || !mounted) return;
 
-    _cancelTimers();
+    _timeoutController.cancelTimers();
     final res = await DriverChatService.createNewConversation();
     if (!mounted) return;
 
@@ -539,7 +486,11 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
         _conversationId = res['conversationId'];
         _isClosed = false;
         _messages = _getDefaultWelcomeMessage();
-        _lastAiReplyTimestamp = null;
+        _timeoutController.syncState(
+          conversationId: _conversationId,
+          isClosed: false,
+          lastAiReplyTimestamp: null,
+        );
       });
       _scrollToBottom();
     }
