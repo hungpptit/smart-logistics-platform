@@ -1,0 +1,289 @@
+{
+  "_fixtureSource": "derived, not captured",
+  "_derivedFrom": "backend/src/services/shipment.service.ts (loadToteIntoShipment) + backend/src/services/routing/routing.service.ts (getRouteDetail Prisma include)",
+  "success": true,
+  "data": {
+    "id": "00000000-0000-4000-9000-000000000101",
+    "routeCode": "RT-LH-DERIVED01",
+    "driverVehicleAssignmentId": "00000000-0000-4000-9000-000000000102",
+    "startFacilityId": "00000000-0000-4000-9000-000000000201",
+    "endFacilityId": "00000000-0000-4000-9000-000000000202",
+    "optimizationId": null,
+    "plannedDistanceKm": "38.4",
+    "plannedDurationMin": 58,
+    "totalStops": 2,
+    "status": "ASSIGNED",
+    "actualStartAt": null,
+    "completedAt": null,
+    "createdAt": "2026-11-26T02:30:00.000Z",
+    "updatedAt": "2026-11-26T02:30:00.000Z",
+    "startFacility": {
+      "id": "00000000-0000-4000-9000-000000000201",
+      "facilityCode": "FAC-TD-TANGNHONPHU",
+      "facilityName": "Start Facility (LINEHAUL-DERIVED)",
+      "address": {
+        "id": "00000000-0000-4000-9000-000000000211",
+        "addressLine1": "Start Facility Street (Redacted)",
+        "wardCode": "26800",
+        "country": "Vietnam",
+        "placeId": null,
+        "latitude": 10.8482,
+        "longitude": 106.7865,
+        "createdAt": "2026-08-03T10:22:05.000Z"
+      }
+    },
+    "endFacility": {
+      "id": "00000000-0000-4000-9000-000000000202",
+      "facilityCode": "FAC-SC-SOUTH",
+      "facilityName": "End Facility (LINEHAUL-DERIVED)"
+    },
+    "driverVehicleAssignment": {
+      "id": "00000000-0000-4000-9000-000000000102",
+      "driverId": "00000000-0000-4000-9000-000000000103",
+      "vehicleId": "00000000-0000-4000-9000-000000000104",
+      "assignedFrom": "2026-08-03T10:22:05.000Z",
+      "assignedTo": null,
+      "isActive": true,
+      "driver": {
+        "id": "00000000-0000-4000-9000-000000000103",
+        "employeeCode": "DRV-LH-01",
+        "fullName": "Driver Demo (LINEHAUL-DERIVED)",
+        "phone": "000-000-0001"
+      },
+      "vehicle": {
+        "id": "00000000-0000-4000-9000-000000000104",
+        "vehicleCode": "VEH-DRV-LH-01",
+        "plateNumber": "00X-000.01"
+      }
+    },
+    "stops": [
+      {
+        "id": "00000000-0000-4000-9000-000000000301",
+        "routeId": "00000000-0000-4000-9000-000000000101",
+        "shipmentId": "00000000-0000-4000-9000-000000000401",
+        "orderId": null,
+        "facilityId": "00000000-0000-4000-9000-000000000201",
+        "stopType": "PICKUP",
+        "sequence": 1,
+        "addressSnapshot": "Facility Stop 01 (Redacted)",
+        "latitude": 10.8482,
+        "longitude": 106.7865,
+        "status": "PENDING",
+        "arrivedAt": "2026-11-26T02:30:00.000Z",
+        "departedAt": null,
+        "facility": {
+          "id": "00000000-0000-4000-9000-000000000201",
+          "facilityCode": "FAC-TD-TANGNHONPHU",
+          "facilityName": "Hub Facility 01 (LINEHAUL-DERIVED)",
+          "address": {
+            "addressLine1": "Hub Street 01 (Redacted)",
+            "latitude": 10.8482,
+            "longitude": 106.7865
+          }
+        },
+        "order": null,
+        "shipment": {
+          "id": "00000000-0000-4000-9000-000000000401",
+          "shipmentCode": "SHP-LH-DERIVED01",
+          "status": "ASSIGNED",
+          "routeId": "00000000-0000-4000-9000-000000000101",
+          "originFacilityId": "00000000-0000-4000-9000-000000000201",
+          "destinationFacilityId": "00000000-0000-4000-9000-000000000202",
+          "createdBy": null,
+          "updatedBy": null,
+          "createdAt": "2026-11-26T02:30:00.000Z",
+          "updatedAt": "2026-11-26T02:30:00.000Z",
+          "shipmentPackages": [
+            {
+              "id": "00000000-0000-4000-9000-000000000501",
+              "shipmentId": "00000000-0000-4000-9000-000000000401",
+              "packageId": "00000000-0000-4000-9000-000000000601",
+              "package": {
+                "id": "00000000-0000-4000-9000-000000000601",
+                "packageCode": "PKG-LH-001",
+                "orderId": "00000000-0000-4000-9000-000000000701",
+                "order": {
+                  "id": "00000000-0000-4000-9000-000000000701",
+                  "orderCode": "ORD-LH-DRV-001",
+                  "status": "AT_HUB",
+                  "receiverName": "Receiver Stop 01",
+                  "receiverPhone": "000-000-0101",
+                  "deliveryAddressText": "Delivery Street 01 (Redacted)",
+                  "pickupAddressText": "Pickup Street 01 (Redacted)",
+                  "estimatedCodAmount": "0",
+                  "estimatedShippingFee": "22000",
+                  "estimatedInsuranceFee": "0",
+                  "payment": null
+                }
+              }
+            },
+            {
+              "id": "00000000-0000-4000-9000-000000000502",
+              "shipmentId": "00000000-0000-4000-9000-000000000401",
+              "packageId": "00000000-0000-4000-9000-000000000602",
+              "package": {
+                "id": "00000000-0000-4000-9000-000000000602",
+                "packageCode": "PKG-LH-002",
+                "orderId": "00000000-0000-4000-9000-000000000702",
+                "order": {
+                  "id": "00000000-0000-4000-9000-000000000702",
+                  "orderCode": "ORD-LH-DRV-002",
+                  "status": "AT_HUB",
+                  "receiverName": "Receiver Stop 01",
+                  "receiverPhone": "000-000-0101",
+                  "deliveryAddressText": "Delivery Street 01 (Redacted)",
+                  "pickupAddressText": "Pickup Street 01 (Redacted)",
+                  "estimatedCodAmount": "150000",
+                  "estimatedShippingFee": "28000",
+                  "estimatedInsuranceFee": "0",
+                  "payment": null
+                }
+              }
+            }
+          ],
+          "warehouseScans": [
+            {
+              "id": "00000000-0000-4000-9000-000000000801",
+              "facilityId": "00000000-0000-4000-9000-000000000201",
+              "shipmentId": "00000000-0000-4000-9000-000000000401",
+              "packageId": "00000000-0000-4000-9000-000000000601",
+              "toteBagId": "00000000-0000-4000-9000-000000000901",
+              "toteBag": {
+                "id": "00000000-0000-4000-9000-000000000901",
+                "toteCode": "TOTE-FAC_TD_TANGNHONPHU-ZONE-W-001",
+                "zoneCode": "ZONE-W-PROVINCE",
+                "status": "LOADED"
+              }
+            }
+          ],
+          "shipmentTransfers": [
+            {
+              "id": "00000000-0000-4000-9000-000000000851",
+              "shipmentId": "00000000-0000-4000-9000-000000000401",
+              "fromFacilityId": "00000000-0000-4000-9000-000000000201",
+              "toFacilityId": "00000000-0000-4000-9000-000000000202",
+              "status": "PENDING",
+              "dispatchedAt": null,
+              "arrivedAt": null,
+              "receivedBy": null
+            }
+          ]
+        }
+      },
+      {
+        "id": "00000000-0000-4000-9000-000000000302",
+        "routeId": "00000000-0000-4000-9000-000000000101",
+        "shipmentId": "00000000-0000-4000-9000-000000000401",
+        "orderId": null,
+        "facilityId": "00000000-0000-4000-9000-000000000202",
+        "stopType": "DELIVERY",
+        "sequence": 2,
+        "addressSnapshot": "Facility Stop 02 (Redacted)",
+        "latitude": 10.8654,
+        "longitude": 106.6123,
+        "status": "PENDING",
+        "arrivedAt": null,
+        "departedAt": null,
+        "facility": {
+          "id": "00000000-0000-4000-9000-000000000202",
+          "facilityCode": "FAC-SC-SOUTH",
+          "facilityName": "Hub Facility 02 (LINEHAUL-DERIVED)",
+          "address": {
+            "addressLine1": "Hub Street 02 (Redacted)",
+            "latitude": 10.8654,
+            "longitude": 106.6123
+          }
+        },
+        "order": null,
+        "shipment": {
+          "id": "00000000-0000-4000-9000-000000000401",
+          "shipmentCode": "SHP-LH-DERIVED01",
+          "status": "ASSIGNED",
+          "routeId": "00000000-0000-4000-9000-000000000101",
+          "originFacilityId": "00000000-0000-4000-9000-000000000201",
+          "destinationFacilityId": "00000000-0000-4000-9000-000000000202",
+          "createdBy": null,
+          "updatedBy": null,
+          "createdAt": "2026-11-26T02:30:00.000Z",
+          "updatedAt": "2026-11-26T02:30:00.000Z",
+          "shipmentPackages": [
+            {
+              "id": "00000000-0000-4000-9000-000000000501",
+              "shipmentId": "00000000-0000-4000-9000-000000000401",
+              "packageId": "00000000-0000-4000-9000-000000000601",
+              "package": {
+                "id": "00000000-0000-4000-9000-000000000601",
+                "packageCode": "PKG-LH-001",
+                "orderId": "00000000-0000-4000-9000-000000000701",
+                "order": {
+                  "id": "00000000-0000-4000-9000-000000000701",
+                  "orderCode": "ORD-LH-DRV-001",
+                  "status": "AT_HUB",
+                  "receiverName": "Receiver Stop 02",
+                  "receiverPhone": "000-000-0102",
+                  "deliveryAddressText": "Delivery Street 02 (Redacted)",
+                  "pickupAddressText": "Pickup Street 02 (Redacted)",
+                  "estimatedCodAmount": "0",
+                  "estimatedShippingFee": "22000",
+                  "estimatedInsuranceFee": "0",
+                  "payment": null
+                }
+              }
+            },
+            {
+              "id": "00000000-0000-4000-9000-000000000502",
+              "shipmentId": "00000000-0000-4000-9000-000000000401",
+              "packageId": "00000000-0000-4000-9000-000000000602",
+              "package": {
+                "id": "00000000-0000-4000-9000-000000000602",
+                "packageCode": "PKG-LH-002",
+                "orderId": "00000000-0000-4000-9000-000000000702",
+                "order": {
+                  "id": "00000000-0000-4000-9000-000000000702",
+                  "orderCode": "ORD-LH-DRV-002",
+                  "status": "AT_HUB",
+                  "receiverName": "Receiver Stop 02",
+                  "receiverPhone": "000-000-0102",
+                  "deliveryAddressText": "Delivery Street 02 (Redacted)",
+                  "pickupAddressText": "Pickup Street 02 (Redacted)",
+                  "estimatedCodAmount": "150000",
+                  "estimatedShippingFee": "28000",
+                  "estimatedInsuranceFee": "0",
+                  "payment": null
+                }
+              }
+            }
+          ],
+          "warehouseScans": [
+            {
+              "id": "00000000-0000-4000-9000-000000000801",
+              "facilityId": "00000000-0000-4000-9000-000000000201",
+              "shipmentId": "00000000-0000-4000-9000-000000000401",
+              "packageId": "00000000-0000-4000-9000-000000000601",
+              "toteBagId": "00000000-0000-4000-9000-000000000901",
+              "toteBag": {
+                "id": "00000000-0000-4000-9000-000000000901",
+                "toteCode": "TOTE-FAC_TD_TANGNHONPHU-ZONE-W-001",
+                "zoneCode": "ZONE-W-PROVINCE",
+                "status": "LOADED"
+              }
+            }
+          ],
+          "shipmentTransfers": [
+            {
+              "id": "00000000-0000-4000-9000-000000000851",
+              "shipmentId": "00000000-0000-4000-9000-000000000401",
+              "fromFacilityId": "00000000-0000-4000-9000-000000000201",
+              "toFacilityId": "00000000-0000-4000-9000-000000000202",
+              "status": "PENDING",
+              "dispatchedAt": null,
+              "arrivedAt": null,
+              "receivedBy": null
+            }
+          ]
+        }
+      }
+    ],
+    "currentGpsLocation": null
+  }
+}

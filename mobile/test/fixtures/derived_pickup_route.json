@@ -1,0 +1,317 @@
+{
+  "_fixtureSource": "derived, not captured",
+  "_derivedFrom": "backend/src/services/routing/routing.service.ts (optimizeRoutesForFacility routeType=PICKUP + getRouteDetail Prisma include)",
+  "success": true,
+  "data": {
+    "id": "00000000-0000-4000-8000-000000000101",
+    "routeCode": "RT-PU-DERIVED01",
+    "driverVehicleAssignmentId": "00000000-0000-4000-8000-000000000102",
+    "startFacilityId": "799de30c-6943-4d9a-bdc3-8f38f70be7b4",
+    "endFacilityId": "799de30c-6943-4d9a-bdc3-8f38f70be7b4",
+    "optimizationId": "00000000-0000-4000-8000-000000000103",
+    "plannedDistanceKm": "6.40",
+    "plannedDurationMin": 48,
+    "totalStops": 3,
+    "status": "IN_PROGRESS",
+    "actualStartAt": "2026-11-26T02:00:00.000Z",
+    "completedAt": null,
+    "createdAt": "2026-11-26T01:50:00.000Z",
+    "updatedAt": "2026-11-26T02:00:00.000Z",
+    "startFacility": {
+      "id": "799de30c-6943-4d9a-bdc3-8f38f70be7b4",
+      "facilityCode": "FAC-TD-DANGBI",
+      "facilityName": "Start Facility (PICKUP-DERIVED)",
+      "address": {
+        "id": "d8b9d0ce-4be5-4b98-baff-c0f38bb53010",
+        "addressLine1": "Start Facility Street (Redacted)",
+        "wardCode": "25747",
+        "country": "Vietnam",
+        "placeId": null,
+        "latitude": 10.8495,
+        "longitude": 106.7625,
+        "createdAt": "2026-08-03T10:22:05.181Z"
+      }
+    },
+    "endFacility": {
+      "id": "799de30c-6943-4d9a-bdc3-8f38f70be7b4",
+      "facilityCode": "FAC-TD-DANGBI",
+      "facilityName": "End Facility (PICKUP-DERIVED)"
+    },
+    "driverVehicleAssignment": {
+      "id": "00000000-0000-4000-8000-000000000102",
+      "driverId": "35bbbcbf-9115-4c91-8f9a-2c5fb7d00600",
+      "vehicleId": "39d9a574-425d-468b-ba5f-114b90052abe",
+      "assignedFrom": "2026-08-03T10:22:05.352Z",
+      "assignedTo": null,
+      "isActive": true,
+      "driver": {
+        "id": "35bbbcbf-9115-4c91-8f9a-2c5fb7d00600",
+        "employeeCode": "DRV-TD-01",
+        "fullName": "Driver Demo (PICKUP-DERIVED)",
+        "phone": "000-000-0001"
+      },
+      "vehicle": {
+        "id": "39d9a574-425d-468b-ba5f-114b90052abe",
+        "vehicleCode": "VEH-DRV-TD-01",
+        "plateNumber": "00X-000.01"
+      }
+    },
+    "stops": [
+      {
+        "id": "00000000-0000-4000-8000-000000000201",
+        "routeId": "00000000-0000-4000-8000-000000000101",
+        "shipmentId": "00000000-0000-4000-8000-000000000301",
+        "orderId": "00000000-0000-4000-8000-000000000401",
+        "facilityId": null,
+        "stopType": "PICKUP",
+        "sequence": 1,
+        "addressSnapshot": "Customer Stop 01 Street (Redacted)",
+        "latitude": 10.845849,
+        "longitude": 106.7874619,
+        "status": "COMPLETED",
+        "arrivedAt": "2026-11-26T02:10:00.000Z",
+        "departedAt": "2026-11-26T02:15:00.000Z",
+        "facility": null,
+        "order": {
+          "id": "00000000-0000-4000-8000-000000000401",
+          "orderCode": "ORD-PU-DRV-001",
+          "status": "PICKED_UP",
+          "receiverName": "Receiver Stop 01",
+          "receiverPhone": "000-000-0101",
+          "deliveryAddressText": "Delivery Street 01 (Redacted)",
+          "pickupAddressText": "Pickup Street 01 (Redacted)",
+          "estimatedCodAmount": "250000",
+          "estimatedShippingFee": "18000",
+          "estimatedInsuranceFee": "0",
+          "payment": {
+            "feePayer": "SENDER",
+            "paymentMethod": "CASH",
+            "paymentStatus": "PAID",
+            "finalShippingFee": "18000",
+            "finalInsuranceFee": "0",
+            "finalCodAmount": "250000"
+          }
+        },
+        "shipment": {
+          "id": "00000000-0000-4000-8000-000000000301",
+          "shipmentCode": "SH-PU-0001",
+          "status": "ASSIGNED",
+          "routeId": "00000000-0000-4000-8000-000000000101",
+          "originFacilityId": "799de30c-6943-4d9a-bdc3-8f38f70be7b4",
+          "destinationFacilityId": "799de30c-6943-4d9a-bdc3-8f38f70be7b4",
+          "createdBy": null,
+          "updatedBy": null,
+          "createdAt": "2026-11-26T01:50:00.000Z",
+          "updatedAt": "2026-11-26T02:15:00.000Z",
+          "shipmentPackages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000501",
+              "shipmentId": "00000000-0000-4000-8000-000000000301",
+              "packageId": "00000000-0000-4000-8000-000000000601",
+              "package": {
+                "id": "00000000-0000-4000-8000-000000000601",
+                "packageCode": "PKG-PU-001",
+                "orderId": "00000000-0000-4000-8000-000000000401",
+                "order": {
+                  "id": "00000000-0000-4000-8000-000000000401",
+                  "orderCode": "ORD-PU-DRV-001",
+                  "status": "PICKED_UP",
+                  "receiverName": "Receiver Stop 01",
+                  "receiverPhone": "000-000-0101",
+                  "deliveryAddressText": "Delivery Street 01 (Redacted)",
+                  "pickupAddressText": "Pickup Street 01 (Redacted)",
+                  "estimatedCodAmount": "250000",
+                  "estimatedShippingFee": "18000",
+                  "estimatedInsuranceFee": "0",
+                  "payment": {
+                    "feePayer": "SENDER",
+                    "paymentMethod": "CASH",
+                    "paymentStatus": "PAID",
+                    "finalShippingFee": "18000",
+                    "finalInsuranceFee": "0",
+                    "finalCodAmount": "250000"
+                  }
+                }
+              }
+            }
+          ],
+          "warehouseScans": [],
+          "shipmentTransfers": []
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000202",
+        "routeId": "00000000-0000-4000-8000-000000000101",
+        "shipmentId": "00000000-0000-4000-8000-000000000302",
+        "orderId": "00000000-0000-4000-8000-000000000402",
+        "facilityId": null,
+        "stopType": "PICKUP",
+        "sequence": 2,
+        "addressSnapshot": "Customer Stop 02 Street (Redacted)",
+        "latitude": 10.8482,
+        "longitude": 106.7865,
+        "status": "PENDING",
+        "arrivedAt": null,
+        "departedAt": null,
+        "facility": null,
+        "order": {
+          "id": "00000000-0000-4000-8000-000000000402",
+          "orderCode": "ORD-PU-DRV-002",
+          "status": "PICKUP_ASSIGNED",
+          "receiverName": "Receiver Stop 02",
+          "receiverPhone": "000-000-0102",
+          "deliveryAddressText": "Delivery Street 02 (Redacted)",
+          "pickupAddressText": "Pickup Street 02 (Redacted)",
+          "estimatedCodAmount": "350000",
+          "estimatedShippingFee": "22000",
+          "estimatedInsuranceFee": "0",
+          "payment": {
+            "feePayer": "RECEIVER",
+            "paymentMethod": "CASH",
+            "paymentStatus": "UNPAID",
+            "finalShippingFee": "22000",
+            "finalInsuranceFee": "0",
+            "finalCodAmount": "350000"
+          }
+        },
+        "shipment": {
+          "id": "00000000-0000-4000-8000-000000000302",
+          "shipmentCode": "SH-PU-0002",
+          "status": "ASSIGNED",
+          "routeId": "00000000-0000-4000-8000-000000000101",
+          "originFacilityId": "799de30c-6943-4d9a-bdc3-8f38f70be7b4",
+          "destinationFacilityId": "beb169af-b029-41a9-8b58-b1e2eafa4e30",
+          "createdBy": null,
+          "updatedBy": null,
+          "createdAt": "2026-11-26T01:50:00.000Z",
+          "updatedAt": "2026-11-26T01:50:00.000Z",
+          "shipmentPackages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000502",
+              "shipmentId": "00000000-0000-4000-8000-000000000302",
+              "packageId": "00000000-0000-4000-8000-000000000602",
+              "package": {
+                "id": "00000000-0000-4000-8000-000000000602",
+                "packageCode": "PKG-PU-002",
+                "orderId": "00000000-0000-4000-8000-000000000402",
+                "order": {
+                  "id": "00000000-0000-4000-8000-000000000402",
+                  "orderCode": "ORD-PU-DRV-002",
+                  "status": "PICKUP_ASSIGNED",
+                  "receiverName": "Receiver Stop 02",
+                  "receiverPhone": "000-000-0102",
+                  "deliveryAddressText": "Delivery Street 02 (Redacted)",
+                  "pickupAddressText": "Pickup Street 02 (Redacted)",
+                  "estimatedCodAmount": "350000",
+                  "estimatedShippingFee": "22000",
+                  "estimatedInsuranceFee": "0",
+                  "payment": {
+                    "feePayer": "RECEIVER",
+                    "paymentMethod": "CASH",
+                    "paymentStatus": "UNPAID",
+                    "finalShippingFee": "22000",
+                    "finalInsuranceFee": "0",
+                    "finalCodAmount": "350000"
+                  }
+                }
+              }
+            }
+          ],
+          "warehouseScans": [],
+          "shipmentTransfers": [
+            {
+              "id": "00000000-0000-4000-8000-000000000702",
+              "shipmentId": "00000000-0000-4000-8000-000000000302",
+              "fromFacilityId": "799de30c-6943-4d9a-bdc3-8f38f70be7b4",
+              "toFacilityId": "beb169af-b029-41a9-8b58-b1e2eafa4e30",
+              "status": "PENDING",
+              "dispatchedAt": null,
+              "arrivedAt": null,
+              "receivedBy": null
+            }
+          ]
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000203",
+        "routeId": "00000000-0000-4000-8000-000000000101",
+        "shipmentId": "00000000-0000-4000-8000-000000000303",
+        "orderId": "00000000-0000-4000-8000-000000000403",
+        "facilityId": null,
+        "stopType": "PICKUP",
+        "sequence": 3,
+        "addressSnapshot": "Customer Stop 03 Street (Redacted)",
+        "latitude": 10.8345859,
+        "longitude": 106.7827499,
+        "status": "PENDING",
+        "arrivedAt": null,
+        "departedAt": null,
+        "facility": null,
+        "order": {
+          "id": "00000000-0000-4000-8000-000000000403",
+          "orderCode": "ORD-PU-DRV-003",
+          "status": "PICKUP_ASSIGNED",
+          "receiverName": "Receiver Stop 03",
+          "receiverPhone": "000-000-0103",
+          "deliveryAddressText": "Delivery Street 03 (Redacted)",
+          "pickupAddressText": "Pickup Street 03 (Redacted)",
+          "estimatedCodAmount": "500000",
+          "estimatedShippingFee": "30000",
+          "estimatedInsuranceFee": "2000",
+          "payment": null
+        },
+        "shipment": {
+          "id": "00000000-0000-4000-8000-000000000303",
+          "shipmentCode": "SH-PU-0003",
+          "status": "ASSIGNED",
+          "routeId": "00000000-0000-4000-8000-000000000101",
+          "originFacilityId": "799de30c-6943-4d9a-bdc3-8f38f70be7b4",
+          "destinationFacilityId": "beb169af-b029-41a9-8b58-b1e2eafa4e30",
+          "createdBy": null,
+          "updatedBy": null,
+          "createdAt": "2026-11-26T01:50:00.000Z",
+          "updatedAt": "2026-11-26T01:50:00.000Z",
+          "shipmentPackages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000503",
+              "shipmentId": "00000000-0000-4000-8000-000000000303",
+              "packageId": "00000000-0000-4000-8000-000000000603",
+              "package": {
+                "id": "00000000-0000-4000-8000-000000000603",
+                "packageCode": "PKG-PU-003",
+                "orderId": "00000000-0000-4000-8000-000000000403",
+                "order": {
+                  "id": "00000000-0000-4000-8000-000000000403",
+                  "orderCode": "ORD-PU-DRV-003",
+                  "status": "PICKUP_ASSIGNED",
+                  "receiverName": "Receiver Stop 03",
+                  "receiverPhone": "000-000-0103",
+                  "deliveryAddressText": "Delivery Street 03 (Redacted)",
+                  "pickupAddressText": "Pickup Street 03 (Redacted)",
+                  "estimatedCodAmount": "500000",
+                  "estimatedShippingFee": "30000",
+                  "estimatedInsuranceFee": "2000",
+                  "payment": null
+                }
+              }
+            }
+          ],
+          "warehouseScans": [],
+          "shipmentTransfers": [
+            {
+              "id": "00000000-0000-4000-8000-000000000703",
+              "shipmentId": "00000000-0000-4000-8000-000000000303",
+              "fromFacilityId": "799de30c-6943-4d9a-bdc3-8f38f70be7b4",
+              "toFacilityId": "beb169af-b029-41a9-8b58-b1e2eafa4e30",
+              "status": "PENDING",
+              "dispatchedAt": null,
+              "arrivedAt": null,
+              "receivedBy": null
+            }
+          ]
+        }
+      }
+    ],
+    "currentGpsLocation": null
+  }
+}
