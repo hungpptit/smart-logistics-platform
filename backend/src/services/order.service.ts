@@ -3,8 +3,14 @@ import { GeocodingService } from './geocoding.service';
 import { PricingService } from './pricing/pricing.service';
 import { CreateOrderDto, UpdateOrderStatusDto } from '../dtos/order.dto';
 import { BadRequestException, NotFoundException, ForbiddenException } from '../middlewares/error.middleware';
-import { OrderStatus, PaymentStatus, CustomerAddressType, RouteStopStatus, RouteStatus } from '@prisma/client';
+import { OrderStatus, PaymentStatus, CustomerAddressType, RouteStopStatus, RouteStatus, DriverEmploymentStatus, Prisma } from '@prisma/client';
 import { resolveAddressDetails } from '../utils/address-resolver';
+import { getTrackingGateway } from '../gateways/tracking.gateway';
+import {
+  evaluatePickupRouteHandover,
+  PICKUP_WAITING_INITIAL_STATUSES,
+  UNPICKED_BLOCKED_STATUSES,
+} from '../utils/pickup-handover.util';
 
 export class OrderService {
   private geocodingService = new GeocodingService();
@@ -816,9 +822,65 @@ export class OrderService {
       }
     }
 
-    return await prisma.$transaction(async (tx) => {
+    if (dto.status === OrderStatus.ARRIVED_ORIGIN_FACILITY) {
+      const activePickupStop = await prisma.routeStop.findFirst({
+        where: {
+          orderId: order.id,
+          stopType: 'PICKUP',
+          facilityId: null,
+          route: {
+            status: { in: [RouteStatus.PLANNED, RouteStatus.ASSIGNED, RouteStatus.IN_PROGRESS] },
+          },
+        },
+        include: {
+          route: {
+            include: {
+              driverVehicleAssignment: {
+                include: { driver: { select: { fullName: true } } },
+              },
+            },
+          },
+        },
+      });
+
+      const isUnpickedPickupOrder =
+        (UNPICKED_BLOCKED_STATUSES as readonly string[]).includes(order.status) ||
+        (order.pickupType === 'PICKUP' &&
+          (PICKUP_WAITING_INITIAL_STATUSES as readonly string[]).includes(order.status));
+
+      if (isUnpickedPickupOrder || activePickupStop) {
+        const driverName =
+          activePickupStop?.route?.driverVehicleAssignment?.driver?.fullName || 'Shipper';
+        throw new BadRequestException(
+          `Đơn [${order.orderCode}] đang thuộc quy trình lấy hàng của ${driverName}. Vui lòng dùng màn hình Phân Loại Hàng Vào Zone Kho và quét mã QR chuyến của Shipper trước khi nhập kho!`
+        );
+      }
+
+      if (
+        staffFacilityId &&
+        order.originFacilityId &&
+        order.originFacilityId !== staffFacilityId &&
+        (
+          [
+            OrderStatus.CREATED,
+            OrderStatus.READY_FOR_PICKUP,
+            OrderStatus.PICKED_UP,
+          ] as OrderStatus[]
+        ).includes(order.status)
+      ) {
+        throw new BadRequestException(
+          `Cảnh báo sai bưu cục! Đơn [${order.orderCode}] thuộc bưu cục gửi khác, không thể xác nhận nhập kho tại bưu cục hiện tại.`
+        );
+      }
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
       const updateData: any = { status: dto.status, updatedBy: userId };
-      if (staffFacilityId && (order.pickupType === 'DROP_OFF' || dto.status === 'ARRIVED_ORIGIN_FACILITY')) {
+      if (
+        staffFacilityId &&
+        !order.originFacilityId &&
+        (order.pickupType === 'DROP_OFF' || dto.status === 'ARRIVED_ORIGIN_FACILITY')
+      ) {
         updateData.originFacilityId = staffFacilityId;
       }
 
@@ -898,6 +960,15 @@ export class OrderService {
 
       return updatedOrder;
     });
+
+    if (dto.status === OrderStatus.ARRIVED_ORIGIN_FACILITY) {
+      const syncResult = await this.syncPickupRouteHandover(order.id, staffFacilityId || undefined);
+      if (syncResult.shouldBroadcast) {
+        getTrackingGateway()?.broadcastRoutesUpdated();
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -1089,9 +1160,298 @@ export class OrderService {
   }
 
   /**
+   * Kiểm tra an toàn trước khi cho phép quét nhập kho & phân loại bưu kiện:
+   * - Chặn đơn shipper chưa lấy thành công (PICKUP_ASSIGNED, PICKING, PICK_FAILED, CANCELLED, hoặc PICKUP đang CREATED/READY_FOR_PICKUP)
+   * - Chặn đơn thuộc chuyến PICKUP chưa bắt đầu chạy
+   * - Chặn quét nhầm ở bưu cục khác với startFacilityId của chuyến hoặc originFacilityId ban đầu
+   * - Nếu đang khóa đối soát theo chuyến (expectedRouteRef), chặn quét nhầm hàng của shipper khác hoặc ngoài chuyến
+   * - Bắt buộc quét QR chuyến trên app của tài xế khi đơn đang ở trạng thái PICKED_UP thuộc chuyến PICKUP đang chạy
+   */
+  private async validatePickupHandoverForZoneScan(
+    order: {
+      id: string;
+      orderCode: string;
+      status: OrderStatus;
+      pickupType: string;
+      originFacilityId: string | null;
+    },
+    expectedRouteRef?: string,
+    targetZoneFacilityId?: string | null
+  ): Promise<void> {
+    const activePickupStops = await prisma.routeStop.findMany({
+      where: {
+        orderId: order.id,
+        stopType: 'PICKUP',
+        facilityId: null,
+        route: {
+          status: { in: [RouteStatus.PLANNED, RouteStatus.ASSIGNED, RouteStatus.IN_PROGRESS] },
+        },
+      },
+      include: {
+        route: {
+          include: {
+            startFacility: {
+              select: { id: true, facilityName: true, facilityCode: true },
+            },
+            driverVehicleAssignment: {
+              include: {
+                driver: {
+                  select: { fullName: true, employeeCode: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const primaryPickupStop = activePickupStops[0];
+    const pickupDriver = primaryPickupStop?.route?.driverVehicleAssignment?.driver;
+    const pickupDriverLabel = pickupDriver
+      ? `${pickupDriver.fullName} (${pickupDriver.employeeCode})`
+      : 'Shipper đang phụ trách';
+
+    const isUnpickedPickupOrder =
+      (UNPICKED_BLOCKED_STATUSES as readonly string[]).includes(order.status) ||
+      (order.pickupType === 'PICKUP' &&
+        (PICKUP_WAITING_INITIAL_STATUSES as readonly string[]).includes(order.status));
+
+    if (isUnpickedPickupOrder) {
+      const routeInfo = primaryPickupStop
+        ? ` thuộc quyền quản lý của ${pickupDriverLabel}`
+        : '';
+      throw new BadRequestException(
+        `Không thể nhập kho đơn [${order.orderCode}]${routeInfo} vì trạng thái hiện tại là [${order.status}] — chưa được shipper xác nhận đã lấy hàng!`
+      );
+    }
+
+    if (primaryPickupStop && primaryPickupStop.route.status !== RouteStatus.IN_PROGRESS) {
+      throw new BadRequestException(
+        `Chuyến lấy hàng của ${pickupDriverLabel} chưa bắt đầu chạy (trạng thái: ${primaryPickupStop.route.status}), không thể quét nhập kho đơn [${order.orderCode}].`
+      );
+    }
+
+    if (
+      primaryPickupStop &&
+      targetZoneFacilityId &&
+      primaryPickupStop.route.startFacilityId &&
+      primaryPickupStop.route.startFacilityId !== targetZoneFacilityId
+    ) {
+      const facName =
+        primaryPickupStop.route.startFacility?.facilityName ||
+        primaryPickupStop.route.startFacilityId;
+      throw new BadRequestException(
+        `Cảnh báo sai bưu cục! Bưu kiện [${order.orderCode}] thuộc chuyến lấy hàng của [${facName}], KHÔNG thể quét nhập tại bưu cục hiện tại!`
+      );
+    }
+
+    if (
+      !primaryPickupStop &&
+      targetZoneFacilityId &&
+      order.originFacilityId &&
+      order.originFacilityId !== targetZoneFacilityId &&
+      (
+        [
+          OrderStatus.CREATED,
+          OrderStatus.READY_FOR_PICKUP,
+          OrderStatus.PICKED_UP,
+        ] as OrderStatus[]
+      ).includes(order.status)
+    ) {
+      throw new BadRequestException(
+        `Cảnh báo sai bưu cục! Đơn [${order.orderCode}] thuộc bưu cục gửi khác, không thể quét nhập kho ban đầu tại bưu cục này!`
+      );
+    }
+
+    const trimmedRouteRef = expectedRouteRef?.trim();
+    if (trimmedRouteRef) {
+      const isRefUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmedRouteRef);
+      const targetRoute = await prisma.route.findFirst({
+        where: isRefUuid
+          ? { OR: [{ id: trimmedRouteRef }, { routeCode: trimmedRouteRef }] }
+          : { routeCode: trimmedRouteRef },
+        include: {
+          startFacility: {
+            select: { id: true, facilityName: true },
+          },
+          stops: {
+            select: { orderId: true, stopType: true, facilityId: true },
+          },
+        },
+      });
+
+      if (!targetRoute) {
+        throw new NotFoundException(`Không tìm thấy chuyến lấy hàng [${trimmedRouteRef}] để đối soát.`);
+      }
+      if (
+        targetZoneFacilityId &&
+        targetRoute.startFacilityId &&
+        targetRoute.startFacilityId !== targetZoneFacilityId
+      ) {
+        throw new BadRequestException(
+          `Cảnh báo sai bưu cục! Chuyến đối soát [${targetRoute.routeCode}] thuộc về [${targetRoute.startFacility?.facilityName || 'bưu cục khác'}], KHÔNG khớp với phân khu kho vừa chọn!`
+        );
+      }
+      if (targetRoute.status !== RouteStatus.IN_PROGRESS) {
+        throw new BadRequestException(
+          `Chuyến [${targetRoute.routeCode}] không còn ở trạng thái đang bàn giao (${targetRoute.status}).`
+        );
+      }
+
+      const belongsToTargetRoute = targetRoute.stops.some(
+        (s) => s.stopType === 'PICKUP' && s.orderId === order.id && !s.facilityId
+      );
+      if (!belongsToTargetRoute) {
+        if (primaryPickupStop && primaryPickupStop.route.id !== targetRoute.id) {
+          throw new BadRequestException(
+            `Cảnh báo nhầm shipper! Bưu kiện [${order.orderCode}] đang thuộc quyền quản lý của ${pickupDriverLabel}, KHÔNG thuộc chuyến đang đối soát [${targetRoute.routeCode}].`
+          );
+        }
+        throw new BadRequestException(
+          `Bưu kiện [${order.orderCode}] không nằm trong danh sách đơn của chuyến [${targetRoute.routeCode}] đang đối soát. Hãy đóng phiên đối soát nếu muốn phân loại đơn khác.`
+        );
+      }
+      return;
+    }
+
+    if (primaryPickupStop && order.status === OrderStatus.PICKED_UP) {
+      throw new BadRequestException(
+        `Bưu kiện [${order.orderCode}] đang thuộc quyền quản lý của ${pickupDriverLabel}. Vui lòng quét mã QR chuyến trên app của tài xế khi về bưu cục để mở phiên bàn giao trước khi kiểm kiện!`
+      );
+    }
+  }
+
+  /**
+   * Đồng bộ tiến độ bàn giao cho chuyến Lấy hàng chặng cuối (PICKUP) và tự động chốt COMPLETED
+   * + giải phóng tài xế khi tất cả kiện hợp lệ của chuyến đã được kho quét nhập kho.
+   */
+  private async syncPickupRouteHandover(
+    orderId: string,
+    facilityId?: string,
+    dbClient: Prisma.TransactionClient | typeof prisma = prisma
+  ): Promise<{
+    summary: {
+      routeId: string;
+      routeCode: string;
+      handedOverCount: number;
+      requiredCount: number;
+      routeCompleted: boolean;
+    } | null;
+    shouldBroadcast: boolean;
+  }> {
+    const activePickupRoutes = await dbClient.route.findMany({
+      where: {
+        status: RouteStatus.IN_PROGRESS,
+        ...(facilityId ? { startFacilityId: facilityId } : {}),
+        stops: {
+          some: {
+            orderId,
+            stopType: 'PICKUP',
+            facilityId: null,
+          },
+        },
+      },
+      include: {
+        driverVehicleAssignment: true,
+        stops: {
+          include: {
+            order: {
+              select: {
+                id: true,
+                orderCode: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (activePickupRoutes.length === 0) {
+      return { summary: null, shouldBroadcast: false };
+    }
+
+    let lastSyncedSummary: {
+      routeId: string;
+      routeCode: string;
+      handedOverCount: number;
+      requiredCount: number;
+      routeCompleted: boolean;
+    } | null = null;
+    let shouldBroadcast = false;
+
+    for (const route of activePickupRoutes) {
+      await dbClient.routeStop.updateMany({
+        where: {
+          routeId: route.id,
+          orderId,
+          stopType: 'PICKUP',
+          facilityId: null,
+          status: { not: RouteStopStatus.DEPARTED },
+        },
+        data: { status: RouteStopStatus.DEPARTED },
+      });
+      shouldBroadcast = true;
+
+      const { handedOverStops, requiredStops, allHandedOver } = evaluatePickupRouteHandover(route.stops);
+      let completedNow = false;
+
+      if (allHandedOver) {
+        await dbClient.routeStop.updateMany({
+          where: { routeId: route.id },
+          data: { status: RouteStopStatus.DEPARTED },
+        });
+
+        const updatedCount = await dbClient.route.updateMany({
+          where: { id: route.id, status: RouteStatus.IN_PROGRESS },
+          data: {
+            status: RouteStatus.COMPLETED,
+            completedAt: new Date(),
+          },
+        });
+        completedNow = updatedCount.count > 0;
+
+        if (completedNow) {
+          if (route.driverVehicleAssignmentId) {
+            await dbClient.driverVehicleAssignment.update({
+              where: { id: route.driverVehicleAssignmentId },
+              data: { isActive: true },
+            });
+          }
+
+          const driverStaffId = route.driverVehicleAssignment?.driverId;
+          if (driverStaffId) {
+            await dbClient.staff.update({
+              where: { id: driverStaffId },
+              data: { employmentStatus: DriverEmploymentStatus.ACTIVE },
+            });
+          }
+        }
+      }
+
+      lastSyncedSummary = {
+        routeId: route.id,
+        routeCode: route.routeCode,
+        handedOverCount: handedOverStops.length,
+        requiredCount: requiredStops.length,
+        routeCompleted: completedNow || allHandedOver,
+      };
+    }
+
+    return { summary: lastSyncedSummary, shouldBroadcast };
+  }
+
+  /**
    * Assign package to a facility zone and record BarcodeScan
    */
-  public async assignPackageToZone(orderCode: string, zoneId: string, userId: string, toteCode?: string) {
+  public async assignPackageToZone(
+    orderCode: string,
+    zoneId: string,
+    userId: string,
+    toteCode?: string,
+    expectedRouteRef?: string
+  ) {
     const cleanCode = orderCode.trim();
     const baseCode = cleanCode.includes('-PKG-') ? cleanCode.split('-PKG-')[0] : cleanCode;
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanCode);
@@ -1148,129 +1508,146 @@ export class OrderService {
       throw new NotFoundException('Không tìm thấy Phân Khu Kho phù hợp');
     }
 
+    await this.validatePickupHandoverForZoneScan(order, expectedRouteRef, zone.facilityId);
+
     const activeToteCode = toteCode || `TOTE-${zone.zoneCode}-001`;
+    const resolvedZone = zone;
 
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        updatedBy: userId || undefined,
-        status: 'ARRIVED_ORIGIN_FACILITY',
-        ...(zone.facilityId ? { originFacilityId: zone.facilityId } : {}),
-      },
-    });
+    const { pickupHandover, shouldBroadcast } = await prisma.$transaction(async (tx) => {
+      let pkgId = order.package?.id;
+      if (!pkgId) {
+        const newPkg = await tx.package.create({
+          data: {
+            orderId: order.id,
+            packageCode: `PKG-${order.orderCode.replace(/^ORD-/, '')}`,
+            weight: 1.0,
+            length: 10,
+            width: 10,
+            height: 10,
+            volume: 0.001,
+            currentZoneId: resolvedZone.id,
+            currentFacilityId: resolvedZone.facilityId,
+          },
+        });
+        pkgId = newPkg.id;
+      } else {
+        await tx.package.update({
+          where: { id: pkgId },
+          data: {
+            currentZoneId: resolvedZone.id,
+            currentFacilityId: resolvedZone.facilityId,
+          },
+        });
+      }
 
-    let pkgId = order.package?.id;
-    if (!pkgId) {
-      const newPkg = await prisma.package.create({
+      let targetShipmentId: string | undefined = order.package?.shipmentPackages?.[0]?.shipmentId;
+      if (!targetShipmentId) {
+        const firstShipment = await tx.shipment.findFirst();
+        if (firstShipment) {
+          targetShipmentId = firstShipment.id;
+        }
+      }
+
+      let activeToteBagId: string | null = null;
+      if (activeToteCode) {
+        const tote = await tx.toteBag.upsert({
+          where: { toteCode: activeToteCode },
+          update: {
+            facilityId: resolvedZone.facilityId,
+            zoneCode: resolvedZone.zoneCode,
+          },
+          create: {
+            toteCode: activeToteCode,
+            zoneCode: resolvedZone.zoneCode,
+            facilityId: resolvedZone.facilityId,
+            status: 'OPEN',
+          },
+        });
+        activeToteBagId = tote.id;
+      }
+
+      // Clean up previous tote scans for this package so it is removed from any old tote
+      await tx.warehouseScan.deleteMany({
+        where: {
+          packageId: pkgId,
+          toteBagId: { not: activeToteBagId },
+        },
+      });
+
+      const existingScan = await tx.warehouseScan.findFirst({
+        where: {
+          packageId: pkgId,
+          toteBagId: activeToteBagId,
+        },
+      });
+
+      if (existingScan) {
+        await tx.warehouseScan.update({
+          where: { id: existingScan.id },
+          data: {
+            shipmentId: targetShipmentId,
+            facilityId: resolvedZone.facilityId,
+            scannedBy: userId || order.customerId,
+            toteBagId: activeToteBagId,
+            scannedAt: new Date(),
+          },
+        });
+      } else {
+        await tx.warehouseScan.create({
+          data: {
+            packageId: pkgId,
+            shipmentId: targetShipmentId,
+            facilityId: resolvedZone.facilityId,
+            scannedBy: userId || order.customerId,
+            toteBagId: activeToteBagId,
+          },
+        });
+      }
+
+      const targetStatus = OrderStatus.AT_HUB;
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          updatedBy: userId || undefined,
+          status: targetStatus,
+          ...(!order.originFacilityId && resolvedZone.facilityId
+            ? { originFacilityId: resolvedZone.facilityId }
+            : {}),
+        },
+      });
+
+      await tx.orderStatusHistory.create({
         data: {
           orderId: order.id,
-          packageCode: `PKG-${order.orderCode.replace(/^ORD-/, '')}`,
-          weight: 1.0,
-          length: 10,
-          width: 10,
-          height: 10,
-          volume: 0.001,
-          currentZoneId: zone.id,
-          currentFacilityId: zone.facilityId,
+          status: targetStatus,
+          changedByUserId: userId,
+          reason: `Bưu kiện đã được phân loại vào ${resolvedZone.zoneName} (${resolvedZone.zoneCode}) tại ${resolvedZone.facility?.facilityName || 'Kho trung chuyển'}`,
         },
       });
-      pkgId = newPkg.id;
-    } else {
-      await prisma.package.update({
-        where: { id: pkgId },
-        data: {
-          currentZoneId: zone.id,
-          currentFacilityId: zone.facilityId,
-        },
-      });
-    }
 
-    let targetShipmentId: string | undefined = order.package?.shipmentPackages?.[0]?.shipmentId;
-    if (!targetShipmentId) {
-      const firstShipment = await prisma.shipment.findFirst();
-      if (firstShipment) {
-        targetShipmentId = firstShipment.id;
-      }
-    }
-
-    let activeToteBagId: string | null = null;
-    if (activeToteCode) {
-      const tote = await prisma.toteBag.upsert({
-        where: { toteCode: activeToteCode },
-        update: {
-          facilityId: zone.facilityId,
-          zoneCode: zone.zoneCode,
-        },
-        create: {
-          toteCode: activeToteCode,
-          zoneCode: zone.zoneCode,
-          facilityId: zone.facilityId,
-          status: 'OPEN',
-        },
-      });
-      activeToteBagId = tote.id;
-    }
-
-    // Clean up previous tote scans for this package so it is removed from any old tote
-    await prisma.warehouseScan.deleteMany({
-      where: {
-        packageId: pkgId,
-        toteBagId: { not: activeToteBagId },
-      },
+      const syncResult = await this.syncPickupRouteHandover(
+        order.id,
+        resolvedZone.facilityId,
+        tx
+      );
+      return {
+        pickupHandover: syncResult.summary,
+        shouldBroadcast: syncResult.shouldBroadcast,
+      };
     });
 
-    const existingScan = await prisma.warehouseScan.findFirst({
-      where: {
-        packageId: pkgId,
-        toteBagId: activeToteBagId,
-      },
-    });
-
-    if (existingScan) {
-      await prisma.warehouseScan.update({
-        where: { id: existingScan.id },
-        data: {
-          shipmentId: targetShipmentId,
-          facilityId: zone.facilityId,
-          scannedBy: userId || order.customerId,
-          toteBagId: activeToteBagId,
-          scannedAt: new Date(),
-        },
-      });
-    } else {
-      await prisma.warehouseScan.create({
-        data: {
-          packageId: pkgId,
-          shipmentId: targetShipmentId,
-          facilityId: zone.facilityId,
-          scannedBy: userId || order.customerId,
-          toteBagId: activeToteBagId,
-        },
-      });
+    if (shouldBroadcast) {
+      getTrackingGateway()?.broadcastRoutesUpdated();
     }
-
-    const targetStatus = OrderStatus.AT_HUB;
-
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { status: targetStatus },
-    });
-
-    await prisma.orderStatusHistory.create({
-      data: {
-        orderId: order.id,
-        status: targetStatus,
-        changedByUserId: userId,
-        reason: `Bưu kiện đã được phân loại vào ${zone.zoneName} (${zone.zoneCode}) tại ${zone.facility?.facilityName || 'Kho trung chuyển'}`,
-      },
-    });
 
     return {
       orderCode: order.orderCode,
-      zoneCode: zone.zoneCode,
-      zoneName: zone.zoneName,
-      facilityName: zone.facility.facilityName,
+      zoneCode: resolvedZone.zoneCode,
+      zoneName: resolvedZone.zoneName,
+      facilityName: resolvedZone.facility.facilityName,
       toteCode: activeToteCode,
+      pickupHandover,
     };
   }
 

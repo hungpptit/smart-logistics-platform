@@ -6,6 +6,7 @@ import { BadRequestException, NotFoundException } from '../../middlewares/error.
 import { getTrackingGateway } from '../../gateways/tracking.gateway';
 import { OrderStatus, RouteStatus, RouteStopStatus, DriverEmploymentStatus, TransferStatus, DispatchTaskStatus } from '@prisma/client';
 import { selectBatchDrivers, DriverRole } from './express_insertion';
+import { evaluatePickupRouteHandover, isLastMilePickupStop } from '../../utils/pickup-handover.util';
 
 export class RoutingService {
   private kmeansService = new KMeansService();
@@ -1216,10 +1217,34 @@ export class RoutingService {
       where: isUuid
         ? { OR: [{ id: routeId }, { routeCode: routeId }] }
         : { routeCode: routeId },
+      include: {
+        stops: {
+          include: {
+            order: {
+              select: {
+                id: true,
+                orderCode: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!route) {
       throw new NotFoundException('Không tìm thấy lộ trình / chuyến đi này');
+    }
+
+    // Chuyến Lấy hàng chặng cuối (PICKUP): bắt buộc kho phải quét kiểm đếm nhập kho tất cả kiện hợp lệ trước khi chốt COMPLETED
+    const hasLastMilePickupStops = route.stops.some(isLastMilePickupStop);
+    if (hasLastMilePickupStops) {
+      const { missingOrderCodes } = evaluatePickupRouteHandover(route.stops);
+      if (missingOrderCodes.length > 0) {
+        throw new BadRequestException(
+          `Chưa thể hoàn thành chuyến [${route.routeCode}] do còn ${missingOrderCodes.length} đơn chưa được nhân viên kho quét nhập kho & phân loại: ${missingOrderCodes.join(', ')}`
+        );
+      }
     }
 
     // 1. Mark all route stops as DEPARTED

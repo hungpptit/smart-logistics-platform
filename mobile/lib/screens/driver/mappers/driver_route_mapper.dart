@@ -1,6 +1,77 @@
 import 'package:flutter/foundation.dart';
 import '../../../core/constants/app_constants.dart';
 
+const Set<String> kPickupHandedOverOrderStatuses = {
+  'ARRIVED_ORIGIN_FACILITY',
+  'AT_HUB',
+  'READY_FOR_DISPATCH',
+  'IN_TRANSIT',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+  'COMPLETED',
+};
+
+const Set<String> kPickupExemptOrderStatuses = {
+  'PICK_FAILED',
+  'CANCELLED',
+};
+
+bool isPickupOrderHandedOver(String? orderStatus) {
+  if (orderStatus == null || orderStatus.isEmpty) return false;
+  return kPickupHandedOverOrderStatuses.contains(orderStatus.toUpperCase());
+}
+
+class PickupHandoverProgress {
+  final int handedOverCount;
+  final int requiredCount;
+  final List<String> pendingOrderCodes;
+
+  const PickupHandoverProgress({
+    required this.handedOverCount,
+    required this.requiredCount,
+    required this.pendingOrderCodes,
+  });
+
+  bool get allHandedOver => requiredCount == 0 || handedOverCount >= requiredCount;
+}
+
+PickupHandoverProgress computePickupHandoverProgress(
+  List<Map<String, dynamic>> stops,
+) {
+  int handedOver = 0;
+  int required = 0;
+  final List<String> pendingCodes = [];
+
+  for (final stop in stops) {
+    final bool isPickupStop =
+        stop['stopType'] == 'PICKUP' || stop['isPickup'] == true;
+    if (!isPickupStop) continue;
+
+    final String rawStatus =
+        (stop['orderStatus']?.toString() ?? '').trim().toUpperCase();
+    if (kPickupExemptOrderStatuses.contains(rawStatus)) continue;
+
+    required++;
+    if (isPickupOrderHandedOver(rawStatus)) {
+      handedOver++;
+    } else {
+      final String code = stop['orderCode']?.toString().trim() ?? '';
+      if (code.isNotEmpty) {
+        pendingCodes.add(code);
+      } else {
+        final String fallback = stop['title']?.toString().trim() ?? 'Đơn hàng';
+        pendingCodes.add(fallback);
+      }
+    }
+  }
+
+  return PickupHandoverProgress(
+    handedOverCount: handedOver,
+    requiredCount: required,
+    pendingOrderCodes: pendingCodes,
+  );
+}
+
 class DriverRouteMapResult {
   final List<Map<String, dynamic>> mappedStops;
   final bool isLinehaul;
@@ -36,6 +107,16 @@ _ToteAndPackages _extractToteAndPackages(
 ) {
   final Set<String> allToteCodes = {};
   int totalPkgCount = 0;
+
+  // Chuyến có điểm dừng khách hàng Last-Mile (PICKUP/DELIVERY có orderId, không phải facility/HUB)
+  // KHÔNG bao giờ được tự coi là chuyến TRUNG CHUYỂN chỉ vì đơn đó đã có WarehouseScan phân loại vào sọt.
+  final bool isExplicitLastMileCustomerRoute = stopsRaw.isNotEmpty &&
+      stopsRaw.every((s) {
+        final st = (s['stopType']?.toString() ?? '').toUpperCase();
+        final bool hasFacility = s['facilityId'] != null || s['facility'] != null;
+        return !hasFacility && (st == 'PICKUP' || st == 'DELIVERY');
+      });
+
   bool isLinehaul = isLinehaulDriverProfile;
 
   // 1. Accumulate from firstRoute shipments
@@ -50,7 +131,6 @@ _ToteAndPackages _extractToteAndPackages(
           final tote = scan['toteBag'];
           if (tote != null && tote['toteCode'] != null) {
             allToteCodes.add(tote['toteCode'].toString());
-            isLinehaul = true;
           }
         }
       }
@@ -71,11 +151,14 @@ _ToteAndPackages _extractToteAndPackages(
           final tote = scan['toteBag'];
           if (tote != null && tote['toteCode'] != null) {
             allToteCodes.add(tote['toteCode'].toString());
-            isLinehaul = true;
           }
         }
       }
     }
+  }
+
+  if (!isExplicitLastMileCustomerRoute && allToteCodes.isNotEmpty) {
+    isLinehaul = true;
   }
 
   return _ToteAndPackages(
@@ -265,13 +348,23 @@ _LastMileStatus _resolveLastMileStatus({
 
   // Last-mile Shipper logic
   if (stopType == 'PICKUP') {
-    isCompleted = (rawStopStatus == 'COMPLETED' ||
-        rawStopStatus == 'DEPARTED' ||
-        rawOrderStatus == 'PICKED_UP' ||
-        rawOrderStatus == 'ARRIVED_ORIGIN_FACILITY');
-    if (isCompleted) {
-      displayStatus = 'ĐÃ LẤY HÀNG';
+    if (rawOrderStatus == 'CANCELLED') {
+      isCompleted = true;
+      displayStatus = 'ĐÃ HỦY';
       isActive = false;
+    } else if (rawStopStatus == 'FAILED' || rawOrderStatus == 'PICK_FAILED') {
+      isCompleted = true;
+      displayStatus = 'LẤY THẤT BẠI';
+      isActive = false;
+    } else {
+      isCompleted = (rawStopStatus == 'COMPLETED' ||
+          rawStopStatus == 'DEPARTED' ||
+          rawOrderStatus == 'PICKED_UP' ||
+          isPickupOrderHandedOver(rawOrderStatus));
+      if (isCompleted) {
+        displayStatus = 'ĐÃ LẤY HÀNG';
+        isActive = false;
+      }
     }
   } else {
     isCompleted = (rawStopStatus == 'COMPLETED' ||
@@ -455,6 +548,7 @@ DriverRouteMapResult mapRouteToStops({
         'eta': 'Chờ giao',
         'distance': 'Theo tuyến',
         'status': displayStatus,
+        'orderStatus': rawOrderStatus,
         'isActive': isActive,
         'isCheckedIn': isCompleted,
         'signature': null,

@@ -212,9 +212,18 @@ class DriverService {
 
   /// Confirm Route Complete & Finish Shift (POST /routes/:id/complete)
   static Future<bool> completeRoute(String routeId) async {
+    final res = await completeRouteWithDetail(routeId);
+    return res.success;
+  }
+
+  /// Confirm Route Complete returning both success flag and optional server message
+  static Future<({bool success, String? message})> completeRouteWithDetail(
+      String routeId) async {
     try {
       final token = await AuthService.getToken();
-      if (token == null || token.isEmpty) return false;
+      if (token == null || token.isEmpty) {
+        return (success: false, message: 'Phiên đăng nhập đã hết hạn');
+      }
 
       final url = Uri.parse(ApiConstants.routeComplete(routeId));
       final response = await http.post(
@@ -227,14 +236,21 @@ class DriverService {
       );
 
       debugPrint('📡 [DriverService] Confirm complete route ($routeId): ${response.statusCode}');
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        return body['success'] == true;
-      }
+      Map<String, dynamic>? body;
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          body = decoded;
+        }
+      } catch (_) {}
+
+      final bool ok = response.statusCode == 200 && body?['success'] == true;
+      final String? msg = body?['message']?.toString();
+      return (success: ok, message: msg);
     } catch (e) {
-      debugPrint('💥 [DriverService] Lỗi completeRoute: $e');
+      debugPrint('💥 [DriverService] Lỗi completeRouteWithDetail: $e');
+      return (success: false, message: 'Không thể kết nối máy chủ để hoàn thành chuyến');
     }
-    return false;
   }
 
   /// Reject Assigned Route with reason (POST /routes/:id/reject)

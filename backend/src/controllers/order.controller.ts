@@ -180,7 +180,7 @@ export class OrderController {
   public assignZone = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
       const code = req.body?.code || req.params?.code;
-      const { zoneId, toteCode } = req.body;
+      const { zoneId, toteCode, expectedRouteId, expectedRouteCode } = req.body;
       const userId = req.user?.id!;
       if (!code) {
         res.status(400).json({ success: false, message: 'Thiếu mã bưu kiện (code).' });
@@ -190,7 +190,13 @@ export class OrderController {
         res.status(400).json({ success: false, message: 'Thiếu mã Phân Khu Kho (zoneId).' });
         return;
       }
-      const result = await this.orderService.assignPackageToZone(code, zoneId, userId, toteCode);
+      const result = await this.orderService.assignPackageToZone(
+        code,
+        zoneId,
+        userId,
+        toteCode,
+        expectedRouteId || expectedRouteCode
+      );
       res.status(200).json({
         success: true,
         message: 'Phân loại bưu kiện vào Phân Khu Kho thành công',

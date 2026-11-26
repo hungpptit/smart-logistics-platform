@@ -1437,4 +1437,167 @@ void main() {
       );
     });
   });
+
+  group('Pickup Handover Progress & Mapper Compatibility', () {
+    test('maps orderStatus for PICKUP and DELIVERY and tracks AT_HUB vs PICKED_UP vs PICK_FAILED', () {
+      final result = mapRouteToStops(
+        firstRoute: {
+          'id': 'route-pickup-1',
+          'routeCode': 'RT-PU-001',
+          'status': 'IN_PROGRESS',
+        },
+        stopsRaw: [
+          {
+            'id': 'st-1',
+            'stopType': 'PICKUP',
+            'sequence': 1,
+            'status': 'DEPARTED',
+            'orderId': 'ord-1',
+            'order': {
+              'id': 'ord-1',
+              'orderCode': 'ORD-PU-01',
+              'status': 'AT_HUB',
+            },
+          },
+          {
+            'id': 'st-2',
+            'stopType': 'PICKUP',
+            'sequence': 2,
+            'status': 'DEPARTED',
+            'orderId': 'ord-2',
+            'order': {
+              'id': 'ord-2',
+              'orderCode': 'ORD-PU-02',
+              'status': 'PICKED_UP',
+            },
+          },
+          {
+            'id': 'st-3',
+            'stopType': 'PICKUP',
+            'sequence': 3,
+            'status': 'FAILED',
+            'orderId': 'ord-3',
+            'order': {
+              'id': 'ord-3',
+              'orderCode': 'ORD-PU-03',
+              'status': 'PICK_FAILED',
+            },
+          },
+        ],
+        isLinehaulDriverProfile: false,
+        isRouteStarted: true,
+        prevLoadedTotesCount: 0,
+      );
+
+      expect(result.isLinehaul, isFalse);
+      expect(result.mappedStops[0]['orderStatus'], 'AT_HUB');
+      expect(result.mappedStops[0]['isCheckedIn'], isTrue);
+      expect(result.mappedStops[0]['status'], 'ĐÃ LẤY HÀNG');
+      expect(result.mappedStops[1]['orderStatus'], 'PICKED_UP');
+      expect(result.mappedStops[2]['orderStatus'], 'PICK_FAILED');
+      expect(result.mappedStops[2]['isCheckedIn'], isTrue);
+      expect(result.mappedStops[2]['status'], 'LẤY THẤT BẠI');
+
+      final progress = computePickupHandoverProgress(result.mappedStops);
+      expect(progress.requiredCount, 2);
+      expect(progress.handedOverCount, 1);
+      expect(progress.pendingOrderCodes, ['ORD-PU-02']);
+      expect(progress.allHandedOver, isFalse);
+    });
+
+    test('DELIVERY stops preserve ĐÃ GIAO and do not trigger pickup handover requirement', () {
+      final result = mapRouteToStops(
+        firstRoute: {
+          'id': 'route-del-1',
+          'routeCode': 'RT-DEL-001',
+          'status': 'IN_PROGRESS',
+        },
+        stopsRaw: [
+          {
+            'id': 'st-del-1',
+            'stopType': 'DELIVERY',
+            'sequence': 1,
+            'status': 'COMPLETED',
+            'orderId': 'ord-del-1',
+            'order': {
+              'id': 'ord-del-1',
+              'orderCode': 'ORD-DEL-01',
+              'status': 'DELIVERED',
+            },
+          },
+        ],
+        isLinehaulDriverProfile: false,
+        isRouteStarted: true,
+        prevLoadedTotesCount: 0,
+      );
+
+      expect(result.mappedStops[0]['status'], 'ĐÃ GIAO');
+      expect(result.mappedStops[0]['orderStatus'], 'DELIVERED');
+      final progress = computePickupHandoverProgress(result.mappedStops);
+      expect(progress.requiredCount, 0);
+      expect(progress.allHandedOver, isTrue);
+    });
+
+    test('PICKUP route remains last-mile (isLinehaul=false) when 1/2 parcel is scanned into tote (AT_HUB)', () {
+      final result = mapRouteToStops(
+        firstRoute: {
+          'id': 'route-pickup-mix',
+          'routeCode': 'RT-25482310',
+          'status': 'IN_PROGRESS',
+        },
+        stopsRaw: [
+          {
+            'id': 'st-1',
+            'stopType': 'PICKUP',
+            'sequence': 1,
+            'status': 'DEPARTED',
+            'facilityId': null,
+            'orderId': 'ord-1',
+            'shipmentId': 'shp-1',
+            'order': {
+              'id': 'ord-1',
+              'orderCode': 'ORD-CASE1-0001',
+              'status': 'AT_HUB',
+            },
+            'shipment': {
+              'id': 'shp-1',
+              'shipmentPackages': [{'package': {'packageCode': 'PKG-1'}}],
+              'warehouseScans': [{'toteBag': {'toteCode': 'TOTE-ZONE-W-LOCAL-001'}}],
+            },
+          },
+          {
+            'id': 'st-2',
+            'stopType': 'PICKUP',
+            'sequence': 2,
+            'status': 'DEPARTED',
+            'facilityId': null,
+            'orderId': 'ord-2',
+            'shipmentId': 'shp-2',
+            'order': {
+              'id': 'ord-2',
+              'orderCode': 'ORD-6369000002',
+              'status': 'PICKED_UP',
+            },
+            'shipment': {
+              'id': 'shp-2',
+              'shipmentPackages': [{'package': {'packageCode': 'PKG-2'}}],
+              'warehouseScans': [],
+            },
+          },
+        ],
+        isLinehaulDriverProfile: false,
+        isRouteStarted: true,
+        prevLoadedTotesCount: 0,
+      );
+
+      expect(result.isLinehaul, isFalse);
+      expect(result.mappedStops[0]['status'], 'ĐÃ LẤY HÀNG');
+      expect(result.mappedStops[1]['status'], 'ĐÃ LẤY HÀNG');
+      final progress = computePickupHandoverProgress(result.mappedStops);
+      expect(progress.handedOverCount, 1);
+      expect(progress.requiredCount, 2);
+      expect(progress.pendingOrderCodes, ['ORD-6369000002']);
+      expect(progress.allHandedOver, isFalse);
+    });
+  });
 }

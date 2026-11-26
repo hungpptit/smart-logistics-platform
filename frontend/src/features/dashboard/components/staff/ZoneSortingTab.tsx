@@ -18,6 +18,13 @@ import { TotePackageDetailModal } from './zone-sorting/TotePackageDetailModal';
 import { LiveCameraSortingBoard } from './zone-sorting/LiveCameraSortingBoard';
 import { SortingHistoryPanel } from './zone-sorting/SortingHistoryPanel';
 import type { SortingHistoryItem } from './zone-sorting/SortingHistoryPanel';
+import {
+  PickupHandoverPanel,
+  extractActivePickupRoutes,
+  type PickupHandoverRouteItem,
+  UNPICKED_BLOCKED_ORDER_STATUSES,
+  PICKUP_WAITING_INITIAL_STATUSES,
+} from './zone-sorting/PickupHandoverPanel';
 import { resolveZoneClassification } from '../../../../constants/enumLabels';
 
 /**
@@ -158,6 +165,37 @@ export const ZoneSortingTab: React.FC = () => {
   const [includeLoaded, setIncludeLoaded] = useState<boolean>(false);
   const [currentFacilityId, setCurrentFacilityId] = useState<string>('');
   const [currentFacility, setCurrentFacility] = useState<any | null>(null);
+
+  // State đối soát bàn giao chuyến Lấy hàng (tách biệt với phân loại sọt/trung chuyển)
+  const [pickupRoutes, setPickupRoutes] = useState<PickupHandoverRouteItem[]>([]);
+  const [lockedHandoverRouteId, setLockedHandoverRouteId] = useState<string | null>(null);
+  const [pickupRefreshKey, setPickupRefreshKey] = useState<number>(0);
+  const pickupRoutesRef = useRef<PickupHandoverRouteItem[]>([]);
+  const lockedHandoverRouteIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    pickupRoutesRef.current = pickupRoutes;
+    if (lockedHandoverRouteId && !pickupRoutes.some((r) => r.id === lockedHandoverRouteId)) {
+      setLockedHandoverRouteId(null);
+      lockedHandoverRouteIdRef.current = null;
+    }
+  }, [pickupRoutes, lockedHandoverRouteId]);
+
+  const handleToggleLockHandoverRoute = (route: PickupHandoverRouteItem | null) => {
+    const nextId = route?.id || null;
+    setLockedHandoverRouteId(nextId);
+    lockedHandoverRouteIdRef.current = nextId;
+    if (route) {
+      setError(null);
+      setSuccessMsg(
+        `Đã khóa đối soát riêng cho chuyến [${route.routeCode}] — Tài xế ${route.driverName} (${route.handedOverOrders.length}/${route.requiredOrders.length} kiện). Quét từng kiện hàng để kiểm đếm!`
+      );
+    } else {
+      setError(null);
+      setSuccessMsg(null);
+      setScannedPackageInfo(null);
+    }
+  };
 
   const getActiveToteCode = (zoneCode: string) => {
     const zoneObj = zoneTotesData.find((z) => z.zoneCode === zoneCode);
@@ -467,10 +505,126 @@ export const ZoneSortingTab: React.FC = () => {
     };
   }, [isCameraActive, facilityZones]);
 
+  // Xử lý khi quét mã QR chuyến Lấy hàng (RT-...) -> mở & khóa đúng danh sách đơn của shipper đó
+  const handleRouteQrScan = async (routeCodeRaw: string) => {
+    const upperRouteCode = routeCodeRaw.trim().toUpperCase();
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${CONFIG.API_BASE_URL}/routes?status=IN_PROGRESS`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.data)) {
+        const activePickup = extractActivePickupRoutes(data.data);
+        setPickupRoutes(activePickup);
+        pickupRoutesRef.current = activePickup;
+
+        const matched = activePickup.find((r) => r.routeCode.toUpperCase() === upperRouteCode);
+        if (matched) {
+          if (
+            matched.startFacilityId &&
+            currentFacilityId &&
+            matched.startFacilityId !== currentFacilityId
+          ) {
+            setSuccessMsg(null);
+            setError(
+              `Cảnh báo sai bưu cục! Chuyến [${matched.routeCode}] của tài xế ${matched.driverName} KHÔNG thuộc bưu cục hiện tại.`
+            );
+            return;
+          }
+          setScannedPackageInfo(null);
+          setScanCode('');
+          handleToggleLockHandoverRoute(matched);
+          setPickupRefreshKey((k) => k + 1);
+          return;
+        }
+      }
+      setSuccessMsg(null);
+      setError(
+        `Không tìm thấy chuyến lấy hàng [${upperRouteCode}] đang ở trạng thái bàn giao (IN_PROGRESS) tại bưu cục.`
+      );
+    } catch (err: any) {
+      setError(err.message || `Lỗi khi tra cứu chuyến [${upperRouteCode}]`);
+    }
+  };
+
+  // Kiểm tra bảo vệ chéo shipper / đơn chưa lấy trước khi cho phép nhập kho hoặc tự động lưu
+  const getPickupHandoverGuardError = (orderData: any): string | null => {
+    const orderStatus = String(orderData?.status || '').toUpperCase();
+    const pickupType = String(orderData?.pickupType || '').toUpperCase();
+    const orderId = String(orderData?.id || '');
+    const orderCode = String(orderData?.orderCode || '');
+
+    const matchingRoute = pickupRoutesRef.current.find((r) =>
+      r.requiredOrders.some((o) => o.orderId === orderId || o.orderCode === orderCode) ||
+      r.exemptOrders.some((o) => o.orderId === orderId || o.orderCode === orderCode)
+    );
+
+    const isUnpicked =
+      UNPICKED_BLOCKED_ORDER_STATUSES.has(orderStatus) ||
+      (pickupType === 'PICKUP' && PICKUP_WAITING_INITIAL_STATUSES.has(orderStatus));
+
+    if (isUnpicked) {
+      const routeDetail = matchingRoute
+        ? ` thuộc chuyến [${matchingRoute.routeCode}] (${matchingRoute.driverName})`
+        : '';
+      return `Không thể nhập kho đơn [${orderCode}]${routeDetail} vì trạng thái hiện tại là [${orderStatus}] — chưa được shipper xác nhận đã lấy hàng!`;
+    }
+
+    if (
+      matchingRoute &&
+      matchingRoute.startFacilityId &&
+      currentFacilityId &&
+      matchingRoute.startFacilityId !== currentFacilityId
+    ) {
+      return `Cảnh báo sai bưu cục! Bưu kiện [${orderCode}] thuộc chuyến lấy hàng của bưu cục khác, KHÔNG thể quét nhập tại bưu cục hiện tại!`;
+    }
+
+    if (
+      !matchingRoute &&
+      currentFacilityId &&
+      orderData?.originFacilityId &&
+      orderData.originFacilityId !== currentFacilityId &&
+      ['CREATED', 'READY_FOR_PICKUP', 'PICKED_UP'].includes(orderStatus)
+    ) {
+      return `Cảnh báo sai bưu cục! Đơn [${orderCode}] thuộc bưu cục gửi khác, không thể nhập kho ban đầu tại bưu cục hiện tại!`;
+    }
+
+    const lockedId = lockedHandoverRouteIdRef.current;
+    if (lockedId) {
+      const lockedRoute = pickupRoutesRef.current.find((r) => r.id === lockedId);
+      if (lockedRoute) {
+        const belongsToLocked = lockedRoute.allStopsRaw.some(
+          (s: any) =>
+            (s.order?.id && s.order.id === orderId) ||
+            (s.orderId && s.orderId === orderId) ||
+            (s.order?.orderCode && s.order.orderCode === orderCode)
+        );
+        if (!belongsToLocked) {
+          if (matchingRoute && matchingRoute.id !== lockedRoute.id) {
+            return `Cảnh báo nhầm shipper! Bưu kiện [${orderCode}] đang thuộc quyền quản lý của tài xế ${matchingRoute.driverName}, KHÔNG thuộc chuyến đang đối soát [${lockedRoute.routeCode}].`;
+          }
+          return `Bưu kiện [${orderCode}] không nằm trong chuyến [${lockedRoute.routeCode}] đang khóa đối soát. Hãy bấm "Đóng phiên đối soát" nếu muốn phân loại đơn khác.`;
+        }
+      }
+    } else if (matchingRoute && orderStatus === 'PICKED_UP') {
+      return `Bưu kiện [${orderCode}] đang thuộc quyền quản lý của tài xế ${matchingRoute.driverName}. Vui lòng quét mã QR chuyến trên app của tài xế khi về bưu cục để mở phiên bàn giao trước khi kiểm kiện!`;
+    }
+
+    return null;
+  };
+
   // Live Camera Scan Auto-Save
   const handleLiveCameraScan = async (codeToLookup: string) => {
     const cleanCode = codeToLookup.trim();
     if (!cleanCode) return;
+
+    if (cleanCode.toUpperCase().startsWith('RT-')) {
+      await handleRouteQrScan(cleanCode);
+      return;
+    }
 
     try {
       const token = localStorage.getItem('token');
@@ -484,6 +638,12 @@ export const ZoneSortingTab: React.FC = () => {
 
       if (response.ok && res.success) {
         const orderData = res.data;
+        const guardError = getPickupHandoverGuardError(orderData);
+        if (guardError) {
+          setSuccessMsg(null);
+          setError(guardError);
+          return;
+        }
         const currentFac = currentFacility;
         const currentFacilityProvinceCode = currentFac?.provinceCode || currentFac?.province?.code || currentFac?.address?.wardRelation?.provinceCode || '';
         const currentFacilityWardCode = currentFac?.address?.wardCode || currentFac?.address?.wardRelation?.code || '';
@@ -555,20 +715,49 @@ export const ZoneSortingTab: React.FC = () => {
 
         if (matchedZone) {
           setSelectedZoneId(matchedZone.id);
-          await fetch(`${CONFIG.API_BASE_URL}/orders/assign-zone`, {
+          const assignRes = await fetch(`${CONFIG.API_BASE_URL}/orders/assign-zone`, {
             method: 'POST',
             headers,
             body: JSON.stringify({
               code: cleanCode,
               zoneId: matchedZone.id,
               toteCode: activeToteCode,
+              ...(lockedHandoverRouteIdRef.current
+                ? { expectedRouteId: lockedHandoverRouteIdRef.current }
+                : {}),
             }),
           });
+          const assignJson = await assignRes.json();
 
+          if (!assignRes.ok || !assignJson.success) {
+            setSuccessMsg(null);
+            setError(assignJson.message || `Không thể nhập kho bưu kiện ${cleanCode}`);
+            return;
+          }
+
+          setError(null);
           fetchSortingHistory();
           fetchZoneTotes();
+          setPickupRefreshKey((k) => k + 1);
+
+          const handoverInfo = assignJson.data?.pickupHandover;
+          if (handoverInfo?.routeCompleted) {
+            setLockedHandoverRouteId(null);
+            lockedHandoverRouteIdRef.current = null;
+            setSuccessMsg(
+              `LIVE SCAN: Đã phân loại [${cleanCode}] vào ${targetZoneCode} (${activeToteCode}) và HOÀN TẤT BÀN GIAO đủ ${handoverInfo.handedOverCount}/${handoverInfo.requiredCount} kiện chuyến [${handoverInfo.routeCode}]!`
+            );
+            return;
+          }
+          if (handoverInfo) {
+            setSuccessMsg(
+              `LIVE SCAN: Đã nhập kho [${cleanCode}] vào ${targetZoneCode} (${activeToteCode}) — Tiến độ chuyến [${handoverInfo.routeCode}]: ${handoverInfo.handedOverCount}/${handoverInfo.requiredCount} kiện.`
+            );
+            return;
+          }
         }
 
+        setError(null);
         setSuccessMsg(`LIVE SCAN: ĐÃ TỰ ĐỘNG LƯU BƯU KIỆN ${cleanCode} VÀO ${targetZoneCode} (SỌT: ${activeToteCode})!`);
       }
     } catch (err: any) {
@@ -580,6 +769,16 @@ export const ZoneSortingTab: React.FC = () => {
     const cleanCode = codeToLookup.trim();
     if (!cleanCode) {
       setError('Vui lòng nhập hoặc quét mã Bưu kiện / Mã đơn hàng');
+      return;
+    }
+
+    if (cleanCode.toUpperCase().startsWith('RT-')) {
+      setLoading(true);
+      try {
+        await handleRouteQrScan(cleanCode);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
@@ -599,6 +798,11 @@ export const ZoneSortingTab: React.FC = () => {
 
       if (response.ok && res.success) {
         const orderData = res.data;
+        const guardError = getPickupHandoverGuardError(orderData);
+        if (guardError) {
+          setScannedPackageInfo(null);
+          throw new Error(guardError);
+        }
         const currentFac = currentFacility;
         const currentFacilityProvinceCode = currentFac?.provinceCode || currentFac?.province?.code || currentFac?.address?.wardRelation?.provinceCode || '';
         const currentFacilityWardCode = currentFac?.address?.wardCode || currentFac?.address?.wardRelation?.code || '';
@@ -711,17 +915,34 @@ export const ZoneSortingTab: React.FC = () => {
           code: scannedPackageInfo.code,
           zoneId: selectedZoneId,
           toteCode: activeToteCode,
+          ...(lockedHandoverRouteIdRef.current
+            ? { expectedRouteId: lockedHandoverRouteIdRef.current }
+            : {}),
         }),
       });
 
       const res = await response.json();
 
       if (response.ok && res.success) {
-        setSuccessMsg(`✅ THÀNH CÔNG: Bưu kiện ${scannedPackageInfo.code} đã được ném vào sọt [${activeToteCode}]!`);
+        const handoverInfo = res.data?.pickupHandover;
+        if (handoverInfo?.routeCompleted) {
+          setLockedHandoverRouteId(null);
+          lockedHandoverRouteIdRef.current = null;
+          setSuccessMsg(
+            `Đã lưu bưu kiện ${scannedPackageInfo.code} vào sọt [${activeToteCode}] và HOÀN TẤT BÀN GIAO đủ ${handoverInfo.handedOverCount}/${handoverInfo.requiredCount} kiện cho chuyến [${handoverInfo.routeCode}]!`
+          );
+        } else if (handoverInfo) {
+          setSuccessMsg(
+            `Đã nhập kho & phân loại ${scannedPackageInfo.code} vào sọt [${activeToteCode}] — Tiến độ chuyến [${handoverInfo.routeCode}]: ${handoverInfo.handedOverCount}/${handoverInfo.requiredCount} kiện.`
+          );
+        } else {
+          setSuccessMsg(`THÀNH CÔNG: Bưu kiện ${scannedPackageInfo.code} đã được xếp vào sọt [${activeToteCode}]!`);
+        }
         setScannedPackageInfo(null);
         setScanCode('');
         fetchSortingHistory();
         fetchZoneTotes();
+        setPickupRefreshKey((k) => k + 1);
       } else {
         throw new Error(res.message || 'Không thể xác nhận phân loại vào Zone');
       }
@@ -800,6 +1021,24 @@ export const ZoneSortingTab: React.FC = () => {
         handleSealAndOpenNewTote={handleSealAndOpenNewTote}
       />
 
+      {/* Sub-component 3.5: Đối soát bàn giao chuyến Lấy hàng (chỉ hiển thị sau khi quét QR RT-... của Shipper) */}
+      <PickupHandoverPanel
+        refreshKey={pickupRefreshKey}
+        lockedRouteId={lockedHandoverRouteId}
+        onToggleLockRoute={handleToggleLockHandoverRoute}
+        onRoutesLoaded={setPickupRoutes}
+        onRouteCompletedSuccess={(msg) => {
+          setError(null);
+          setSuccessMsg(msg);
+          fetchSortingHistory();
+          fetchZoneTotes();
+        }}
+        onRouteActionError={(msg) => {
+          setSuccessMsg(null);
+          setError(msg);
+        }}
+      />
+
       {/* Alert Notification System */}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center justify-between shadow-sm animate-fade-in">
@@ -844,7 +1083,7 @@ export const ZoneSortingTab: React.FC = () => {
                   type="text"
                   value={scanCode}
                   onChange={(e) => setScanCode(e.target.value)}
-                  placeholder="Nhập mã đơn hàng VD: ORD-7802000053..."
+                  placeholder="Quét/nhập mã kiện (ORD-...) hoặc mã QR chuyến của Shipper (RT-...)..."
                   className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition font-bold"
                 />
               </div>

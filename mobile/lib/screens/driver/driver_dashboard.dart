@@ -39,6 +39,7 @@ import 'widgets/shipment_qr_modal.dart';
 import 'widgets/tote_detail_dialog.dart';
 import 'widgets/pickup_assignment_dialog.dart';
 import 'widgets/reject_route_dialog.dart';
+import 'widgets/route_handover_qr_dialog.dart';
 import 'driver_chat_screen.dart';
 import 'mappers/driver_route_mapper.dart';
 
@@ -74,6 +75,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   String? _activeRouteId;
   String? _activeRouteCode;
   String? _lastShownPickupDialogRouteId;
+  String? _awaitingHandoverRouteId;
   List<LatLng> _roadPolylinePoints = [];
 
   // GPS
@@ -132,11 +134,18 @@ class _DriverDashboardState extends State<DriverDashboard> {
           return st == 'IN_PROGRESS' || st == 'ASSIGNED' || st == 'PLANNED' || st == 'PENDING';
         }).toList();
 
+        final bool awaitingPickupRouteCompleted = _awaitingHandoverRouteId != null &&
+            !activeRoutes.any(
+              (r) => r['id']?.toString() == _awaitingHandoverRouteId,
+            );
+
         if (activeRoutes.isEmpty) {
           // Tài xế đã chốt xong toàn bộ chuyến đi và không còn chuyến nào đang chạy!
+          final bool showAutoCompletedDialog = awaitingPickupRouteCompleted;
           setState(() {
             _activeRouteId = null;
             _activeRouteCode = null;
+            _awaitingHandoverRouteId = null;
             _driverStops.clear();
             _roadPolylinePoints.clear();
             _isRouteFinished = false;
@@ -145,7 +154,31 @@ class _DriverDashboardState extends State<DriverDashboard> {
             _totalPackageCount = 0;
             _loadedTotes.clear();
           });
+          if (showAutoCompletedDialog && mounted) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                FinishRouteSuccessDialog.show(
+                  context,
+                  success: true,
+                  onConfirm: () {},
+                );
+              }
+            });
+          }
           return;
+        }
+
+        if (awaitingPickupRouteCompleted && mounted) {
+          _awaitingHandoverRouteId = null;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              FinishRouteSuccessDialog.show(
+                context,
+                success: true,
+                onConfirm: () {},
+              );
+            }
+          });
         }
 
         final firstRoute = activeRoutes.firstWhere(
@@ -180,6 +213,29 @@ class _DriverDashboardState extends State<DriverDashboard> {
             final loadedToteCodes = result.loadedToteCodes;
             final totalPkgCount = result.totalPkgCount;
             if (mappedStops.isNotEmpty && mounted) {
+              final bool hasPickupStop = mappedStops.any(
+                (s) => s['stopType'] == 'PICKUP' || s['isPickup'] == true,
+              );
+              final bool isLastMilePickupStarted =
+                  !_isLinehaulDriverProfile &&
+                  !isLinehaul &&
+                  hasPickupStop &&
+                  _isRouteStarted;
+
+              if (isLastMilePickupStarted && _activeRouteId != null) {
+                final bool allStopsCheckedIn = mappedStops.every(
+                  (s) =>
+                      s['isCheckedIn'] == true ||
+                      s['status'] == 'ĐÃ LẤY HÀNG' ||
+                      s['status'] == 'LẤY THẤT BẠI' ||
+                      s['status'] == 'ĐÃ HỦY',
+                );
+                final progress = computePickupHandoverProgress(mappedStops);
+                if (allStopsCheckedIn && !progress.allHandedOver) {
+                  _awaitingHandoverRouteId = _activeRouteId;
+                }
+              }
+
               setState(() {
                 _driverStops.clear();
                 _driverStops.addAll(mappedStops);
@@ -192,10 +248,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
               Future.microtask(() => _updateGoongPolyline(force: true));
 
               // Tự động bật Popup phân công lộ trình lấy hàng nếu ĐÚNG LÀ TÀI XẾ CHẶNG CUỐI và có điểm dừng PICKUP
-              final bool hasPickup = mappedStops.any((s) => s['stopType'] == 'PICKUP' || s['isPickup'] == true);
               if (!_isLinehaulDriverProfile &&
                   !isLinehaul &&
-                  hasPickup &&
+                  hasPickupStop &&
                   !_isRouteStarted &&
                   _activeRouteId != null &&
                   _lastShownPickupDialogRouteId != _activeRouteId) {
@@ -364,6 +419,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
             return s['isCheckedIn'] == true ||
                 s['status'] == 'DA LAY HANG' ||
                 s['status'] == 'ĐÃ LẤY HÀNG' ||
+                s['status'] == 'LẤY THẤT BẠI' ||
+                s['status'] == 'ĐÃ HỦY' ||
+                s['status'] == 'THAT BAI' ||
                 s['status'] == 'COMPLETED';
           }
           return s['isCheckedIn'] == true ||
@@ -478,8 +536,21 @@ class _DriverDashboardState extends State<DriverDashboard> {
       onShowQRScanner: () => _showQRScanner(stop),
       onShowShipmentQR: _showShipmentQRModal,
       onFailureConfirmed: () {
+        final bool isPickupStop =
+            stop['stopType'] == 'PICKUP' || stop['isPickup'] == true;
         setState(() {
-          stop['status'] = 'THAT BAI';
+          if (isPickupStop) {
+            stop['isCheckedIn'] = true;
+            stop['status'] = 'LẤY THẤT BẠI';
+            stop['orderStatus'] = 'PICK_FAILED';
+            if (!_isLinehaulDriverProfile &&
+                !_isLinehaulRoute &&
+                _activeRouteId != null) {
+              _awaitingHandoverRouteId = _activeRouteId;
+            }
+          } else {
+            stop['status'] = 'THAT BAI';
+          }
           stop['isActive'] = false;
           final currentIndex = stop['index'] as int;
           final nextStop = _driverStops.firstWhere(
@@ -605,7 +676,14 @@ class _DriverDashboardState extends State<DriverDashboard> {
     setState(() {
       stop['isCheckedIn'] = true;
       stop['status'] = isPickupStop ? 'ĐÃ LẤY HÀNG' : 'ĐÃ GIAO';
+      stop['orderStatus'] = nextStatus;
       stop['isActive'] = false;
+      if (isPickupStop &&
+          !_isLinehaulDriverProfile &&
+          !_isLinehaulRoute &&
+          _activeRouteId != null) {
+        _awaitingHandoverRouteId = _activeRouteId;
+      }
       final currentIndex = stop['index'] as int;
       final nextStop = _driverStops.firstWhere(
         (s) => s['index'] == currentIndex + 1,
@@ -655,29 +733,54 @@ class _DriverDashboardState extends State<DriverDashboard> {
     if (_isRouteFinished) return;
     final routeIdToComplete = _activeRouteId ?? _activeRouteCode!;
     setState(() => _isDutyLoading = true);
-    final success = await DriverService.completeRoute(routeIdToComplete);
-    if (mounted) {
-      setState(() {
-        _isDutyLoading = false;
-        if (success) {
-          _activeRouteId = null;
-          _activeRouteCode = null;
-          _driverStops.clear();
-          _roadPolylinePoints.clear();
-          _loadedTotesCount = 0;
-          _totalPackageCount = 0;
-          _loadedTotes.clear();
-          _isRouteFinished = false;
-          _isRouteStarted = false;
-          _lastShownPickupDialogRouteId = null;
-        }
-      });
-    }
-    if (mounted) {
+    final result = await DriverService.completeRouteWithDetail(routeIdToComplete);
+    if (!mounted) return;
+
+    setState(() {
+      _isDutyLoading = false;
+      if (result.success) {
+        _activeRouteId = null;
+        _activeRouteCode = null;
+        _awaitingHandoverRouteId = null;
+        _driverStops.clear();
+        _roadPolylinePoints.clear();
+        _loadedTotesCount = 0;
+        _totalPackageCount = 0;
+        _loadedTotes.clear();
+        _isRouteFinished = false;
+        _isRouteStarted = false;
+        _lastShownPickupDialogRouteId = null;
+      }
+    });
+
+    if (result.success) {
       FinishRouteSuccessDialog.show(
         context,
-        success: success,
+        success: true,
         onConfirm: () => _initSocketAndFetchRoutes(force: true),
+      );
+    } else {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  result.message ?? 'Chưa thể chốt hoàn thành chuyến đi lúc này.',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 4),
+        ),
       );
     }
   }
@@ -805,6 +908,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
             return s['isCheckedIn'] == true ||
                 s['status'] == 'DA LAY HANG' ||
                 s['status'] == 'ĐÃ LẤY HÀNG' ||
+                s['status'] == 'LẤY THẤT BẠI' ||
+                s['status'] == 'ĐÃ HỦY' ||
+                s['status'] == 'THAT BAI' ||
                 s['status'] == 'COMPLETED';
           }
           return s['isCheckedIn'] == true ||
@@ -825,6 +931,14 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
     final bool isPickupRoute = _driverStops.isNotEmpty &&
         _driverStops.any((s) => s['stopType'] == 'PICKUP' || s['isPickup'] == true);
+
+    final bool isLastMilePickupRoute =
+        isPickupRoute && !_isLinehaulRoute && !_isLinehaulDriverProfile;
+
+    final PickupHandoverProgress? pickupHandoverProgress =
+        (isLastMilePickupRoute && allCompleted)
+            ? computePickupHandoverProgress(_driverStops)
+            : null;
 
     final bool showPickupAssignmentBanner = !effectiveRouteStarted &&
         _activeRouteCode != null &&
@@ -926,6 +1040,33 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   isDutyLoading: _isDutyLoading,
                   isFinished: _isRouteFinished,
                   onFinish: _handleFinishRouteAndShift,
+                  isPickupHandover: isLastMilePickupRoute,
+                  handedOverCount: pickupHandoverProgress?.handedOverCount ?? 0,
+                  requiredHandoverCount: pickupHandoverProgress?.requiredCount ?? 0,
+                  pendingOrderCodes: pickupHandoverProgress?.pendingOrderCodes ?? const [],
+                  onShowRouteQr: isLastMilePickupRoute
+                      ? () {
+                          final routeCodeDisplay =
+                              _activeRouteCode ?? _activeRouteId ?? '';
+                          if (routeCodeDisplay.isEmpty) return;
+                          RouteHandoverQrDialog.show(
+                            context,
+                            routeCode: routeCodeDisplay,
+                            handedOverCount:
+                                pickupHandoverProgress?.handedOverCount ?? 0,
+                            requiredHandoverCount:
+                                pickupHandoverProgress?.requiredCount ?? 0,
+                            pendingOrderCodes:
+                                pickupHandoverProgress?.pendingOrderCodes ??
+                                    const [],
+                            onRefresh: () =>
+                                _initSocketAndFetchRoutes(force: true),
+                          );
+                        }
+                      : null,
+                  onRefreshStatus: isLastMilePickupRoute
+                      ? () => _initSocketAndFetchRoutes(force: true)
+                      : null,
                 ),
 
               // 5. Live Map Preview Card
