@@ -423,7 +423,12 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
           )}
 
           {/* Preview Section if results are calculated */}
-          {previewResult && (
+          {previewResult && (() => {
+            const totalPreviewDistanceKm = Number(
+              previewResult.totalDistanceKm ??
+                previewRoutes.reduce((acc: number, r: any) => acc + Number(r?.plannedDistanceKm || 0), 0)
+            );
+            return (
             <div className="bg-indigo-50/50 border border-indigo-200 rounded-xl p-5 space-y-4 animate-fade-in shadow-sm">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-indigo-100">
                 <div>
@@ -436,9 +441,14 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
                     Bản xem trước mô phỏng — <strong>Chưa lưu vào DB</strong>. Hãy kiểm tra trước khi xác nhận.
                   </p>
                 </div>
-                <span className="text-[11px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-2.5 py-1 rounded-full font-mono">
-                  Chờ xác nhận lưu
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] bg-indigo-100 text-indigo-900 border border-indigo-300 font-bold px-2.5 py-1 rounded-full font-mono">
+                    Tổng quãng đường: {totalPreviewDistanceKm.toFixed(1)} km
+                  </span>
+                  <span className="text-[11px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-2.5 py-1 rounded-full font-mono">
+                    Chờ xác nhận lưu
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
@@ -469,7 +479,7 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
                           <span>Thời gian: <strong className="text-slate-800">{duration} phút</strong></span>
                         </div>
                         {rt.matrixSource && (
-                          <div className="pt-0.5">
+                          <div className="pt-0.5 space-y-1">
                             {(() => {
                               const src = String(rt.matrixSource).toLowerCase();
                               if (src === 'goong') {
@@ -492,6 +502,18 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
                                 </span>
                               );
                             })()}
+                            <p className="text-[9px] font-sans text-slate-500">
+                              {(() => {
+                                const rule = rt.distanceRule || routeType;
+                                if (rule === 'PICKUP') {
+                                  return 'Lấy hàng: tính từ điểm #1 → quay về Bưu cục (chưa gồm chặng Kho → điểm đầu)';
+                                }
+                                if (rule === 'ROUND_TRIP') {
+                                  return 'Tuyến kết hợp: tính từ Bưu cục qua các điểm → quay về Bưu cục';
+                                }
+                                return 'Giao hàng: tính từ Bưu cục qua các điểm giao (không gồm chặng quay về)';
+                              })()}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -535,7 +557,8 @@ export const RouteOptimizationModal: React.FC<RouteOptimizationModalProps> = ({
                 })}
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Modal Footer Controls */}

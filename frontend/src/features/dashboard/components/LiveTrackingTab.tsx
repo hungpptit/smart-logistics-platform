@@ -747,6 +747,12 @@ export const LiveTrackingTab: React.FC = () => {
                     </span>
                   </div>
 
+                  {Array.isArray(route.stops) && route.stops.length > 0 && route.stops.every((s) => s.stopType === 'PICKUP') && (
+                    <p className="mt-1.5 text-[9px] text-slate-400">
+                      Lấy hàng: tính từ điểm #1 → quay về Bưu cục (chưa gồm Kho → #1)
+                    </p>
+                  )}
+
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
