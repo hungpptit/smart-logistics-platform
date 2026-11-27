@@ -73,4 +73,7 @@ class ApiConstants {
   static String get driverChatNew => '${AppConfig.baseUrl}/chat/driver/new';
   static String get driverChatTimeoutCheck => '${AppConfig.baseUrl}/chat/driver/timeout-check';
   static String get driverChatClose => '${AppConfig.baseUrl}/chat/driver/close';
+  static String get driverChatUnreadCount => '${AppConfig.baseUrl}/chat/driver/unread-count';
+  static String get driverChatMarkRead => '${AppConfig.baseUrl}/chat/driver/mark-read';
+  static String get driverChatReplyStaff => '${AppConfig.baseUrl}/chat/driver/reply-staff';
 }

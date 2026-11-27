@@ -1,3 +1,9 @@
+import {
+  formatChatMessageForClient,
+  mapDbHistoryToLlmMessages,
+  syncDriverChatRealtimeEvents,
+} from './driver_support_auth.util';
+import { getTrackingGateway } from '../../gateways/tracking.gateway';
 import { prisma } from '../../config/prisma';
 import { ragService } from './rag.service';
 import { nvidiaAIService, ChatTool } from './nvidia.service';
@@ -62,7 +68,7 @@ export class BaseAgentService {
       );
 
       // Lưu tin nhắn USER vào CSDL
-      await prisma.chatMessage.create({
+      const savedUserMsg = await prisma.chatMessage.create({
         data: {
           conversationId: activeConversationId,
           role: 'USER',
@@ -71,6 +77,13 @@ export class BaseAgentService {
           status: 'SENT',
         },
       });
+
+      if (config.ragRole === 'SHIPPER') {
+        getTrackingGateway()?.emitStaffDriverMessage(
+          userId,
+          formatChatMessageForClient(savedUserMsg)
+        );
+      }
     }
 
     // 2. Tìm kiếm ngữ nghĩa trong kho tri thức theo vai trò (RAG)
@@ -93,13 +106,7 @@ export class BaseAgentService {
 
       // Bỏ qua tin nhắn cuối cùng (chính là tin vừa tạo ở trên)
       const previousTurns = dbHistory.slice(0, -1);
-      for (const item of previousTurns) {
-        if (item.role === 'USER') {
-          messages.push({ role: 'user', content: item.content || '' });
-        } else if (item.role === 'ASSISTANT' && item.content) {
-          messages.push({ role: 'assistant', content: item.content });
-        }
-      }
+      messages.push(...mapDbHistoryToLlmMessages(previousTurns));
     } else if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
       const recentHistory = conversationHistory.slice(-4);
       for (const item of recentHistory) {
@@ -300,13 +307,17 @@ export class BaseAgentService {
 
     // 8. Lưu câu trả lời cuối cùng vào DB (kèm dữ liệu thẻ hành động nếu có)
     if (activeConversationId) {
-      await prisma.chatMessage.create({
+      const isDriverChat = config.ragRole === 'SHIPPER' && Boolean(userId);
+      const isInChatScreen =
+        isDriverChat && userId ? Boolean(getTrackingGateway()?.isUserInChatScreen(userId)) : false;
+
+      const savedAssistantMsg = await prisma.chatMessage.create({
         data: {
           conversationId: activeConversationId,
           role: 'ASSISTANT',
           content: aiReply.trim(),
           toolResult: latestActionData || undefined,
-          status: 'SENT',
+          status: isDriverChat && isInChatScreen ? 'READ' : 'SENT',
         },
       });
 
@@ -314,6 +325,15 @@ export class BaseAgentService {
         where: { id: activeConversationId },
         data: { updatedAt: new Date() },
       });
+
+      if (isDriverChat && userId) {
+        await syncDriverChatRealtimeEvents({
+          driverUserId: userId,
+          message: savedAssistantMsg,
+          emitUnreadToDriver: !isInChatScreen,
+          emitNewMessageToDriver: !isInChatScreen,
+        });
+      }
     }
 
     // 9. Trích xuất sources

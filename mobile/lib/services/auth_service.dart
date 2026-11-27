@@ -129,8 +129,10 @@ class AuthService {
         if (data['success'] == true && data['data'] != null) {
           final newAccessToken = data['data']['accessToken'] ?? data['data']['token'];
           if (newAccessToken != null) {
-            await _storage.write(key: AppConstants.tokenKey, value: newAccessToken.toString());
-            return newAccessToken.toString();
+            final tokenStr = newAccessToken.toString();
+            await _storage.write(key: AppConstants.tokenKey, value: tokenStr);
+            SocketService().reconnectIfConnected(tokenStr);
+            return tokenStr;
           }
         }
       }

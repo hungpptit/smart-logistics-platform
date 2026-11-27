@@ -5,9 +5,13 @@ import { customerAgentService } from '../services/ai/customer_agent.service';
 import { driverAgentService } from '../services/ai/driver_agent.service';
 import { executeConfirmedAction } from '../services/ai/tools/customer_action.tools';
 import { actionTokenService } from '../services/ai/action_token.service';
-import { ChatMessageInputSchema } from '../dtos/chat_validation.dto';
+import {
+  ChatMessageInputSchema,
+  ReplyStaffInputSchema,
+  SendStaffDriverMessageSchema,
+} from '../dtos/chat_validation.dto';
 import { securityAuditService } from '../services/ai/security_audit.service';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 
 export class ChatController {
   /**
@@ -248,6 +252,187 @@ export class ChatController {
         message: 'Không thể xác nhận hành động lúc này. Vui lòng thử lại sau.',
         error: error.message,
       });
+    }
+  }
+
+  private handleControllerError(res: Response, error: any, fallbackMessage: string): void {
+    if (error instanceof ZodError) {
+      const firstIssue = error.issues?.[0]?.message || 'Dữ liệu đầu vào không hợp lệ.';
+      res.status(400).json({
+        success: false,
+        message: firstIssue,
+        error: firstIssue,
+      });
+      return;
+    }
+
+    const status = error?.status || error?.statusCode || 500;
+    res.status(status).json({
+      success: false,
+      message: error?.message || fallbackMessage,
+      error: error?.message,
+    });
+  }
+
+  /**
+   * Đếm số tin nhắn chưa đọc của tài xế
+   * GET /api/v1/chat/driver/unread-count
+   */
+  public async getDriverUnreadCount(req: any, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ success: false, message: 'Chưa xác thực tài khoản.' });
+        return;
+      }
+
+      const unreadCount = await chatConversationService.getDriverUnreadCount(req.user.id);
+      res.status(200).json({
+        success: true,
+        data: { unreadCount },
+      });
+    } catch (error: any) {
+      console.error('[ChatController] Lỗi đếm tin chưa đọc của tài xế:', error);
+      this.handleControllerError(res, error, 'Không thể đếm tin nhắn chưa đọc.');
+    }
+  }
+
+  /**
+   * Đánh dấu các tin nhắn chưa đọc của tài xế là đã đọc
+   * POST /api/v1/chat/driver/mark-read
+   */
+  public async markDriverMessagesAsRead(req: any, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ success: false, message: 'Chưa xác thực tài khoản.' });
+        return;
+      }
+
+      const rawConvId = req.body?.conversationId;
+      const conversationId =
+        typeof rawConvId === 'string' && rawConvId.trim()
+          ? z.string().uuid('conversationId không hợp lệ').parse(rawConvId.trim())
+          : undefined;
+
+      const unreadCount = await chatConversationService.markDriverMessagesAsRead(
+        req.user.id,
+        conversationId
+      );
+      res.status(200).json({
+        success: true,
+        data: { unreadCount },
+      });
+    } catch (error: any) {
+      console.error('[ChatController] Lỗi đánh dấu đã đọc tin tài xế:', error);
+      this.handleControllerError(res, error, 'Không thể cập nhật trạng thái đã đọc.');
+    }
+  }
+
+  /**
+   * Tài xế nhắn trực tiếp về Nhân viên Kho / Điều phối (không gọi AI LLM)
+   * POST /api/v1/chat/driver/reply-staff
+   */
+  public async replyToStaff(req: any, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ success: false, message: 'Chưa xác thực tài khoản.' });
+        return;
+      }
+
+      const rateLimit = securityAuditService.checkChatRateLimit(req.user.id);
+      if (!rateLimit.allowed) {
+        res.status(429).json({
+          success: false,
+          message: `Bạn gửi tin quá nhanh. Vui lòng thử lại sau ${rateLimit.retryAfterSec || 30} giây.`,
+        });
+        return;
+      }
+
+      const parsed = ReplyStaffInputSchema.parse(req.body);
+      const saved = await chatConversationService.replyToStaffByDriver({
+        driverUserId: req.user.id,
+        message: parsed.message,
+        image: parsed.image,
+        conversationId: parsed.conversationId,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: saved,
+      });
+    } catch (error: any) {
+      console.error('[ChatController] Lỗi tài xế phản hồi nhân viên:', error);
+      this.handleControllerError(res, error, 'Không thể gửi tin nhắn cho điều phối viên.');
+    }
+  }
+
+  /**
+   * Nhân viên Kho / Admin xem lịch sử chat của một tài xế
+   * GET /api/v1/chat/staff/driver/:driverUserId/messages
+   */
+  public async getDriverMessagesForStaff(req: any, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ success: false, message: 'Chưa xác thực tài khoản.' });
+        return;
+      }
+
+      const driverUserId = z
+        .string()
+        .uuid('driverUserId không hợp lệ')
+        .parse(req.params?.driverUserId);
+
+      const data = await chatConversationService.getDriverConversationForStaff({
+        staffUserId: req.user.id,
+        staffRoles: req.user.roles || [],
+        driverUserId,
+      });
+
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error: any) {
+      console.error('[ChatController] Lỗi tải lịch sử hỗ trợ tài xế:', error);
+      this.handleControllerError(res, error, 'Không thể tải lịch sử chat tài xế.');
+    }
+  }
+
+  /**
+   * Nhân viên Kho / Admin gửi tin nhắn hỗ trợ 2 chiều xuống tài xế
+   * POST /api/v1/chat/staff/send-to-driver
+   */
+  public async sendMessageToDriver(req: any, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ success: false, message: 'Chưa xác thực tài khoản.' });
+        return;
+      }
+
+      const rateLimit = securityAuditService.checkChatRateLimit(req.user.id);
+      if (!rateLimit.allowed) {
+        res.status(429).json({
+          success: false,
+          message: `Bạn gửi tin quá nhanh. Vui lòng thử lại sau ${rateLimit.retryAfterSec || 30} giây.`,
+        });
+        return;
+      }
+
+      const parsed = SendStaffDriverMessageSchema.parse(req.body);
+      const data = await chatConversationService.sendMessageFromStaffToDriver({
+        staffUserId: req.user.id,
+        staffUsername: req.user.username,
+        staffRoles: req.user.roles || [],
+        driverUserId: parsed.driverUserId,
+        message: parsed.message,
+      });
+
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error: any) {
+      console.error('[ChatController] Lỗi nhân viên gửi tin cho tài xế:', error);
+      this.handleControllerError(res, error, 'Không thể gửi tin nhắn tới tài xế.');
     }
   }
 

@@ -8,6 +8,7 @@ import '../../core/utils/app_snackbar.dart';
 import '../../core/utils/time_format.dart';
 import '../../models/chat_message.dart';
 import '../../services/driver_chat_service.dart';
+import '../../services/socket_service.dart';
 import 'controllers/chat_timeout_controller.dart';
 import 'widgets/chat/ai_message_bubble.dart';
 import 'widgets/chat/attached_image_bar.dart';
@@ -94,12 +95,16 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
       },
     );
     WidgetsBinding.instance.addObserver(this);
+    SocketService().emitChatScreenActive(true);
+    SocketService().onChatNewMessage(_handleIncomingSocketMessage);
     _initSpeechToText();
     _loadConversationHistory();
   }
 
   @override
   void dispose() {
+    SocketService().removeChatNewMessageListener(_handleIncomingSocketMessage);
+    SocketService().emitChatScreenActive(false);
     WidgetsBinding.instance.removeObserver(this);
     _timeoutController.dispose();
     _textController.dispose();
@@ -234,6 +239,48 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
     }
   }
 
+  void _handleIncomingSocketMessage(Map<String, dynamic> payload) {
+    if (!mounted) return;
+    final String msgId = payload['id']?.toString() ?? UniqueKey().toString();
+    if (_messages.any((m) => m.id == msgId)) return;
+
+    final String content = (payload['text'] ?? payload['content'] ?? '').toString();
+    final String? imageVal = payload['imageUrl']?.toString();
+    if (content.trim().isEmpty && (imageVal == null || imageVal.isEmpty)) return;
+
+    final String? toolName = payload['toolName']?.toString();
+    final String? senderName = payload['senderName']?.toString();
+    final String? incomingConvId = payload['conversationId']?.toString();
+    final bool isUser = payload['isUser'] == true ||
+        payload['role']?.toString().toUpperCase() == 'USER';
+
+    DateTime msgDate = DateTime.now();
+    if (payload['createdAt'] != null) {
+      msgDate = DateTime.tryParse(payload['createdAt'].toString())?.toLocal() ?? msgDate;
+    }
+    final String timeStr =
+        payload['time']?.toString().isNotEmpty == true ? payload['time'].toString() : formatHHmm(msgDate);
+
+    setState(() {
+      if (incomingConvId != null && incomingConvId.isNotEmpty) {
+        _conversationId = incomingConvId;
+        _isClosed = false;
+      }
+      _messages.add(ChatMessage(
+        id: msgId,
+        text: content,
+        isUser: isUser,
+        time: timeStr,
+        imageUrl: imageVal,
+        toolName: toolName,
+        senderName: senderName,
+        status: MessageStatus.sent,
+      ));
+    });
+    _scrollToBottom();
+    DriverChatService.markAsRead();
+  }
+
   // ==========================================
   // 3. NẠP LỊCH SỬ THẬT TỪ BACKEND
   // ==========================================
@@ -246,10 +293,10 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
     if (res['success'] == true) {
       _conversationId = res['conversationId'];
       _isClosed = (res['status'] == 'CLOSED');
+      final bool hasUnread = res['hasUnread'] == true;
 
-      // Nếu phiên trước đó đã ĐÓNG (CLOSED):
-      // Thoát ra vào lại sẽ khởi tạo ngay phiên mới sạch sẽ, không giữ phiên cũ đã đóng
-      if (_isClosed) {
+      // Chỉ tự làm mới phiên đã đóng nếu KHÔNG còn tin nhắn chưa đọc để tài xế không bỏ lỡ thông báo
+      if (_isClosed && !hasUnread) {
         setState(() {
           _conversationId = null;
           _isClosed = false;
@@ -261,6 +308,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
           );
           _isLoadingHistory = false;
         });
+        DriverChatService.markAsRead();
         return;
       }
 
@@ -279,6 +327,11 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
         // Bỏ qua tin rỗng nếu không có text lẫn image
         if (content.trim().isEmpty && (imageVal == null || imageVal.isEmpty)) continue;
 
+        final String? toolName = m['toolName']?.toString();
+        final dynamic actionData = m['actionData'];
+        final String? senderName = m['senderName']?.toString() ??
+            (actionData is Map ? actionData['senderName']?.toString() : null);
+
         String timeStr;
         DateTime msgDate = DateTime.now();
         if (m['createdAt'] != null) {
@@ -296,11 +349,16 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
           isUser: isUser,
           time: timeStr,
           imageUrl: imageVal,
+          toolName: toolName,
+          senderName: senderName,
           status: MessageStatus.sent,
         ));
 
-        // Mốc thời gian: Lấy tin trợ lý thật cuối cùng (bỏ qua tin nhắc nhở)
-        if (!isUser && !content.contains('Quý khách có cần') && !content.contains('bác tài còn cần')) {
+        // Mốc thời gian: Lấy tin trợ lý AI thật cuối cùng (bỏ qua tin nhắc nhở và tin STAFF_SUPPORT)
+        if (!isUser &&
+            toolName != 'STAFF_SUPPORT' &&
+            !content.contains('Quý khách có cần') &&
+            !content.contains('bác tài còn cần')) {
           lastRealAiTime = msgDate;
         }
       }
@@ -314,6 +372,8 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
         );
         _isLoadingHistory = false;
       });
+
+      DriverChatService.markAsRead();
 
       // Lập lịch timeout nếu phiên còn mở
       if (!_isClosed && lastRealAiTime != null) {
@@ -387,7 +447,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
     });
     _scrollToBottom();
 
-    // Gọi API Backend thật
+    // Gọi API Backend Trợ lý AI thật
     final res = await DriverChatService.sendMessage(
       message: text,
       imageBase64: imageBase64,
@@ -459,11 +519,16 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
   // 6. TẠO CUỘC TRÒ CHUYỆN MỚI
   // ==========================================
   Future<void> _handleNewConversation() async {
+    final bool hasStaffMessages = _messages.any((m) => m.isStaffSupport || m.isStaffReply);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Tạo cuộc trò chuyện mới?'),
-        content: const Text('Phiên hiện tại sẽ được lưu trữ và làm mới khung chat.'),
+        content: Text(
+          hasStaffMessages
+              ? 'Cuộc trò chuyện này đang có tin nhắn trao đổi với Nhân viên Kho / Điều phối. Tạo hội thoại mới sẽ mở khung chat AI trống mới (nhân viên Kho vẫn xem được lịch sử trước đó). Bạn có chắc chắn muốn tiếp tục?'
+              : 'Phiên hiện tại sẽ được lưu trữ và làm mới khung chat.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
           ElevatedButton(
@@ -538,7 +603,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> with WidgetsBinding
       body: SafeArea(
         child: Column(
           children: [
-            // Quick Prompt Chips (3 chip chuẩn)
+            // Quick Prompt Chips
             QuickChipsBar(
               chips: _quickChips,
               isDisabled: _isSending || _isAITyping,

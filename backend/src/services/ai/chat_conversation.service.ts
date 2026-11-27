@@ -1,4 +1,13 @@
 import { prisma } from '../../config/prisma';
+import {
+  assertStaffCanSupportDriver,
+  countDriverUnreadMessages,
+  formatChatMessageForClient,
+  STAFF_SUPPORT_REPLY_TOOL_NAME,
+  STAFF_SUPPORT_TOOL_NAME,
+  syncDriverChatRealtimeEvents,
+} from './driver_support_auth.util';
+import { getTrackingGateway } from '../../gateways/tracking.gateway';
 
 export const REMINDER_MESSAGE =
   'Dạ không biết quý khách còn thắc mắc hay cần Velocity hỗ trợ thêm thông tin gì nữa không ạ?';
@@ -16,11 +25,21 @@ export class ChatConversationService {
    */
   public async getActiveConversation(userId?: string) {
     if (!userId) {
-      return { conversationId: null, status: 'NEW', isClosed: false, messages: [] };
+      return { conversationId: null, status: 'NEW', isClosed: false, hasUnread: false, messages: [] };
     }
 
+    // Ưu tiên mở phiên gần nhất đang có tin ASSISTANT chưa đọc (kể cả ACTIVE hay CLOSED)
     let activeConv = await prisma.chatConversation.findFirst({
-      where: { userId },
+      where: {
+        userId,
+        messages: {
+          some: {
+            role: 'ASSISTANT',
+            content: { not: null },
+            OR: [{ status: null }, { status: { not: 'READ' } }],
+          },
+        },
+      },
       orderBy: { updatedAt: 'desc' },
       include: {
         messages: {
@@ -30,7 +49,19 @@ export class ChatConversationService {
     });
 
     if (!activeConv) {
-      return { conversationId: null, status: 'NEW', isClosed: false, messages: [] };
+      activeConv = await prisma.chatConversation.findFirst({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          messages: {
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+      });
+    }
+
+    if (!activeConv) {
+      return { conversationId: null, status: 'NEW', isClosed: false, hasUnread: false, messages: [] };
     }
 
     let isClosed = activeConv.status === 'CLOSED';
@@ -49,9 +80,10 @@ export class ChatConversationService {
     const expectedClosing = isDriver ? DRIVER_CLOSING_MESSAGE : CLOSING_MESSAGE;
 
     // Xử lý Timeout tự động trên Server (Shopee Style: 3p nhắc nhở, 5p tự đóng)
+    // Bỏ qua nếu tin cuối là STAFF_SUPPORT để không tự đóng phiên hỗ trợ từ Nhân viên Kho
     if (!isClosed && activeConv.messages.length > 0) {
       const lastMsg = activeConv.messages[activeConv.messages.length - 1];
-      if (lastMsg.role === 'ASSISTANT') {
+      if (lastMsg.role === 'ASSISTANT' && lastMsg.toolName !== STAFF_SUPPORT_TOOL_NAME) {
         const elapsedMs = Date.now() - new Date(lastMsg.createdAt).getTime();
         const THREE_MINUTES = 3 * 60 * 1000;
         const FIVE_MINUTES = 5 * 60 * 1000;
@@ -127,30 +159,52 @@ export class ChatConversationService {
                 status: 'SENT',
               },
             });
+
+            activeConv = (await prisma.chatConversation.findUnique({
+              where: { id: activeConv.id },
+              include: {
+                messages: {
+                  orderBy: { createdAt: 'asc' },
+                },
+              },
+            })) as any;
           }
         }
       }
     }
 
-    const formattedMessages = (activeConv?.messages || [])
-      .filter((m) => m.role === 'USER' || (m.role === 'ASSISTANT' && m.content))
-      .map((m) => ({
-        id: m.id,
-        sender: m.role === 'USER' ? 'user' : 'ai',
-        role: m.role,
-        text: m.content || '',
-        content: m.content || '',
-        image: m.imageUrl || undefined,
-        actionData: (m.toolResult as any) || undefined,
-        timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        createdAt: m.createdAt,
-      }));
+    const assistantVisibleMessages = (activeConv?.messages || []).filter(
+      (m) => m.role === 'USER' || (m.role === 'ASSISTANT' && m.content)
+    );
+
+    const hasUnread = assistantVisibleMessages.some(
+      (m) => m.role === 'ASSISTANT' && m.status !== 'READ'
+    );
+
+    const formattedMessages = assistantVisibleMessages.map((m) => ({
+      id: m.id,
+      sender: m.role === 'USER' ? 'user' : 'ai',
+      role: m.role,
+      text: m.content || '',
+      content: m.content || '',
+      image: m.imageUrl || undefined,
+      actionData: (m.toolResult as any) || undefined,
+      status: m.status || 'SENT',
+      toolName: m.toolName || undefined,
+      senderName:
+        m.toolResult && typeof m.toolResult === 'object' && (m.toolResult as any).senderName
+          ? String((m.toolResult as any).senderName)
+          : undefined,
+      timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: m.createdAt,
+    }));
 
     return {
       conversationId: activeConv?.id,
       title: activeConv?.title,
       status: isClosed ? 'CLOSED' : 'ACTIVE',
       isClosed,
+      hasUnread,
       messages: formattedMessages,
     };
   }
@@ -255,9 +309,9 @@ export class ChatConversationService {
       return { success: true, action: 'ALREADY_CLOSED', isClosed: true };
     }
 
-    // Nếu người dùng vừa nhắn tin thì không gửi nhắc/đóng
+    // Nếu người dùng vừa nhắn tin hoặc tin cuối là Nhân viên Kho hỗ trợ thì không gửi nhắc/đóng AI
     const lastMsg = conv.messages[conv.messages.length - 1];
-    if (lastMsg && lastMsg.role === 'USER') {
+    if (lastMsg && (lastMsg.role === 'USER' || lastMsg.toolName === STAFF_SUPPORT_TOOL_NAME)) {
       return { success: true, action: 'IGNORED_USER_ACTIVE', isClosed: false };
     }
 
@@ -269,10 +323,11 @@ export class ChatConversationService {
     const expectedReminder = isDriver ? DRIVER_REMINDER_MESSAGE : REMINDER_MESSAGE;
     const expectedClosing = isDriver ? DRIVER_CLOSING_MESSAGE : CLOSING_MESSAGE;
 
-    // 1. Tìm tin nhắn trợ lý thật gần nhất (bỏ qua tin nhắc nhở để mốc đóng không bị dời sang phút thứ 8)
+    // 1. Tìm tin nhắn trợ lý AI thật gần nhất (bỏ qua tin nhắc nhở và tin STAFF_SUPPORT)
     const assistantMessages = conv.messages.filter(
       (m) =>
         m.role === 'ASSISTANT' &&
+        m.toolName !== STAFF_SUPPORT_TOOL_NAME &&
         m.content !== REMINDER_MESSAGE &&
         m.content !== CLOSING_MESSAGE &&
         m.content !== DRIVER_REMINDER_MESSAGE &&
@@ -318,12 +373,16 @@ export class ChatConversationService {
         };
       }
 
+      const isInChatScreen = isDriver && conv.userId
+        ? Boolean(getTrackingGateway()?.isUserInChatScreen(conv.userId))
+        : false;
+
       const reminderMsg = await prisma.chatMessage.create({
         data: {
           conversationId: conv.id,
           role: 'ASSISTANT',
           content: expectedReminder,
-          status: 'SENT',
+          status: isInChatScreen ? 'READ' : 'SENT',
         },
       });
 
@@ -331,6 +390,15 @@ export class ChatConversationService {
         where: { id: conv.id },
         data: { updatedAt: new Date() },
       });
+
+      if (isDriver && conv.userId) {
+        await syncDriverChatRealtimeEvents({
+          driverUserId: conv.userId,
+          message: reminderMsg,
+          emitUnreadToDriver: !isInChatScreen,
+          emitNewMessageToDriver: true,
+        });
+      }
 
       return {
         success: true,
@@ -355,12 +423,16 @@ export class ChatConversationService {
         };
       }
 
+      const isInChatScreen = isDriver && conv.userId
+        ? Boolean(getTrackingGateway()?.isUserInChatScreen(conv.userId))
+        : false;
+
       const closingMsg = await prisma.chatMessage.create({
         data: {
           conversationId: conv.id,
           role: 'ASSISTANT',
           content: expectedClosing,
-          status: 'SENT',
+          status: isInChatScreen ? 'READ' : 'SENT',
         },
       });
 
@@ -372,6 +444,15 @@ export class ChatConversationService {
           updatedAt: new Date(),
         },
       });
+
+      if (isDriver && conv.userId) {
+        await syncDriverChatRealtimeEvents({
+          driverUserId: conv.userId,
+          message: closingMsg,
+          emitUnreadToDriver: !isInChatScreen,
+          emitNewMessageToDriver: true,
+        });
+      }
 
       return {
         success: true,
@@ -402,6 +483,175 @@ export class ChatConversationService {
       },
     });
     return { success: true, message: 'Đã đóng cuộc trò chuyện.' };
+  }
+
+  /**
+   * Đếm số tin nhắn ASSISTANT chưa đọc của tài xế
+   */
+  public async getDriverUnreadCount(userId: string): Promise<number> {
+    return countDriverUnreadMessages(userId);
+  }
+
+  /**
+   * Đánh dấu các tin nhắn ASSISTANT chưa đọc của tài xế sang READ và đồng bộ badge realtime về 0
+   */
+  public async markDriverMessagesAsRead(userId: string, conversationId?: string): Promise<number> {
+    if (!userId) return 0;
+
+    await prisma.chatMessage.updateMany({
+      where: {
+        conversation: conversationId
+          ? { id: conversationId, userId }
+          : { userId },
+        role: 'ASSISTANT',
+        OR: [{ status: null }, { status: { not: 'READ' } }],
+      },
+      data: { status: 'READ' },
+    });
+
+    const remainingUnread = await countDriverUnreadMessages(userId);
+    getTrackingGateway()?.emitDriverUnreadUpdated(userId, remainingUnread);
+    return remainingUnread;
+  }
+
+  /**
+   * Tài xế trả lời trực tiếp cho Nhân viên Kho / Điều phối (lưu DB + đẩy Socket, không gọi AI LLM)
+   */
+  public async replyToStaffByDriver(params: {
+    driverUserId: string;
+    message?: string;
+    image?: string;
+    conversationId?: string;
+  }) {
+    const cleanText = params.message?.trim() || '';
+    const activeConvId = await this.getOrCreateActiveConversation(
+      params.driverUserId,
+      params.conversationId,
+      cleanText || 'Phản hồi Nhân viên Điều phối'
+    );
+
+    const savedMsg = await prisma.chatMessage.create({
+      data: {
+        conversationId: activeConvId,
+        role: 'USER',
+        content: cleanText,
+        imageUrl: params.image || null,
+        toolName: STAFF_SUPPORT_REPLY_TOOL_NAME,
+        status: 'SENT',
+      },
+    });
+
+    await prisma.chatConversation.update({
+      where: { id: activeConvId },
+      data: { updatedAt: new Date() },
+    });
+
+    await syncDriverChatRealtimeEvents({
+      driverUserId: params.driverUserId,
+      message: savedMsg,
+      emitUnreadToDriver: false,
+      emitNewMessageToDriver: false,
+    });
+
+    return formatChatMessageForClient(savedMsg);
+  }
+
+  /**
+   * Lấy lịch sử tin nhắn gần nhất theo userId của tài xế cho Nhân viên Kho / Admin trên Web
+   */
+  public async getDriverConversationForStaff(params: {
+    staffUserId: string;
+    staffRoles: string[];
+    driverUserId: string;
+  }) {
+    const driverInfo = await assertStaffCanSupportDriver(
+      params.staffUserId,
+      params.staffRoles,
+      params.driverUserId
+    );
+
+    const recentMessages = await prisma.chatMessage.findMany({
+      where: {
+        conversation: { userId: params.driverUserId },
+        OR: [{ role: 'USER' }, { role: 'ASSISTANT', content: { not: null } }],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 80,
+    });
+
+    const formatted = recentMessages.reverse().map((m) => formatChatMessageForClient(m));
+    const latestConversationId =
+      formatted.length > 0 ? formatted[formatted.length - 1].conversationId : null;
+
+    return {
+      driverUserId: params.driverUserId,
+      driverName: driverInfo.driverFullName,
+      conversationId: latestConversationId,
+      messages: formatted,
+    };
+  }
+
+  /**
+   * Nhân viên Kho / Admin gửi tin nhắn hỗ trợ 2 chiều xuống Tài xế
+   */
+  public async sendMessageFromStaffToDriver(params: {
+    staffUserId: string;
+    staffUsername?: string;
+    staffRoles: string[];
+    driverUserId: string;
+    message: string;
+  }) {
+    const driverInfo = await assertStaffCanSupportDriver(
+      params.staffUserId,
+      params.staffRoles,
+      params.driverUserId
+    );
+
+    const senderName =
+      driverInfo.staffFullName || params.staffUsername || 'Nhân viên Điều phối';
+    const senderRole = params.staffRoles.includes('ADMIN') ? 'ADMIN' : 'STAFF';
+
+    const activeConvId = await this.getOrCreateActiveConversation(
+      params.driverUserId,
+      undefined,
+      `Hỗ trợ từ ${senderName}`
+    );
+
+    const isDriverInChat = Boolean(
+      getTrackingGateway()?.isUserInChatScreen(params.driverUserId)
+    );
+
+    const savedMsg = await prisma.chatMessage.create({
+      data: {
+        conversationId: activeConvId,
+        role: 'ASSISTANT',
+        content: params.message.trim(),
+        toolName: STAFF_SUPPORT_TOOL_NAME,
+        toolResult: {
+          senderRole,
+          senderName,
+          staffUserId: params.staffUserId,
+        },
+        status: isDriverInChat ? 'READ' : 'SENT',
+      },
+    });
+
+    await prisma.chatConversation.update({
+      where: { id: activeConvId },
+      data: { updatedAt: new Date() },
+    });
+
+    const unreadCount = await syncDriverChatRealtimeEvents({
+      driverUserId: params.driverUserId,
+      message: savedMsg,
+      emitUnreadToDriver: !isDriverInChat,
+      emitNewMessageToDriver: true,
+    });
+
+    return {
+      message: formatChatMessageForClient(savedMsg),
+      unreadCount,
+    };
   }
 }
 

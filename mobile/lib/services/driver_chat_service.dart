@@ -28,6 +28,7 @@ class DriverChatService {
           'success': true,
           'conversationId': data['data']?['id'] ?? data['data']?['conversationId'],
           'status': data['data']?['status'] ?? 'ACTIVE',
+          'hasUnread': data['data']?['hasUnread'] ?? false,
           'messages': data['data']?['messages'] ?? [],
         };
       }
@@ -172,6 +173,115 @@ class DriverChatService {
     } catch (e) {
       debugPrint('⚠️ [DriverChatService] Lỗi timeoutCheck: $e');
       return {'success': false, 'message': 'Lỗi kết nối: $e'};
+    }
+  }
+
+  /// Lấy tổng số tin nhắn chưa đọc gửi tới tài xế
+  static Future<int> getUnreadCount() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || token.isEmpty) return 0;
+
+      final url = Uri.parse(ApiConstants.driverChatUnreadCount);
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        final raw = data['data']?['unreadCount'];
+        if (raw is num) return raw.toInt();
+        return int.tryParse(raw?.toString() ?? '0') ?? 0;
+      }
+      return 0;
+    } catch (e) {
+      debugPrint('⚠️ [DriverChatService] Lỗi getUnreadCount: $e');
+      return 0;
+    }
+  }
+
+  /// Đánh dấu các tin nhắn của tài xế là đã đọc
+  static Future<bool> markAsRead({String? conversationId}) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || token.isEmpty) return false;
+
+      final url = Uri.parse(ApiConstants.driverChatMarkRead);
+      final body = <String, dynamic>{};
+      if (conversationId != null && conversationId.isNotEmpty) {
+        body['conversationId'] = conversationId;
+      }
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 8));
+
+      final data = jsonDecode(response.body);
+      return response.statusCode == 200 && data['success'] == true;
+    } catch (e) {
+      debugPrint('⚠️ [DriverChatService] Lỗi markAsRead: $e');
+      return false;
+    }
+  }
+
+  /// Tài xế phản hồi trực tiếp về Nhân viên Kho / Điều phối (không gọi AI)
+  static Future<Map<String, dynamic>> replyToStaff({
+    required String message,
+    String? imageBase64,
+    String? conversationId,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'statusCode': 401, 'message': 'Chưa đăng nhập'};
+      }
+
+      final url = Uri.parse(ApiConstants.driverChatReplyStaff);
+      final payload = <String, dynamic>{};
+      if (message.trim().isNotEmpty) {
+        payload['message'] = message.trim();
+      }
+      if (imageBase64 != null && imageBase64.isNotEmpty) {
+        payload['image'] = imageBase64;
+      }
+      if (conversationId != null && conversationId.isNotEmpty) {
+        payload['conversationId'] = conversationId;
+      }
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 12));
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {
+          'success': true,
+          'data': data['data'],
+        };
+      }
+
+      return {
+        'success': false,
+        'statusCode': response.statusCode,
+        'message': data['message'] ?? 'Không thể gửi tin nhắn cho điều phối viên',
+      };
+    } catch (e) {
+      debugPrint('⚠️ [DriverChatService] Lỗi replyToStaff: $e');
+      return {'success': false, 'message': 'Lỗi kết nối máy chủ: $e'};
     }
   }
 }

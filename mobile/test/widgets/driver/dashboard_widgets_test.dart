@@ -179,7 +179,7 @@ void main() {
       expect(tapCount, 1);
     });
 
-    testWidgets('AiAssistantFab has tooltip and invokes onPressed', (tester) async {
+    testWidgets('AiAssistantFab has tooltip and invokes onPressed without badge when unreadCount == 0', (tester) async {
       int tapCount = 0;
 
       await tester.pumpWidget(
@@ -192,10 +192,36 @@ void main() {
 
       final fabFinder = find.byTooltip('Trợ lý Tài xế AI');
       expect(fabFinder, findsOneWidget);
+      expect(find.byType(Badge), findsNothing);
+      expect(find.byIcon(Icons.smart_toy_rounded), findsOneWidget);
 
       await tester.tap(fabFinder);
       await tester.pump();
       expect(tapCount, 1);
+    });
+
+    testWidgets('AiAssistantFab displays Material Badge with exact count and 99+ cap', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            floatingActionButton: AiAssistantFab(unreadCount: 3, onPressed: () {}),
+          ),
+        ),
+      );
+
+      expect(find.byType(Badge), findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            floatingActionButton: AiAssistantFab(unreadCount: 120, onPressed: () {}),
+          ),
+        ),
+      );
+
+      expect(find.byType(Badge), findsOneWidget);
+      expect(find.text('99+'), findsOneWidget);
     });
   });
 

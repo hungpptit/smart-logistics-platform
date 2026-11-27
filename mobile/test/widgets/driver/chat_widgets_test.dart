@@ -117,6 +117,28 @@ void main() {
       expect(find.textContaining('Xin chào bác tài.', findRichText: true), findsOneWidget);
       expect(find.textContaining('Bước 1: Kiểm tra thùng hàng.', findRichText: true), findsOneWidget);
       expect(find.text('10:35'), findsOneWidget);
+      expect(find.byIcon(Icons.smart_toy_rounded), findsOneWidget);
+    });
+
+    testWidgets('renders STAFF_SUPPORT header and support_agent icon distinctly from AI', (tester) async {
+      final msg = ChatMessage(
+        id: 's1',
+        text: 'Anh ghé cổng B lấy thêm thùng hàng nhé.',
+        isUser: false,
+        time: '11:02',
+        toolName: 'STAFF_SUPPORT',
+        senderName: 'Điều phối An',
+      );
+
+      await tester.pumpWidget(
+        _wrapWithScaffold(AiMessageBubble(msg: msg)),
+      );
+
+      expect(find.text('Điều phối / Kho • Điều phối An'), findsOneWidget);
+      expect(find.byIcon(Icons.support_agent_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.headset_mic_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.smart_toy_rounded), findsNothing);
+      expect(find.text('11:02'), findsOneWidget);
     });
   });
 

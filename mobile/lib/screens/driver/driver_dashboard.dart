@@ -10,6 +10,7 @@ import '../../core/theme/app_styles.dart';
 import '../../core/utils/app_snackbar.dart';
 import '../../core/constants/app_constants.dart';
 import '../../services/auth_service.dart';
+import '../../services/driver_chat_service.dart';
 import '../../services/driver_service.dart';
 import '../../services/socket_service.dart';
 import 'widgets/dashboard/ai_assistant_fab.dart';
@@ -53,7 +54,7 @@ class DriverDashboard extends StatefulWidget {
   State<DriverDashboard> createState() => _DriverDashboardState();
 }
 
-class _DriverDashboardState extends State<DriverDashboard> {
+class _DriverDashboardState extends State<DriverDashboard> with WidgetsBindingObserver {
   // ------ State ------
   bool _isDutyActive = true;
   bool _isDutyLoading = false;
@@ -62,6 +63,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   bool _isNavigating = false;
   Timer? _routeRefreshTimer;
   bool _isFetchingRoutes = false;
+  int _unreadChatCount = 0;
 
   bool _isLinehaulRoute = false;
   bool _isLinehaulDriverProfile = false;
@@ -85,6 +87,33 @@ class _DriverDashboardState extends State<DriverDashboard> {
   final MapController _navMapController = MapController();
   NavigationEngine? _navigationEngine;
 
+  void _handleRoutesUpdatedSocket() {
+    if (mounted) _initSocketAndFetchRoutes();
+  }
+
+  void _handleChatUnreadSocket(int count) {
+    if (!mounted) return;
+    setState(() {
+      _unreadChatCount = count < 0 ? 0 : count;
+    });
+  }
+
+  Future<void> _refreshUnreadChatCount() async {
+    final count = await DriverChatService.getUnreadCount();
+    if (!mounted) return;
+    setState(() {
+      _unreadChatCount = count;
+    });
+  }
+
+  Future<void> _openDriverChat() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const DriverChatScreen()),
+    );
+    await _refreshUnreadChatCount();
+  }
+
   // ------ Helpers ------
   String _formatCurrency(num amount) {
     final int value = amount.round();
@@ -98,22 +127,33 @@ class _DriverDashboardState extends State<DriverDashboard> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadDriverProfile();
     _initSocketAndFetchRoutes();
+    _refreshUnreadChatCount();
     _initLocationService();
-    SocketService().onRoutesUpdated(() {
-      if (mounted) _initSocketAndFetchRoutes();
-    });
+    SocketService().onRoutesUpdated(_handleRoutesUpdatedSocket);
+    SocketService().onChatUnreadUpdated(_handleChatUnreadSocket);
     _routeRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted && !_isDutyLoading) _initSocketAndFetchRoutes();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _refreshUnreadChatCount();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _routeRefreshTimer?.cancel();
     _positionSubscription?.cancel();
     _navigationEngine?.dispose();
+    SocketService().removeRoutesUpdatedListener(_handleRoutesUpdatedSocket);
+    SocketService().removeChatUnreadUpdatedListener(_handleChatUnreadSocket);
     SocketService().disconnect();
     super.dispose();
   }
@@ -968,10 +1008,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
         email: _driverEmail,
         onOpenChat: () {
           Navigator.pop(context);
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const DriverChatScreen()),
-          );
+          _openDriverChat();
         },
         onLogout: () async {
           SpeedLimitService().clearCache();
@@ -1109,12 +1146,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
         ),
       ),
       floatingActionButton: AiAssistantFab(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const DriverChatScreen()),
-          );
-        },
+        unreadCount: _unreadChatCount,
+        onPressed: _openDriverChat,
       ),
     );
   }

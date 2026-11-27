@@ -12,7 +12,7 @@ node_modules/
 *.tar.gz
 
 # AI Models
-models/
+/models/
 *.gguf
 *.bin
 

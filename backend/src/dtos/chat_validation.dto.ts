@@ -111,3 +111,30 @@ export const FindNearestFacilityParamsSchema = z
   .strict('Tool find_nearest_facility không chấp nhận tham số lạ (không nhận tọa độ từ client).');
 
 export type FindNearestFacilityParams = z.infer<typeof FindNearestFacilityParamsSchema>;
+
+export const ReplyStaffInputSchema = z
+  .object({
+    message: z.string().trim().min(1, 'Nội dung tin nhắn không được để trống').max(2000, 'Tin nhắn quá dài').optional(),
+    image: z.string().max(15_000_000, 'Ảnh đính kèm vượt quá dung lượng cho phép').optional(),
+    conversationId: z.string().uuid('conversationId không hợp lệ').optional(),
+  })
+  .strict()
+  .refine((data) => Boolean(data.message?.trim() || data.image), {
+    message: 'Vui lòng nhập nội dung tin nhắn hoặc đính kèm hình ảnh.',
+  });
+
+export type ReplyStaffInput = z.infer<typeof ReplyStaffInputSchema>;
+
+export const SendStaffDriverMessageSchema = z
+  .object({
+    driverUserId: z.string().uuid('driverUserId không hợp lệ'),
+    message: z
+      .string()
+      .trim()
+      .min(1, 'Nội dung tin nhắn không được để trống')
+      .max(2000, 'Tin nhắn quá dài (tối đa 2000 ký tự)'),
+  })
+  .strict();
+
+export type SendStaffDriverMessageInput = z.infer<typeof SendStaffDriverMessageSchema>;
+

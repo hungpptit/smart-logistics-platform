@@ -14,6 +14,17 @@ class AiMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isStaff = msg.isStaffSupport;
+    final Color accentColor = isStaff ? AppColors.tertiary : AppColors.logisticsRed;
+    final Color bubbleColor = isStaff ? const Color(0xFFF0F6FF) : AppColors.pureWhite;
+    final Color borderColor = isStaff
+        ? AppColors.tertiary.withValues(alpha: 0.28)
+        : const Color(0xFFE5E7EB);
+    final String senderLabel =
+        msg.senderName != null && msg.senderName!.trim().isNotEmpty
+            ? 'Điều phối / Kho • ${msg.senderName!.trim()}'
+            : 'Điều phối / Kho';
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
@@ -25,11 +36,15 @@ class AiMessageBubble extends StatelessWidget {
             width: 32.0,
             height: 32.0,
             decoration: BoxDecoration(
-              color: AppColors.logisticsRed.withValues(alpha: 0.1),
+              color: accentColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.logisticsRed.withValues(alpha: 0.2)),
+              border: Border.all(color: accentColor.withValues(alpha: 0.25)),
             ),
-            child: const Icon(Icons.smart_toy_rounded, color: AppColors.logisticsRed, size: 18.0),
+            child: Icon(
+              isStaff ? Icons.support_agent_rounded : Icons.smart_toy_rounded,
+              color: accentColor,
+              size: 18.0,
+            ),
           ),
           Flexible(
             child: Column(
@@ -38,14 +53,14 @@ class AiMessageBubble extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
                   decoration: BoxDecoration(
-                    color: AppColors.pureWhite,
+                    color: bubbleColor,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(4.0),
                       topRight: Radius.circular(16.0),
                       bottomLeft: Radius.circular(16.0),
                       bottomRight: Radius.circular(16.0),
                     ),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    border: Border.all(color: borderColor),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.03),
@@ -57,6 +72,27 @@ class AiMessageBubble extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (isStaff) ...[
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.headset_mic_rounded, size: 13.0, color: accentColor),
+                            const SizedBox(width: 5.0),
+                            Flexible(
+                              child: Text(
+                                senderLabel,
+                                style: TextStyle(
+                                  fontSize: 11.0,
+                                  fontWeight: FontWeight.w700,
+                                  color: accentColor,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6.0),
+                      ],
                       if (msg.imageUrl != null && msg.imageUrl!.isNotEmpty) ...[
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8.0),
