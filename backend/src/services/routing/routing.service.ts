@@ -1,7 +1,14 @@
 import { prisma } from '../../config/prisma';
 import { KMeansService } from './kmeans.service';
 import { AssignmentService } from './assignment.service';
-import { VRPService } from './vrp.service';
+import {
+  DISTANCE_RULE_VERSION,
+  resolveClusterRouteFlags,
+  STOP_SERVICE_MINUTES,
+  URBAN_AVG_SPEED_KMH,
+  URBAN_ROAD_TORTUOSITY_FACTOR,
+  VRPService,
+} from './vrp.service';
 import { BadRequestException, NotFoundException } from '../../middlewares/error.middleware';
 import { getTrackingGateway } from '../../gateways/tracking.gateway';
 import { OrderStatus, RouteStatus, RouteStopStatus, DriverEmploymentStatus, TransferStatus, DispatchTaskStatus } from '@prisma/client';
@@ -12,6 +19,110 @@ export class RoutingService {
   private kmeansService = new KMeansService();
   private assignmentService = new AssignmentService();
   private vrpService = new VRPService();
+
+  private computeFallbackRouteMetrics(
+    sortedOrders: any[],
+    facilityLocation: { lat: number; lng: number },
+    routeType: string
+  ): { plannedDistanceKm: number; plannedDurationMin: number; distanceRule: string } {
+    const flags = resolveClusterRouteFlags(sortedOrders, routeType);
+    if (sortedOrders.length === 0) {
+      return { plannedDistanceKm: 0, plannedDurationMin: 0, distanceRule: flags.distanceRule };
+    }
+
+    const orderCoords = sortedOrders.map((order: any) => {
+      const isPickup =
+        order.status !== OrderStatus.AT_HUB &&
+        order.status !== OrderStatus.OUT_FOR_DELIVERY &&
+        order.status !== OrderStatus.DELIVERED;
+      const rawLat = isPickup ? order.pickupLatitude : order.deliveryLatitude;
+      const rawLng = isPickup ? order.pickupLongitude : order.deliveryLongitude;
+      if (rawLat == null || rawLng == null) {
+        console.warn(
+          `[RoutingService] Đơn ${order.orderCode || order.id} thiếu tọa độ ${isPickup ? 'pickup' : 'delivery'}, fallback về Bưu cục.`
+        );
+      }
+      return {
+        lat: Number(rawLat ?? facilityLocation.lat),
+        lng: Number(rawLng ?? facilityLocation.lng),
+      };
+    });
+
+    let plannedDistanceMeters = 0;
+    if (flags.includeStartFromHub) {
+      plannedDistanceMeters +=
+        this.kmeansService.haversineDistance(
+          facilityLocation.lat,
+          facilityLocation.lng,
+          orderCoords[0].lat,
+          orderCoords[0].lng
+        ) *
+        1000 *
+        URBAN_ROAD_TORTUOSITY_FACTOR;
+    }
+
+    for (let i = 1; i < orderCoords.length; i++) {
+      plannedDistanceMeters +=
+        this.kmeansService.haversineDistance(
+          orderCoords[i - 1].lat,
+          orderCoords[i - 1].lng,
+          orderCoords[i].lat,
+          orderCoords[i].lng
+        ) *
+        1000 *
+        URBAN_ROAD_TORTUOSITY_FACTOR;
+    }
+
+    if (flags.returnToHub) {
+      const lastLoc = orderCoords[orderCoords.length - 1];
+      plannedDistanceMeters +=
+        this.kmeansService.haversineDistance(
+          lastLoc.lat,
+          lastLoc.lng,
+          facilityLocation.lat,
+          facilityLocation.lng
+        ) *
+        1000 *
+        URBAN_ROAD_TORTUOSITY_FACTOR;
+    }
+
+    const plannedDistanceKm = Number((plannedDistanceMeters / 1000).toFixed(2));
+    const plannedDurationMin = Math.round(
+      (plannedDistanceKm / URBAN_AVG_SPEED_KMH) * 60 + sortedOrders.length * STOP_SERVICE_MINUTES
+    );
+
+    return {
+      plannedDistanceKm,
+      plannedDurationMin,
+      distanceRule: flags.distanceRule,
+    };
+  }
+
+  private resolveClusterDistanceAndDuration(
+    cluster: any,
+    sortedOrders: any[],
+    facilityLocation: { lat: number; lng: number },
+    routeType: string
+  ): { plannedDistanceKm: number; plannedDurationMin: number; distanceRule: string } {
+    const flags = resolveClusterRouteFlags(sortedOrders, routeType);
+    let plannedDistanceKm = cluster.plannedDistanceKm;
+    let plannedDurationMin = cluster.plannedDurationMin;
+
+    if (plannedDistanceKm == null || plannedDurationMin == null) {
+      const fallback = this.computeFallbackRouteMetrics(sortedOrders, facilityLocation, routeType);
+      plannedDistanceKm = fallback.plannedDistanceKm;
+      plannedDurationMin = fallback.plannedDurationMin;
+    }
+
+    if (isNaN(plannedDistanceKm)) plannedDistanceKm = 0;
+    if (isNaN(plannedDurationMin)) plannedDurationMin = sortedOrders.length * STOP_SERVICE_MINUTES;
+
+    return {
+      plannedDistanceKm,
+      plannedDurationMin,
+      distanceRule: cluster.distanceRule || flags.distanceRule,
+    };
+  }
 
   /**
    * Triggers the AI routing optimization pipeline for a facility.
@@ -146,8 +257,8 @@ export class RoutingService {
     const K = Math.min(availableDrivers.length, orders.length);
     let clusters: any[] = [];
 
-    // Nhận diện nghiệp vụ bưu cục: Tuyến thu gom (PICKUP) BẮT BUỘC quay về kho nhập hàng; Tuyến giao hàng (DELIVERY) là tuyến mở
-    const returnToHub = routeType === 'PICKUP' || (routeType === 'ALL' && orders.some((o: any) => o.status === OrderStatus.READY_FOR_PICKUP));
+    // Nhận diện nghiệp vụ theo từng cụm (PICKUP: #1->...->Kho; DELIVERY: Kho->#1->...->#N; ALL trộn: Kho->...->Kho)
+    const batchFlags = resolveClusterRouteFlags(orders, routeType);
 
     const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:5001';
     try {
@@ -158,34 +269,65 @@ export class RoutingService {
           orders,
           facilityLocation,
           k: K,
-          returnToHub,
+          routeType,
+          returnToHub: batchFlags.returnToHub,
+          includeStartFromHub: batchFlags.includeStartFromHub,
         }),
         signal: AbortSignal.timeout(30000),
       });
 
       if (aiResponse.ok) {
-        const aiData = await aiResponse.json() as any;
-        if (aiData.success && aiData.data?.clusters) {
-          clusters = aiData.data.clusters;
-          console.log(`🤖 [Main Backend] Successfully delegated AI optimization to Standalone AI Microservice (${aiServiceUrl})`);
+        const aiData = (await aiResponse.json()) as any;
+        const returnedClusters = aiData?.data?.clusters;
+        const versionOk = aiData?.data?.distanceRuleVersion === DISTANCE_RULE_VERSION;
+        const flagsMatch =
+          Array.isArray(returnedClusters) &&
+          returnedClusters.every((c: any) => {
+            const expected = resolveClusterRouteFlags(c?.orders || [], routeType);
+            return (
+              c?.appliedIncludeStartFromHub === expected.includeStartFromHub &&
+              c?.appliedReturnToHub === expected.returnToHub
+            );
+          });
+
+        if (aiData?.success && Array.isArray(returnedClusters) && versionOk && flagsMatch) {
+          clusters = returnedClusters;
+          console.log(
+            `🤖 [Main Backend] Successfully delegated AI optimization to Standalone AI Microservice (${aiServiceUrl}, rule=${DISTANCE_RULE_VERSION})`
+          );
+        } else if (aiData?.success && Array.isArray(returnedClusters)) {
+          console.warn(
+            `⚠️ [Main Backend] AI Microservice lệch distanceRuleVersion/flags (${aiData?.data?.distanceRuleVersion || 'legacy'}). Tự động fallback sang VRPService nội bộ để bảo đảm quy tắc Cách 1!`
+          );
         }
       }
     } catch (err) {
       console.warn(`⚠️ [Main Backend] Standalone AI Microservice unreachable, using local fallback:`, (err as Error).message);
     }
 
-    // Fallback if AI Microservice is not running
+    // Fallback if AI Microservice is not running or mismatched version
     if (clusters.length === 0) {
       const rawClusters = this.kmeansService.clusterOrders(orders, K);
       clusters = [];
       for (const c of rawClusters) {
-        const res = await this.vrpService.optimizeRouteWithMetrics(c.orders, facilityLocation, new Date(), returnToHub);
+        const clusterFlags = resolveClusterRouteFlags(c.orders, routeType);
+        const res = await this.vrpService.optimizeRouteWithMetrics(
+          c.orders,
+          facilityLocation,
+          new Date(),
+          clusterFlags.returnToHub,
+          undefined,
+          clusterFlags.includeStartFromHub
+        );
         clusters.push({
           ...c,
           orders: res.orders,
           plannedDistanceKm: res.metrics.plannedDistanceKm,
           plannedDurationMin: res.metrics.plannedDurationMin,
           matrixSource: res.metrics.matrixSource,
+          appliedIncludeStartFromHub: clusterFlags.includeStartFromHub,
+          appliedReturnToHub: clusterFlags.returnToHub,
+          distanceRule: clusterFlags.distanceRule,
         });
       }
     }
@@ -213,44 +355,9 @@ export class RoutingService {
         if (!driver || !cluster || !cluster.orders || cluster.orders.length === 0) return null;
 
         const sortedOrders = cluster.orders;
-        
-        // Lấy km và phút từ ma trận Goong/VRP thật đã dựng, thay vì tính bằng Haversine chim bay
-        let plannedDistanceKm = cluster.plannedDistanceKm;
-        let plannedDurationMin = cluster.plannedDurationMin;
         const matrixSource = cluster.matrixSource || 'haversine';
-
-        if (plannedDistanceKm == null || plannedDurationMin == null) {
-          let plannedDistanceMeters = 0;
-          let prevLoc = facilityLocation;
-
-          for (const order of sortedOrders) {
-            const isPickup = order.status !== OrderStatus.AT_HUB && order.status !== OrderStatus.OUT_FOR_DELIVERY && order.status !== OrderStatus.DELIVERED;
-            const lat = (isPickup ? order.pickupLatitude : order.deliveryLatitude) || facilityLocation.lat;
-            const lng = (isPickup ? order.pickupLongitude : order.deliveryLongitude) || facilityLocation.lng;
-            const orderLoc = { lat, lng };
-            plannedDistanceMeters += this.kmeansService.haversineDistance(
-              prevLoc.lat,
-              prevLoc.lng,
-              orderLoc.lat,
-              orderLoc.lng
-            ) * 1000 * 1.76; // Hệ số uốn lượn đô thị 1.76
-            prevLoc = orderLoc;
-          }
-          if (returnToHub) {
-            plannedDistanceMeters += this.kmeansService.haversineDistance(
-              prevLoc.lat,
-              prevLoc.lng,
-              facilityLocation.lat,
-              facilityLocation.lng
-            ) * 1000 * 1.76;
-          }
-
-          plannedDistanceKm = Number((plannedDistanceMeters / 1000).toFixed(2));
-          plannedDurationMin = Math.round((plannedDistanceKm / 11) * 60 + sortedOrders.length * 5); // Tốc độ 11 km/h
-        }
-
-        if (isNaN(plannedDistanceKm)) plannedDistanceKm = 0;
-        if (isNaN(plannedDurationMin)) plannedDurationMin = 30;
+        const { plannedDistanceKm, plannedDurationMin, distanceRule } =
+          this.resolveClusterDistanceAndDuration(cluster, sortedOrders, facilityLocation, routeType);
 
         return {
           id: `preview-${index + 1}`,
@@ -264,6 +371,7 @@ export class RoutingService {
           plannedDistanceKm,
           plannedDurationMin,
           matrixSource,
+          distanceRule,
           totalStops: sortedOrders.length,
           orders: sortedOrders.map((o: any, sIdx: number) => ({
             id: o.id,
@@ -278,11 +386,23 @@ export class RoutingService {
         };
       }).filter(Boolean);
 
+      const totalDistanceKm = Number(
+        previewRoutes
+          .reduce((acc: number, r: any) => acc + Number(r?.plannedDistanceKm || 0), 0)
+          .toFixed(2)
+      );
+      const totalDurationMin = previewRoutes.reduce(
+        (acc: number, r: any) => acc + Number(r?.plannedDurationMin || 0),
+        0
+      );
+
       return {
         isPreview: true,
         routes: previewRoutes,
         totalOrders: orders.length,
         totalRoutes: previewRoutes.length,
+        totalDistanceKm,
+        totalDurationMin,
       };
     }
 
@@ -340,47 +460,13 @@ export class RoutingService {
 
       const sortedOrders = cluster.orders;
 
-      // Calculate planned distance and duration
-      let plannedDistanceMeters = 0;
-      let prevLoc = facilityLocation;
-
-      // Lấy km và phút từ ma trận Goong/VRP thật đã dựng, thay vì tính bằng Haversine chim bay
-      let plannedDistanceKm = cluster.plannedDistanceKm;
-      let plannedDurationMin = cluster.plannedDurationMin;
-
-      if (plannedDistanceKm == null || plannedDurationMin == null) {
-        let plannedDistanceMeters = 0;
-        let prevLoc = facilityLocation;
-
-        for (const order of sortedOrders) {
-          const isPickup = order.status !== OrderStatus.AT_HUB && order.status !== OrderStatus.OUT_FOR_DELIVERY && order.status !== OrderStatus.DELIVERED;
-          const lat = (isPickup ? order.pickupLatitude : order.deliveryLatitude) || facilityLocation.lat;
-          const lng = (isPickup ? order.pickupLongitude : order.deliveryLongitude) || facilityLocation.lng;
-          const orderLoc = { lat, lng };
-          plannedDistanceMeters += this.kmeansService.haversineDistance(
-            prevLoc.lat,
-            prevLoc.lng,
-            orderLoc.lat,
-            orderLoc.lng
-          ) * 1000 * 1.76;
-          prevLoc = orderLoc;
-        }
-        // Return to facility if required
-        if (returnToHub) {
-          plannedDistanceMeters += this.kmeansService.haversineDistance(
-            prevLoc.lat,
-            prevLoc.lng,
-            facilityLocation.lat,
-            facilityLocation.lng
-          ) * 1000 * 1.76;
-        }
-
-        plannedDistanceKm = Number((plannedDistanceMeters / 1000).toFixed(2));
-        plannedDurationMin = Math.round((plannedDistanceKm / 11) * 60 + sortedOrders.length * 5);
-      }
-
-      if (isNaN(plannedDistanceKm)) plannedDistanceKm = 0;
-      if (isNaN(plannedDurationMin)) plannedDurationMin = 30;
+      // Lấy km và phút chuẩn hóa theo Cách 1 từ ma trận Goong/VRP (hoặc fallback helper)
+      const { plannedDistanceKm, plannedDurationMin } = this.resolveClusterDistanceAndDuration(
+        cluster,
+        sortedOrders,
+        facilityLocation,
+        routeType
+      );
 
       totalOptimizationDistanceKm += plannedDistanceKm;
       totalOptimizationDurationMin += plannedDurationMin;

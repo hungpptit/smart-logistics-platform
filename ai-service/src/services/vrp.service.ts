@@ -1,5 +1,58 @@
 import { OrderItem, Location } from './kmeans.service';
 
+export const URBAN_ROAD_TORTUOSITY_FACTOR = 1.76; // Hệ số uốn lượn đường phố đô thị TP.HCM (đo từ Goong Maps)
+export const URBAN_AVG_SPEED_KMH = 11; // Vận tốc xe máy trung bình nội đô tính cả dừng đèn đỏ & giao lộ
+export const STOP_SERVICE_MINUTES = 5; // Thời gian dừng phục vụ mỗi điểm dừng (phút)
+export const DISTANCE_RULE_VERSION = 'v2-way1';
+
+export type DistanceRuleType = 'DELIVERY' | 'PICKUP' | 'ROUND_TRIP';
+
+export function resolveClusterRouteFlags(
+  orders: Array<{ status?: string | null }>,
+  explicitRouteType?: string
+): {
+  hasPickup: boolean;
+  hasDelivery: boolean;
+  includeStartFromHub: boolean;
+  returnToHub: boolean;
+  distanceRule: DistanceRuleType;
+} {
+  if (explicitRouteType === 'PICKUP') {
+    return {
+      hasPickup: true,
+      hasDelivery: false,
+      includeStartFromHub: false,
+      returnToHub: true,
+      distanceRule: 'PICKUP',
+    };
+  }
+  if (explicitRouteType === 'DELIVERY') {
+    return {
+      hasPickup: false,
+      hasDelivery: true,
+      includeStartFromHub: true,
+      returnToHub: false,
+      distanceRule: 'DELIVERY',
+    };
+  }
+
+  const isPickupStatus = (status?: string | null) =>
+    status !== 'AT_HUB' && status !== 'OUT_FOR_DELIVERY' && status !== 'DELIVERED';
+
+  const hasPickup = orders.some((o) => isPickupStatus(o.status));
+  const hasDelivery = orders.some((o) => !isPickupStatus(o.status));
+  const includeStartFromHub = hasDelivery || !hasPickup;
+  const returnToHub = hasPickup;
+  const distanceRule: DistanceRuleType =
+    returnToHub && !includeStartFromHub
+      ? 'PICKUP'
+      : includeStartFromHub && !returnToHub
+        ? 'DELIVERY'
+        : 'ROUND_TRIP';
+
+  return { hasPickup, hasDelivery, includeStartFromHub, returnToHub, distanceRule };
+}
+
 export class VRPService {
   /**
    * Calculates the Haversine distance between two coordinates in kilometers.
@@ -135,10 +188,8 @@ export class VRPService {
     }
 
     // 3. Tertiary: Fallback to Haversine (Hiệu chỉnh theo số liệu thực tế đô thị từ Goong Maps)
-    // Hệ số uốn lượn đường phố trung bình: 1.76 (đo đạc thực tế đường phố TP.HCM)
-    // Vận tốc xe máy trung bình trong đô thị tính cả đèn đỏ & giao lộ: 11 km/h (~3.06 m/s)
-    const roadTortuosity = 1.76;
-    const averageSpeedMPS = (11 * 1000) / 3600; // 11 km/h in m/s (~3.06 m/s)
+    const roadTortuosity = URBAN_ROAD_TORTUOSITY_FACTOR;
+    const averageSpeedMPS = (URBAN_AVG_SPEED_KMH * 1000) / 3600;
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
         if (i === j) {
@@ -158,19 +209,21 @@ export class VRPService {
         }
       }
     }
-    console.log('🗺️ [AI Microservice] Using calibrated Haversine calculations (factor: 1.76, speed: 11km/h, source: haversine)');
+    console.log(`🗺️ [AI Microservice] Using calibrated Haversine calculations (factor: ${URBAN_ROAD_TORTUOSITY_FACTOR}, speed: ${URBAN_AVG_SPEED_KMH}km/h, source: haversine)`);
     return { distanceMatrix, durationMatrix, matrixSource: 'haversine' };
   }
 
   /**
    * Tối ưu hóa thứ tự điểm dừng kèm tính toán chi tiết cự ly và thời gian chính xác từ ma trận đã dùng.
+   * @param includeStartFromHub true nếu tính thêm chặng Kho -> #1 (DELIVERY / Benchmark); false nếu bỏ chặng đầu (PICKUP: #1 -> ... -> #N -> Kho)
    */
   public async optimizeRouteWithMetrics(
     orders: OrderItem[],
     facilityLocation: Location,
     startTime: Date = new Date(),
     returnToHub: boolean = false,
-    matrices?: { distanceMatrix: number[][]; durationMatrix: number[][]; matrixSource?: string }
+    matrices?: { distanceMatrix: number[][]; durationMatrix: number[][]; matrixSource?: string },
+    includeStartFromHub: boolean = true
   ): Promise<{
     orders: OrderItem[];
     metrics: {
@@ -180,13 +233,13 @@ export class VRPService {
       matrixSource: 'goong' | 'osrm' | 'haversine' | string;
     };
   }> {
-    if (orders.length <= 1) {
+    if (orders.length === 0) {
       return {
         orders,
         metrics: {
           plannedDistanceMeters: 0,
           plannedDistanceKm: 0,
-          plannedDurationMin: orders.length * 5,
+          plannedDurationMin: 0,
           matrixSource: matrices?.matrixSource || 'haversine',
         },
       };
@@ -205,9 +258,17 @@ export class VRPService {
         facilityLocation,
         ...orders.map((o) => {
           const isPickup = o.status !== 'AT_HUB' && o.status !== 'OUT_FOR_DELIVERY' && o.status !== 'DELIVERED';
-          const lat = isPickup ? o.pickupLatitude : o.deliveryLatitude;
-          const lng = isPickup ? o.pickupLongitude : o.deliveryLongitude;
-          return { lat: lat!, lng: lng! };
+          const rawLat = isPickup ? o.pickupLatitude : o.deliveryLatitude;
+          const rawLng = isPickup ? o.pickupLongitude : o.deliveryLongitude;
+          if (rawLat == null || rawLng == null) {
+            console.warn(
+              `[AI Microservice] Đơn ${(o as any).orderCode || o.id} thiếu tọa độ ${isPickup ? 'pickup' : 'delivery'}, fallback về tọa độ Bưu cục.`
+            );
+          }
+          return {
+            lat: rawLat ?? facilityLocation.lat,
+            lng: rawLng ?? facilityLocation.lng,
+          };
         }),
       ];
       const res = await this.calculateDistanceAndDurationMatrices(locations);
@@ -219,33 +280,43 @@ export class VRPService {
     const orderIndices = orders.map((_, idx) => idx + 1);
     const estimatedDeliveryDates = orders.map((o) => o.estimatedDeliveryDate ? new Date(o.estimatedDeliveryDate) : null);
 
-    const optimalPermutation = this.runGeneticAlgorithm(
-      orderIndices,
-      distanceMatrix,
-      durationMatrix,
-      estimatedDeliveryDates,
-      startTime,
-      returnToHub
-    );
+    // GA luôn tối ưu thứ tự xuất phát từ Bưu cục (prevNode = 0) để giữ chuẩn deadline & benchmark
+    const optimalPermutation =
+      orders.length === 1
+        ? orderIndices
+        : this.runGeneticAlgorithm(
+            orderIndices,
+            distanceMatrix,
+            durationMatrix,
+            estimatedDeliveryDates,
+            startTime,
+            returnToHub
+          );
 
-    // Tính cự ly và thời gian di chuyển chuẩn xác từ ma trận thực tế
+    // Cộng cự ly & thời gian thống nhất cho cả 1 đơn và nhiều đơn
     let totalDistMeters = 0;
     let totalTravelSec = 0;
-    let prev = 0;
 
-    for (const node of optimalPermutation) {
-      totalDistMeters += distanceMatrix[prev][node];
-      totalTravelSec += durationMatrix[prev][node];
-      prev = node;
-    }
-
-    if (returnToHub) {
-      totalDistMeters += distanceMatrix[prev][0];
-      totalTravelSec += durationMatrix[prev][0];
+    if (optimalPermutation.length > 0) {
+      if (includeStartFromHub) {
+        totalDistMeters += distanceMatrix[0][optimalPermutation[0]];
+        totalTravelSec += durationMatrix[0][optimalPermutation[0]];
+      }
+      for (let i = 1; i < optimalPermutation.length; i++) {
+        const fromNode = optimalPermutation[i - 1];
+        const toNode = optimalPermutation[i];
+        totalDistMeters += distanceMatrix[fromNode][toNode];
+        totalTravelSec += durationMatrix[fromNode][toNode];
+      }
+      if (returnToHub) {
+        const lastNode = optimalPermutation[optimalPermutation.length - 1];
+        totalDistMeters += distanceMatrix[lastNode][0];
+        totalTravelSec += durationMatrix[lastNode][0];
+      }
     }
 
     const plannedDistanceKm = Number((totalDistMeters / 1000).toFixed(2));
-    const plannedDurationMin = Math.round(totalTravelSec / 60 + orders.length * 5);
+    const plannedDurationMin = Math.round(totalTravelSec / 60 + orders.length * STOP_SERVICE_MINUTES);
 
     const sortedOrders = optimalPermutation.map((idx) => orders[idx - 1]);
 
@@ -264,18 +335,27 @@ export class VRPService {
    * Sorts orders in the optimal sequence using Genetic Algorithm (VRP).
    * @param returnToHub true nếu tuyến thu gom hàng (PICKUP) bắt buộc về hub; false nếu tuyến giao hàng (DELIVERY)
    * @param matrices Ma trận đóng băng tuỳ chọn (N+1)x(N+1) cho benchmark/cache, index 0 là kho
+   * @param includeStartFromHub mặc định true để tương thích hoàn toàn với callers cũ
    */
   public async optimizeRouteStops(
     orders: OrderItem[],
     facilityLocation: Location,
     startTime: Date = new Date(),
     returnToHub: boolean = false,
-    matrices?: { distanceMatrix: number[][]; durationMatrix: number[][]; matrixSource?: string }
+    matrices?: { distanceMatrix: number[][]; durationMatrix: number[][]; matrixSource?: string },
+    includeStartFromHub: boolean = true
   ): Promise<OrderItem[]> {
     if (orders.length <= 1) {
       return orders;
     }
-    const res = await this.optimizeRouteWithMetrics(orders, facilityLocation, startTime, returnToHub, matrices);
+    const res = await this.optimizeRouteWithMetrics(
+      orders,
+      facilityLocation,
+      startTime,
+      returnToHub,
+      matrices,
+      includeStartFromHub
+    );
     return res.orders;
   }
 
