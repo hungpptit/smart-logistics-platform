@@ -12,6 +12,8 @@ class StatsBentoCard extends StatelessWidget {
   final bool isLinehaul;
   final int loadedTotesCount;
   final int totalPackageCount;
+  final double? plannedDistanceKm;
+  final int? plannedDurationMin;
 
   const StatsBentoCard({
     super.key,
@@ -21,6 +23,8 @@ class StatsBentoCard extends StatelessWidget {
     this.isLinehaul = false,
     this.loadedTotesCount = 0,
     this.totalPackageCount = 0,
+    this.plannedDistanceKm,
+    this.plannedDurationMin,
   });
 
   int get _completedCount => stops
@@ -34,6 +38,9 @@ class StatsBentoCard extends StatelessWidget {
 
   double get _totalRouteDistanceKm {
     if (stops.isEmpty) return 0.0;
+    if (plannedDistanceKm != null && plannedDistanceKm! > 0) {
+      return plannedDistanceKm!;
+    }
     double totalMeters = 0.0;
 
     LatLng prevPoint = currentLocation ??
@@ -61,6 +68,9 @@ class StatsBentoCard extends StatelessWidget {
   /// Tính tổng thời gian dự kiến di chuyển + xử lý bốc dỡ tại các điểm dừng
   double get _totalEstimatedMinutes {
     if (stops.isEmpty) return 0.0;
+    if (plannedDurationMin != null && plannedDurationMin! > 0) {
+      return plannedDurationMin!.toDouble();
+    }
     final totalKm = _totalRouteDistanceKm;
     final bool isLinehaulMode = isLinehaul || (stops.isNotEmpty && stops.first['isLinehaul'] == true);
     final double avgSpeedKmh = isLinehaulMode ? 60.0 : 30.0; // Xe tải đường trường/quốc lộ ~60 km/h, Shipper nội thành ~30 km/h
@@ -91,6 +101,7 @@ class StatsBentoCard extends StatelessWidget {
     final progress = stops.isEmpty ? 0.0 : completedCount / totalCount;
     final bool isToteMode = isLinehaul || loadedTotesCount > 0 || (stops.isNotEmpty && stops.first['isLinehaul'] == true);
     final bool hasPickup = stops.isNotEmpty && stops.any((s) => s['isPickup'] == true || s['stopType'] == 'PICKUP');
+    final bool isPurePickup = stops.isNotEmpty && stops.every((s) => s['isPickup'] == true || s['stopType'] == 'PICKUP');
     final bool isPendingPickupConfirm = !isRouteStarted && stops.isNotEmpty && !isToteMode && hasPickup;
     final bool isPendingDeliveryScan = !isRouteStarted && stops.isNotEmpty && !isToteMode && !hasPickup;
     final double totalKm = _totalRouteDistanceKm;
@@ -259,6 +270,13 @@ class StatsBentoCard extends StatelessWidget {
               ),
             ],
           ),
+          if (!isToteMode && isPurePickup) ...[
+            const SizedBox(height: 8.0),
+            Text(
+              'Lấy hàng: tính từ điểm #1 → quay về Bưu cục (chưa gồm Kho → #1)',
+              style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
+            ),
+          ],
         ],
       ),
     );

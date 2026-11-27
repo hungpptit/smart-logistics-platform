@@ -10,6 +10,7 @@ import 'package:velocity_mobile/screens/driver/widgets/dashboard/finish_route_su
 import 'package:velocity_mobile/screens/driver/widgets/dashboard/pickup_assignment_banner.dart';
 import 'package:velocity_mobile/screens/driver/widgets/dashboard/route_scan_reminder_dialog.dart';
 import 'package:velocity_mobile/screens/driver/widgets/dashboard/tote_scan_button.dart';
+import 'package:velocity_mobile/screens/driver/widgets/stats_bento_card.dart';
 
 const List<int> _kTransparentPng = <int>[
   0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
@@ -264,6 +265,55 @@ void main() {
         expect(openChatCount, 1);
         expect(logoutCount, 1);
       }, _FakePngHttpOverrides());
+    });
+  });
+
+  group('StatsBentoCard', () {
+    testWidgets('uses plannedDistanceKm and plannedDurationMin from Backend when > 0', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: StatsBentoCard(
+              stops: [
+                {'id': 'o1', 'latitude': 10.85, 'longitude': 106.77, 'isPickup': true},
+                {'id': 'o2', 'latitude': 10.85, 'longitude': 106.77, 'isPickup': true},
+                {'id': 'o3', 'latitude': 10.85, 'longitude': 106.77, 'isPickup': true},
+              ],
+              plannedDistanceKm: 2.1,
+              plannedDurationMin: 24,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('2.1 km'), findsOneWidget);
+      expect(find.text('24 phút'), findsOneWidget);
+      expect(
+        find.text('Lấy hàng: tính từ điểm #1 → quay về Bưu cục (chưa gồm Kho → #1)'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('falls back to Haversine estimation when planned metrics are null', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: StatsBentoCard(
+              stops: [
+                {'id': 'o1', 'latitude': 10.85, 'longitude': 106.77},
+                {'id': 'o2', 'latitude': 10.86, 'longitude': 106.77},
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('1.1 km'), findsOneWidget);
+      expect(find.text('10 phút'), findsOneWidget);
+      expect(
+        find.text('Lấy hàng: tính từ điểm #1 → quay về Bưu cục (chưa gồm Kho → #1)'),
+        findsNothing,
+      );
     });
   });
 

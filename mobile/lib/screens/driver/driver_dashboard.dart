@@ -76,6 +76,8 @@ class _DriverDashboardState extends State<DriverDashboard> with WidgetsBindingOb
   String _driverEmail = 'driver@velocity.vn';
   String? _activeRouteId;
   String? _activeRouteCode;
+  double? _plannedDistanceKm;
+  int? _plannedDurationMin;
   String? _lastShownPickupDialogRouteId;
   String? _awaitingHandoverRouteId;
   List<LatLng> _roadPolylinePoints = [];
@@ -185,6 +187,8 @@ class _DriverDashboardState extends State<DriverDashboard> with WidgetsBindingOb
           setState(() {
             _activeRouteId = null;
             _activeRouteCode = null;
+            _plannedDistanceKm = null;
+            _plannedDurationMin = null;
             _awaitingHandoverRouteId = null;
             _driverStops.clear();
             _roadPolylinePoints.clear();
@@ -230,6 +234,8 @@ class _DriverDashboardState extends State<DriverDashboard> with WidgetsBindingOb
         _isRouteStarted = (firstStatus == 'IN_PROGRESS');
         _activeRouteId = firstRoute['id']?.toString();
         _activeRouteCode = firstRoute['routeCode']?.toString() ?? _activeRouteId;
+        final parsedDistKm = num.tryParse(firstRoute['plannedDistanceKm']?.toString() ?? '')?.toDouble();
+        final parsedDurMin = num.tryParse(firstRoute['plannedDurationMin']?.toString() ?? '')?.round();
         if (_activeRouteId != null) {
           SocketService().joinRoute(_activeRouteId!);
           List stopsRaw = (firstRoute['stops'] ?? firstRoute['routeStops'] ?? []);
@@ -279,6 +285,8 @@ class _DriverDashboardState extends State<DriverDashboard> with WidgetsBindingOb
               setState(() {
                 _driverStops.clear();
                 _driverStops.addAll(mappedStops);
+                _plannedDistanceKm = parsedDistKm;
+                _plannedDurationMin = parsedDurMin;
                 _isLinehaulRoute = isLinehaul;
                 _loadedTotesCount = loadedTotesCount;
                 _totalPackageCount = totalPkgCount;
@@ -308,6 +316,8 @@ class _DriverDashboardState extends State<DriverDashboard> with WidgetsBindingOb
         setState(() {
           _activeRouteId = null;
           _activeRouteCode = null;
+          _plannedDistanceKm = null;
+          _plannedDurationMin = null;
           _driverStops.clear();
           _roadPolylinePoints.clear();
           _lastShownPickupDialogRouteId = null;
@@ -1068,6 +1078,8 @@ class _DriverDashboardState extends State<DriverDashboard> with WidgetsBindingOb
                 isLinehaul: _isLinehaulDriverProfile || _isLinehaulRoute,
                 loadedTotesCount: _loadedTotesCount,
                 totalPackageCount: _totalPackageCount,
+                plannedDistanceKm: _plannedDistanceKm,
+                plannedDurationMin: _plannedDurationMin,
               ),
               const SizedBox(height: 16.0),
 
